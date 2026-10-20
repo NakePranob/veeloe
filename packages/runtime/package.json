@@ -1,0 +1,14 @@
+{
+  "name": "@veeloe/runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/main.ts --compile --outfile dist/veeloe"
+  },
+  "dependencies": {
+    "@veeloe/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "^18.7.0"
+  }
+}

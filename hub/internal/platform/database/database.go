@@ -1,0 +1,108 @@
+package database
+
+import (
+	"fmt"
+	"log"
+	"log/slog"
+	"os"
+	"regexp"
+	"strconv"
+	"time"
+
+	"hub/internal/shared/config"
+	"hub/migrations"
+	// go-scaffold:imports
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
+)
+
+// Open connects to Postgres and sets the connection pool — it talks to a
+// real external system, so it lives in platform/, not shared/.
+// Production schema is managed via golang-migrate (migrations/); development
+// may use the convenience path selected by APP_ENV in the composition root.
+func Open(cfg config.Config) (*gorm.DB, error) {
+	// GORM's default logger reports ErrRecordNotFound at ERROR level, so an
+	// ordinary miss — every FindByID behind a 404, cmd/seed's "does this admin
+	// exist yet" check — printed a red line that reads like a failure and
+	// isn't. Everything else GORM's default does is kept.
+	gormLog := gormlogger.New(log.New(os.Stdout, "", log.LstdFlags), gormlogger.Config{
+		SlowThreshold:             200 * time.Millisecond,
+		LogLevel:                  gormlogger.Warn,
+		IgnoreRecordNotFoundError: true,
+	})
+
+	db, err := gorm.Open(postgres.Open(cfg.DBDSN), &gorm.Config{
+		TranslateError: true,
+		Logger:         gormLog,
+	})
+	if err != nil {
+		return nil, err
+	}
+	// go-scaffold:platform-init
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	sqlDB.SetMaxOpenConns(cfg.DBMaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.DBMaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.DBConnMaxLifetime)
+
+	return db, nil
+}
+
+var migrationVersionRe = regexp.MustCompile(`^(\d+)_.*\.up\.sql$`)
+
+// CheckMigrationVersion fails fast if the DB's applied schema version (the
+// golang-migrate CLI's own schema_migrations table) doesn't match the newest
+// migration file baked into this binary — instead of booting against a stale
+// or half-applied schema and failing later on whatever query hits the
+// missing column first. Call this from the production branch only.
+func CheckMigrationVersion(db *gorm.DB) error {
+	entries, err := migrations.FS.ReadDir(".")
+	if err != nil {
+		return fmt.Errorf("read embedded migrations: %w", err)
+	}
+	var latest int
+	for _, e := range entries {
+		m := migrationVersionRe.FindStringSubmatch(e.Name())
+		if m == nil {
+			continue
+		}
+		if v, _ := strconv.Atoi(m[1]); v > latest {
+			latest = v
+		}
+	}
+
+	// A scaffold that has not generated a module or added auth yet embeds no
+	// migrations, so there is no schema_migrations table to read and nothing
+	// to compare against. That is a project with no schema, not a project
+	// whose schema is behind.
+	if latest == 0 {
+		return nil
+	}
+
+	var version int
+	var dirty bool
+	row := db.Raw("SELECT version, dirty FROM schema_migrations").Row()
+	if err := row.Scan(&version, &dirty); err != nil {
+		return fmt.Errorf("read schema_migrations (did you run `make migrate-up`?): %w", err)
+	}
+	if dirty {
+		return fmt.Errorf("schema_migrations is dirty at version %d — a previous migration failed partway; fix it before starting the app", version)
+	}
+	if version < latest {
+		return fmt.Errorf("DB schema is at migration %d, this binary expects %d — run `make migrate-up`", version, latest)
+	}
+	if version > latest {
+		// Only "DB behind binary" is fatal. A rolling deploy migrates first and
+		// replaces pods after, so an old pod restarting mid-rollout legitimately
+		// sees a newer schema — refusing to boot there turns a normal rollout
+		// into a crashloop of the very replicas still serving traffic.
+		slog.Warn("DB schema is ahead of this binary — fine mid-rollout, investigate if it persists",
+			"db_version", version, "binary_version", latest)
+	}
+	return nil
+}

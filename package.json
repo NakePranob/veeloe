@@ -1,0 +1,18 @@
+{
+  "name": "veeloe",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "workspaces": ["packages/*", "controller", "e2e"],
+  "scripts": {
+    "check": "bun run typecheck && bun run check:controller && bun run check:runtime && bun run check:hub",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p controller",
+    "check:controller": "cd controller && steiger ./src",
+    "check:runtime": "cd packages/runtime && depcruise src",
+    "check:hub": "cd hub && go-scaffold check"
+  },
+  "devDependencies": {
+    "@nakedev/go-scaffold": "0.14.0",
+    "@types/bun": "^1.3.14",
+    "typescript": "~6.0.3"
+  }
+}

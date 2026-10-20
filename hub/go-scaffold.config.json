@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "projectName": "hub",
+  "goModule": "hub",
+  "apiPrefix": "",
+  "features": {
+    "docker": true,
+    "openapiDocs": true,
+    "observability": false,
+    "worker": false,
+    "auth": false,
+    "rbac": false
+  },
+  "architecture": {
+    "style": "modular-monolith",
+    "boundary": "hexagonal",
+    "packageLayout": "split",
+    "defaultModuleSurface": "none",
+    "defaultApplicationStyle": "service"
+  },
+  "modules": {
+    "relay": {
+      "surface": "none",
+      "applicationStyle": "service",
+      "boundary": "hexagonal",
+      "packageLayout": "split"
+    }
+  },
+  "scaffoldVersion": "0.14.0"
+}

@@ -1,0 +1,18 @@
+# A throwaway Postgres for the e2e run, on its own port so it never meets the
+# one hub/docker-compose.yml starts for development.
+name: veeloe-e2e
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hub
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "hub"]
+      interval: 1s
+      retries: 30

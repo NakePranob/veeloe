@@ -15,8 +15,8 @@ This repository holds all of Veeloe:
 - **Controller** — the mobile and web app. Every command it sends is signed by
   the Member's own key.
 
-Status: pre-alpha. There is no code yet. The Hub's code will live here, but
-self-hosting it is not supported yet.
+Status: pre-alpha. Every part has its skeleton; none of them works yet.
+Self-hosting the Hub is not supported yet.
 
 `CONTEXT.md` defines the terms used throughout (Workspace, Machine, Runtime,
 Agent, Task, Flow, Delegation, ...). `docs/adr/` records the design decisions
