@@ -30,6 +30,16 @@ Run lint and typecheck before declaring any task done.
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
 - Docs: https://docs.expo.dev/router/introduction.md
 
+## Design
+
+Follow `DESIGN.md` for every screen and component: its tokens, fonts, layout
+and rules are the design system (ADR 0026). Components are our own, in
+`src/shared/ui`, written with Uniwind; sheets and modals use Expo Router's
+presentation instead of a library. No state library: data comes from SQLite
+live queries (ADR 0021). Every string goes through the translation table
+(English and Thai). When a token changes, change `DESIGN.md` and
+`global.css` together.
+
 ## Building with EAS
 
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
