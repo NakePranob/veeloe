@@ -50,4 +50,4 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - Issues are **public**, like everything in this repo: no secrets, keys or customer data in a title, body or comment.
 - Tickets that `/to-tickets` publishes get the `ready-for-agent` label. The `triage` skill is not installed, so that is the only triage label in use.
 - Blocking edges use GitHub's native issue dependencies (**Blocking** above).
-- Work on an issue goes on a branch `<type>/<number>-<slug>`; when it changes behaviour, the OpenSpec change has the same `<number>-<slug>` name. The PR description starts with `Closes #<number>`; `develop` is the default branch, so the squash merge closes the issue.
+- During v0.1, work on an issue is committed straight to `develop`, with no branch or PR (AGENTS.md). When it changes behaviour, its OpenSpec change is named `<number>-<slug>`. The commit that finishes the issue ends its body with `Closes #<number>`; `develop` is the default branch, so pushing it closes the issue.

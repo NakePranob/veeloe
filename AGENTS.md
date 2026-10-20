@@ -10,7 +10,7 @@ GitHub environments or the host, never in git.
 
 `CONTEXT.md` is the glossary — use its terms. `docs/adr/` holds the
 architecture decisions: do not contradict one; if a change has to, say so and
-change the ADR in the same PR. `openspec/` holds the specs and changes for
+change the ADR in the same commit. `openspec/` holds the specs and changes for
 every part, versioned with the code.
 
 GitHub Releases are for the Runtime only — its updater takes the latest
@@ -77,18 +77,29 @@ Thai, and to quote the Thai copy the change is about. A body usually goes:
 - a short paragraph on a trade-off or what was left out, and why
 - what was checked: tests that pass, and what was tried in the real app
 
-Branch off `develop` as `<type>/<summary>`, with the issue number first when
-there is one — `feat/12-login-form`.
+A commit that finishes an issue ends its body with `Closes #12` (one line per
+issue), so pushing it to `develop`, the default branch, closes the issue.
+
+## Commits on develop (v0.1)
+
+Until v0.1 ships, the maintainer commits straight to `develop`: no branch, no
+PR. Run `bun run check` (and the e2e tests when the change touches a seam)
+before pushing, because nothing on GitHub gates the push — CI runs after it
+lands, and a red run is fixed with the next commit. The `develop` ruleset only
+refuses force-pushes and deleting the branch. When v0.1 ships, the PR rule and
+the required `english` check go back on `develop`, and work moves to branches
+again.
 
 ## Pull requests
 
-Base is `develop`. `main` is promoted from it, so nothing targets `main`
-directly — dependabot included (`target-branch: develop`). Both are guarded by
-repo rulesets (Settings → Rules): no direct push, no force-push, no deletion —
-everything lands through a PR. `develop` merges by squash only and needs the
-`english` check (`.github/workflows/pr-title.yml`) green; `main` merges by
+Outside contributors still open a PR into `develop`, and `main` is promoted
+from `develop` through a PR, so nothing targets `main` directly — dependabot
+included (`target-branch: develop`). `develop` merges by squash only; check
+that the `english` check (`.github/workflows/pr-title.yml`) is green before
+merging, because the ruleset no longer requires it during v0.1. `main` is
+guarded by a ruleset (no direct push, no force-push, no deletion) and merges by
 merge commit only, so promoting `develop` never forks the two histories. No
-approval is required — PRs are self-merged.
+approval is required.
 
 Title in English, same shape as a commit subject, with no issue number: the
 squash merge appends the PR number, so `(#12)` in the title would leave two

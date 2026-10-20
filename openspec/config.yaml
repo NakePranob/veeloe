@@ -28,12 +28,12 @@ rules:
 operations:
   apply:
     guidance:
-      - "Work on a branch off develop named <type>/<change-name>."
-      - "Open the PR with 'Closes #<number>' as the first line of the description, so the squash merge closes the issue."
+      - "During v0.1, commit straight to develop: no branch, no PR. Run bun run check before each push."
+      - "The commit that finishes the issue ends its body with 'Closes #<number>', so pushing it to develop closes the issue."
       - "Commit per AGENTS.md: English subject; the Thai body starts with 'ทำตาม change <name>:'."
   archive:
     guidance:
-      - "Archive in the same PR as the change's last task, so develop never holds a finished change that is not archived."
+      - "Archive in the same commit as the change's last task, so develop never holds a finished change that is not archived."
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.
