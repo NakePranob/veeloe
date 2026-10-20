@@ -10,6 +10,25 @@ context: |
   Conventions: AGENTS.md (English commit subjects and PR titles, Thai bodies
   and PR descriptions).
 
+rules:
+  proposal:
+    - "Say which repo the change touches. If it also needs a Hub or Controller change, a sibling change with the same name is opened in the private repo; keep that work out of this change."
+    - "Do not cite private design documents or ADR numbers. State the decision itself, so an outside reader can follow it."
+    - "Keep business details (pricing, plans, hosting) out: this repo is public."
+  design:
+    - "Do not contradict the Protocol's compatibility rule: changes are additive only, and receivers skip unknown fields and message types."
+  tasks:
+    - "End every task with a check at an agreed seam: a unit test of the worker core (with a fake Clock where time matters) or a Protocol test. The e2e seam tests live in the private repo."
+
+operations:
+  apply:
+    guidance:
+      - "Work on a branch off develop named <type>/<change-name>."
+      - "Commit per AGENTS.md: English subject; the Thai body starts with 'ทำตาม change <name>:'."
+  archive:
+    guidance:
+      - "Archive in the same PR as the change's last task, so develop never holds a finished change that is not archived."
+
 # Project context (optional)
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.
