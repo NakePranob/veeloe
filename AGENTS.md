@@ -3,8 +3,8 @@
 This is the open repo (`veeloe` on GitHub): the Veeloe Protocol and Runtime,
 under AGPL-3.0 (`LICENSE`). It is **public** — everything pushed here, a commit
 message or a PR description included, is public the moment it lands. The
-maintainers' design documents live in a private repo; do not copy anything
-from it here without checking it holds nothing private. `CONTEXT.md` is the
+maintainers' design documents live outside this repo and are private; do not
+copy anything from them here without checking it holds nothing private. `CONTEXT.md` is the
 shared glossary — use its terms.
 
 Outside contributors sign the CLA (CLA Assistant) on their first PR. Do not
