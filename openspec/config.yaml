@@ -18,6 +18,7 @@ rules:
   proposal:
     - "Say which parts the change touches (Protocol, Runtime, Hub, Controller)."
     - "Name, by number, the ADRs in docs/adr/ the change relies on."
+    - "Name the GitHub issue the change implements (#<number>), and name the change <number>-<slug> after it. A change with no issue says so."
   design:
     - "Do not contradict an ADR in docs/adr/. If the design has to, say so plainly and propose changing the ADR instead of working around it."
     - "Do not contradict the Protocol's compatibility rule: changes are additive only, and receivers skip unknown fields and message types."
@@ -28,6 +29,7 @@ operations:
   apply:
     guidance:
       - "Work on a branch off develop named <type>/<change-name>."
+      - "Open the PR with 'Closes #<number>' as the first line of the description, so the squash merge closes the issue."
       - "Commit per AGENTS.md: English subject; the Thai body starts with 'ทำตาม change <name>:'."
   archive:
     guidance:

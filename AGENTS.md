@@ -61,8 +61,8 @@ Thai, and to quote the Thai copy the change is about. A body usually goes:
 - a short paragraph on a trade-off or what was left out, and why
 - what was checked: tests that pass, and what was tried in the real app
 
-Branch off `develop` as `<type>/<summary>`, with the ticket number when there
-is one — `feat/abc-12-login-form`.
+Branch off `develop` as `<type>/<summary>`, with the issue number first when
+there is one — `feat/12-login-form`.
 
 ## Pull requests
 
@@ -74,10 +74,12 @@ everything lands through a PR. `develop` merges by squash only and needs the
 merge commit only, so promoting `develop` never forks the two histories. No
 approval is required — PRs are self-merged.
 
-Title in English, same shape as a commit subject, and if there are tickets
-they go after it, separated by ` · `: `feat: ✨ login form (ABC-12)`,
-`feat: ✨ dealer master data (ABC-32 · REQ-5.4)`. The description is Thai — it
-is what the team reads.
+Title in English, same shape as a commit subject, with no issue number: the
+squash merge appends the PR number, so `(#12)` in the title would leave two
+numbers in the subject. The issue goes in the description instead — its first
+line is `Closes #12` (one line per issue), which closes it when the PR is
+squashed into `develop`, the default branch. The description is Thai — it is
+what the team reads.
 
 The two languages in one command is what makes this easy to get wrong: writing
 a long Thai description pulls the title along with it. `gh pr create` and
@@ -91,12 +93,24 @@ it is already written to this rule.
 
 Put in the description whatever the diff cannot say for itself. Usually that
 is why it was done this way, what is left undone and what blocks it, and what
-was checked versus what a reviewer still has to click. A PR closing a ticket
-answers its Acceptance Criteria one by one; plenty of PRs have no ticket at
+was checked versus what a reviewer still has to click. A PR closing an issue
+answers its acceptance criteria one by one; plenty of PRs have no issue at
 all. The usual sections, each bullet led by a **bold label**:
 
 - `## ทำไม` (or `## ปัญหา` / `## สาเหตุ` for a fix)
 - `## ทำอะไร`
 - `## ตรวจแล้ว`
 - `## ยังต้องกดดู` — `- [ ]` steps a reviewer clicks through
-- `## ข้อจำกัด` — ends with `**ไม่มี ticket**` when there is none
+- `## ข้อจำกัด` — ends with `**ไม่มี issue**` when there is none
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `NakePranob/veeloe`, worked with `gh`; `/to-tickets` publishes
+tickets there with native blocking links. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the root. See
+`docs/agents/domain.md`.
