@@ -1,24 +1,28 @@
 schema: spec-driven
 
 context: |
-  Repo: veeloe (public, AGPL-3.0). Protocol (TypeScript, Zod schemas, @noble
-  Ed25519 and sealed boxes, JSON signed as exact bytes, additive-only changes)
-  and Runtime (TypeScript compiled with Bun: a supervisor plus one sandboxed
-  worker process per Agent, bun:sqlite event log per Agent).
-  Glossary: CONTEXT.md — use its terms.
-  Everything here is public: keep private or business decisions out of specs.
+  Repo: veeloe (public, AGPL-3.0), the whole of Veeloe.
+  Protocol (packages/protocol: TypeScript, Zod schemas, @noble Ed25519 and
+  sealed boxes, JSON signed as exact bytes, additive-only changes).
+  Runtime (packages/runtime: TypeScript compiled with Bun, a supervisor plus
+  one sandboxed worker process per Agent, bun:sqlite event log per Agent).
+  Hub (hub/: Go on go-scaffold 0.14+, hexagonal modules, Postgres).
+  Controller (controller/: React Native Expo, Feature-Sliced Design,
+  local-first expo-sqlite). e2e seam tests in e2e/.
+  Glossary: CONTEXT.md — use its terms. Decisions: docs/adr/.
+  Everything here is public: never put a secret or a real key in a spec.
   Conventions: AGENTS.md (English commit subjects and PR titles, Thai bodies
   and PR descriptions).
 
 rules:
   proposal:
-    - "Say which repo the change touches. If it also needs a Hub or Controller change, a sibling change with the same name is opened in the private repo; keep that work out of this change."
-    - "Do not cite private design documents or ADR numbers. State the decision itself, so an outside reader can follow it."
-    - "Keep business details (pricing, plans, hosting) out: this repo is public."
+    - "Say which parts the change touches (Protocol, Runtime, Hub, Controller)."
+    - "Name, by number, the ADRs in docs/adr/ the change relies on."
   design:
+    - "Do not contradict an ADR in docs/adr/. If the design has to, say so plainly and propose changing the ADR instead of working around it."
     - "Do not contradict the Protocol's compatibility rule: changes are additive only, and receivers skip unknown fields and message types."
   tasks:
-    - "End every task with a check at an agreed seam: a unit test of the worker core (with a fake Clock where time matters) or a Protocol test. The e2e seam tests live in the private repo."
+    - "End every task with a check at an agreed seam: the e2e test through the Controller protocol (e2e/), a unit test of the worker core (with a fake Clock where time matters), a Protocol test, or a unit test of the code the task touches."
 
 operations:
   apply:

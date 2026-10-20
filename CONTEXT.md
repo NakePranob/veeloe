@@ -34,6 +34,10 @@ _Avoid_: Role, permission, ACL
 แอปที่ Member คนหนึ่งติดตั้งบนมือถือหรือเบราว์เซอร์และได้รับความไว้ใจจาก Workspace คำสั่งทุกอย่างต้องมาจาก Controller และถือว่าเป็นคำสั่งของ Member เจ้าของ Controller นั้น
 _Avoid_: Device, client, phone, app
 
+**Demo Workspace**:
+Workspace ตัวอย่างที่อยู่บน Controller อย่างเดียว ไม่ต่อ Hub ใช้ event ตัวอย่างที่ฝังมากับแอป ให้ลองทุกฟีเจอร์ได้โดยไม่ต้องมี Machine คำสั่งที่กดในนี้ไม่ถูกส่งไปที่ไหน
+_Avoid_: Demo account, sandbox mode, guest mode
+
 **Pairing**:
 การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียว
 _Avoid_: Registration, enroll

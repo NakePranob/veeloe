@@ -1,18 +1,25 @@
 # Agent Guidance: veeloe
 
-This is the open repo (`veeloe` on GitHub): the Veeloe Protocol and Runtime,
-under AGPL-3.0 (`LICENSE`). It is **public** — everything pushed here, a commit
-message or a PR description included, is public the moment it lands. The
-maintainers' design documents live outside this repo and are private; do not
-copy anything from them here without checking it holds nothing private. `CONTEXT.md` is the
-shared glossary — use its terms.
+This is the whole of Veeloe (`veeloe` on GitHub), under AGPL-3.0 (`LICENSE`):
+Protocol (`packages/protocol`), Runtime (`packages/runtime`), Hub (`hub/`),
+Controller (`controller/`) and the e2e seam tests (`e2e/`). It is **public** —
+everything pushed here, a commit message or a PR description included, is
+public the moment it lands. Never commit a secret: the Runtime release signing
+key, push and Expo credentials, billing keys and the hosted Hub's env stay in
+GitHub environments or the host, never in git.
 
-`openspec/` holds the specs and changes for the Protocol and Runtime, versioned
-with the code. They are public like the rest: keep private or business
-decisions out of them.
+`CONTEXT.md` is the glossary — use its terms. `docs/adr/` holds the
+architecture decisions: do not contradict one; if a change has to, say so and
+change the ADR in the same PR. `openspec/` holds the specs and changes for
+every part, versioned with the code.
+
+GitHub Releases are for the Runtime only — its updater takes the latest
+release as its own (ADR 0009, 0025). The Hub ships as an image on GHCR, the
+Controller through EAS.
 
 Outside contributors sign the CLA (CLA Assistant) on their first PR. Do not
-merge an outside contribution until the CLA check is green.
+merge an outside contribution until the CLA check is green: relicensing and
+the App Store build both depend on it (ADR 0016).
 
 ## Git hooks
 
