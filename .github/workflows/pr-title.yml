@@ -1,0 +1,47 @@
+name: PR title
+
+# The PR title is English and shaped like a commit subject (AGENTS.md). It
+# matters more than it looks: develop takes the PR title as the squashed
+# commit's subject, so a Thai title becomes a Thai line in the history that
+# .githooks/commit-msg would have refused on a branch.
+#
+# .claude/hooks/pr-title-english.py already refuses a Thai --title, but only
+# inside Claude Code. This is the backstop for every other tool — Codex, the
+# gh CLI by hand, and a title edited in the browser after the fact.
+#
+# The develop ruleset requires this check on the PR's head commit, so it runs
+# on every push too (synchronize) — otherwise a PR pushed to after it was
+# opened waits forever on a check that never reports.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  english:
+    runs-on: ubuntu-latest
+    steps:
+      # Through the environment, never interpolated into the script: a title is
+      # attacker-controlled text and `${{ }}` inside `run:` is a shell injection.
+      - name: The title is English, in the shape of a commit subject
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf 'title: %s\n\n' "$TITLE"
+
+          # Thai by its UTF-8 lead bytes (E0 B8, E0 B9), not a [฀-๿] range,
+          # which matches emoji bytes when the locale is not UTF-8.
+          if printf '%s' "$TITLE" | LC_ALL=C grep -qF -e "$(printf '\340\270')" -e "$(printf '\340\271')"; then
+            echo "The PR title is Thai. AGENTS.md: the title is English, the description is Thai."
+            echo "Reuse the branch's commit subject — it is already written to this rule."
+            exit 1
+          fi
+
+          if ! printf '%s' "$TITLE" |
+            grep -Eq '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9/._-]+\))?!?: .+'; then
+            echo "The PR title is not a Conventional Commit subject."
+            echo "  type(optional-scope): <emoji> what changed"
+            echo "  build chore ci docs feat fix perf refactor revert style test"
+            exit 1
+          fi

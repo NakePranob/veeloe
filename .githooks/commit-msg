@@ -1,0 +1,19 @@
+#!/bin/sh
+# The subject line is English. The body may quote Thai — a button's label, a
+# line of QA — because that is the text being talked about.
+#
+# This is the commit-side twin of .claude/hooks/pr-title-english.py: when the
+# ticket and the conversation are Thai, an English subject is the line an
+# author drifts off halfway through a session.
+#
+# Thai is matched by its UTF-8 lead bytes (E0 B8, E0 B9 = U+0E00–U+0E7F), not
+# by a [฀-๿] range: without a UTF-8 locale grep reads that range as bytes and
+# matches an emoji's continuation bytes, refusing every valid subject.
+if head -n 1 "$1" | LC_ALL=C grep -qF -e "$(printf '\340\270')" -e "$(printf '\340\271')"; then
+	echo "commit subject is Thai:"
+	head -n 1 "$1"
+	echo
+	echo "AGENTS.md: subjects are English, in the shape 'type(scope): <emoji> what changed'."
+	echo "Say it in Thai in the body if that is where it reads better."
+	exit 1
+fi
