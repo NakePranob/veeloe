@@ -50,6 +50,19 @@ linters:
                 consumer-side interface for what you need and let
                 cmd/api/wiring.go wire the concrete service in
                 (docs/architect/patterns.md)
+        domain-isolation-machine:
+          list-mode: lax
+          files:
+            - "**/internal/app/machine/**"
+          allow:
+            - "hub/internal/app/machine"
+          deny:
+            - pkg: "hub/internal/app"
+              desc: >-
+                a domain must not import another domain directly — declare a
+                consumer-side interface for what you need and let
+                cmd/api/wiring.go wire the concrete service in
+                (docs/architect/patterns.md)
         # go-scaffold:depguard-rules
     errcheck:
       exclude-functions:

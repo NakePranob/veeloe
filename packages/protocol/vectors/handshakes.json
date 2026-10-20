@@ -1,0 +1,33 @@
+{
+  "note": "TEST-ONLY KEYS from fixed public seeds. The Hub is configured with `hubUrl` and sent `nonce`.",
+  "hubUrl": "wss://hub.example.com",
+  "nonce": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "signedText": "veeloe-hub-auth/1\nwss://hub.example.com\nAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "vectors": [
+    {
+      "name": "valid",
+      "frame": "{\"type\":\"hub.auth\",\"key\":\"F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\",\"sig\":\"21k6JQsV7dwCfKVdAMbOFfrNal6YaALWUZUFEONIFPz0EVAsYAaNYKhZq3so112SyYRJtg2-Lffj7Hm1BfPRAQ\"}",
+      "valid": true
+    },
+    {
+      "name": "valid when signed for the same Hub URL written differently",
+      "frame": "{\"type\":\"hub.auth\",\"key\":\"F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\",\"sig\":\"21k6JQsV7dwCfKVdAMbOFfrNal6YaALWUZUFEONIFPz0EVAsYAaNYKhZq3so112SyYRJtg2-Lffj7Hm1BfPRAQ\"}",
+      "valid": true
+    },
+    {
+      "name": "signed for another Hub",
+      "frame": "{\"type\":\"hub.auth\",\"key\":\"F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\",\"sig\":\"H0vxMU4CL-slKqRqOJ7rggGyUP0ikQkXFYHpAwwnClRADrqisXHPQBkIt07F9o3h9QGDQt_-Ph53Ckk6OyFVBw\"}",
+      "valid": false
+    },
+    {
+      "name": "signed for another nonce",
+      "frame": "{\"type\":\"hub.auth\",\"key\":\"F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\",\"sig\":\"ucCHxQpjHJmK8JhCzwrY6KEQzqVJ3zU6r88Y0JSfeWbfYa2mZG-0k6zFFqkbBU257EceGoXAomjDr3gdyCkaCA\"}",
+      "valid": false
+    },
+    {
+      "name": "signature by another key",
+      "frame": "{\"type\":\"hub.auth\",\"key\":\"F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\",\"sig\":\"ByqxuUlWpwZO5IiqLjYP9QNyxyYey2SxkYPAAKaeaw_VqbA53Q5cuhp4OL4-5JLaiNr-Spt92k6RqqQZZTzsDA\"}",
+      "valid": false
+    }
+  ]
+}

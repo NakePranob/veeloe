@@ -11,7 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"hub/internal/app/machine"
 	"hub/internal/app/relay"
+	"hub/internal/composition"
 	"hub/internal/platform/database"
 	"hub/internal/shared/config"
 	"hub/internal/shared/middleware"
@@ -104,7 +106,12 @@ func run() error {
 	// it public.
 
 	api := r.Group("/")
-	relay.NewHandler().Register(api)
+	relay.NewHandler(composition.RelayMachineKeys(machine.NewLookupFromDB(db)), relay.Config{
+		PublicURL:         cfg.HubPublicURL,
+		HandshakeTimeout:  cfg.HandshakeTimeout,
+		HeartbeatInterval: cfg.HeartbeatInterval,
+	}).Register(api)
+	machine.NewHandlerFromDB(db).Register(api)
 	// go-scaffold:routes
 
 	srv := &http.Server{

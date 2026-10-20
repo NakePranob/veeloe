@@ -2,5 +2,14 @@
   "name": "@veeloe/protocol",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "fixtures": "UPDATE_FIXTURES=1 bun test src/fixtures"
+  },
+  "dependencies": {
+    "@noble/curves": "2.4.0",
+    "zod": "4.6.7"
+  }
 }

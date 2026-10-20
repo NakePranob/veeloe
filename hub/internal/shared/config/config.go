@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"hub/internal/shared/protocol"
 )
 
 // Config loads from env (with dev-friendly defaults).
@@ -22,6 +24,13 @@ type Config struct {
 	// TrustedProxies is which peers may set X-Forwarded-For — empty means
 	// "nobody", so ClientIP() is the address that actually connected.
 	TrustedProxies []string
+
+	// HubPublicURL is the URL Runtimes and Controllers dial, normalized. It is
+	// bound into every handshake signature, so it must be what clients really
+	// use (ADR 0013, 0016).
+	HubPublicURL      string
+	HandshakeTimeout  time.Duration
+	HeartbeatInterval time.Duration
 	// go-scaffold:config-fields
 }
 
@@ -44,6 +53,9 @@ func Load() Config {
 		// empty on purpose: trust nothing until you know which hop in front of
 		// this app is yours. See main.go's SetTrustedProxies call.
 		TrustedProxies: envList("TRUSTED_PROXIES", ""),
+
+		HandshakeTimeout:  envDuration("HUB_HANDSHAKE_TIMEOUT", 10*time.Second),
+		HeartbeatInterval: envDuration("HUB_HEARTBEAT_INTERVAL", 15*time.Second),
 		// go-scaffold:config-load
 	}
 
@@ -54,6 +66,21 @@ func Load() Config {
 	if cfg.AppEnv != "development" && cfg.AppEnv != "production" {
 		panic(fmt.Sprintf("invalid APP_ENV %q — must be development or production", cfg.AppEnv))
 	}
+
+	// A wrong public URL fails every handshake, so it fails the boot instead.
+	// Production must say it; development defaults to this machine.
+	publicURL := env("HUB_PUBLIC_URL", "")
+	if publicURL == "" {
+		if cfg.IsProd() {
+			panic("HUB_PUBLIC_URL is required in production — the URL Runtimes and Controllers dial, e.g. wss://hub.example.com")
+		}
+		publicURL = "ws://localhost:" + cfg.Port
+	}
+	normalized, err := protocol.NormalizeHubURL(publicURL)
+	if err != nil {
+		panic(fmt.Sprintf("invalid HUB_PUBLIC_URL %q: %v", publicURL, err))
+	}
+	cfg.HubPublicURL = normalized
 
 	return cfg
 }
@@ -74,6 +101,16 @@ func envList(k, def string) []string {
 		}
 	}
 	return out
+}
+
+func envDuration(k string, def time.Duration) time.Duration {
+	if v := os.Getenv(k); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			return d
+		}
+		panic(fmt.Sprintf("invalid %s %q — want a positive duration such as 15s", k, v))
+	}
+	return def
 }
 
 func envInt(k string, def int) int {

@@ -4,6 +4,7 @@
   "packageManager": "bun@1.3.14",
   "workspaces": ["packages/*", "controller", "e2e"],
   "scripts": {
+    "test": "cd packages && bun test",
     "check": "bun run typecheck && bun run check:controller && bun run check:runtime && bun run check:hub",
     "typecheck": "tsc --noEmit && tsc --noEmit -p controller",
     "check:controller": "cd controller && steiger ./src",

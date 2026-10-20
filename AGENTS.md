@@ -27,12 +27,21 @@ After `bun install` at the root:
 
 ```bash
 bun run check
+bun run test
 ```
 
-It runs the type check and each part's structure check (ADR 0022): Steiger on
-the Controller, dependency-cruiser on the Runtime and `go-scaffold check` on
-the Hub. `bun run --cwd e2e test` starts Postgres in Docker and the real Hub,
-then runs the seam tests. CI runs both, plus the Hub's build, lint and tests.
+`check` runs the type check and each part's structure check (ADR 0022):
+Steiger on the Controller, dependency-cruiser on the Runtime and
+`go-scaffold check` on the Hub. `test` runs the Protocol's and the Runtime's
+unit tests. `bun run --cwd e2e test` starts Postgres in Docker, applies the
+Hub's migrations, builds the Runtime binary and starts the real Hub, then runs
+the seam tests; it needs Go and Docker. CI runs all three, plus the Hub's
+build, lint and tests.
+
+The JSON Schema and test vectors in `packages/protocol/schema/` and
+`packages/protocol/vectors/` are generated; after changing the envelope or the
+handshake, rebuild them with `bun run --cwd packages/protocol fixtures`. The
+Hub's Go tests read the same files.
 
 In `hub/`, never run `go-scaffold add auth`, `add rbac` or `add worker`
 (ADR 0014).

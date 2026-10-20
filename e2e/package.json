@@ -4,5 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "bun test"
+  },
+  "dependencies": {
+    "@veeloe/protocol": "workspace:*"
   }
 }

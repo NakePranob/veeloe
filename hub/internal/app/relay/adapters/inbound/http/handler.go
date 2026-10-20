@@ -1,50 +1,43 @@
-// Package httpadapter is the Gin inbound adapter for relay.
+// Package httpadapter is the inbound adapter for relay: the WebSocket that
+// Runtimes (and, from #8, Controllers) connect to. WebSocket starts as an HTTP
+// upgrade, so it lives here (ADR 0022).
 package httpadapter
 
 import (
-	"errors"
-	"net/http"
+	"time"
 
 	"hub/internal/app/relay/application"
-	"hub/internal/app/relay/domain"
-	"hub/internal/shared/apperror"
+	"hub/internal/shared/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
+// Config is what the connection needs from the process.
+type Config struct {
+	// PublicURL is this Hub's normalized public URL, bound into every
+	// handshake signature.
+	PublicURL         string
+	HandshakeTimeout  time.Duration
+	HeartbeatInterval time.Duration
+}
+
 type Handler struct {
-	svc application.ServicePort
+	svc       application.ServicePort
+	auth      middleware.KeyAuth
+	heartbeat time.Duration
 }
 
-func NewHandler(svc application.ServicePort) *Handler {
-	h := &Handler{svc: svc}
-	return h
-}
-
-// Register wires the module's route group. Add endpoints with
-// `go-scaffold generate method relay <name> --type ...`.
-func (h *Handler) Register(rg gin.IRouter) {
-	g := rg.Group("/relays")
-	_ = g
-	_ = appError
-	// go-scaffold:handler-routes
-}
-
-func appError(err error) error {
-	switch {
-	case errors.Is(err, domain.ErrNotFound):
-		return apperror.New(http.StatusNotFound, "RELAY_NOT_FOUND", "relay not found")
-	case errors.Is(err, domain.ErrConflict):
-		return apperror.New(http.StatusConflict, "RELAY_CONFLICT", "relay already exists")
-	case errors.Is(err, domain.ErrStaleVersion):
-		return apperror.New(http.StatusConflict, "RELAY_STALE", "relay was modified by someone else — reload and try again")
-	case errors.Is(err, domain.ErrHasReferences):
-		return apperror.New(http.StatusConflict, "RELAY_HAS_REFERENCES", "relay still has related records")
-	case errors.Is(err, domain.ErrNotImplemented):
-		return apperror.New(http.StatusNotImplemented, "NOT_IMPLEMENTED", "not implemented")
-	default:
-		return apperror.NewInternal(err)
+func NewHandler(svc application.ServicePort, cfg Config) *Handler {
+	return &Handler{
+		svc:       svc,
+		auth:      middleware.KeyAuth{PublicURL: cfg.PublicURL, Timeout: cfg.HandshakeTimeout, Lookup: svc.MachineByKey},
+		heartbeat: cfg.HeartbeatInterval,
 	}
+}
+
+func (h *Handler) Register(rg gin.IRouter) {
+	rg.GET("/connect", h.connect)
+	// go-scaffold:handler-routes
 }
 
 // go-scaffold:handler-funcs

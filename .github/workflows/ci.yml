@@ -20,16 +20,19 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
+      - name: Unit tests (Protocol, Runtime)
+        run: bun run test
       - name: Steiger (Controller, Feature-Sliced Design)
         run: bun run check:controller
       - name: dependency-cruiser (Runtime, supervisor and worker)
         run: bun run check:runtime
       - name: go-scaffold check (Hub)
         run: bun run check:hub
+      # The supervisor's mode is covered by the unit tests above, which build
+      # the binary and connect it to a stand-in Hub.
       - name: The Runtime is one binary that runs as supervisor and as worker
         run: |
           bun run --cwd packages/runtime build
-          packages/runtime/dist/veeloe
           packages/runtime/dist/veeloe worker --agent ci
 
   hub:
