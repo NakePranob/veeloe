@@ -7,6 +7,10 @@ maintainers' design documents live outside this repo and are private; do not
 copy anything from them here without checking it holds nothing private. `CONTEXT.md` is the
 shared glossary — use its terms.
 
+`openspec/` holds the specs and changes for the Protocol and Runtime, versioned
+with the code. They are public like the rest: keep private or business
+decisions out of them.
+
 Outside contributors sign the CLA (CLA Assistant) on their first PR. Do not
 merge an outside contribution until the CLA check is green.
 

@@ -1,0 +1,42 @@
+schema: spec-driven
+
+context: |
+  Repo: veeloe (public, AGPL-3.0). Protocol (TypeScript, Zod schemas, @noble
+  Ed25519 and sealed boxes, JSON signed as exact bytes, additive-only changes)
+  and Runtime (TypeScript compiled with Bun: a supervisor plus one sandboxed
+  worker process per Agent, bun:sqlite event log per Agent).
+  Glossary: CONTEXT.md — use its terms.
+  Everything here is public: keep private or business decisions out of specs.
+  Conventions: AGENTS.md (English commit subjects and PR titles, Thai bodies
+  and PR descriptions).
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
