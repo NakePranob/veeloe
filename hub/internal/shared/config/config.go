@@ -1,0 +1,86 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// Config loads from env (with dev-friendly defaults).
+type Config struct {
+	AppEnv            string // "development" | "production" — the one source of truth for env-gated behavior; see IsProd (validated in Load)
+	Port              string
+	DBDSN             string
+	LogLevel          string
+	DBMaxOpenConns    int
+	DBMaxIdleConns    int
+	DBConnMaxLifetime time.Duration
+
+	CORSAllowedOrigins []string
+	// TrustedProxies is which peers may set X-Forwarded-For — empty means
+	// "nobody", so ClientIP() is the address that actually connected.
+	TrustedProxies []string
+	// go-scaffold:config-fields
+}
+
+// IsProd reports whether env-gated production behavior should be active
+// (e.g. hiding internal error details from responses). Everything that
+// isn't APP_ENV=production is treated the same way.
+func (c Config) IsProd() bool { return c.AppEnv == "production" }
+
+func Load() Config {
+	cfg := Config{
+		AppEnv:            env("APP_ENV", "development"),
+		Port:              env("PORT", "8080"),
+		DBDSN:             env("DB_DSN", "postgres://postgres:postgres@localhost:5432/hub?sslmode=disable"),
+		LogLevel:          env("LOG_LEVEL", "info"),
+		DBMaxOpenConns:    envInt("DB_MAX_OPEN_CONNS", 10),
+		DBMaxIdleConns:    envInt("DB_MAX_IDLE_CONNS", 10),
+		DBConnMaxLifetime: time.Duration(envInt("DB_CONN_MAX_LIFETIME_MIN", 5)) * time.Minute,
+
+		CORSAllowedOrigins: envList("CORS_ALLOWED_ORIGINS", "http://localhost:3000"),
+		// empty on purpose: trust nothing until you know which hop in front of
+		// this app is yours. See main.go's SetTrustedProxies call.
+		TrustedProxies: envList("TRUSTED_PROXIES", ""),
+		// go-scaffold:config-load
+	}
+
+	// Fail closed on an unknown APP_ENV: an unrecognized value (typo, stale var)
+	// would otherwise be treated as non-prod and silently disable the prod guard
+	// (leaking error details). Panics here — the one place the binary loads
+	// config — so a bad value is caught at boot, not discovered in prod later.
+	if cfg.AppEnv != "development" && cfg.AppEnv != "production" {
+		panic(fmt.Sprintf("invalid APP_ENV %q — must be development or production", cfg.AppEnv))
+	}
+
+	return cfg
+}
+
+func env(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
+
+func envList(k, def string) []string {
+	raw := strings.Split(env(k, def), ",")
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func envInt(k string, def int) int {
+	if v := os.Getenv(k); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}

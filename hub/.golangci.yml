@@ -1,0 +1,72 @@
+# golangci-lint v2 config format — v1's `run:`/`linters: enable:` + `issues: exclude-dirs:`
+# top-level keys were replaced by `version: "2"` + `linters:`/`formatters:` with their own
+# `exclusions:` blocks (see https://golangci-lint.run/docs/product/migration-guide/).
+version: "2"
+
+linters:
+  enable:
+    - depguard
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  settings:
+    depguard:
+      # What keeps this a modular monolith rather than a pile of folders: a
+      # domain may not reach into another domain's package. It declares a
+      # narrow interface for what it needs and internal/composition plus
+      # cmd/api/wiring.go supply the concrete service — see docs/architect/patterns.md "Calling Another
+      # Domain's Logic". Without this, the first shortcut someone takes stays
+      # invisible until the coupling is everywhere.
+      #
+      # One rule per domain, written by `go-scaffold generate module`: depguard
+      # matches import paths as static prefixes and has no notion of "the
+      # domain this file belongs to", so denying internal/app wholesale would
+      # also reject a domain importing its own model/ subpackage. Each rule
+      # scopes itself with `files:` and allows exactly its own path.
+      #
+      # This only sees Go imports. A raw SQL JOIN into another domain's table
+      # couples just as hard and no linter can see it — that boundary comes
+      # from giving each domain its own schema.
+      rules:
+        wiring-flows-inward:
+          list-mode: lax
+          files:
+            - "**/internal/app/**"
+          deny:
+            - pkg: "hub/cmd"
+              desc: a domain must not import cmd/ — wiring flows the other way
+        domain-isolation-relay:
+          list-mode: lax
+          files:
+            - "**/internal/app/relay/**"
+          allow:
+            - "hub/internal/app/relay"
+          deny:
+            - pkg: "hub/internal/app"
+              desc: >-
+                a domain must not import another domain directly — declare a
+                consumer-side interface for what you need and let
+                cmd/api/wiring.go wire the concrete service in
+                (docs/architect/patterns.md)
+        # go-scaffold:depguard-rules
+    errcheck:
+      exclude-functions:
+        # gin.Context.Error()'s return value is intentionally never checked —
+        # it just appends to Context.Errors for middleware.Error() to render,
+        # the "handling" of the error already happened via `return` right after.
+        - (*github.com/gin-gonic/gin.Context).Error
+  exclusions:
+    paths:
+      - migrations
+
+formatters:
+  # gofmt only, not goimports: the CLI's own gofmtTree() only runs `gofmt -w .`
+  # (goimports needs a separate binary install), so keep the lint config matching
+  # what actually formats generated code, or every fresh project starts pre-failing.
+  enable:
+    - gofmt
+  exclusions:
+    paths:
+      - migrations

@@ -1,0 +1,59 @@
+package middleware
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+)
+
+func TestCORS_AllowsOnlyConfiguredExactOrigins(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tests := []struct {
+		name            string
+		origin          string
+		wantAllowOrigin string
+		wantCredentials bool
+	}{
+		{name: "allowed exact origin", origin: "http://localhost:3000", wantAllowOrigin: "http://localhost:3000", wantCredentials: true},
+		{name: "different origin denied", origin: "https://evil.example", wantAllowOrigin: "", wantCredentials: false},
+		{name: "wildcard is not a substitute", origin: "*", wantAllowOrigin: "", wantCredentials: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.Use(CORS([]string{"http://localhost:3000"}))
+			router.GET("/refresh", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+			request := httptest.NewRequest(http.MethodGet, "/refresh", nil)
+			request.Header.Set("Origin", tt.origin)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if got := response.Header().Get("Access-Control-Allow-Origin"); got != tt.wantAllowOrigin {
+				t.Fatalf("Access-Control-Allow-Origin = %q, want %q", got, tt.wantAllowOrigin)
+			}
+			if got := response.Header().Get("Access-Control-Allow-Credentials") == "true"; got != tt.wantCredentials {
+				t.Fatalf("Allow-Credentials = %v, want %v", got, tt.wantCredentials)
+			}
+		})
+	}
+}
+
+func TestCORS_AllowsReauthenticationHeader(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(CORS([]string{"http://localhost:3000"}))
+	router.OPTIONS("/users/me/password", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	request := httptest.NewRequest(http.MethodOptions, "/users/me/password", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	request.Header.Set("Access-Control-Request-Headers", "authorization, x-reauth-token")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("preflight status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+	if got := response.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type, Authorization, X-Reauth-Token" {
+		t.Fatalf("Allow-Headers = %q, want reauthentication header", got)
+	}
+}

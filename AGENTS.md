@@ -21,6 +21,22 @@ Outside contributors sign the CLA (CLA Assistant) on their first PR. Do not
 merge an outside contribution until the CLA check is green: relicensing and
 the App Store build both depend on it (ADR 0016).
 
+## Checks
+
+After `bun install` at the root:
+
+```bash
+bun run check
+```
+
+It runs the type check and each part's structure check (ADR 0022): Steiger on
+the Controller, dependency-cruiser on the Runtime and `go-scaffold check` on
+the Hub. `bun run --cwd e2e test` starts Postgres in Docker and the real Hub,
+then runs the seam tests. CI runs both, plus the Hub's build, lint and tests.
+
+In `hub/`, never run `go-scaffold add auth`, `add rbac` or `add worker`
+(ADR 0014).
+
 ## Git hooks
 
 Hooks live in `.githooks/`, not `.git/hooks/`, so they are versioned. Once per

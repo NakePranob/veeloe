@@ -1,0 +1,9 @@
+{
+  // A path, not "expo/tsconfig.base": Steiger reads this file with tsconfck,
+  // which resolves "extends" through expo's exports map, and SDK 58 leaves
+  // tsconfig.base out of it. Works because bunfig.toml hoists node_modules.
+  "extends": "../node_modules/expo/tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true
+  }
+}
