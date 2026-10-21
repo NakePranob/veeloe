@@ -1,77 +1,107 @@
 ---
-version: 1
+version: 2
 name: Veeloe Controller
-description: A calm black-and-white tool where the only color belongs to each Agent's Character and to state. Inspired by how Meta's Muse puts an animated agent at the top of the screen, drops chat bubbles, and shows its work in three layers of detail — for a product whose screens ask people to approve commands on real machines.
+description: A calm black-and-white tool where the only color belongs to each Agent's Character and to state. Organized by Agent, like a messaging app — an inbox of Agents, the open Task, and the Agent's details — for a product whose screens ask people to approve commands on real machines.
 
+# Token names follow shadcn, so React Native Reusables components read them
+# unchanged. They live in global.css as --color-<name>; change both together.
 colors:
-  # light mode; colors-dark below flips them
-  canvas: "#FAFAFA"          # page
-  surface: "#FFFFFF"         # cards, sheets
-  surface-sunken: "#F4F4F5"  # code, inset regions
-  primary: "#0A0A0A"         # the one strongest element: primary button, key text
-  on-primary: "#FFFFFF"
-  text: "#0A0A0A"
-  text-secondary: "#52525B"
-  text-muted: "#71717A"
-  hairline: "#E7E7EA"
-  hairline-strong: "#D4D4D8"
-  waiting: "#B45309"         # waiting on a person: an Approval, a queue
-  waiting-soft: "#FEF3C7"
-  danger: "#B91C1C"          # Stop, errors, a denied Approval
-  danger-soft: "#FEE2E2"
-  done: "#15803D"            # a Turn or Task that finished well
-  done-soft: "#DCFCE7"
+  # light mode; colors-dark below
+  background: "#FFFFFF"           # the page, the Task stream
+  foreground: "#0A0A0A"           # text
+  sidebar: "#F7F7F8"              # the inbox column on wide screens, one step off the page
+  sidebar-foreground: "#0A0A0A"
+  sidebar-accent: "#EBEBEE"       # the selected Agent in the sidebar
+  sidebar-border: "#ECECEE"
+  card: "#FFFFFF"                 # floating surfaces: composer, sheets, a floating panel
+  card-foreground: "#0A0A0A"
+  popover: "#FFFFFF"
+  popover-foreground: "#0A0A0A"
+  primary: "#0A0A0A"              # the one strongest element: the decision on a screen
+  primary-foreground: "#FFFFFF"
+  secondary: "#F0F0F2"            # in-flow fills: the Approval card, a delegation, a status pill
+  secondary-foreground: "#0A0A0A"
+  muted: "#F0F0F2"
+  muted-foreground: "#67676C"     # supporting text, timestamps, previews
+  accent: "#EBEBEE"               # pressed and hovered
+  accent-foreground: "#0A0A0A"
+  border: "#ECECEE"               # hairlines
+  input: "#E6E6E9"                # field borders
+  ring: "#A1A1A6"                 # focus on the web
+  me: "#0A0A0A"                   # the Member's own message bubble
+  me-foreground: "#FFFFFF"
+  waiting: "#A84B00"              # waiting on a person: an Approval, a queue
+  waiting-soft: "#FFF4E5"
+  destructive: "#D70015"          # Stop, errors, a denied Approval
+  done: "#1E7A35"                 # a Turn or Task that finished well
 
 colors-dark:
-  canvas: "#0A0A0A"
-  surface: "#141414"
-  surface-sunken: "#1C1C1E"
-  primary: "#FAFAFA"
-  on-primary: "#0A0A0A"
-  text: "#FAFAFA"
-  text-secondary: "#A1A1AA"
-  text-muted: "#8B8B94"
-  hairline: "#262629"
-  hairline-strong: "#3A3A3F"
-  waiting: "#FBBF24"
-  waiting-soft: "#3A2A07"
-  danger: "#F87171"
-  danger-soft: "#3B1212"
-  done: "#4ADE80"
-  done-soft: "#0F2E1B"
+  background: "#0A0A0A"
+  foreground: "#F5F5F7"
+  sidebar: "#131314"
+  sidebar-foreground: "#F5F5F7"
+  sidebar-accent: "#2E2E30"
+  sidebar-border: "#1F1F21"
+  card: "#1C1C1E"
+  card-foreground: "#F5F5F7"
+  popover: "#1C1C1E"
+  popover-foreground: "#F5F5F7"
+  primary: "#F5F5F7"
+  primary-foreground: "#0A0A0A"
+  secondary: "#222224"
+  secondary-foreground: "#F5F5F7"
+  muted: "#222224"
+  muted-foreground: "#A1A1A6"
+  accent: "#2E2E30"
+  accent-foreground: "#F5F5F7"
+  border: "#1F1F21"
+  input: "#2E2E30"
+  ring: "#636366"
+  me: "#5A5A5E"                   # a mid gray, not white: a white bubble glares on black
+  me-foreground: "#FFFFFF"
+  waiting: "#FF9F0A"
+  waiting-soft: "#3A2200"
+  destructive: "#FF6961"
+  done: "#30D158"
 
-character-colors:
-  # one per Agent, same in both modes; none of them is a state hue
-  violet: { fill: "#C9C2F8", ink: "#3C3489" }
-  indigo: { fill: "#B9C6F5", ink: "#24357A" }
-  sky:    { fill: "#B5DDF4", ink: "#0C447C" }
-  teal:   { fill: "#A8E3CF", ink: "#085041" }
-  pink:   { fill: "#F4C0D1", ink: "#72243E" }
-  sand:   { fill: "#E8DCC4", ink: "#5A4720" }
+characters:
+  # each preset is its own shape and color, the same in both modes; the face
+  # ink is the color mixed 80% toward black. None is the waiting amber, the
+  # destructive red or the done green.
+  egg:     "#7B5CF0"   # violet
+  sprout:  "#0E9C8E"   # teal, with a leaf
+  bear:    "#1E8BDA"   # sky, with ears
+  pebble:  "#B07F3A"   # sand, wide and low
+  bean:    "#4F63E8"   # indigo, tall
+  ghost:   "#A94CC4"   # berry, wavy hem
+  flower:  "#E0508E"   # pink, six petals
+  gumdrop: "#5F7E9C"   # slate, flat base
 
 typography:
-  family-sans: Veeloe Sans   # Geist (Latin) + Anuphan (Thai), merged — see Typography
-  family-mono: Geist Mono
-  title:   { size: 28, lineHeight: 36, weight: 600 }
-  heading: { size: 20, lineHeight: 28, weight: 600 }
-  body:    { size: 16, lineHeight: 26, weight: 400 }
-  body-sm: { size: 14, lineHeight: 22, weight: 400 }
+  family-sans: Veeloe Sans   # Geist (Latin) + Anuphan (Thai), merged; the system font until it exists
+  family-mono: Geist Mono    # Menlo on iOS and monospace on Android until then
+  title:   { size: 24, lineHeight: 30, weight: 700 }
+  heading: { size: 17, lineHeight: 24, weight: 600 }
+  body:    { size: 16, lineHeight: 24, weight: 400 }
+  body-sm: { size: 14, lineHeight: 20, weight: 400 }
   label:   { size: 14, lineHeight: 20, weight: 500 }
-  caption: { size: 12, lineHeight: 18, weight: 400 }
-  mono:    { size: 13, lineHeight: 20, weight: 400 }
+  caption: { size: 12, lineHeight: 16, weight: 400 }
+  mono:    { size: 14, lineHeight: 20, weight: 400 }
 
 rounded:
-  sm: 8      # chips, inputs' inner parts
-  md: 12     # rows that stand alone, code blocks
-  lg: 16     # cards
-  xl: 24     # sheets
-  full: 9999 # buttons, avatars
+  # --radius is 12; the rest follow from it in global.css
+  sm: 8      # small parts
+  md: 10     # buttons, fields
+  lg: 12     # code blocks, rows that stand alone
+  xl: 16     # cards in the stream
+  bubble: 20 # message bubbles, the Approval card
+  full: 9999 # the composer, pills, avatars
 
 spacing: [4, 8, 12, 16, 20, 24, 32, 40, 48]
 
 motion:
   fast: 120ms   # press, toggle
-  base: 200ms   # expand a status layer
+  base: 200ms   # open the panel
   slow: 320ms   # sheets, screen changes
   easing: ease-out
 ---
@@ -86,52 +116,48 @@ deploy to production. The interface has to read as calm and exact: nothing
 on screen should compete with the moment someone decides. So the chrome is
 black and white, and color is spent on two things only:
 
-- **the Character** — each Agent has one, in its own color, and it is the
-  personality of the product;
+- **the Character** — each Agent has one, its own shape in its own color,
+  and it is the personality of the product;
 - **state** — amber for waiting on a person, red for Stop and errors, green
   for done.
 
-Three ideas come from Meta's Muse:
+The app is **organized by Agent**, the way a messaging app is organized by
+person. Home is an inbox with one row per Agent, and whoever needs you comes
+first. Opening an Agent opens the Task that needs you, or its latest one.
 
-1. **The Character sits at the top of a Task**, as its status, not as a small
-   avatar beside messages. It types while the Agent works, raises a hand while
-   it waits for an Approval, and cheers when the Task is done (its Mood).
-2. **No chat bubbles.** A Task reads like a document: plain text blocks, each
-   with a quiet speaker label.
-3. **Three layers of detail**, all from the same event log:
-   - **Layer 1, Mood:** the Character and one line of status. Enough for
-     anyone.
-   - **Layer 2, steps:** a collapsible list of what the Agent did — each tool
-     call as one row (icon, verb, target, duration).
-   - **Layer 3, raw log:** every event with full output, in mono, on its own
-     screen. For whoever has to know exactly what ran.
+There are **three layers of detail**, all from the same event log:
 
-Shapes are soft and spacing is generous, like Muse: pill buttons, 16px cards,
-16px body text. It should feel friendly to a team lead approving from a phone
-and still exact to the SRE reading the raw log.
+- **Layer 1, status:** the Character's Mood and one line under the Agent's
+  name in the Task header. Enough for anyone.
+- **Layer 2, steps:** what the Agent did and will do, one row per step, in
+  the Agent panel (desktop) or the Agent's profile (phone).
+- **Layer 3, raw log:** every event with full output, in mono, on its own
+  screen. For whoever has to know exactly what ran.
 
 ## Colors
 
-Tokens are in the front matter. They live as CSS variables in the app's
-`global.css`, which Uniwind reads, and the Flow canvas (React Flow in a DOM
-component) imports the same file, so there is one set for the whole app.
+Tokens are in the front matter, named as in `global.css`, which Uniwind reads
+and the Flow canvas (React Flow in a DOM component) imports too, so there is
+one set for the whole app.
 
 - **Primary is "the strongest contrast against the page"**: black in light
   mode, white in dark mode. It marks the single most important action on a
   screen, nothing else.
+- **Neutrals step by tone**: the page is `background`, the sidebar one step
+  toward gray, in-flow fills are `secondary`, pressed and selected are
+  `accent`. Rows sit flat on the surface.
 - **State colors never decorate.** Amber means a person is needed now; red
-  means stopping, failure or refusal; green means it finished well. Each
-  comes with its `-soft` tint for backgrounds, with the strong color for text
-  and icons on top.
-- **State is never color alone**: every state also has an icon and words
-  ("Waiting for you", "Stopped"), for color-blind users and screen readers.
-- **Character colors** are pastel fills with a deep ink for the face and line
-  work, the same in both modes. None of them is amber, red or green, so a
-  Character can never be mistaken for a state. A new Agent gets the next
-  unused color; the Owner can change it.
-- Text on the canvas is `text`; supporting copy is `text-secondary`;
-  `text-muted` is only for placeholders, timestamps and metadata. Never fade
-  text with opacity.
+  means stopping, failure or refusal; green means it finished well. Amber has
+  a `-soft` tint for its label background.
+- **State is never color alone**: every state also has words ("Needs you",
+  "Stopped") and, where there is room, an icon.
+- **The Member's own message** is a `me` bubble: black in light mode, a mid
+  gray in dark mode. White text holds 6.9:1 on it.
+- **Character colors** are saturated mid-tones, the same in both modes, each
+  at least 3.4:1 on white and on `#0A0A0A`, so a Character stands out on
+  either page. A new Agent gets the next unused preset; the Owner can change
+  it.
+- Supporting text is `muted-foreground`. Never fade text with opacity.
 
 ## Typography
 
@@ -142,13 +168,15 @@ component) imports the same file, so there is one set for the whole app.
   lacks; on the web CSS could chain the two, but the app must look the same
   everywhere. Both fonts are OFL: the merged font carries the OFL and a name
   of its own. The build script lives with the app and runs once per update of
-  either source font.
+  either source font. Until it exists the app uses the system font.
 - **Geist Mono** for commands, paths, logs and anything a person might copy.
-  Thai inside mono text falls back to Veeloe Sans.
-- Weights 400 (body), 500 (labels, buttons) and 600 (titles, headings).
+  `global.css` sets `--font-mono` per platform, because neither phone has
+  `ui-monospace`.
+- Weights 400 (body), 500 (labels, buttons), 600 (names, headings) and 700
+  (the Agent's name on its profile).
 - **No letter-spacing, ever.** Thai and Latin share the same style, and
   tracking breaks Thai vowels and tone marks that stack on a consonant.
-- Thai needs room above and below for its marks: body line height is 26 on
+- Thai needs room above and below for its marks: body line height is 24 on
   16. Do not tighten it.
 - Sentence case for every label and heading. No all caps.
 
@@ -156,91 +184,113 @@ component) imports the same file, so there is one set for the whole app.
 
 - **Mobile first.** Every screen works one-handed on a phone before it grows.
   Approving while away from a desk is why the app exists.
-- Breakpoints by window width:
-  - **compact (< 600):** one column, 16 gutter, tab bar at the bottom.
-  - **medium (600–1023):** one column, 24 gutter, content max 720.
-  - **expanded (≥ 1024):** a 320 sidebar (Machines, Agents, Tasks) beside the
-    Task. The Flow canvas takes the full width.
-- 4-point spacing (front matter). Screen gutter 16 on phones.
+- **Compact (< 1024):** a native stack with no tab bar. The inbox is home
+  (`/`); an Agent opens its Task (`/agents/<agent>/tasks/<task>`); tapping the
+  Task header opens the Agent's profile (`/agents/<agent>`). Gutter 16.
+- **Expanded (≥ 1024):** three panes — the inbox as a 320 sidebar, the open
+  Task in the middle (content max 720), and the Agent panel at 340 on the
+  right. Below 1280 the panel floats over the Task; it opens and closes from
+  the Task header, and the URL keeps the choice (`?panel=1` or `0`).
+- 4-point spacing (front matter).
 - **Touch targets at least 44 × 44**, even where the visible control is
   smaller.
 - Respect safe areas on every edge.
 
 ## Elevation and shape
 
-- Flat. Surfaces are told apart by tone (`canvas`, `surface`,
-  `surface-sunken`) and 1px `hairline` borders, not by shadows.
-- Only floating things cast a shadow: sheets, menus and toasts, one soft
-  shadow each. Never two floating layers at once; a third need is a new
-  screen.
-- Radius from the front matter: buttons and avatars `full`, cards `lg`,
-  sheets `xl`, code blocks `md`.
+- Flat. Surfaces are told apart by tone and 1px `border` hairlines.
+- **Only floating things cast a shadow**, and only in light mode: the
+  composer, sheets, menus, toasts and the panel when it floats. In dark mode
+  nothing casts a shadow; a floating surface is `card`, a step lighter than
+  the page, with a hairline.
+- Never two floating layers at once; a third need is a new screen.
+- Radius from the front matter.
 
 ## Components
 
-Every component is ours, written with Uniwind in `src/shared/ui` (FSD). Where
-the platform already has the thing, use it instead of drawing it:
+Components live in `src/shared/ui` (FSD). Most come from **React Native
+Reusables** (the Uniwind registry), copied in so the code is ours: each file
+says in its first line where it came from and what we changed. They are
+built on RN Primitives, a React Native port of Radix. Where the platform
+already has the thing, use it instead:
 
 - **Sheets and dialogs:** Expo Router's `formSheet` and modal presentation.
   They are the OS's own sheets on iOS and Android, and modals on the web.
 - **Motion:** Reanimated.
-- **The Character:** Rive, whose state machine takes the Mood as inputs (to
-  be confirmed with the Character's design, #23).
-- **Icons:** Lucide, 20px in rows and buttons, stroke 1.75, colored like the
+- **The Character:** ours. Rive, whose state machine takes the Mood as
+  inputs, once the Character is designed (#23); a still SVG until then.
+- **Icons:** Lucide through the `Icon` component, 16–20px, colored like the
   text beside them.
 
 ### Buttons
-- **Primary:** pill, `primary` fill, `on-primary` label, height 48 (40 when
-  compact rows need it). At most one per screen.
-- **Secondary:** pill, `surface` fill, `hairline-strong` border, `text` label.
-- **Ghost:** no fill or border; for low-weight actions in rows and headers.
-- **Danger:** pill, `danger` border and label, no fill. Stop and Delete use
-  it. A destructive action always asks once in a sheet that says what will
-  happen (Stop lists the Tasks that stop with it).
-- Pressed: scale to 0.97 over `fast`. Never disable a button silently: keep
-  it pressable and say why it cannot act.
+- **Default:** `primary` fill, `primary-foreground` label. At most one per
+  screen, and it is the decision.
+- **Outline:** `border` and `background`; the other choices next to it.
+- **Secondary:** `secondary` fill; for toggles that are on.
+- **Ghost:** no fill or border; for icon buttons in headers.
+- **Destructive:** Stop and Delete. A destructive action always asks once in
+  a sheet that says what will happen (Stop lists the Tasks that stop with it).
+- No shadow on any button: buttons sit in the page.
+- Never disable a button silently: keep it pressable and say why it cannot
+  act.
 
-### Character header (signature)
-Top of every Task: the Character (64 on phones), the Agent's name, its
-Machine, and one line of status (layer 1). While a Turn runs, a Stop button
-sits at the right. Tapping the status line opens layer 2.
+### Inbox (signature)
+- Pinned Agents (up to three) show as big Characters in a row on top, with
+  their name and a one-word state. One that needs you gets an amber ring and
+  "Needs you" in amber.
+- The rest are rows, flat on the surface, with no dividers: the Character at
+  44, the name, the time, and one line — the latest message, or what the
+  Agent is waiting for. A "Needs you" pill or an unread dot sits at the
+  trailing edge. Whoever needs you comes first.
+- An unread dot is `primary`, not a hue: color stays with the Character and
+  state.
+
+### Task header (signature)
+- The Character at 36, the Agent's name, the Task's title, and one line of
+  status with its dot (layer 1). On the phone it opens the profile; on wide
+  screens it toggles the panel. While a Turn runs, a Stop button sits at the
+  right.
 
 ### Task stream (signature)
-- Text blocks, no bubbles. Each block starts with a caption-size speaker
-  label: the Member's name, or the Agent's name in its Character ink.
-- The Member's own messages sit flush right in `text-secondary`; the Agent's
-  sit flush left in `text`.
-- Tool activity collapses into one step row per call (layer 2). Long output
-  never inlines; it links to layer 3.
-- Code and commands in a `surface-sunken` block, Geist Mono, `md` radius,
-  with a copy action.
+- The Member's messages are `me` bubbles, flush right, 80% wide at most.
+- The Agent's replies are plain text, flush left, with a caption-size name
+  above whenever the speaker changes. They have no bubble: replies run long
+  and carry code.
+- A Delegation is a `secondary` card: the other Agent's Character, the
+  sub-Task's title, where it runs, and its state. Tapping it opens the
+  sub-Task, which links back to its parent.
+- Code and commands sit in a block of Geist Mono. Long output never inlines;
+  it links to layer 3.
 - Text from a reply still being written appears as it streams; nothing jumps
   when the block completes.
 
 ### Approval card (signature)
-- `surface` card, `lg` radius, 1px `waiting` border.
-- An amber "Waiting for you" label with its icon, then what the Agent wants
-  to do in plain words, then the exact command in a code block, then when it
-  expires ("Expires in 58 min").
-- Actions: **Deny** (secondary) and **Approve** (primary), side by side,
-  Approve on the right. The Character above raises its hand.
-- After an answer the card stays in the stream, collapsed to one line: who
-  answered, what, and when.
+- In the stream, as the latest item, with no shadow: a `secondary` card at
+  `bubble` radius with an amber "Approval" label and its clock icon, when it
+  expires, what the Agent wants to do in plain words, the exact command in a
+  `background` block, and that no answer counts as denied.
+- Actions on the phone: **Deny** (outline) and **Approve once** (default),
+  side by side. **Always allow** adds to the Allowlist for good, so the phone
+  leaves it to a computer or the Agent's settings, and says so under the
+  buttons. On wide screens the card shows all three.
+- After an answer the card collapses to one line in the stream: what was
+  approved or denied.
 
-### Inputs
-- The composer: `surface` field, `xl` radius, grows to 6 lines, send button
-  as a round primary icon button.
-- Text fields: 48 high, `md` radius, `hairline-strong` border, `primary`
-  2px border when focused. Errors in `danger` below the field, in words.
+### Composer
+- A `card` pill with a hairline border, floating at the bottom with a light
+  shadow (none in dark), and a round default send button.
+- On an offline Machine the composer gives way to one line saying the Machine
+  is offline and only cached history shows.
 
-### Lists and rows
-- Rows are 56–64 high with a 1px `hairline` between them, not cards with
-  gaps. A row leads with the Character or an icon, then a title, then one
-  line of secondary text, with state at the trailing edge.
+### Agent panel and profile
+- The Character at 96, the name, where it runs, and its state in a
+  `secondary` pill; then plain sections with no cards: this Task's steps
+  (layer 2), the Agent's Tasks (the open one highlighted), its Machine and
+  Egress, its Allowlist and Approval expiry, and its Flow lines.
 
-### Badges
-- State only: `-soft` fill, strong text, `full` radius, caption size, with an
-  icon.
+### Fields
+- 44 high or more, `md` radius, `input` border; on the web a `ring` focus
+  ring. Errors in `destructive` below the field, in words.
 
 ## Motion
 
@@ -253,27 +303,29 @@ sits at the right. Tapping the status line opens layer 2.
 ## Language and copy
 
 - English and Thai from the first screen. Every string goes through the
-  translation table; none is written inline. The default follows the device;
-  Settings can change it.
+  translation table in `src/shared/i18n`; none is written inline. The default
+  follows the device; Settings can change it.
 - Terms from `CONTEXT.md` (Agent, Task, Approval, Flow, Machine, Workspace,
   Member, Stop) stay as they are in both languages, so the app and the docs
-  say the same thing. Actions are translated ("Approve" / "อนุมัติ").
+  say the same thing. Actions are translated ("Approve once" / "อนุมัติครั้งนี้").
 - Short, plain, warm. Say what happened and what to do next. Sentence case.
-  No exclamation marks in system copy.
+  No exclamation marks in system copy. Don't explain what the screen already
+  shows.
 - Write for both readers: the status line (layer 1) in everyday words, the
   steps (layer 2) in exact ones.
 
 ## Accessibility
 
 - Text contrast at least 4.5:1 against its background, 3:1 for icons and
-  borders that carry meaning. Every text token in the front matter meets
-  4.5:1 on `canvas`, `surface` and its own `-soft` tint, in both modes; check
-  again whenever a value changes.
+  borders that carry meaning. Every text color in the front matter meets
+  4.5:1 on `background`, `sidebar`, `card`, `secondary` and `accent` in its
+  own mode, and amber also on `waiting-soft`; check again whenever a value
+  changes.
 - Every icon-only control has an accessibility label; every state has words.
 - Text scales with the OS setting up to 200% without clipping; layouts wrap
   instead.
-- On the web: everything reachable by keyboard, with a visible 2px `primary`
-  focus ring offset by 2.
+- On the web: everything reachable by keyboard, with a visible `ring` focus
+  ring.
 
 ## Do and don't
 
@@ -284,9 +336,10 @@ sits at the right. Tapping the status line opens layer 2.
 - Let every layer of detail come from the same event log.
 
 **Don't**
-- Don't put chat bubbles in a Task.
+- Don't put the Agent's replies in bubbles.
 - Don't use amber, red or green for decoration, or for a Character.
+- Don't tell two Characters apart by color alone; each preset is its own shape.
 - Don't add letter-spacing or tighten Thai line height.
-- Don't use shadows on in-flow cards.
+- Don't put a shadow on anything in the page, or on anything in dark mode.
 - Don't hard-code a string, a color or a size: use the tokens and the
   translation table.

@@ -1,0 +1,90 @@
+@import "tailwindcss";
+@import "uniwind";
+
+/* Black and white; colour belongs to each Agent's Character and to state (ADR 0026).
+   Names follow shadcn so React Native Reusables components read them unchanged.
+   Every value here is in controller/DESIGN.md; change the two together. Each text colour
+   holds 4.5:1 on background, sidebar, card, secondary and accent in its own mode. */
+@theme {
+  --radius: 12px;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --spacing-hairline: hairlineWidth();
+}
+
+@layer theme {
+  :root {
+    /* React Native takes one font name, and neither phone has ui-monospace.
+       ponytail: system fonts until the merged Veeloe Sans exists (ADR 0026). */
+    @variant ios {
+      --font-mono: "Menlo";
+    }
+    @variant android {
+      --font-mono: "monospace";
+    }
+
+    @variant light {
+      --color-background: #ffffff;
+      --color-foreground: #0a0a0a;
+      --color-card: #ffffff;
+      --color-card-foreground: #0a0a0a;
+      --color-popover: #ffffff;
+      --color-popover-foreground: #0a0a0a;
+      --color-primary: #0a0a0a;
+      --color-primary-foreground: #ffffff;
+      --color-secondary: #f0f0f2;
+      --color-secondary-foreground: #0a0a0a;
+      --color-muted: #f0f0f2;
+      --color-muted-foreground: #67676c;
+      --color-accent: #ebebee;
+      --color-accent-foreground: #0a0a0a;
+      --color-destructive: #d70015;
+      --color-border: #ececee;
+      --color-input: #e6e6e9;
+      --color-ring: #a1a1a6;
+      --color-sidebar: #f7f7f8;
+      --color-sidebar-foreground: #0a0a0a;
+      --color-sidebar-accent: #ebebee;
+      --color-sidebar-border: #ececee;
+      /* The user's own message: black in light, a mid gray in dark so it never glares */
+      --color-me: #0a0a0a;
+      --color-me-foreground: #ffffff;
+      --color-waiting: #a84b00;
+      --color-waiting-soft: #fff4e5;
+      --color-done: #1e7a35;
+    }
+
+    @variant dark {
+      --color-background: #0a0a0a;
+      --color-foreground: #f5f5f7;
+      --color-card: #1c1c1e;
+      --color-card-foreground: #f5f5f7;
+      --color-popover: #1c1c1e;
+      --color-popover-foreground: #f5f5f7;
+      --color-primary: #f5f5f7;
+      --color-primary-foreground: #0a0a0a;
+      --color-secondary: #222224;
+      --color-secondary-foreground: #f5f5f7;
+      --color-muted: #222224;
+      --color-muted-foreground: #a1a1a6;
+      --color-accent: #2e2e30;
+      --color-accent-foreground: #f5f5f7;
+      --color-destructive: #ff6961;
+      --color-border: #1f1f21;
+      --color-input: #2e2e30;
+      --color-ring: #636366;
+      --color-sidebar: #131314;
+      --color-sidebar-foreground: #f5f5f7;
+      --color-sidebar-accent: #2e2e30;
+      --color-sidebar-border: #1f1f21;
+      --color-me: #5a5a5e;
+      --color-me-foreground: #ffffff;
+      --color-waiting: #ff9f0a;
+      --color-waiting-soft: #3a2200;
+      --color-done: #30d158;
+    }
+  }
+}

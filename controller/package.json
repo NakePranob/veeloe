@@ -10,16 +10,27 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@rn-primitives/slot": "^1.5.2",
     "@veeloe/protocol": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "expo": "~58.0.16",
     "expo-constants": "~58.0.12",
     "expo-linking": "~58.0.13",
     "expo-router": "~58.0.24",
     "expo-status-bar": "~58.0.3",
+    "expo-system-ui": "~58.0.6",
+    "lucide-react-native": "^1.60.0",
     "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-native": "0.88.0",
     "react-native-safe-area-context": "~5.10.1",
-    "react-native-screens": "~4.30.0"
+    "react-native-screens": "~4.30.0",
+    "react-native-svg": "15.16.0",
+    "react-native-web": "^0.21.4",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
+    "uniwind": "^1.13.0"
   },
   "devDependencies": {
     "@feature-sliced/steiger-plugin": "^0.8.0",
