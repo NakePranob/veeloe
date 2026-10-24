@@ -4,9 +4,6 @@
   // tsconfig.base out of it. Works because bunfig.toml hoists node_modules.
   "extends": "../node_modules/expo/tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "paths": {
-      "@/*": ["./*"]
-    }
+    "strict": true
   }
 }

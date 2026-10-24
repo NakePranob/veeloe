@@ -3,9 +3,9 @@
     "name": "Veeloe",
     "slug": "veeloe",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
@@ -19,8 +19,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "output": "single"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       [
