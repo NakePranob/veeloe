@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "controller",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd controller && exec bunx expo start --web --port 8081"],
+      "port": 8081
+    }
+  ]
+}
