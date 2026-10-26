@@ -10,16 +10,23 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~58.0.15",
+    "@expo/ui": "~58.0.23",
     "@veeloe/protocol": "workspace:*",
     "expo": "~58.0.16",
     "expo-constants": "~58.0.12",
+    "expo-haptics": "~58.0.7",
     "expo-linking": "~58.0.13",
     "expo-router": "~58.0.24",
     "expo-status-bar": "~58.0.3",
+    "expo-symbols": "~58.0.4",
+    "expo-system-ui": "~58.0.6",
     "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-native": "0.88.0",
     "react-native-safe-area-context": "~5.10.1",
-    "react-native-screens": "~4.30.0"
+    "react-native-screens": "~4.30.0",
+    "react-native-web": "^0.21.4"
   },
   "devDependencies": {
     "@feature-sliced/steiger-plugin": "^0.8.0",

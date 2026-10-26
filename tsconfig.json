@@ -6,7 +6,8 @@
     "types": ["bun"],
     "strict": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "jsx": "react-jsx"
   },
-  "include": ["packages/*/src", "e2e"]
+  "include": ["packages/*/src", "e2e", "controller/src/**/*.test.ts"]
 }

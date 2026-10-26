@@ -30,6 +30,26 @@ Run lint and typecheck before declaring any task done.
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
 - Docs: https://docs.expo.dev/router/introduction.md
 
+## UI
+
+Every screen looks and behaves like an app the platform itself ships: Apple's
+Human Interface Guidelines on iOS, Material 3 on Android. Veeloe's own look
+(quiet surfaces, colour only on a Character and on state) sits on top of that,
+never in place of it.
+
+- Before writing or changing a screen, load the `expo-native-ui` and
+  `expo-design-system` skills, and look in `@expo/ui` before building a control
+  by hand; its universal components run on iOS, Android and web.
+- Colours are the semantic ones from `Color` in `expo-router`, gathered in
+  `src/shared/ui/theme.ts`; never a hex value in a screen. Icons are
+  `expo-symbols` with an SF Symbol and a Material name; never emoji.
+- Name the app a screen follows (Mail for the inbox, Messages for a Task) and
+  match it: large titles, inset separators, the native back button,
+  continuous corners and haptics on iOS.
+- A screen is done once it has run on the iOS Simulator and on web, in light
+  and dark, with a screenshot of each. Checking on web alone is not enough,
+  because web draws the header differently.
+
 ## Building with EAS
 
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.

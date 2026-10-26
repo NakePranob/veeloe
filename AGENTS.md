@@ -32,8 +32,8 @@ bun run test
 
 `check` runs the type check and each part's structure check (ADR 0022):
 Steiger on the Controller, dependency-cruiser on the Runtime and
-`go-scaffold check` on the Hub. `test` runs the Protocol's and the Runtime's
-unit tests. `bun run --cwd e2e test` starts Postgres in Docker, applies the
+`go-scaffold check` on the Hub. `test` runs the Protocol's, the Runtime's and
+the Controller's unit tests. `bun run --cwd e2e test` starts Postgres in Docker, applies the
 Hub's migrations, builds the Runtime binary and starts the real Hub, then runs
 the seam tests; it needs Go and Docker. CI runs all three, plus the Hub's
 build, lint and tests.

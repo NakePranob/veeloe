@@ -5,5 +5,7 @@
   "extends": "../node_modules/expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  // Tests run on Bun and are type-checked with Bun's types from the root tsconfig.
+  "exclude": ["node_modules", "**/*.test.ts"]
 }
