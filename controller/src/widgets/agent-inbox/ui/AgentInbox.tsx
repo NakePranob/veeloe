@@ -3,7 +3,7 @@ import { FlatList, Pressable, View } from "react-native";
 import { Character, useAgents, type Agent } from "../../../entities/agent";
 import { lastActivity, preview, stateOf, statusOf, TaskStatus, useTasks, type Status, type Task } from "../../../entities/task";
 import { ago, useNow } from "../../../shared/lib";
-import { column, Icon, Label, space, Text, useColors } from "../../../shared/ui";
+import { column, Icon, Label, radius, space, Text, useColors } from "../../../shared/ui";
 
 const ORDER: Record<Status, number> = { waiting: 0, working: 1, done: 2, offline: 3 };
 
@@ -37,7 +37,6 @@ interface Props {
 export function AgentInbox({ selectedTaskId, split }: Props) {
   const agents = useAgents();
   const tasks = useTasks();
-  const colors = useColors();
   const now = useNow();
   return (
     <FlatList
@@ -51,9 +50,8 @@ export function AgentInbox({ selectedTaskId, split }: Props) {
           Demo Workspace · ข้อมูลตัวอย่าง คำสั่งที่กดไม่ถูกส่งไปที่ Machine ไหน
         </Label>
       }
+      // No separators: rows are set apart by their spacing, not by lines.
       renderItem={({ item }) => <InboxRow {...item} now={now} selected={item.task.id === selectedTaskId} replace={split} />}
-      // Inset to the text, as Mail does, so the Characters stand apart.
-      ItemSeparatorComponent={() => <View style={{ height: 0.5, marginLeft: space.lg + AVATAR + space.md, backgroundColor: colors.separator }} />}
     />
   );
 }
@@ -63,38 +61,47 @@ function InboxRow({ agent, task, status, now, selected, replace }: Row & { now: 
   // Link's Slot drops a Pressable style function on web, so the layout lives on an inner View.
   return (
     <Link href={`/tasks/${task.id}`} replace={replace} asChild>
-      <Pressable>
-        {({ pressed }) => (
-          <View
-            style={{
-              flexDirection: "row",
-              gap: space.md,
-              paddingHorizontal: space.lg,
-              paddingVertical: space.md,
-              backgroundColor: pressed || selected ? colors.fill : undefined,
-            }}
-          >
-            <Character color={agent.color} status={status} size={AVATAR} />
-            <View style={{ flex: 1, gap: space.xs / 2 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-                <Text variant="headline" numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {agent.name}
+      <Pressable aria-selected={selected}>
+        {({ pressed }) => {
+          // What the row is painted with: the sidebar card in split view, else the screen.
+          const fill = pressed ? "chipPressed" : selected ? "chip" : replace ? "surface" : "background";
+          return (
+            // An inset rounded highlight, as in an iPadOS sidebar, so it sits inside the card's
+            // curve rather than cutting across it; content still lines up at space.lg.
+            <View
+              style={{
+                flexDirection: "row",
+                gap: space.md,
+                marginHorizontal: space.sm,
+                paddingHorizontal: space.sm,
+                paddingVertical: space.md,
+                borderRadius: radius.lg,
+                borderCurve: "continuous",
+                backgroundColor: colors[fill],
+              }}
+            >
+              <Character color={agent.color} status={status} size={AVATAR} backdrop={fill} />
+              <View style={{ flex: 1, gap: space.xs / 2 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
+                  <Text variant="headline" numberOfLines={1} style={{ flexShrink: 1 }}>
+                    {agent.name}
+                  </Text>
+                  <Text variant="subheadline" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                    {agent.machine.name}
+                  </Text>
+                  <Text variant="subheadline" tone="secondary">
+                    {ago(lastActivity(task.events), now)}
+                  </Text>
+                  {!replace && <Icon name="disclosure" size="xs" color="tertiaryLabel" weight="semibold" />}
+                </View>
+                <TaskStatus status={status} detail={task.title} emphasize />
+                <Text variant="subheadline" tone="secondary" numberOfLines={2} mono={status === "waiting"}>
+                  {preview(task.events, now)}
                 </Text>
-                <Text variant="subheadline" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
-                  {agent.machine.name}
-                </Text>
-                <Text variant="subheadline" tone="secondary">
-                  {ago(lastActivity(task.events), now)}
-                </Text>
-                {!replace && <Icon name="disclosure" size="xs" color="tertiaryLabel" weight="semibold" />}
               </View>
-              <TaskStatus status={status} detail={task.title} emphasize />
-              <Text variant="subheadline" tone="secondary" numberOfLines={2} mono={status === "waiting"}>
-                {preview(task.events, now)}
-              </Text>
             </View>
-          </View>
-        )}
+          );
+        }}
       </Pressable>
     </Link>
   );

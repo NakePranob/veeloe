@@ -1,9 +1,10 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useGlobalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, useColorScheme, View } from "react-native";
+import { useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { SIDEBAR_WIDTH, space, Text, useColors, useNavigationColors, useSplit } from "../../shared/ui";
+import { Card, SIDEBAR_WIDTH, space, Text, useColors, useSplit } from "../../shared/ui";
 import { AgentInbox } from "../../widgets/agent-inbox";
+import "../styles/web-reset";
 
 // Web draws its own header, Material-style by default; give it iOS's layout:
 // a centred title and a chevron with the previous screen's name.
@@ -13,28 +14,38 @@ const webHeader =
     ? ({ headerTitleAlign: "center", headerBackButtonDisplayMode: "default", headerBackIcon: { type: "image", source: { uri: CHEVRON } } } as const)
     : {};
 
-// The inbox beside the open Task on an iPad or a wide window, as in Mail.
+// The inbox beside the open Task on an iPad or a wide window, as in Mail: a card
+// floating on the grey screen, no divider line.
 // ponytail: a plain title, not a second navigation stack; the sidebar never navigates on its own.
 function Sidebar({ selectedTaskId }: { selectedTaskId?: string }) {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   return (
-    <View style={{ width: SIDEBAR_WIDTH, paddingTop: insets.top, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.separator }}>
-      <Text variant="largeTitle" style={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.xs }}>
+    <Card
+      style={{
+        width: SIDEBAR_WIDTH,
+        marginTop: insets.top + space.md,
+        marginBottom: insets.bottom + space.md,
+        marginLeft: insets.left + space.md,
+        padding: 0,
+        gap: 0,
+        // Clips the list to the card's corners as it scrolls.
+        overflow: "hidden",
+      }}
+    >
+      <Text variant="largeTitle" style={{ paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.xs }}>
         Inbox
       </Text>
       <AgentInbox selectedTaskId={selectedTaskId} split />
-    </View>
+    </Card>
   );
 }
 
 export function RootLayout() {
   const colors = useColors();
-  const nav = useNavigationColors();
   const split = useSplit();
   const { task } = useGlobalSearchParams<{ task?: string }>();
   const base = useColorScheme() === "dark" ? DarkTheme : DefaultTheme;
-  const theme = { ...base, colors: { ...base.colors, background: nav.background, card: nav.background, text: nav.label, border: nav.separator, primary: nav.blue } };
+  const theme = { ...base, colors: { ...base.colors, background: colors.background, card: colors.background, text: colors.label, border: colors.separator, primary: colors.accent } };
   return (
     <ThemeProvider value={theme}>
       <StatusBar style="auto" />
@@ -42,9 +53,11 @@ export function RootLayout() {
       <View style={{ flex: 1, flexDirection: "row", backgroundColor: colors.background }}>
         {split && <Sidebar selectedTaskId={task} />}
         <View style={{ flex: 1 }}>
-          <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, ...webHeader }}>
-            {/* The inbox is a list like Mail, so its title is large and shrinks as the list scrolls. */}
-            <Stack.Screen name="index" options={split ? { headerShown: false } : { title: "Inbox", headerLargeTitleEnabled: true, headerShadowVisible: false }} />
+          {/* No line under the header: the brand sets things apart by space and shadow, not borders. */}
+          <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, ...webHeader }}>
+            {/* A plain title, as on the Task screen and on web, so the list starts right under the header;
+                a large title would leave an empty bar above it, since the inbox has no header buttons. */}
+            <Stack.Screen name="index" options={split ? { headerShown: false } : { title: "Inbox" }} />
             {/* In split view the inbox is already beside the Task, so there is nothing to go back to.
                 Web ignores headerBackVisible when a deep link anchors the inbox underneath, hence headerLeft. */}
             <Stack.Screen name="tasks/[task]" options={split ? { headerBackVisible: false, headerLeft: () => null } : {}} />

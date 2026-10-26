@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { useColors } from "../../../shared/ui";
+import { useColors, type Colors } from "../../../shared/ui";
 
 // What the Agent is doing, as the Task entity reports it. Mood follows from it
 // here and only here, never from the LLM (CONTEXT.md).
@@ -11,18 +11,20 @@ interface Props {
   color: string;
   status: Status;
   size?: number;
+  // What it sits on, so the ring around the raised hand reads as a cut-out, not an outline.
+  backdrop?: keyof Colors;
 }
 
 const FACE = "#1C1917";
 
 // ponytail: a face drawn from Views, enough to show Mood; the real Characters are artwork.
-export function Character({ color, status, size = 44 }: Props) {
+export function Character({ color, status, size = 44, backdrop = "background" }: Props) {
   const colors = useColors();
   const mood = MOOD[status];
   const eye = size * 0.1;
   const off = mood === "off";
   return (
-    <View aria-hidden style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: off ? colors.fill : color, alignItems: "center", justifyContent: "center" }}>
+    <View aria-hidden style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: off ? colors.chipPressed : color, alignItems: "center", justifyContent: "center" }}>
       <View style={{ flexDirection: "row", gap: size * 0.2, marginBottom: size * 0.08 }}>
         {[0, 1].map((i) => (
           <View key={i} style={{ width: eye, height: off ? 2 : eye, borderRadius: eye, backgroundColor: off ? colors.tertiaryLabel : FACE }} />
@@ -46,7 +48,7 @@ export function Character({ color, status, size = 44 }: Props) {
               borderRadius: size,
               borderWidth: 2,
               backgroundColor: colors.orange,
-              borderColor: colors.background,
+              borderColor: colors[backdrop],
             }}
           />
         </>

@@ -17,7 +17,7 @@ export function Text({ variant = "body", tone = "label", strong, mono, style, ..
   return (
     <RNText
       {...props}
-      style={[type[variant], { color: colors[TONE[tone]] }, strong && { fontWeight: "600" }, mono && { fontFamily: monoFont }, style]}
+      style={[type[variant], { color: colors[TONE[tone]] }, strong && { fontWeight: "500" }, mono && { fontFamily: monoFont }, style]}
     />
   );
 }

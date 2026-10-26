@@ -1,8 +1,8 @@
 import { Host, Picker } from "@expo/ui";
 import { useState, type Ref } from "react";
-import { Alert, Pressable, TextInput, View, type TextInputInstance } from "react-native";
+import { Alert, TextInput, View, type TextInputInstance } from "react-native";
 import { sendMessage, stopTurn, type Effort } from "../../../entities/task";
-import { column, Icon, radius, space, type, useColors } from "../../../shared/ui";
+import { Button, Card, column, radius, space, type, useColors } from "../../../shared/ui";
 
 const EFFORTS: { value: Effort; label: string }[] = [
   { value: "low", label: "Effort ต่ำ" },
@@ -51,12 +51,7 @@ export function Composer({ agent, taskId, busy, inputRef }: Props) {
 
   return (
     <View style={{ paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm, backgroundColor: colors.background }}>
-      <View
-        style={[
-          column,
-          { gap: space.xs, padding: space.sm, borderRadius: radius.lg + space.xs, borderCurve: "continuous", borderWidth: 1, borderColor: colors.separator },
-        ]}
-      >
+      <Card raised style={[column, { gap: space.xs, padding: space.sm }]}>
         <TextInput
           ref={inputRef}
           value={text}
@@ -70,32 +65,23 @@ export function Composer({ agent, taskId, busy, inputRef }: Props) {
           style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
         />
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Host matchContents>
-            <Picker selectedValue={effort} onValueChange={setEffort} appearance="menu">
-              {EFFORTS.map((item) => (
-                <Picker.Item key={item.value} label={item.label} value={item.value} />
-              ))}
-            </Picker>
-          </Host>
+          {/* The menu itself stays the platform's; only its trigger wears the chip. */}
+          <View style={{ minHeight: 36, paddingHorizontal: space.xs, justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.chip }}>
+            <Host matchContents seedColor={colors.accent}>
+              <Picker selectedValue={effort} onValueChange={setEffort} appearance="menu">
+                {EFFORTS.map((item) => (
+                  <Picker.Item key={item.value} label={item.label} value={item.value} />
+                ))}
+              </Picker>
+            </Host>
+          </View>
           {stopping ? (
-            <Pressable role="button" aria-label="หยุด" onPress={() => confirmStop(agent, () => stopTurn(taskId))} hitSlop={8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-              <Icon name="stop" size="lg" color="label" />
-            </Pressable>
+            <Button label="หยุด" icon="stop" variant="primary" onPress={() => confirmStop(agent, () => stopTurn(taskId))} />
           ) : (
-            <Pressable
-              role="button"
-              aria-label="ส่ง"
-              aria-disabled={!message}
-              disabled={!message}
-              onPress={send}
-              hitSlop={8}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-            >
-              <Icon name="send" size="lg" color={message ? "blue" : "tertiaryLabel"} />
-            </Pressable>
+            <Button label="ส่ง" icon="send" variant="primary" disabled={!message} onPress={send} />
           )}
         </View>
-      </View>
+      </Card>
     </View>
   );
 }

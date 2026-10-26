@@ -1,97 +1,75 @@
-import { Color } from "expo-router";
-import { useColorScheme, useWindowDimensions, type ColorValue } from "react-native";
+import { Easing, useColorScheme, useWindowDimensions } from "react-native";
 
-// Web has no semantic colours, so it takes the values iOS publishes for each mode.
-const web = {
+// Monochrome with a cool, faintly blue cast, the same on every platform. The
+// screen is a light grey so white cards stand out; nothing is outlined.
+// The only hues are state, on icons: orange means a person is needed now.
+const light = {
+  background: "#f3f5f8",
+  surface: "#ffffff",
+  chip: "#eef1f5",
+  chipPressed: "#e2e7ee",
+  fill: "#e8ecf2",
+  separator: "#0f172a14",
+  label: "#0f1520",
+  secondaryLabel: "#5b6472",
+  tertiaryLabel: "#8a93a1",
+  // The accent is the ink itself.
+  accent: "#0f1520",
+  onAccent: "#ffffff",
+  orange: "#ff9500",
+  green: "#34c759",
+  red: "#ff3b30",
+};
+
+export type Colors = typeof light;
+
+const dark: Colors = {
+  background: "#0e1116",
+  surface: "#181c23",
+  chip: "#232833",
+  chipPressed: "#2c323e",
+  fill: "#222731",
+  separator: "#ffffff12",
+  label: "#f5f7fa",
+  secondaryLabel: "#a3acb9",
+  tertiaryLabel: "#6b7480",
+  accent: "#f5f7fa",
+  onAccent: "#0e1116",
+  orange: "#ff9f0a",
+  green: "#30d158",
+  red: "#ff453a",
+};
+
+// Soft, wide, faintly blue shadows lift a card off the grey; never an edge line.
+const shadows = {
   light: {
-    label: "#000000",
-    secondaryLabel: "#3C3C4399",
-    tertiaryLabel: "#3C3C434D",
-    background: "#FFFFFF",
-    secondaryBackground: "#F2F2F7",
-    tertiaryBackground: "#FFFFFF",
-    separator: "#3C3C434A",
-    fill: "#7676801F",
-    blue: "#007AFF",
-    orange: "#FF9500",
-    green: "#34C759",
-    red: "#FF3B30",
+    card: "0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 8px 24px 0 rgba(15, 23, 42, 0.06)",
+    raised: "0 2px 6px 0 rgba(15, 23, 42, 0.05), 0 12px 32px 0 rgba(15, 23, 42, 0.09)",
   },
   dark: {
-    label: "#FFFFFF",
-    secondaryLabel: "#EBEBF599",
-    tertiaryLabel: "#EBEBF54D",
-    background: "#000000",
-    secondaryBackground: "#1C1C1E",
-    tertiaryBackground: "#2C2C2E",
-    separator: "#54545899",
-    fill: "#7676803D",
-    blue: "#0A84FF",
-    orange: "#FF9F0A",
-    green: "#30D158",
-    red: "#FF453A",
+    card: "0 1px 2px 0 rgba(0, 0, 0, 0.30), 0 8px 24px 0 rgba(0, 0, 0, 0.35)",
+    raised: "0 2px 6px 0 rgba(0, 0, 0, 0.35), 0 12px 32px 0 rgba(0, 0, 0, 0.45)",
   },
 };
 
-export type Colors = Record<keyof typeof web.light, ColorValue>;
-
-// On a phone these resolve on the device and follow light, dark and contrast settings.
-const ios: Colors = {
-  label: Color.ios.label,
-  secondaryLabel: Color.ios.secondaryLabel,
-  tertiaryLabel: Color.ios.tertiaryLabel,
-  background: Color.ios.systemBackground,
-  secondaryBackground: Color.ios.secondarySystemBackground,
-  tertiaryBackground: Color.ios.tertiarySystemBackground,
-  separator: Color.ios.separator,
-  fill: Color.ios.tertiarySystemFill,
-  blue: Color.ios.systemBlue,
-  orange: Color.ios.systemOrange,
-  green: Color.ios.systemGreen,
-  red: Color.ios.systemRed,
-};
-
-// Material 3 has no orange or green, so state keeps iOS's.
-const android: Colors = {
-  label: Color.android.dynamic.onSurface,
-  secondaryLabel: Color.android.dynamic.onSurfaceVariant,
-  tertiaryLabel: Color.android.dynamic.outline,
-  background: Color.android.dynamic.surface,
-  secondaryBackground: Color.android.dynamic.surfaceContainer,
-  tertiaryBackground: Color.android.dynamic.surfaceContainerHigh,
-  separator: Color.android.dynamic.outlineVariant,
-  fill: Color.android.dynamic.surfaceContainerHighest,
-  blue: Color.android.dynamic.primary,
-  orange: web.light.orange,
-  green: web.light.green,
-  red: Color.android.dynamic.error,
-};
-
-// Text on a tinted surface, such as the Member's bubble, stays white in both modes.
-export const onTint = "#FFFFFF";
-
 export function useColors(): Colors {
-  // Read on every platform: Android re-renders through it when the theme flips.
-  const scheme = useColorScheme();
-  if (process.env.EXPO_OS === "ios") return ios;
-  if (process.env.EXPO_OS === "android") return android;
-  return web[scheme === "dark" ? "dark" : "light"];
+  return useColorScheme() === "dark" ? dark : light;
 }
 
-// The navigation theme does colour maths on its values, so it gets plain hex.
-export function useNavigationColors() {
-  return web[useColorScheme() === "dark" ? "dark" : "light"];
+export function useShadows() {
+  return shadows[useColorScheme() === "dark" ? "dark" : "light"];
 }
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
 
-// Pair every radius but a capsule with borderCurve "continuous", Apple's squircle.
-export const radius = { sm: 8, md: 12, lg: 18 };
+// Pair every radius but a pill with borderCurve "continuous". Cards share one
+// generous radius so they sit with the pills inside them, as the composer does.
+export const radius = { sm: 8, lg: 18, card: 22, pill: 999 };
 
-// Apple's text styles. System fonts carry Thai on every platform.
+// Apple's sizes; headings at medium weight, never bold. System fonts carry Thai on every platform.
 export const type = {
-  largeTitle: { fontSize: 34, fontWeight: "700" },
-  headline: { fontSize: 17, fontWeight: "600" },
+  largeTitle: { fontSize: 34, fontWeight: "500" },
+  headline: { fontSize: 17, fontWeight: "500" },
   body: { fontSize: 17 },
   subheadline: { fontSize: 15 },
   footnote: { fontSize: 13 },
@@ -99,6 +77,14 @@ export const type = {
 } as const;
 
 export const mono = process.env.EXPO_OS === "ios" ? "Menlo" : process.env.EXPO_OS === "android" ? "monospace" : "ui-monospace, Menlo, monospace";
+
+// Motion: short, eased out, never bouncy for routine changes.
+export const motion = {
+  duration: { micro: 80, quick: 150, fast: 250, medium: 350 },
+  easeOut: Easing.bezier(0.22, 1, 0.36, 1),
+  // How far a pressed control sinks.
+  press: 0.97,
+};
 
 // Icon sizes: xs beside a caption, sm beside a footnote, md beside a headline,
 // lg for a composer action, xl for an empty state.

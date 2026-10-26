@@ -1,9 +1,8 @@
-import { Button, Host, Row } from "@expo/ui";
 import * as Haptics from "expo-haptics";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { answerApproval, type Answer, type ApprovalStatus, type TaskEvent } from "../../../entities/task";
 import { fromNow } from "../../../shared/lib";
-import { Icon, Label, radius, space, Text, useColors, type IconName } from "../../../shared/ui";
+import { Button, Card, Icon, Label, radius, space, Text, useColors, type IconName } from "../../../shared/ui";
 
 interface Props {
   taskId: string;
@@ -35,7 +34,7 @@ export function ApprovalCard({ taskId, agent, request, status, now, onSteer }: P
   const colors = useColors();
   const open = status === "open";
   return (
-    <View style={{ gap: space.sm, padding: space.lg, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.secondaryBackground }}>
+    <Card>
       <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
         <Icon name="approval" size="md" color={open ? "orange" : "tertiaryLabel"} />
         <Text variant="headline" style={{ flex: 1 }}>
@@ -58,31 +57,25 @@ export function ApprovalCard({ taskId, agent, request, status, now, onSteer }: P
           <Text variant="footnote" tone="secondary">
             ไม่อยู่ใน Allowlist ถ้าไม่ตอบก่อนหมดอายุจะนับว่าปฏิเสธ
           </Text>
-          <Host matchContents style={{ marginTop: space.xs }}>
-            <Row spacing={space.sm}>
-              <Button label="อนุมัติ" onPress={() => respond(taskId, request.id, "approve")} />
-              <Button label="ปฏิเสธ" variant="outlined" onPress={() => respond(taskId, request.id, "deny")} />
-            </Row>
-          </Host>
-          {/* Codex's "Tell Codex what to do": a no that steers instead of ending the conversation.
-              A tinted text button, as iOS draws a borderless one; @expo/ui's "text" variant comes out black. */}
-          <Pressable
-            role="button"
-            onPress={() => {
-              respond(taskId, request.id, "steer");
-              onSteer();
-            }}
-            hitSlop={space.sm}
-            style={({ pressed }) => ({ alignSelf: "flex-start", opacity: pressed ? 0.6 : 1 })}
-          >
-            <Text style={{ color: colors.blue }}>บอกให้ทำอย่างอื่น</Text>
-          </Pressable>
+          {/* One ink pill for the answer the card asks for; quiet chips beside it. "บอกให้ทำอย่างอื่น"
+              is Codex's "Tell Codex what to do": a no that steers instead of ending the conversation. */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginTop: space.xs }}>
+            <Button label="อนุมัติ" variant="primary" onPress={() => respond(taskId, request.id, "approve")} />
+            <Button label="ปฏิเสธ" onPress={() => respond(taskId, request.id, "deny")} />
+            <Button
+              label="บอกให้ทำอย่างอื่น"
+              onPress={() => {
+                respond(taskId, request.id, "steer");
+                onSteer();
+              }}
+            />
+          </View>
         </>
       ) : (
         <Label icon={OUTCOME[status].icon} iconColor={OUTCOME[status].color}>
           {OUTCOME[status].text}
         </Label>
       )}
-    </View>
+    </Card>
   );
 }

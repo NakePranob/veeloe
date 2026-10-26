@@ -32,20 +32,32 @@ Run lint and typecheck before declaring any task done.
 
 ## UI
 
-Every screen looks and behaves like an app the platform itself ships: Apple's
-Human Interface Guidelines on iOS, Material 3 on Android. Veeloe's own look
-(quiet surfaces, colour only on a Character and on state) sits on top of that,
-never in place of it.
+Veeloe's brand is monochrome with a cool, faintly blue cast, the same on every
+platform; the platform's
+own patterns carry the structure. The design system (tokens, components,
+widgets, guidelines) is the reference: https://claude.ai/artifact/FLFrmUHanU1rdq7qF6bR8R
 
+- Navigation, headers, the back button, alerts and the menus a control opens
+  are the platform's: Apple's Human Interface Guidelines on iOS, Material 3 on
+  Android. Never rebuild them.
+- Buttons, chips, cards, bubbles and everything else on the page are ours,
+  from `src/shared/ui` (`Button`, `Card`, `Text`, `Icon`, `Label`): pills for
+  buttons and chips, one ink `primary` pill per view, white cards lifted off
+  the light-grey screen by a soft shadow, headings at medium weight. No borders
+  or divider lines: space, surface and shadow set things apart. Each keeps a pressed state, a role and a 44pt
+  target.
 - Before writing or changing a screen, load the `expo-native-ui` and
-  `expo-design-system` skills, and look in `@expo/ui` before building a control
-  by hand; its universal components run on iOS, Android and web.
-- Colours are the semantic ones from `Color` in `expo-router`, gathered in
-  `src/shared/ui/theme.ts`; never a hex value in a screen. Icons are
-  `expo-symbols` with an SF Symbol and a Material name; never emoji.
+  `expo-design-system` skills.
+- Colours come from `src/shared/ui/theme.ts` only: ink on a light blue-grey,
+  white on a blue-tinted near-black, cool greys; hues are state, on icons. Never a hex value in a
+  screen. Icons are `Icon` (SF Symbol on iOS, Material on Android and web);
+  never emoji. Motion uses `motion` from the theme: short and eased out.
+- A component is the smallest piece of UI with one job (`Text`, `Icon`,
+  `Label`, `Button`, `Card`, `Character`, `TaskStatus`); a widget composes
+  components into one part of a screen (the Approval card, the composer, the
+  inbox). Change one in the design system and the code together.
 - Name the app a screen follows (Mail for the inbox, Messages for a Task) and
-  match it: large titles, inset separators, the native back button,
-  continuous corners and haptics on iOS.
+  match its structure.
 - A screen is done once it has run on the iOS Simulator and on web, in light
   and dark, with a screenshot of each. Checking on web alone is not enough,
   because web draws the header differently.

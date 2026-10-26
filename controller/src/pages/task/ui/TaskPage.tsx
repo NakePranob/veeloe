@@ -1,24 +1,25 @@
 import { Stack, useLocalSearchParams } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
 import { useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, ScrollView, View, type ScrollViewInstance, type TextInputInstance, type ViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Character, useAgent } from "../../../entities/agent";
 import { approvals, queued, statusOf, TaskStatus, toolResults, turnOpen, useTask, type TaskEvent } from "../../../entities/task";
 import { ago, useNow } from "../../../shared/lib";
-import { column, Label, onTint, radius, space, Text, useColors } from "../../../shared/ui";
+import { column, Label, radius, space, Text, useColors } from "../../../shared/ui";
 import { items } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
 import { Composer } from "./Composer";
 import { ToolCalls } from "./ToolCalls";
 
-// The Member's message, in a blue bubble on the right as in Messages.
+// The Member's message, in an accent bubble on the right as in Messages.
 function Bubble({ text, queued: waiting, agent }: { text: string; queued: boolean; agent: string }) {
   const colors = useColors();
   return (
     <View style={{ alignSelf: "flex-end", alignItems: "flex-end", maxWidth: "80%", gap: space.xs }}>
-      <View style={{ paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: colors.blue }}>
-        <Text selectable style={{ color: onTint }}>
+      <View style={{ paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: colors.accent }}>
+        <Text selectable style={{ color: colors.onAccent }}>
           {text}
         </Text>
       </View>
@@ -31,7 +32,7 @@ function Bubble({ text, queued: waiting, agent }: { text: string; queued: boolea
   );
 }
 
-// Laid out like Messages: the Agent at the top, your messages in blue bubbles
+// Laid out like Messages: the Agent at the top, your messages in accent bubbles
 // on the right. The Agent's replies have no bubble, because they run long and carry code.
 export function TaskPage() {
   const { task: id } = useLocalSearchParams<{ task: string }>();
@@ -42,6 +43,8 @@ export function TaskPage() {
   const frame = useRef<ViewInstance>(null);
   const [top, setTop] = useState(0);
   const scroll = useRef<ScrollViewInstance>(null);
+  const size = useRef({ content: 0, view: 0 });
+  const headerHeight = useHeaderHeight();
   const input = useRef<TextInputInstance>(null);
 
   if (!task || !agent) {
@@ -59,6 +62,15 @@ export function TaskPage() {
   const waitingMessages = queued(task.events);
   const approvalStatus = approvals(task.events, now);
   const results = toolResults(task.events);
+
+  // scrollToEnd clamps at 0, but under iOS 26's glass header the list rests above 0 by
+  // the header's height, so a short Task would slide its first lines under the header.
+  // Scroll only as far as the end needs, and not at all when everything fits.
+  function toEnd(animated: boolean) {
+    const { content, view } = size.current;
+    const y = content - view;
+    if (view && y > top - headerHeight) scroll.current?.scrollTo({ y, animated });
+  }
 
   function render(event: TaskEvent) {
     switch (event.type) {
@@ -101,9 +113,15 @@ export function TaskPage() {
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[column, { padding: space.lg, gap: space.lg }]}
-          onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}
+          onContentSizeChange={(_w, h) => {
+            size.current.content = h;
+            toEnd(false);
+          }}
           // The view shrinks when the keyboard opens; keep the latest event above the composer, as Messages does.
-          onLayout={() => scroll.current?.scrollToEnd({ animated: true })}
+          onLayout={(e) => {
+            size.current.view = e.nativeEvent.layout.height;
+            toEnd(true);
+          }}
         >
           {/* The Agent's name with what it is doing under it, so the state stays in view however far the log scrolls. */}
           <Stack.Screen

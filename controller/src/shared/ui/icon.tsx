@@ -8,8 +8,9 @@ const SYMBOLS = {
   done: { ios: "checkmark.circle.fill", android: "check_circle", web: "check_circle" },
   failed: { ios: "xmark.circle.fill", android: "cancel", web: "cancel" },
   stopped: { ios: "stop.circle", android: "stop_circle", web: "stop_circle" },
-  stop: { ios: "stop.circle.fill", android: "stop_circle", web: "stop_circle" },
-  send: { ios: "arrow.up.circle.fill", android: "arrow_circle_up", web: "arrow_circle_up" },
+  // Drawn inside a Button circle, so plain glyphs rather than circled ones.
+  stop: { ios: "stop.fill", android: "stop", web: "stop" },
+  send: { ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" },
   time: { ios: "clock", android: "schedule", web: "schedule" },
   info: { ios: "info.circle", android: "info", web: "info" },
   inbox: { ios: "tray", android: "inbox", web: "inbox" },

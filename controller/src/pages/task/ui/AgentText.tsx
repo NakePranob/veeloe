@@ -15,7 +15,7 @@ function Pieces({ inline }: { inline: Inline[] }) {
     if (piece.link) {
       const url = piece.link;
       return (
-        <Text key={i} role="link" style={{ color: colors.blue }} onPress={() => Linking.openURL(url)}>
+        <Text key={i} role="link" style={{ color: colors.accent, textDecorationLine: "underline" }} onPress={() => Linking.openURL(url)}>
           {piece.text}
         </Text>
       );
