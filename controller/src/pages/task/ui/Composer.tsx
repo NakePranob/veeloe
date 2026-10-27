@@ -1,8 +1,7 @@
-import { Host, Picker } from "@expo/ui";
 import { useState, type Ref } from "react";
 import { Alert, TextInput, View, type TextInputInstance } from "react-native";
 import { sendMessage, stopTurn, type Effort } from "../../../entities/task";
-import { Button, Card, column, radius, space, type, useColors } from "../../../shared/ui";
+import { Button, Card, column, Select, space, type, useColors } from "../../../shared/ui";
 
 const EFFORTS: { value: Effort; label: string }[] = [
   { value: "low", label: "Effort ต่ำ" },
@@ -65,16 +64,7 @@ export function Composer({ agent, taskId, busy, inputRef }: Props) {
           style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
         />
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          {/* The menu itself stays the platform's; only its trigger wears the chip. */}
-          <View style={{ minHeight: 36, paddingHorizontal: space.xs, justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.chip }}>
-            <Host matchContents seedColor={colors.accent}>
-              <Picker selectedValue={effort} onValueChange={setEffort} appearance="menu">
-                {EFFORTS.map((item) => (
-                  <Picker.Item key={item.value} label={item.label} value={item.value} />
-                ))}
-              </Picker>
-            </Host>
-          </View>
+          <Select label="Effort" value={effort} options={EFFORTS} onChange={setEffort} />
           {stopping ? (
             <Button label="หยุด" icon="stop" variant="primary" onPress={() => confirmStop(agent, () => stopTurn(taskId))} />
           ) : (

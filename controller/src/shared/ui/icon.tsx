@@ -17,6 +17,8 @@ const SYMBOLS = {
   disclosure: { ios: "chevron.right", android: "chevron_right", web: "chevron_right" },
   expand: { ios: "chevron.down", android: "expand_more", web: "expand_more" },
   collapse: { ios: "chevron.up", android: "expand_less", web: "expand_less" },
+  // On a Select's chip: a menu of options opens here.
+  choose: { ios: "chevron.up.chevron.down", android: "unfold_more", web: "unfold_more" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 
 export type IconName = keyof typeof SYMBOLS;
