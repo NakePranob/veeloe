@@ -61,6 +61,8 @@ export function RootLayout() {
             {/* In split view the inbox is already beside the Task, so there is nothing to go back to.
                 Web ignores headerBackVisible when a deep link anchors the inbox underneath, hence headerLeft. */}
             <Stack.Screen name="tasks/[task]" options={split ? { headerBackVisible: false, headerLeft: () => null } : {}} />
+            {/* Slides up over the Task as a sheet; on web, where the stack shows one screen, it is a page. */}
+            <Stack.Screen name="agents/[agent]/character" options={{ presentation: "formSheet" }} />
           </Stack>
         </View>
       </View>

@@ -2,17 +2,19 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import { motion, useColors, type Colors } from "../../../shared/ui";
-import type { Agent, Decal, Shell, Sides, Top } from "../model/agents";
+import { lookOf, type Decal, type Look, type Shell, type Sides, type Top } from "../model/look";
 
 // What the Agent is doing, as the Task entity works it out (moodOf). It moves the head, never the look.
 type Mood = "idle" | "thinking" | "working" | "waiting" | "done" | "offline";
 
 interface Props {
-  agent: Agent;
+  look: Look;
   mood: Mood;
   size?: number;
   // What it floats over, so the ring around the raised hand reads as a cut-out, not an outline.
   backdrop?: keyof Colors;
+  // Holds the pose without moving, as when motion is reduced: for a grid of options.
+  still?: boolean;
 }
 
 // A screen and its LEDs look the same in light and dark, like the hardware they draw.
@@ -136,16 +138,17 @@ function DecalPart({ decal, visor: [vx, vy, vw, vh], c }: { decal: Decal; visor:
 // A floating robot head drawn 2.5D: a lit front over a darker wall, a screen set into it. Turning slides
 // the screen toward the turn and the wall and side parts against it. Who it is never changes with the
 // Mood; offline is the one exception, greyed out because the Agent can't be reached.
-export function Character({ agent, mood, size = 44, backdrop = "background" }: Props) {
+export function Character({ look: given, mood, size = 44, backdrop = "background", still }: Props) {
   const colors = useColors();
-  const reduce = useReduceMotion();
+  const reduce = useReduceMotion() || !!still;
   const id = useId().replace(/[^\w-]/g, "");
-  const s = SHELLS[agent.shell];
+  const look = lookOf(given);
+  const s = SHELLS[look.shell];
   const [vx, vy, vw, vh, vr] = s.visor;
   const fy = vy + vh / 2;
   const u = size / 100;
 
-  const base = mood === "offline" ? grey(agent.color) : agent.color;
+  const base = mood === "offline" ? grey(look.color) : look.color;
   const part = mix(base, 0.42);
   const wall = mix(base, 0.28);
   const low = mix(base, 0.1);
@@ -284,7 +287,7 @@ export function Character({ agent, mood, size = 44, backdrop = "background" }: P
                 ]}
               >
                 <Layer style={{ transform: [slide(-4)] }}>
-                  <SidePart sides={agent.sides} x={s.side} y={fy} c={part} />
+                  <SidePart sides={look.sides} x={s.side} y={fy} c={part} />
                 </Layer>
                 {/* The top part sways with the float and boings after a hop, a beat behind the head. */}
                 <Animated.View
@@ -294,7 +297,7 @@ export function Character({ agent, mood, size = 44, backdrop = "background" }: P
                   ]}
                 >
                   <Layer style={{ transformOrigin: `50% ${s.top}%`, transform: [slide(2.5), { rotate: deg(v.float, [0, 1], [-3, 3]) }] }}>
-                    <TopPart top={agent.top} y={s.top} c={part} />
+                    <TopPart top={look.top} y={s.top} c={part} />
                   </Layer>
                 </Animated.View>
                 <Layer style={{ transform: [slide(-4.5), { translateY: 5 * u }] }}>
@@ -326,7 +329,7 @@ export function Character({ agent, mood, size = 44, backdrop = "background" }: P
                         <Stop offset={1} stopColor={SCREEN_BOTTOM} />
                       </LinearGradient>
                     </Defs>
-                    <DecalPart decal={agent.decal} visor={s.visor} c={part} />
+                    <DecalPart decal={look.decal} visor={s.visor} c={part} />
                     <Rect x={vx} y={vy} width={vw} height={vh} rx={vr} fill={mood === "offline" ? SCREEN : `url(#${id}v)`} />
                     <Path d={`M${vx + 4} ${vy + vh - 4}L${vx + 10} ${vy + 4}h4L${vx + 8} ${vy + vh - 4}Z`} fill="#ffffff" opacity={0.1} />
                   </Layer>

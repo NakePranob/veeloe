@@ -80,7 +80,7 @@ function InboxRow({ agent, task, status, now, selected, replace }: Row & { now: 
                 backgroundColor: colors[fill],
               }}
             >
-              <Character agent={agent} mood={moodOf(task.events, agent.machine.online, now)} size={AVATAR} backdrop={fill} />
+              <Character look={agent.character} mood={moodOf(task.events, agent.machine.online, now)} size={AVATAR} backdrop={fill} />
               <View style={{ flex: 1, gap: space.xs / 2 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
                   <Text variant="headline" numberOfLines={1} style={{ flexShrink: 1 }}>

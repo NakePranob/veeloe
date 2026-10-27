@@ -1,12 +1,12 @@
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Link, Stack, useLocalSearchParams } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { useRef, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, ScrollView, View, type ScrollViewInstance, type TextInputInstance, type ViewInstance } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, View, type ScrollViewInstance, type TextInputInstance, type ViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Character, useAgent } from "../../../entities/agent";
 import { approvals, moodOf, queued, statusOf, TaskStatus, toolResults, turnOpen, useTask, type TaskEvent } from "../../../entities/task";
 import { ago, useNow } from "../../../shared/lib";
-import { column, Label, radius, space, Text, useColors } from "../../../shared/ui";
+import { column, Label, motion, radius, space, Text, useColors } from "../../../shared/ui";
 import { items } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
@@ -138,7 +138,16 @@ export function TaskPage() {
             }}
           />
           <View style={{ alignItems: "center", gap: space.xs, paddingBottom: space.sm }}>
-            <Character agent={agent} mood={moodOf(task.events, agent.machine.online, now)} size={56} />
+            {/* Tapping the Agent's Character opens its editor (Link's Slot drops a style function on web, hence the inner View). */}
+            <Link href={`/agents/${agent.id}/character`} asChild>
+              <Pressable role="button" aria-label={`แก้ Character ของ ${agentName}`} hitSlop={space.xs}>
+                {({ pressed }) => (
+                  <View style={{ transform: [{ scale: pressed ? motion.press : 1 }] }}>
+                    <Character look={agent.character} mood={moodOf(task.events, agent.machine.online, now)} size={56} />
+                  </View>
+                )}
+              </Pressable>
+            </Link>
             <Text variant="footnote" tone="secondary" style={{ textAlign: "center" }}>
               {task.title}
             </Text>
