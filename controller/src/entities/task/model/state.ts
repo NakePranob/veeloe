@@ -80,6 +80,23 @@ export function statusOf(events: TaskEvent[], online: boolean, now = Date.now())
   return online ? stateOf(events, now) : "offline";
 }
 
+// How the Agent's Character carries itself (CONTEXT.md): it follows the events, the LLM never picks it.
+// ponytail: the six today's events tell apart; "delegating" and "stuck" wait for Delegation events and a
+// Turn that can end in error.
+export type Mood = "idle" | "thinking" | "working" | "waiting" | "done" | "offline";
+
+export function moodOf(events: TaskEvent[], online: boolean, now = Date.now()): Mood {
+  if (!online) return "offline";
+  if (pendingApproval(events, now)) return "waiting";
+  const start = lastIndex(events, ["turn_start"]);
+  if (turnOpen(events)) {
+    const results = toolResults(events);
+    return events.slice(start).some((event) => event.type === "tool_call" && !results.has(event.id)) ? "working" : "thinking";
+  }
+  // A Turn the Member stopped has nothing new to show them.
+  return start < 0 || lastIndex(events, ["stop"]) > start ? "idle" : "done";
+}
+
 // Messages sent during a Turn wait for it to end before the Agent reads them.
 export function queued(events: TaskEvent[]): Set<number> {
   if (!turnOpen(events)) return new Set();

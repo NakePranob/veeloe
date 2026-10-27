@@ -10,6 +10,8 @@ const light = {
   chipPressed: "#e2e7ee",
   fill: "#e8ecf2",
   separator: "#0f172a14",
+  // The soft shadow on the ground under a floating Character.
+  ground: "#0f152052",
   label: "#0f1520",
   secondaryLabel: "#5b6472",
   tertiaryLabel: "#8a93a1",
@@ -30,6 +32,7 @@ const dark: Colors = {
   chipPressed: "#2c323e",
   fill: "#222731",
   separator: "#ffffff12",
+  ground: "#000000bf",
   label: "#f5f7fa",
   secondaryLabel: "#a3acb9",
   tertiaryLabel: "#6b7480",

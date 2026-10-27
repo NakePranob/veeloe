@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { parseMarkdown, plainFirstLine } from "../../../shared/lib";
 import { demoTasks } from "./demo";
-import { approvals, pendingApproval, preview, queued, stateOf, statusOf, toolResults } from "./state";
+import { approvals, moodOf, pendingApproval, preview, queued, stateOf, statusOf, toolResults } from "./state";
 import type { EventBody, TaskEvent } from "./types";
 
 const NOW = 1_000_000_000;
@@ -53,6 +53,16 @@ test("an open Turn is working and an ended one is done", () => {
   expect(stateOf(review.events, NOW)).toBe("working");
   expect(stateOf(e2e.events, NOW)).toBe("done");
   expect(preview(e2e.events, NOW)).toBe("ผ่าน 41 จาก 42 ตัว ตัวที่พังคือ checkout › empty cart ตะกร้าว่างแล้วปุ่มชำระเงินยังกดได้");
+});
+
+test("the Character's Mood follows the events", () => {
+  expect(moodOf(deploy.events, true, NOW)).toBe("waiting");
+  expect(moodOf(deploy.events, false, NOW)).toBe("offline");
+  expect(moodOf(review.events, true, NOW)).toBe("working");
+  expect(moodOf(after(review.events, { type: "tool_result", id: "t2", ok: true, output: "" }), true, NOW)).toBe("thinking");
+  expect(moodOf(after(review.events, { type: "stop" }, { type: "turn_end" }), true, NOW)).toBe("idle");
+  expect(moodOf(e2e.events, true, NOW)).toBe("done");
+  expect(moodOf([], true, NOW)).toBe("idle");
 });
 
 test("a message sent mid-Turn is queued until the Turn ends", () => {

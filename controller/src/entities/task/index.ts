@@ -2,6 +2,7 @@ export { answerApproval, sendMessage, stopTurn, type Answer } from "./model/demo
 export {
   approvals,
   lastActivity,
+  moodOf,
   pendingApproval,
   preview,
   queued,
@@ -11,6 +12,7 @@ export {
   toolResults,
   turnOpen,
   type ApprovalStatus,
+  type Mood,
   type Status,
   type TaskState,
   type ToolResult,

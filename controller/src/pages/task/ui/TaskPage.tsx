@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, ScrollView, View, type ScrollViewInstance, type TextInputInstance, type ViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Character, useAgent } from "../../../entities/agent";
-import { approvals, queued, statusOf, TaskStatus, toolResults, turnOpen, useTask, type TaskEvent } from "../../../entities/task";
+import { approvals, moodOf, queued, statusOf, TaskStatus, toolResults, turnOpen, useTask, type TaskEvent } from "../../../entities/task";
 import { ago, useNow } from "../../../shared/lib";
 import { column, Label, radius, space, Text, useColors } from "../../../shared/ui";
 import { items } from "../model/items";
@@ -138,7 +138,7 @@ export function TaskPage() {
             }}
           />
           <View style={{ alignItems: "center", gap: space.xs, paddingBottom: space.sm }}>
-            <Character color={agent.color} status={status} size={56} />
+            <Character agent={agent} mood={moodOf(task.events, agent.machine.online, now)} size={56} />
             <Text variant="footnote" tone="secondary" style={{ textAlign: "center" }}>
               {task.title}
             </Text>

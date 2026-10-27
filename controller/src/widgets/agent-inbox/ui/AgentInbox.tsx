@@ -1,7 +1,7 @@
 import { Link } from "expo-router";
 import { FlatList, Pressable, View } from "react-native";
 import { Character, useAgents, type Agent } from "../../../entities/agent";
-import { lastActivity, preview, stateOf, statusOf, TaskStatus, useTasks, type Status, type Task } from "../../../entities/task";
+import { lastActivity, moodOf, preview, stateOf, statusOf, TaskStatus, useTasks, type Status, type Task } from "../../../entities/task";
 import { ago, useNow } from "../../../shared/lib";
 import { column, Icon, Label, radius, space, Text, useColors } from "../../../shared/ui";
 
@@ -80,7 +80,7 @@ function InboxRow({ agent, task, status, now, selected, replace }: Row & { now: 
                 backgroundColor: colors[fill],
               }}
             >
-              <Character color={agent.color} status={status} size={AVATAR} backdrop={fill} />
+              <Character agent={agent} mood={moodOf(task.events, agent.machine.online, now)} size={AVATAR} backdrop={fill} />
               <View style={{ flex: 1, gap: space.xs / 2 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
                   <Text variant="headline" numberOfLines={1} style={{ flexShrink: 1 }}>
