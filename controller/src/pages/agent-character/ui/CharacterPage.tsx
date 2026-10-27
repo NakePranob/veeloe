@@ -67,6 +67,8 @@ function Option({ section, name, selected, ring, onPress, children }: { section:
             alignItems: "center",
             gap: space.xs,
             paddingVertical: space.sm,
+            // Keeps a long name off the coloured border.
+            paddingHorizontal: space.xs,
             borderRadius: radius.lg,
             borderCurve: "continuous",
             backgroundColor: pressed ? colors.chipPressed : colors.surface,
@@ -77,7 +79,8 @@ function Option({ section, name, selected, ring, onPress, children }: { section:
           }}
         >
           {children}
-          <Text variant="caption" tone={selected ? "label" : "secondary"} strong={selected} numberOfLines={1}>
+          {/* Android's Thai is wider than iOS's: a long name shrinks a little before it is cut. */}
+          <Text variant="caption" tone={selected ? "label" : "secondary"} strong={selected} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {name}
           </Text>
         </View>

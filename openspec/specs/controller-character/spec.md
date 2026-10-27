@@ -57,7 +57,7 @@ The Controller SHALL work out the Mood from the Agent's Machine status and the T
 - **THEN** the Mood is offline
 
 ### Requirement: The Character at the top of a Task opens its editor
-The Character at the top of a Task SHALL be a button, spoken as editing that Agent's Character, that opens the Character editor for that Agent. The editor SHALL slide up as a sheet over the Task on iOS and Android and SHALL be a page with its own address on web. Opening the address of an Agent that does not exist SHALL say so and offer a way back.
+The Character at the top of a Task SHALL be a button, spoken as editing that Agent's Character, that opens the Character editor for that Agent. The editor SHALL slide up over the Task with the platform's header holding Cancel and Done: a sheet on iOS, and a full-screen dialog on Android, whose sheet has no header. On web it SHALL be a page with its own address. Opening the address of an Agent that does not exist SHALL say so and offer a way back.
 
 #### Scenario: Open from a Task
 - **WHEN** the Member taps the Character at the top of a Task
@@ -79,7 +79,7 @@ The editor SHALL show the look being edited large, and the same look at inbox si
 - **THEN** the large preview and every inbox-size Mood preview show the new shell
 
 ### Requirement: Picking edits a draft until Done
-The editor SHALL offer every shell, colour, top part, side part and decal, with the Agent's current values selected. Picking an option SHALL change only the editor's draft. Done SHALL apply the whole draft to the Agent at once, and every screen showing that Agent SHALL then draw the new look. Cancel, or dismissing the sheet, SHALL leave the Agent's look unchanged.
+The editor SHALL offer every shell, colour, top part, side part and decal, with the Agent's current values selected. Picking an option SHALL change only the editor's draft. Done SHALL apply the whole draft to the Agent at once, and every screen showing that Agent SHALL then draw the new look. Cancel, or dismissing the editor by swiping the sheet down or with Android's back, SHALL leave the Agent's look unchanged.
 
 #### Scenario: Done applies the draft
 - **WHEN** the Member picks a new colour and a new top part and taps Done
@@ -92,6 +92,14 @@ The editor SHALL offer every shell, colour, top part, side part and decal, with 
 #### Scenario: Swiping the sheet away
 - **WHEN** the Member picks a new decal and swipes the sheet down
 - **THEN** the Agent keeps its old decal everywhere
+
+#### Scenario: Going back on Android
+- **WHEN** the Member picks a new decal on Android and presses back
+- **THEN** the editor closes and the Agent keeps its old decal everywhere
+
+#### Scenario: Done and Cancel on Android
+- **WHEN** the Member opens the editor on Android
+- **THEN** the header shows Cancel, the Agent's name and Done, as on iOS
 
 ### Requirement: Shuffle avoids looks already in use
 The editor SHALL offer a shuffle that fills the draft with a random shell, colour and parts. The shuffled look SHALL differ from the look of every other Agent in the Workspace.
