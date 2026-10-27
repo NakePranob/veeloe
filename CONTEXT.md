@@ -1,6 +1,6 @@
 # Veeloe
 
-ระบบ Agent ที่ติดตั้งลงหลายเครื่อง ทำงานร่วมกันเป็นทีมข้ามเครื่องได้ และสั่งการได้จากทุกที่ผ่านแอปมือถือ
+ระบบ Agent ที่ติดตั้งลงหลายเครื่อง Agent บนเครื่องเดียวกันทำงานร่วมกันเป็นทีมได้ และสั่งการได้จากทุกที่ผ่านแอปมือถือ
 
 ## Language
 
@@ -27,7 +27,7 @@ Member ที่ทำ Pairing ได้ เพิ่มหรือลบ Membe
 _Avoid_: Admin, root
 
 **Grant**:
-สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งและดู Task), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist และเส้นใน Flow ที่ชี้เข้าหา Agent ตัวนี้) ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
+สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งและดู Task), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, เส้นใน Flow ที่ชี้เข้าหา Agent ตัวนี้ และตั้ง Agent ตัวนี้เป็น Entry ของ Team) ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
 _Avoid_: Role, permission, ACL
 
 **Controller**:
@@ -47,7 +47,7 @@ _Avoid_: Registration, enroll
 _Avoid_: Login, sign-in, device registration
 
 **Hub**:
-บริการกลางที่เรา host ส่งต่อข้อความระหว่าง Controller กับ Runtime และระหว่าง Runtime ด้วยกัน และตรวจว่า Delegation เดินตามเส้นใน Flow ไม่รัน Agent และไม่ถือ key ของ LLM
+บริการกลางที่เรา host ส่งต่อข้อความระหว่าง Controller กับ Runtime ไม่รัน Agent และไม่ถือ key ของ LLM
 _Avoid_: Server, gateway, relay, broker
 
 **Protocol**:
@@ -69,7 +69,7 @@ _Avoid_: Avatar, persona, mascot
 _Avoid_: Emotion, expression, animation
 
 **Workdir**:
-โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้
+โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Agent ที่อยู่ Team เดียวกันอ่าน Workdir ของกันได้แต่เขียนไม่ได้
 _Avoid_: Workspace, project, sandbox
 
 **Egress**:
@@ -85,12 +85,16 @@ _Avoid_: Permissions, whitelist, rules
 _Avoid_: Confirmation, consent, prompt
 
 **Task**:
-บทสนทนาหนึ่งเรื่องระหว่างผู้ใช้กับ Agent ตัวใดก็ได้ คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น
+บทสนทนาหนึ่งเรื่องระหว่าง Member กับ Agent ตัวหนึ่ง หรือกับ Team หนึ่ง คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น ส่วน Task ของ Team เป็นของ Entry
 _Avoid_: Chat, thread, session, job, run
 
 **Turn**:
 ช่วงที่ Agent ลงมือทำงานเพื่อตอบข้อความหนึ่งข้อความใน Task เริ่มเมื่อได้รับข้อความ และจบเมื่อ Agent ตอบเสร็จหรือถูก Stop ระหว่าง Turn รวมถึงตอนรอ Approval Agent จะไม่ว่าง ส่วน Task ที่เปิดค้างไว้ไม่ได้ถือ Agent
 _Avoid_: Run, step, iteration
+
+**Schedule**:
+ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Team ทุกรอบ เป็นทางเดียวที่งานจะเริ่มได้โดยไม่มีคนพิมพ์ ทำในนามของ Member ที่ตั้ง และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox
+_Avoid_: Heartbeat, cron, automation, routine, trigger
 
 **Stop**:
 การสั่งให้ Turn ที่กำลังทำอยู่จบทันที พร้อมกับ Turn ของ Task ย่อยทั้งหมดที่อยู่ใต้ Task นั้น ไฟล์ที่แก้ไปแล้วคงสภาพเดิม และ Task ยังคุยต่อได้
@@ -98,21 +102,25 @@ _Avoid_: Cancel, abort, kill, close
 
 ### ทีม
 
-**Delegation**:
-การที่ Agent สร้าง Task ย่อยส่งให้ Agent อีกตัว ซึ่งอาจอยู่บน Machine อื่น เป็นทางเดียวที่งานจะข้ามเครื่องได้ ทำได้เฉพาะตามเส้นใน Flow และทำในนามของ Member ที่เริ่ม Task ต้นทางเสมอ
-_Avoid_: Handoff, dispatch
+**Team**:
+กลุ่ม Agent ที่ตั้งชื่อไว้ อยู่บน Machine เดียวกัน มี Flow และ Entry ของตัวเอง Member สั่งงานทีมด้วยการเริ่ม Task กับ Team ซึ่งเป็นทางเดียวที่ Delegation จะเกิดได้ Agent ตัวหนึ่งอยู่ได้หลาย Team
+_Avoid_: Swarm, crew, squad, group
+
+**Entry**:
+Agent ใน Team ที่รับข้อความของ Member ใน Task ของ Team นั้น Team หนึ่งมี Entry ตัวเดียว
+_Avoid_: Lead, leader, manager, orchestrator
 
 **Flow**:
-ผังที่ผู้ใช้วาดว่า Agent ตัวไหน Delegation ให้ตัวไหนได้ ถ้าไม่มีเส้นก็ส่งไม่ได้ ส่วนจะส่งเมื่อไหร่ Agent เป็นคนตัดสินใจเอง
+ผังของ Team หนึ่งที่ Member วาดว่า Agent ตัวไหน Delegation ให้ตัวไหนได้ เส้นแต่ละเส้นบอกว่าใช้ส่งงานแบบไหนและส่งข้ามได้กี่ครั้งต่อ Turn ถ้าไม่มีเส้นก็ส่งไม่ได้ ส่วนจะส่งเมื่อไหร่ Agent เป็นคนตัดสินใจเอง
 _Avoid_: Workflow, pipeline, graph
+
+**Delegation**:
+การที่ Agent ใน Task ของ Team สร้าง Task ย่อยส่งให้ Agent อีกตัวตามเส้นใน Flow หรือส่งข้อความต่อใน Task ย่อยเดิม เช่น ตีงานกลับให้แก้ ทำในนามของ Member ที่เริ่ม Task ต้นทางเสมอ
+_Avoid_: Handoff, dispatch
 
 **Subagent**:
 ตัวช่วยชั่วคราวที่ Agent สร้างขึ้นเองระหว่างทำ Task อยู่บน Machine เดียวกับ Agent แม่ อ่านได้อย่างเดียว ส่ง Delegation ไม่ได้ ไม่มี Character และหายไปทันทีที่ส่งคำตอบกลับ ไม่ได้สร้าง Task ใหม่
 _Avoid_: Helper, child agent, worker
-
-**Team**:
-กลุ่ม Agent ที่ร่วมทำ Task ชิ้นหนึ่ง เกิดขึ้นเองจาก Delegation ตามเส้นใน Flow โดยไม่ต้องตั้งไว้ล่วงหน้า
-_Avoid_: Swarm, crew, cluster
 
 ### LLM
 

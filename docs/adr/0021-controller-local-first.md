@@ -1,6 +1,6 @@
 # Controller เป็นแบบ local-first: ข้อมูลทุกอย่างลง SQLite บนเครื่องก่อน
 
-Controller ต้องรวม event log จาก Runtime หลายเครื่อง (ADR 0018) กับ metadata จาก Hub ต้องแสดงสิ่งที่เคยเห็นได้แม้ไม่มีสัญญาณ (ADR 0005) และต้องคำนวณ Mood จาก event ข้อมูลทุกอย่างที่ได้รับจึงเขียนลง expo-sqlite บนเครื่องก่อนเสมอ ทั้ง event ของ Task และ metadata ของ Machine, Agent และ Flow หน้าจออ่านจาก database แบบ live query ส่วนการ sync แยกเป็นอีกตัวหนึ่ง ทำหน้าที่ขอ "event หลังเลข N" ของแต่ละ Task หน้าจอกับการ sync จึงไม่ผูกกัน และแอปมีทางเดินข้อมูลแค่ทางเดียว การนำทางใช้ Expo Router เพื่อให้แตะ push แล้วเปิดตรงไปที่หน้า Approval ได้ และมี URL บนเว็บ
+Controller ต้องรวม event log กับ Team และ Flow จาก Runtime หลายเครื่อง (ADR 0018, 0026) กับ metadata จาก Hub ต้องแสดงสิ่งที่เคยเห็นได้แม้ไม่มีสัญญาณ (ADR 0005) และต้องคำนวณ Mood จาก event ข้อมูลทุกอย่างที่ได้รับจึงเขียนลง expo-sqlite บนเครื่องก่อนเสมอ ทั้ง event ของ Task และ metadata ของ Machine, Agent, Team และ Flow หน้าจออ่านจาก database แบบ live query ส่วนการ sync แยกเป็นอีกตัวหนึ่ง ทำหน้าที่ขอ "event หลังเลข N" ของแต่ละ Task หน้าจอกับการ sync จึงไม่ผูกกัน และแอปมีทางเดินข้อมูลแค่ทางเดียว การนำทางใช้ Expo Router เพื่อให้แตะ push แล้วเปิดตรงไปที่หน้า Approval ได้ และมี URL บนเว็บ
 
 ## Considered Options
 
