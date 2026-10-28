@@ -1,0 +1,1348 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Answers one question: "what does Veeloe v0.1 look like end to end?"
+  One HTML file, no build, nothing is sent anywhere, state lives in memory.
+  The left panel walks through each v0.1 issue; the phone is free to click.
+  The Team editor has three layouts (?variant=A|B|C), switched from the bar at the bottom.
+  Copies the Controller's tokens (src/shared/ui/theme.ts) and Character (src/entities/agent/ui/Character.tsx) by hand.
+-->
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veeloe v0.1 Prototype</title>
+<style>
+:root {
+  --page: #e6eaf0; --bg: #f3f5f8; --surface: #ffffff; --chip: #eef1f5; --chipPressed: #e2e7ee; --fill: #e8ecf2;
+  --label: #0f1520; --label2: #5b6472; --label3: #8a93a1; --accent: #0f1520; --onAccent: #ffffff;
+  --orange: #ff9500; --green: #34c759; --red: #ff3b30; --ground: #0f152052; --scrim: rgba(15, 21, 32, .32);
+  --sh: 0 1px 2px 0 rgba(15, 23, 42, .04), 0 8px 24px 0 rgba(15, 23, 42, .06);
+  --raised: 0 2px 6px 0 rgba(15, 23, 42, .05), 0 12px 32px 0 rgba(15, 23, 42, .09);
+  --phone: 0 30px 80px rgba(15, 23, 42, .18);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #07090c; --bg: #0e1116; --surface: #181c23; --chip: #232833; --chipPressed: #2c323e; --fill: #222731;
+    --label: #f5f7fa; --label2: #a3acb9; --label3: #6b7480; --accent: #f5f7fa; --onAccent: #0e1116;
+    --orange: #ff9f0a; --green: #30d158; --red: #ff453a; --ground: #000000bf; --scrim: rgba(0, 0, 0, .5);
+    --sh: 0 1px 2px 0 rgba(0, 0, 0, .30), 0 8px 24px 0 rgba(0, 0, 0, .35);
+    --raised: 0 2px 6px 0 rgba(0, 0, 0, .35), 0 12px 32px 0 rgba(0, 0, 0, .45);
+    --phone: 0 30px 80px rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #07090c; --bg: #0e1116; --surface: #181c23; --chip: #232833; --chipPressed: #2c323e; --fill: #222731;
+  --label: #f5f7fa; --label2: #a3acb9; --label3: #6b7480; --accent: #f5f7fa; --onAccent: #0e1116;
+  --orange: #ff9f0a; --green: #30d158; --red: #ff453a; --ground: #000000bf; --scrim: rgba(0, 0, 0, .5);
+  --sh: 0 1px 2px 0 rgba(0, 0, 0, .30), 0 8px 24px 0 rgba(0, 0, 0, .35);
+  --raised: 0 2px 6px 0 rgba(0, 0, 0, .35), 0 12px 32px 0 rgba(0, 0, 0, .45);
+  --phone: 0 30px 80px rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--page); color: var(--label); }
+body { font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Noto Sans Thai", "Sukhumvit Set", sans-serif; -webkit-font-smoothing: antialiased; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+code, .mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+b, strong { font-weight: 600; }
+
+/* Prototype chrome: deliberately not the app's look. */
+.proto { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 10px 16px; background: repeating-linear-gradient(-45deg, #1b1f27, #1b1f27 10px, #222731 10px, #222731 20px); color: #f5f7fa; font-size: 13px; }
+.proto b { letter-spacing: .08em; }
+.proto .actions { display: flex; gap: 8px; }
+.proto button { background: #f5f7fa; color: #0f1520; border: 0; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 410px; gap: 24px; max-width: 1180px; margin: 0 auto; padding: 20px 16px 96px; align-items: start; }
+@media (max-width: 920px) { .layout { grid-template-columns: minmax(0, 1fr); } .device { order: -1; } }
+
+/* Walkthrough panel */
+.guide { display: grid; gap: 12px; min-width: 0; }
+.guide h2 { font-size: 22px; font-weight: 500; margin: 0; }
+.guide .lede { color: var(--label2); margin: 0; }
+.gtabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.gtabs button { border: 0; border-radius: 999px; padding: 6px 14px; background: var(--chip); font-weight: 600; font-size: 14px; }
+.gtabs button.on { background: var(--accent); color: var(--onAccent); }
+.gcard { background: var(--surface); border-radius: 22px; box-shadow: var(--sh); padding: 14px 16px; min-width: 0; }
+.gstep { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 10px 6px; border-radius: 16px; }
+.gstep:hover { background: var(--chip); }
+.gstep.on { background: var(--chip); }
+.gstep .n { width: 28px; height: 28px; border-radius: 999px; background: var(--fill); display: grid; place-items: center; font-weight: 600; font-size: 13px; }
+.gstep.on .n { background: var(--accent); color: var(--onAccent); }
+.gstep .tt { font-weight: 600; }
+.gstep .iss { color: var(--label3); font-size: 12px; margin-left: 6px; font-weight: 400; }
+.gstep .dd { color: var(--label2); font-size: 14px; }
+.gnext { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.sim h3, .gcard h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.narr { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.narr li { font-size: 14px; color: var(--label2); }
+.narr li:first-child { color: var(--label); }
+pre.state { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--label2); max-height: 340px; overflow: auto; }
+.later { display: grid; gap: 10px; }
+.later div { font-size: 14px; color: var(--label2); }
+.later b { color: var(--label); }
+
+/* Phone */
+.device { position: sticky; top: 16px; min-width: 0; }
+.phone { position: relative; width: min(390px, 100%); height: clamp(620px, calc(100vh - 100px), 820px); margin: 0 auto; background: var(--bg); border-radius: 44px; overflow: hidden; box-shadow: var(--phone); display: flex; flex-direction: column; }
+@media (max-width: 920px) { .device { position: static; } }
+.nav { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 52px; padding: 10px 12px 0; }
+.nav-title { font-weight: 600; text-align: center; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-back { justify-self: start; display: flex; align-items: center; gap: 2px; border: 0; background: none; color: var(--label); padding: 6px 4px; font-weight: 500; }
+.nav-right { justify-self: end; display: flex; gap: 6px; }
+.scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 16px 24px; overscroll-behavior: contain; }
+.large { font-size: 32px; font-weight: 500; margin: 2px 4px 12px; letter-spacing: -.01em; }
+.tabs { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px 8px 16px; background: var(--bg); }
+.tabs button { border: 0; background: none; display: grid; justify-items: center; gap: 2px; font-size: 11px; color: var(--label3); padding: 4px 0; }
+.tabs button.on { color: var(--label); }
+
+/* Our components */
+.card { background: var(--surface); border-radius: 22px; box-shadow: var(--sh); padding: 16px; margin-bottom: 12px; }
+.btn { border: 0; border-radius: 999px; min-height: 36px; padding: 0 16px; background: var(--chip); color: var(--label); font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: transform .15s cubic-bezier(.22, 1, .36, 1); }
+.btn:active { transform: scale(.97); background: var(--chipPressed); }
+.btn.primary { background: var(--accent); color: var(--onAccent); }
+.btn[disabled] { color: var(--label3); background: var(--chip); cursor: default; transform: none; }
+.btn.round { width: 36px; padding: 0; }
+.btn.sm { min-height: 30px; font-size: 13px; padding: 0 12px; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.sec { color: var(--label2); font-size: 13px; font-weight: 600; margin: 16px 8px 6px; }
+.hint { display: flex; gap: 6px; align-items: center; color: var(--label2); font-size: 13px; margin: 0 8px 8px; }
+.sub { color: var(--label2); font-size: 14px; }
+.sub2 { color: var(--label3); font-size: 13px; }
+.tag { display: inline-block; background: var(--accent); color: var(--onAccent); font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 2px; }
+.tag.q { background: var(--fill); color: var(--label2); }
+.pill-sm { display: inline-flex; align-items: center; gap: 3px; background: var(--fill); color: var(--label2); border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 600; }
+.ic { display: inline-block; flex: none; vertical-align: -3px; }
+.c-orange { color: var(--orange); } .c-green { color: var(--green); } .c-red { color: var(--red); } .c-3 { color: var(--label3); } .c-2 { color: var(--label2); }
+
+/* Inbox rows, laid out like Mail */
+.row { display: flex; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 12px 8px; border-radius: 18px; color: inherit; }
+.row:hover { background: var(--chip); }
+.row-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.row-top { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.row-top b { font-weight: 500; font-size: 17px; white-space: nowrap; }
+.row-top .sub { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status { color: var(--label2); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status.em { color: var(--label); font-weight: 600; }
+.preview { color: var(--label2); font-size: 15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cluster { position: relative; width: 52px; height: 44px; flex: none; }
+.cluster .head { position: absolute; }
+
+/* Character */
+.head { display: inline-block; flex: none; position: relative; line-height: 0; }
+.head svg { display: block; overflow: visible; }
+.m-offline { opacity: .5; }
+@keyframes float { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+@keyframes nod { to { transform: translateY(2px) rotate(2deg); } }
+@keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+@keyframes pulse { to { opacity: .25; } }
+@keyframes scan { to { transform: translateX(var(--scan)); } }
+@keyframes wave { from { transform: rotate(-10deg); } to { transform: rotate(14deg); } }
+.m-idle .fl, .m-done .fl { animation: float 1.8s ease-in-out infinite alternate; }
+.m-thinking .fl { animation: float 2.5s ease-in-out infinite alternate; }
+.m-waiting .fl { animation: float 1.2s ease-in-out infinite alternate; }
+.m-working .nod { animation: nod .25s ease-in-out infinite alternate; transform-origin: 50px 55px; }
+.m-idle .bl, .m-thinking .bl, .m-working .bl, .m-waiting .bl { animation: blink 4s infinite; }
+.pulse { animation: pulse .6s ease-in-out infinite alternate; }
+.scan { animation: scan .9s ease-in-out infinite alternate; }
+.hand { animation: wave .8s ease-in-out infinite alternate; }
+.still * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .head * { animation: none !important; } }
+
+/* Task, laid out like Messages (pages/task/ui/TaskPage.tsx) */
+.nav-title { line-height: 1.2; font-size: 17px; }
+.nav-back { font-size: 17px; font-weight: 400; }
+.nav-title .cap { justify-content: center; }
+.plain { border: 0; background: none; padding: 0; color: inherit; }
+.plain:active { transform: scale(.97); }
+.task-top { display: grid; justify-items: center; gap: 4px; padding: 8px 0 16px; text-align: center; }
+.foot2 { font-size: 13px; color: var(--label2); }
+.cap { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--label2); font-weight: 400; }
+.chat { display: grid; gap: 16px; padding-top: 4px; }
+.me { justify-self: end; display: grid; justify-items: end; gap: 4px; max-width: 80%; }
+.me .bubble { background: var(--accent); color: var(--onAccent); padding: 8px 12px; border-radius: 18px; white-space: pre-wrap; word-wrap: break-word; font-size: 17px; }
+.inmsg { display: grid; gap: 4px; justify-items: start; max-width: 86%; }
+.bubble.in { background: var(--chip); padding: 8px 12px; border-radius: 18px; white-space: pre-wrap; word-wrap: break-word; }
+.atext { white-space: pre-wrap; font-size: 17px; line-height: 1.4; }
+.atext code, .bubble code { font: 14px ui-monospace, Menlo, monospace; background: var(--fill); border-radius: 4px; padding: 0 3px; }
+.toolrow, .toolsum { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start; }
+.toolsum { grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; border: 0; background: none; padding: 0; text-align: left; color: var(--label2); width: 100%; }
+.toolgroup { display: grid; gap: 8px; }
+.toolrow .st, .toolsum .st { display: grid; place-items: center; height: 18px; }
+.toolrow .cmd, .toolsum .cmd { font: 13px ui-monospace, Menlo, monospace; color: var(--label2); word-break: break-all; }
+.toolsum .cmd { font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toolrow .out { font-size: 13px; color: var(--label2); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--fill); border-top-color: var(--label2); animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.lbl { display: flex; gap: 4px; align-items: center; color: var(--label2); font-size: 13px; }
+.lbl.center { justify-content: center; }
+.deleg { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; border: 0; background: var(--surface); box-shadow: var(--sh); border-radius: 18px; padding: 10px 12px; color: inherit; }
+.deleg .main { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.deleg .top { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.result { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 16px; background: var(--chip); font-size: 14px; }
+.ap { display: grid; gap: 8px; margin: 0; }
+.ap .t { display: flex; gap: 8px; align-items: center; }
+.ap .t b { flex: 1; font-weight: 500; font-size: 17px; }
+.ap .cmd { background: var(--fill); border-radius: 8px; padding: 8px 12px; }
+.composer-wrap { flex: none; padding: 8px 16px; background: var(--bg); }
+.mode { display: flex; gap: 6px; align-items: center; justify-content: center; color: var(--label2); font-size: 12px; padding: 0 8px 6px; text-align: center; }
+.composer { display: grid; gap: 4px; background: var(--surface); box-shadow: var(--raised); border-radius: 22px; padding: 8px; }
+.composer textarea { border: 0; background: none; resize: none; outline: none; min-height: 40px; max-height: 140px; padding: 8px; font-size: 17px; }
+.composer textarea::placeholder { color: var(--label3); }
+.crow { display: flex; align-items: center; justify-content: space-between; }
+.effort { border: 0; min-height: 36px; border-radius: 999px; background: var(--chip); padding: 0 12px 0 16px; font-weight: 500; font-size: 15px; display: inline-flex; gap: 4px; align-items: center; }
+.effort:active { background: var(--chipPressed); }
+.readonly { display: flex; gap: 8px; align-items: center; justify-content: space-between; background: var(--surface); box-shadow: var(--raised); border-radius: 22px; padding: 10px 10px 10px 16px; font-size: 13px; color: var(--label2); }
+/* The platform's alert, as Alert.alert draws it on iOS. */
+.ascrim { position: absolute; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 7; animation: fade .2s ease-out; }
+.alert { width: 270px; background: var(--surface); border-radius: 14px; overflow: hidden; text-align: center; box-shadow: var(--raised); }
+.alert .at { font-weight: 600; font-size: 17px; padding: 18px 16px 2px; }
+.alert .am { font-size: 13px; color: var(--label); padding: 0 16px 16px; white-space: pre-line; }
+.alert .ab { display: grid; grid-template-columns: 1fr 1fr; box-shadow: inset 0 .5px 0 var(--label3); }
+.alert .ab button { border: 0; background: none; padding: 11px; font-size: 17px; color: var(--label); }
+.alert .ab button + button { box-shadow: inset .5px 0 0 var(--label3); }
+.alert .ab .destructive { color: var(--red); font-weight: 600; }
+
+/* Team tree */
+.tree { padding: 8px; }
+.tree h4 { margin: 4px 8px 4px; font-size: 13px; color: var(--label2); font-weight: 600; }
+.trow { display: flex; gap: 8px; align-items: center; width: 100%; border: 0; background: none; border-radius: 14px; padding: 4px 8px; text-align: left; color: inherit; }
+.trow:hover, .trow.on { background: var(--chip); }
+.trow .nm { font-weight: 500; }
+.trow { flex-wrap: wrap; }
+.trow .st { color: var(--label2); font-size: 13px; flex: 1 0 auto; white-space: nowrap; }
+
+/* Team editor */
+.canvas { width: 100%; height: auto; display: block; touch-action: none; user-select: none; }
+.canvas text { font-family: inherit; fill: var(--label); }
+.canvas .nm { font-size: 13px; font-weight: 600; text-anchor: middle; }
+.canvas .edge { fill: none; stroke: var(--label3); stroke-width: 2; }
+.canvas .lbl rect { fill: var(--accent); }
+.canvas .lbl text { fill: var(--onAccent); font-size: 12px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.canvas .lbl, .canvas .node { cursor: pointer; }
+.canvas .halo { fill: var(--chip); }
+.canvas .etag rect { fill: var(--accent); } .canvas .etag text { fill: var(--onAccent); font-size: 10px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.chint { color: var(--label2); font-size: 13px; margin-bottom: 4px; }
+.ol-node { padding: 8px 0; }
+.ol-head { display: flex; gap: 10px; align-items: flex-start; }
+.ol-line { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; width: calc(100% - 46px); margin: 6px 0 0 46px; border: 0; background: var(--chip); border-radius: 14px; padding: 8px 10px; text-align: left; color: inherit; font-size: 14px; }
+.ol-line .q { grid-column: 2 / 4; color: var(--label2); font-size: 13px; font-style: italic; }
+.ol-add { margin: 6px 0 0 46px; border: 0; background: none; color: var(--label2); font-weight: 600; font-size: 13px; padding: 4px 0; }
+.ol-ref { color: var(--label3); font-size: 13px; padding: 6px 0; display: flex; gap: 6px; align-items: center; }
+.mx { width: 100%; border-collapse: separate; border-spacing: 4px; }
+.mx th { font-weight: 500; font-size: 11px; color: var(--label2); }
+.mx th .head { margin: 0 auto; display: block; }
+.cell { width: 100%; aspect-ratio: 1; min-height: 36px; border: 0; border-radius: 12px; background: var(--chip); color: var(--label3); display: grid; place-items: center; font-weight: 700; }
+.cell.on { background: var(--accent); color: var(--onAccent); }
+.cell.off { background: transparent; color: var(--label3); opacity: .6; }
+.cell.self { background: transparent; }
+.members { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* Sheets, toast, forms */
+.scrim { position: absolute; inset: 0; background: var(--scrim); display: flex; align-items: flex-end; z-index: 5; animation: fade .2s ease-out; }
+.sheet { width: 100%; max-height: 90%; overflow-y: auto; background: var(--bg); border-radius: 22px 22px 0 0; padding: 8px 16px 24px; animation: up .25s cubic-bezier(.22, 1, .36, 1); }
+.grab { width: 36px; height: 5px; border-radius: 3px; background: var(--fill); margin: 0 auto 8px; }
+.sheet-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 12px; }
+.sheet-top .tt { font-weight: 600; text-align: center; }
+.sheet-top .x { justify-self: end; }
+@keyframes up { from { transform: translateY(40px); opacity: 0; } }
+@keyframes fade { from { opacity: 0; } }
+.field { display: grid; gap: 4px; margin-bottom: 12px; }
+.field > span { font-size: 13px; color: var(--label2); font-weight: 600; margin-left: 4px; }
+.input { width: 100%; border: 0; border-radius: 14px; padding: 10px 12px; background: var(--surface); box-shadow: var(--sh); outline: none; }
+textarea.input { resize: vertical; min-height: 70px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--chip); border-radius: 999px; padding: 3px; margin-bottom: 12px; }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 6px; font-weight: 600; font-size: 14px; color: var(--label2); }
+.seg button.on { background: var(--surface); color: var(--label); box-shadow: var(--sh); }
+.pick { display: flex; gap: 10px; align-items: center; width: 100%; border: 0; background: var(--surface); box-shadow: var(--sh); border-radius: 18px; padding: 10px 12px; margin-bottom: 8px; text-align: left; color: inherit; }
+.pick.on { box-shadow: 0 0 0 2px var(--accent); }
+.pick[disabled] { opacity: .5; cursor: default; }
+.pick .main { flex: 1; min-width: 0; }
+.stepper { display: flex; align-items: center; gap: 12px; }
+.stepper b { font-size: 22px; font-weight: 500; min-width: 24px; text-align: center; }
+.kind { display: flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--label2); margin: 4px 0; }
+.qr { display: block; width: 168px; height: 168px; margin: 8px auto; background: #fff; border-radius: 16px; padding: 10px; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 88px; background: var(--accent); color: var(--onAccent); border-radius: 18px; padding: 12px 14px; font-size: 14px; z-index: 6; box-shadow: var(--raised); animation: up .25s cubic-bezier(.22, 1, .36, 1); }
+.toast .sm { opacity: .75; font-size: 13px; margin-top: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--chip); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+.onboard { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 60px 8px; }
+.onboard h1 { font-size: 34px; font-weight: 500; margin: 8px 0 0; }
+
+/* The prototype's variant switcher: not part of the design being judged. */
+.switcher { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; background: #111; color: #fff; border-radius: 999px; padding: 4px; box-shadow: 0 8px 30px rgba(0, 0, 0, .35); z-index: 50; font-size: 13px; outline: 2px dashed #ffd60a; outline-offset: 3px; max-width: calc(100vw - 32px); }
+.switcher[hidden] { display: none; }
+.switcher button { border: 0; background: #2a2f3a; color: #fff; width: 32px; height: 32px; border-radius: 999px; font-size: 16px; }
+.switcher span { padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="proto">
+  <span><b>PROTOTYPE</b> · Veeloe v0.1 ภาพรวมที่คาดหวัง · ทิ้งได้ ไม่ใช่โค้ดจริง ไม่ส่งอะไรไปไหน</span>
+  <span class="actions"><button data-g="theme">สลับสว่าง/มืด</button><button data-g="reset">เริ่มใหม่</button></span>
+</div>
+<main class="layout">
+  <section class="guide" id="guide"></section>
+  <section class="device"><div class="phone" id="phone"></div></section>
+</main>
+<div class="switcher" id="switcher" hidden></div>
+<script>
+"use strict";
+// ---------- tiny helpers
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const BLOCK = Symbol("block");
+let gid = 0;
+
+// ---------- icons (Material-ish strokes, never emoji)
+const ICONS = {
+  inbox: "M4 13h4l2 3h4l2-3h4M5 5h14l1 8v6H4v-6z",
+  team: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 3-5 6-5s6 2 6 5M12 15.5c1-.4 2.5-.5 4-.5 3 0 6 2 6 5",
+  machine: "M4 5h16v11H4zM9 20h6M12 16v4",
+  gear: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z",
+  back: "M15 5l-7 7 7 7", chev: "M9 6l6 6-6 6", plus: "M12 5v14M5 12h14", close: "M6 6l12 12M18 6L6 18",
+  send: "M12 19V5M6 11l6-6 6 6", stop: "M7 7h10v10H7z", check: "M5 12.5l4.5 4.5L19 7.5", x: "M7 7l10 10M17 7L7 17",
+  hand: "M8 13V6a1.5 1.5 0 0 1 3 0v5M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1c-2 0-3.5-1-5-3l-3-4.5a1.5 1.5 0 0 1 2.4-1.8L8 13",
+  lock: "M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z", quote: "M7 7h4v4c0 3-1.5 5-4 6M14 7h4v4c0 3-1.5 5-4 6",
+  info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v6M12 7.5v.5", clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
+  arrow: "M5 12h14M13 6l6 6-6 6", link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
+  folder: "M3 6h6l2 2h10v11H3z", globe: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18",
+  up: "M6 15l6-6 6 6", down: "M6 9l6 6 6-6", choose: "M8 9l4-4 4 4M8 15l4 4 4-4",
+  compose: "M12 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6M17.5 3.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z",
+  shuffle: "M4 7h3c5 0 5 10 10 10h3M4 17h3c2 0 3-1.5 4-3M14 9.5c1-1.5 2-2.5 3-2.5h3M18 4l3 3-3 3M18 14l3 3-3 3",
+};
+function ic(name, size = 18, cls = "") {
+  return `<svg class="ic ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
+}
+
+// ---------- Character: a hand copy of Character.tsx, posed by Mood, moved by CSS
+const LED = "#eef6ff", SCREEN_TOP = "#070a10", SCREEN_BOTTOM = "#1f2836", SCREEN = "#151b25";
+const SHELLS = {
+  box: { d: "M30 26H70A16 16 0 0 1 86 42V68A16 16 0 0 1 70 84H30A16 16 0 0 1 14 68V42A16 16 0 0 1 30 26Z", visor: [22, 37, 56, 34, 11], top: 26, side: [14, 86], hand: [86, 27] },
+  capsule: { d: "M37 30H63A27 27 0 0 1 63 84H37A27 27 0 0 1 37 30Z", visor: [20, 41, 60, 30, 15], top: 30, side: [10, 90], hand: [88, 33] },
+  dome: { d: "M14 76V58a36 36 0 0 1 72 0v18q0 8-8 8H22q-8 0-8-8Z", visor: [22, 44, 56, 28, 12], top: 22, side: [14, 86], hand: [81, 27] },
+  chamfer: { d: "M30 24H70L86 40V68L70 84H30L14 68V40Z", round: 6, visor: [22, 38, 56, 34, 10], top: 21, side: [12, 88], hand: [84, 27] },
+};
+const POSE = {
+  idle: { tilt: 0, turn: 0, lift: 0, look: [0, 0], open: 1 }, thinking: { tilt: -8, turn: 0.4, lift: 0, look: [3, -4], open: 1 },
+  working: { tilt: 2, turn: 0, lift: 1, look: [0, 1], open: 0.4 }, waiting: { tilt: -6, turn: 0, lift: -1, look: [0, 0], open: 1.08 },
+  done: { tilt: -4, turn: 0, lift: 0, look: [0, 0], open: 1 }, offline: { tilt: 12, turn: 0, lift: 8, look: [0, 0], open: 1 },
+};
+function mix(hex, k, to = [26, 32, 48]) {
+  const n = parseInt(hex.slice(1), 16);
+  return "#" + [n >> 16, (n >> 8) & 255, n & 255].map((v, i) => Math.round(v + (to[i] - v) * k).toString(16).padStart(2, "0")).join("");
+}
+function grey(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return "#" + Math.round(0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)).toString(16).padStart(2, "0").repeat(3);
+}
+function topPart(top, y, c) {
+  if (top === "antenna") return `<path d="M50 ${y + 3}V${y - 10}" stroke="${c}" stroke-width="3.2" stroke-linecap="round"/><circle cx="50" cy="${y - 14}" r="4.6" fill="${c}"/>`;
+  if (top === "twin") return `<path d="M41 ${y + 4}L35 ${y - 8}M59 ${y + 4}L65 ${y - 8}" stroke="${c}" stroke-width="3" stroke-linecap="round"/><circle cx="34" cy="${y - 11}" r="3.6" fill="${c}"/><circle cx="66" cy="${y - 11}" r="3.6" fill="${c}"/>`;
+  if (top === "fin") return `<rect x="45.5" y="${y - 11}" width="9" height="16" rx="4.5" fill="${c}"/>`;
+  if (top === "beacon") return `<path d="M43.5 ${y - 3}a6.5 6.5 0 0 1 13 0Z" fill="${LED}"/><rect x="40" y="${y - 4}" width="20" height="7" rx="3.5" fill="${c}"/>`;
+  return "";
+}
+function sidePart(sides, [l, r], y, c) {
+  if (sides === "ears") return [l, r].map((x) => `<circle cx="${x}" cy="${y}" r="7.5" fill="${c}"/>`).join("");
+  if (sides === "pods") return [l, r].map((x) => `<rect x="${x - 5}" y="${y - 11}" width="10" height="22" rx="5" fill="${c}"/>`).join("");
+  if (sides === "fins") return `<path d="M${l + 3} ${y + 4}L${l - 8} ${y - 12}L${l + 3} ${y - 6}ZM${r - 3} ${y + 4}L${r + 8} ${y - 12}L${r - 3} ${y - 6}Z" fill="${c}" stroke="${c}" stroke-width="3" stroke-linejoin="round"/>`;
+  return "";
+}
+function decalPart(decal, [vx, vy, vw, vh], c) {
+  const fx = vx + vw / 2;
+  if (decal === "brow") return `<rect x="${fx - 14}" y="${vy - 8}" width="28" height="4" rx="2" fill="${c}"/>`;
+  if (decal === "lights") return [-6, 0, 6].map((d) => `<circle cx="${fx + d}" cy="${vy - 6}" r="2.1" fill="${c}"/>`).join("");
+  const gy = vy + vh + 4;
+  if (decal === "grille") return [-6, 0, 6].map((d) => `<rect x="${fx + d - 1.4}" y="${gy}" width="2.8" height="${Math.min(7, 81 - gy)}" rx="1.4" fill="${c}"/>`).join("");
+  return "";
+}
+// The head as an <svg>; x/y place it inside a larger SVG (the Team canvas).
+function headSvg(look, mood = "idle", size = 44, x, y) {
+  const id = "h" + ++gid, s = SHELLS[look.shell] || SHELLS.box, [vx, vy, vw, vh, vr] = s.visor, fy = vy + vh / 2, p = POSE[mood] || POSE.idle, t = p.turn;
+  const base = mood === "offline" ? grey(look.color) : look.color;
+  const part = mix(base, 0.42), wall = mix(base, 0.28), low = mix(base, 0.1), lit = mix(base, 0.4, [255, 255, 255]), rnd = s.round || 0;
+  const eyes = mood === "offline" ? "" : [-12, 12].map((dx) => mood === "done"
+    ? `<path d="M${50 + dx - 5} ${fy + 2.5}Q${50 + dx} ${fy - 5} ${50 + dx + 5} ${fy + 2.5}" stroke="${LED}" stroke-width="3" stroke-linecap="round" fill="none"/>`
+    : `<rect x="${50 + dx - 4}" y="${fy - 6}" width="8" height="12" rx="4" fill="${LED}"/>`).join("");
+  const pos = x === undefined ? "" : `x="${x}" y="${y}"`;
+  return `<svg class="m-${mood}" ${pos} width="${size}" height="${size}" viewBox="0 0 100 100" overflow="visible" aria-hidden="true">
+<defs><radialGradient id="${id}g"><stop offset="0" style="stop-color:var(--ground)"/><stop offset="1" style="stop-color:var(--ground);stop-opacity:0"/></radialGradient>
+<linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${lit}"/><stop offset=".5" stop-color="${base}"/><stop offset="1" stop-color="${low}"/></linearGradient>
+<linearGradient id="${id}v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${SCREEN_TOP}"/><stop offset="1" stop-color="${SCREEN_BOTTOM}"/></linearGradient></defs>
+<ellipse cx="50" cy="95" rx="27" ry="4.4" fill="url(#${id}g)"/>
+<g transform="translate(0 ${p.lift})"><g class="fl"><g transform="rotate(${p.tilt} 50 55)"><g class="nod">
+<g transform="translate(${-4 * t} 0)">${sidePart(look.sides, s.side, fy, part)}</g>
+<g transform="translate(${2.5 * t} 0)">${topPart(look.top, s.top, part)}</g>
+<path transform="translate(${-4.5 * t} 5)" d="${s.d}" fill="${wall}" stroke="${wall}" stroke-width="${rnd}" stroke-linejoin="round"/>
+<path transform="translate(${1.5 * t} 0)" d="${s.d}" fill="url(#${id}s)" stroke="url(#${id}s)" stroke-width="${rnd}" stroke-linejoin="round"/>
+<g transform="translate(${5.5 * t} 0)">${decalPart(look.decal, s.visor, part)}
+<rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" rx="${vr}" fill="${mood === "offline" ? SCREEN : `url(#${id}v)`}"/>
+<path d="M${vx + 4} ${vy + vh - 4}L${vx + 10} ${vy + 4}h4L${vx + 8} ${vy + vh - 4}Z" fill="#fff" opacity=".1"/>
+<g transform="translate(${p.look[0]} ${p.look[1]})"><g class="bl" style="transform-origin:50px ${fy}px"><g transform="translate(0 ${fy}) scale(1 ${p.open}) translate(0 ${-fy})">${eyes}</g></g></g>
+${mood === "thinking" ? `<g class="pulse">${[-5, 0, 5].map((dx) => `<circle cx="${50 + dx}" cy="${vy + vh - 5.5}" r="1.6" fill="${LED}"/>`).join("")}</g>` : ""}
+${mood === "working" ? `<g class="scan" style="--scan:${vw - 22}px"><rect x="${vx + 6}" y="${vy + vh - 6}" width="10" height="2.2" rx="1.1" fill="${LED}"/></g>` : ""}
+</g></g></g></g>
+${mood === "waiting" ? `<g class="hand" style="transform-origin:${s.hand[0]}px ${s.hand[1] + 18}px"><rect x="${s.hand[0] - 7.5}" y="${s.hand[1] - 8.5}" width="15" height="17" rx="5.5" fill="var(--orange)" stroke="var(--bg)" stroke-width="3"/></g>` : ""}
+</g></svg>`;
+}
+const head = (look, mood, size = 44, cls = "") => `<span class="head ${cls} ${mood === "offline" ? "m-offline" : ""}" style="width:${size}px;height:${size}px">${headSvg(look, mood, size)}</span>`;
+
+// ---------- the Workspace, in memory
+const LOOK_COLORS = ["#F4B183", "#9DC3E6", "#A9D18E", "#C9B3E6", "#F6D57A", "#8FD3C8", "#F2A7B8"];
+const randomLook = () => ({
+  color: LOOK_COLORS[Math.floor(Math.random() * LOOK_COLORS.length)],
+  shell: ["box", "capsule", "dome", "chamfer"][Math.floor(Math.random() * 4)],
+  top: ["antenna", "twin", "fin", "beacon", "none"][Math.floor(Math.random() * 5)],
+  sides: ["ears", "pods", "fins", "none"][Math.floor(Math.random() * 4)],
+  decal: ["brow", "lights", "grille", "none"][Math.floor(Math.random() * 4)],
+});
+function fresh() {
+  return {
+    ws: null, stack: [{ screen: "onboard", p: {} }], tab: "inbox", sheet: null, toast: null, sel: null, gtab: "setup", gstep: 0,
+    machines: [
+      { id: "mac", name: "mac-studio", online: true, version: "0.1.0", egress: ["api.anthropic.com", "github.com", "registry.npmjs.org", "proxy.golang.org"] },
+      { id: "build", name: "build-box", online: true, version: "0.1.0", egress: ["api.anthropic.com", "github.com"] },
+    ],
+    agents: [
+      { id: "lead", name: "Lead", machine: "mac", workdir: "~/work/web-app", desc: "หัวหน้าทีม dev รับงานจาก Member แตกงานให้ frontend กับ backend แล้วรวมผล push branch", look: { color: "#F4B183", shell: "chamfer", top: "beacon", sides: "ears", decal: "grille" } },
+      { id: "frontend", name: "Frontend", machine: "mac", workdir: "~/work/web", desc: "ถือ repo web แก้หน้าจอ React ส่งให้ reviewer ตรวจทุกครั้งก่อนส่งงานกลับ", look: { color: "#9DC3E6", shell: "dome", top: "antenna", sides: "pods", decal: "none" } },
+      { id: "backend", name: "Backend", machine: "mac", workdir: "~/work/api", desc: "ถือ repo api แก้ Go กับ migration ส่งงานมาพร้อม spec ของ endpoint", look: { color: "#A9D18E", shell: "box", top: "twin", sides: "none", decal: "lights" } },
+      { id: "reviewer", name: "Reviewer", machine: "mac", workdir: "~/work/review", desc: "ตรวจโค้ดและบทความ ตอบว่าผ่านหรือไม่ผ่านพร้อมเหตุผล แก้ไฟล์ของคนอื่นไม่ได้", look: { color: "#C9B3E6", shell: "capsule", top: "fin", sides: "fins", decal: "brow" } },
+      { id: "writer", name: "Writer", machine: "mac", workdir: "~/work/blog", desc: "เขียนบทความและ release notes", look: { color: "#F6D57A", shell: "box", top: "antenna", sides: "ears", decal: "brow" } },
+      { id: "tester", name: "Tester", machine: "build", workdir: "~/e2e", desc: "รัน e2e บน build-box", look: { color: "#8FD3C8", shell: "dome", top: "fin", sides: "pods", decal: "lights" } },
+    ],
+    teams: [
+      { id: "dev", name: "Dev", machine: "mac", entry: "lead", members: ["lead", "frontend", "backend", "reviewer"], pos: {}, lines: [
+        { from: "lead", to: "backend", note: "ส่งงาน API และ migration บอก endpoint ที่หน้าจอต้องใช้", limit: 3 },
+        { from: "lead", to: "frontend", note: "ส่งงานหน้าจอ บอก endpoint ที่ backend กำลังทำ", limit: 3 },
+        { from: "backend", to: "reviewer", note: "ส่งตรวจก่อนส่งงานกลับทุกครั้ง", limit: 3 },
+        { from: "frontend", to: "reviewer", note: "ส่งตรวจทุกครั้งที่แก้เสร็จ", limit: 3 },
+      ] },
+      { id: "content", name: "Content", machine: "mac", entry: "writer", members: ["writer", "reviewer"], pos: {}, lines: [
+        { from: "writer", to: "reviewer", note: "ส่งร่างให้ตรวจข้อเท็จจริงและน้ำเสียง", limit: 2 },
+      ] },
+    ],
+    tasks: [], queue: {}, runs: [], scenario: "pass", open: [], effort: "high", alert: null, devices: [{ name: "iPhone เครื่องนี้", note: "เครื่องที่สร้าง Workspace" }], focus: null,
+  };
+}
+let S = fresh();
+const variants = { A: "ผังอิสระ", B: "ต้นไม้จาก Entry", C: "ตารางเส้น" };
+let variant = new URLSearchParams(location.search).get("variant");
+if (!variants[variant]) variant = "A";
+
+const A = (id) => S.agents.find((a) => a.id === id);
+const M = (id) => S.machines.find((m) => m.id === id);
+const TM = (id) => S.teams.find((t) => t.id === id);
+const T = (id) => S.tasks.find((t) => t.id === id);
+const kids = (t) => S.tasks.filter((x) => x.parent === t.id);
+const subtree = (t) => [t, ...kids(t).flatMap(subtree)];
+const rootOf = (t) => (t.parent ? rootOf(T(t.parent)) : t);
+const RUNNING = ["thinking", "working", "waiting", "delegating"];
+const ACTIVE = [...RUNNING, "queued"];
+const busy = (agent, except) => S.tasks.some((t) => t.agent === agent && t.id !== except && RUNNING.includes(t.state));
+const LABEL = { thinking: "กำลังคิด", working: "กำลังทำ", waiting: "รออนุมัติ", delegating: "รอทีม", queued: "ต่อคิว", done: "เสร็จ", stopped: "หยุดแล้ว", idle: "ว่าง" };
+function moodOfTask(t) {
+  if (!M(A(t.agent).machine).online) return "offline";
+  return { thinking: "thinking", working: "working", waiting: "waiting", delegating: "thinking", done: "done" }[t.state] || "idle";
+}
+function moodOfAgent(id) {
+  const a = A(id);
+  if (!M(a.machine).online) return "offline";
+  const act = S.tasks.find((t) => t.agent === id && RUNNING.includes(t.state));
+  if (act) return moodOfTask(act);
+  const last = [...S.tasks].reverse().find((t) => t.agent === id);
+  return last && last.state === "done" ? "done" : "idle";
+}
+function ago(at) {
+  const m = Math.floor((Date.now() - at) / 60000);
+  return m < 1 ? "ตอนนี้" : m < 60 ? `${m} นาที` : `${Math.floor(m / 60)} ชม.`;
+}
+
+// ---------- Tasks and Delegation (ADR 0003, 0011, 0026)
+let tid = 0;
+function newTask(agent, title, parent, team) {
+  const t = { id: "t" + ++tid, agent, title, parent: parent || null, team: team || null, events: [], state: "idle", sends: {}, at: Date.now() };
+  S.tasks.push(t);
+  return t;
+}
+function push(t, e) { t.events.push({ ...e, at: Date.now() }); t.at = Date.now(); }
+function enqueue(t) {
+  const q = (S.queue[t.agent] ||= []);
+  q.push(t.id);
+  t.state = "queued";
+  push(t, { t: "queued", text: `ต่อคิวที่ ${q.length} · ${A(t.agent).name} ยังทำ Turn อื่นอยู่ (ADR 0011)` });
+}
+// A message starts a Turn, which resets the per-Turn send counts.
+function messageIn(t, text, from) {
+  t.sends = {};
+  push(t, { t: "message", text, from });
+  if (busy(t.agent, t.id)) enqueue(t); else t.state = "thinking";
+}
+function dequeue(agent) {
+  const q = S.queue[agent];
+  if (!q || !q.length || busy(agent)) return;
+  const t = T(q.shift());
+  t.state = "thinking";
+  push(t, { t: "note", text: "ถึงคิวแล้ว เริ่ม Turn" });
+}
+const say = (t, text) => { t.state = "thinking"; push(t, { t: "text", text }); };
+const tool = (t, cmd, out, ok = true) => { t.state = "working"; push(t, { t: "tool", cmd, out, ok }); };
+function lineOf(t, to) { const tm = TM(t.team); return tm && tm.lines.find((l) => l.from === t.agent && l.to === to); }
+// The send tool: a new sub-Task, or the next message in an existing one. Both count against the line.
+function send(from, to, text, again) {
+  const line = lineOf(from, to);
+  if (!line) { push(from, { t: "refused", text: `ไม่มีเส้น ${A(from.agent).name} → ${A(to).name} ใน Flow ของทีมนี้ Runtime ปฏิเสธ` }); return null; }
+  const used = from.sends[to] || 0;
+  if (used >= line.limit) {
+    push(from, { t: "refused", text: `ส่งข้ามเส้น ${A(from.agent).name} → ${A(to).name} ครบ ${line.limit} ครั้งใน Turn นี้แล้ว tool ส่งงานปฏิเสธ` });
+    return null;
+  }
+  from.sends[to] = used + 1;
+  const sub = again ? T(again) : newTask(to, text, from.id, from.team);
+  push(from, { t: "delegate", to, sub: sub.id, n: used + 1, limit: line.limit, text, again: !!again });
+  messageIn(sub, text, from.agent);
+  from.state = "delegating";
+  return sub.id;
+}
+// Ending a Turn: the result goes back to the parent, which picks up again once nothing it waits on is running.
+function finish(t, text, ok = true) {
+  if (text) push(t, { t: "text", text });
+  t.state = "done";
+  if (t.parent) {
+    const p = T(t.parent);
+    push(p, { t: "result", from: t.agent, sub: t.id, text, ok });
+    if (!kids(p).some((k) => ACTIVE.includes(k.state)) && p.state === "delegating") p.state = "thinking";
+  }
+  dequeue(t.agent);
+}
+let apid = 0;
+function approval(t, command, reason) { t.state = "waiting"; push(t, { t: "approval", id: "a" + ++apid, command, reason, status: "open" }); }
+const lastAp = (t) => [...t.events].reverse().find((e) => e.t === "approval");
+const ready = (id) => T(id).state === "queued";
+
+// Stop flows down, never up; each parent above hears about it and decides (ADR 0017).
+function stopTree(id) {
+  const t = T(id);
+  const hit = subtree(t).filter((x) => ACTIVE.includes(x.state));
+  hit.forEach((x) => {
+    x.state = "stopped";
+    push(x, { t: "stop" });
+    Object.values(S.queue).forEach((q) => { const i = q.indexOf(x.id); if (i >= 0) q.splice(i, 1); });
+  });
+  hit.forEach((x) => dequeue(x.agent));
+  const run = runOf(id);
+  // ponytail: the script can't go on with a branch gone, so the other branches wrap up at once instead of
+  // freezing their Agents; a real Turn would just carry on.
+  if (t.parent) {
+    const root = rootOf(t), above = [];
+    for (let a = t; a.parent; a = T(a.parent)) above.push(a.parent);
+    const depth = (x) => (x.parent ? depth(T(x.parent)) + 1 : 0);
+    subtree(root).filter((x) => x !== root && ACTIVE.includes(x.state) && !above.includes(x.id) && !subtree(t).includes(x))
+      .sort((a, b) => depth(b) - depth(a))
+      .forEach((x) => { Object.values(S.queue).forEach((q) => { const i = q.indexOf(x.id); if (i >= 0) q.splice(i, 1); }); finish(x, "ทำส่วนของผมเสร็จแล้ว"); });
+  }
+  if (run) { run.halted = true; run.notes.unshift(t.parent ? `Stop ที่กิ่ง ${A(t.agent).name}: หยุด ${hit.length} Task ข้างใต้ แม่ได้รับแจ้งแล้วตัดสินใจเอง` : `Stop ทั้งสาย: หยุด ${hit.length} Task ไฟล์ที่แก้แล้วคงอยู่ คุยต่อได้`); }
+  let child = t;
+  while (child.parent) {
+    const p = T(child.parent);
+    if (child === t) push(p, { t: "result", from: t.agent, sub: t.id, text: "ถูก Stop โดย Member", ok: false });
+    if (!RUNNING.includes(p.state) || kids(p).some((k) => ACTIVE.includes(k.state))) break;
+    finish(p, `${A(t.agent).name} ถูกหยุดกลางทาง ขอรอคำสั่งก่อนว่าจะให้ทำต่อหรือเปลี่ยนแผน`, "partial");
+    child = p;
+  }
+}
+
+// ---------- scripted Turns: the prototype's stand-in for the LLM
+const SCRIPTS = {
+  solo: () => [
+    (r) => { const t = T(r.root); if (ready(t.id)) return BLOCK; t.state = "thinking"; return `${A(t.agent).name} เริ่ม Turn ระหว่างนี้ Agent ไม่ว่าง ข้อความอื่นจะต่อคิว`; },
+    (r) => { tool(T(r.root), 'rg -n "users" migrations/', "ยังไม่มี index ของ users.email"); return "tool ทุกตัวรันใน sandbox เขียนได้แค่ใน Workdir ของตัวเอง (ADR 0008)"; },
+    (r) => { const t = T(r.root); say(t, "เขียน migration ไว้ที่ migrations/0042_users_email_idx.sql แล้ว ขั้นต่อไปต้องรัน migrate"); tool(t, "git diff --stat", "1 file changed, 3 insertions(+)"); return "คุยเดี่ยวไม่มี tool ส่งงาน Agent ต้องทำเองทั้งหมด"; },
+    (r) => { approval(T(r.root), "bun run db:migrate", "ใช้ migration 0042 กับ database ของ dev"); return "คำสั่งนี้ไม่อยู่ใน Allowlist Task หยุดรอคนที่มี Approve และ push บอกแค่ชื่อ Agent (ADR 0005)"; },
+    (r) => {
+      const t = T(r.root), ap = lastAp(t);
+      if (ap.status === "open") return BLOCK;
+      if (ap.status === "approved") { tool(t, "bun run db:migrate", "applied 0042_users_email_idx"); finish(t, "เพิ่ม index ให้ users.email แล้ว query หาอีเมลน่าจะเร็วขึ้นมาก"); return "อนุมัติแล้ว Turn เดินต่อจนจบ"; }
+      finish(t, "ไม่ได้รัน migrate ตามที่ปฏิเสธ ไฟล์ migration ยังอยู่ ไว้รันทีหลังได้");
+      return "ปฏิเสธแล้ว Agent จบ Turn โดยไม่รันคำสั่งนั้น";
+    },
+  ],
+  reply: () => [
+    (r) => { const t = T(r.root); if (ready(t.id)) return BLOCK; t.state = "thinking"; return "ข้อความใหม่เริ่ม Turn ใหม่"; },
+    (r) => { finish(T(r.root), "รับทราบครับ (prototype มีบทตอบแค่นี้)"); return "Turn จบ"; },
+  ],
+  // Any Team: the Entry sends once along each of its lines, each teammate answers, the Entry sums up.
+  team: (r) => {
+    const tm = TM(T(r.root).team), outs = tm.lines.filter((l) => l.from === tm.entry);
+    return [
+      (r) => { const t = T(r.root); if (ready(t.id)) return BLOCK; t.state = "thinking"; return `${A(t.agent).name} เป็น Entry ของทีม ${tm.name} ข้อความไปที่นี่`; },
+      (r) => {
+        const t = T(r.root);
+        if (!outs.length) { finish(t, "ทีมนี้ยังไม่มีเส้นจากผม เลยทำเองคนเดียว"); return "Entry ไม่มีเส้นออก ส่งงานให้ใครไม่ได้"; }
+        say(t, `แบ่งงานให้ ${outs.map((l) => A(l.to).name).join(" กับ ")}`);
+        r.subs = outs.map((l) => send(t, l.to, `ช่วยทำส่วนของคุณในงาน: ${t.title}`)).filter(Boolean);
+        return "ส่งงานตามเส้นพร้อมกันในคำตอบเดียว Turn ของ Entry เปิดรอผล";
+      },
+      ...outs.map((l, i) => (r) => { const id = r.subs[i]; if (!id) return null; if (ready(id)) return BLOCK; tool(T(id), "ls", "อ่าน Workdir แล้ว"); finish(T(id), "ทำส่วนของผมเสร็จแล้ว"); return `${A(l.to).name} ส่งผลกลับหา Entry`; }),
+      (r) => { finish(T(r.root), "ทีมทำเสร็จแล้ว สรุปผลตามที่แต่ละคนส่งมา"); return "Entry รวมผลแล้วตอบ Member"; },
+    ];
+  },
+  // Team Dev: parallel sends, a queue at the reviewer, a rework loop, then either an Approval or the limit.
+  dev: (r) => {
+    const head = [
+      (r) => { const t = T(r.root); if (ready(t.id)) return BLOCK; t.state = "thinking"; return "ข้อความไปที่ Entry ของทีม Dev คือ Lead"; },
+      (r) => {
+        const t = T(r.root);
+        say(t, "แบ่งเป็นสองงานแล้วส่งพร้อมกัน: Backend ทำ API ส่งลิงก์ reset ทางอีเมล Frontend ทำหน้ากรอกอีเมล");
+        r.B = send(t, "backend", "ทำ POST /auth/reset ส่งลิงก์ทางอีเมล ลิงก์หมดอายุใน 30 นาที");
+        r.F = send(t, "frontend", "ทำหน้า /reset-password ใช้ POST /auth/reset ที่ Backend กำลังทำ body เป็น { email }");
+        return "Lead ส่งสองเส้นในคำตอบเดียว Turn ของ Lead เปิดรอผลครบทั้งสอง (ADR 0003)";
+      },
+      (r) => { tool(T(r.B), "go test ./auth/...", "ผ่าน 18 จาก 18 ตัว"); tool(T(r.F), "bun run build", "build ผ่าน"); return "Backend กับ Frontend ลงมือพร้อมกัน แต่ละตัวเขียนได้แค่ Workdir ของตัวเอง"; },
+      (r) => { const B = T(r.B); say(B, "API เสร็จ ส่งให้ Reviewer ตรวจก่อนส่งกลับ"); r.RB = send(B, "reviewer", "ตรวจ auth/reset.go ใน ~/work/api"); return "Backend ส่งตรวจตามเส้น backend → reviewer"; },
+      (r) => { const F = T(r.F); say(F, "หน้าเสร็จแล้ว ส่งให้ Reviewer ตรวจ"); r.RF = send(F, "reviewer", "ตรวจ src/pages/reset-password.tsx ใน ~/work/web"); return "Reviewer กำลังตรวจงานของ Backend อยู่ งานของ Frontend จึงต่อคิว (ADR 0011)"; },
+      (r) => { const RB = T(r.RB); tool(RB, "cat ~/work/api/auth/reset.go", "อ่านจาก Workdir ของ Backend ได้ เพราะอยู่ทีมเดียวกัน"); finish(RB, "ผ่าน token สุ่มยาวพอ และหมดอายุ 30 นาทีตามที่ขอ"); return "Reviewer อ่าน Workdir ของเพื่อนร่วมทีมได้แต่แก้ไม่ได้ (ADR 0026) พอเสร็จก็หยิบงานถัดไปจากคิว"; },
+      (r) => { finish(T(r.B), "POST /auth/reset เสร็จและผ่านรีวิวแล้ว ใช้ body { email }"); return "Backend ส่งผลกลับหา Lead Lead ยังรอ Frontend อยู่"; },
+      (r) => { if (ready(r.RF)) return BLOCK; const RF = T(r.RF); tool(RF, "cat ~/work/web/src/pages/reset-password.tsx", "อ่านแล้ว"); finish(RF, "ไม่ผ่าน ปุ่มส่งไม่มีสถานะกำลังส่ง และไม่บอกเมื่ออีเมลผิดรูปแบบ", false); return "Reviewer ตีงานกลับ ผลกลับไปหา Frontend ซึ่งเป็นแม่ของ Task ย่อยนี้"; },
+      (r) => { const F = T(r.F); tool(F, "bun run build", "build ผ่าน"); send(F, "reviewer", "แก้แล้ว เพิ่มสถานะกำลังส่งและข้อความเมื่ออีเมลผิด ตรวจอีกรอบ", r.RF); return "ตีกลับคือคุยต่อใน Task ย่อยเดิม ใช้เส้นเดิม และนับเป็นครั้งที่ 2"; },
+    ];
+    const pass = [
+      (r) => { finish(T(r.RF), "ผ่านรอบนี้ ครบตามที่บอก"); return "รอบสองผ่าน"; },
+      (r) => { finish(T(r.F), "หน้า /reset-password เสร็จและผ่านรีวิวรอบ 2"); return "Frontend ส่งผลกลับ Lead ได้ผลครบแล้ว Turn ของ Lead เดินต่อ"; },
+      (r) => { const t = T(r.root); say(t, "ได้ครบทั้งสองฝั่งแล้ว รวมเป็น branch เดียวแล้ว push ขึ้น GitHub"); approval(t, "git push origin feat/reset-password", "push branch ที่รวมงานของ Backend กับ Frontend"); return "git push ไม่อยู่ใน Allowlist ของ Lead จึงขออนุมัติ แถวของทีมใน Inbox ขึ้นมาบนสุด"; },
+      (r) => {
+        const t = T(r.root), ap = lastAp(t);
+        if (ap.status === "open") return BLOCK;
+        if (ap.status === "approved") { tool(t, "git push origin feat/reset-password", "pushed"); finish(t, "เสร็จแล้ว หน้า reset password กับ API อยู่ใน branch feat/reset-password ผ่านรีวิวทั้งสองฝั่ง"); return "อนุมัติแล้ว ทีมทำงานจบ"; }
+        finish(t, "ไม่ได้ push ตามที่ปฏิเสธ งานอยู่ใน Workdir ของแต่ละคนครบ");
+        return "ปฏิเสธแล้ว Lead จบ Turn";
+      },
+    ];
+    const limit = [
+      (r) => { finish(T(r.RF), "ยังไม่ผ่าน ข้อความ error ยังเป็นภาษาอังกฤษ", false); return "รอบสองไม่ผ่าน"; },
+      (r) => { send(T(r.F), "reviewer", "แก้ข้อความ error เป็นภาษาไทยแล้ว ตรวจอีกรอบ", r.RF); return "Frontend ส่งรอบที่ 3 ซึ่งเป็นครั้งสุดท้ายตามเพดานของเส้นนี้"; },
+      (r) => { finish(T(r.RF), "ยังไม่ผ่าน ข้อความ error ไม่ตรงกับคู่มือ copy ของทีม", false); return "รอบสามไม่ผ่าน"; },
+      (r) => { send(T(r.F), "reviewer", "แก้ตามคู่มือ copy แล้ว ตรวจอีกรอบ", r.RF); return "Frontend พยายามส่งครั้งที่ 4 tool ปฏิเสธ เพราะครบเพดานใน Turn นี้แล้ว"; },
+      (r) => { finish(T(r.F), "ส่งกลับพร้อมของที่มี: หน้าใช้งานได้ แต่ Reviewer ยังไม่ผ่านเรื่องข้อความ error ค้างอยู่ 1 เรื่อง", "partial"); return "Frontend ต้องจบ Turn แล้วไล่ข่าวขึ้นไปหาแม่ ทางเดียวกับผลงานปกติ"; },
+      (r) => { finish(T(r.root), "API เสร็จและผ่านรีวิว ส่วนหน้าจอ Frontend กับ Reviewer ตกลงกันไม่ได้เรื่องข้อความ error ครบ 3 รอบแล้ว อยากให้ใช้ข้อความแบบไหน หรือจะให้ข้ามไปก่อน?", "partial"); return "ข่าวมาถึง Member ผ่าน Entry และไม่มีการเปิด Approval (ADR 0003)"; },
+    ];
+    return [...head, ...(r.scenario === "limit" ? limit : pass)];
+  },
+};
+const runOf = (id) => { const t = T(id); if (!t) return null; const root = rootOf(t); return S.runs.find((r) => r.root === root.id); };
+function stepRun(run) {
+  if (!run || run.done || run.halted) return false;
+  const script = SCRIPTS[run.kind](run), fn = script[run.step];
+  if (!fn) { run.done = true; return false; }
+  const out = fn(run);
+  if (out === BLOCK) { run.blocked = true; return false; }
+  run.blocked = false;
+  run.step++;
+  if (out) run.notes.unshift(out);
+  if (run.step >= script.length) run.done = true;
+  return true;
+}
+setInterval(() => {
+  let moved = false;
+  S.runs.forEach((r) => { if (r.auto && stepRun(r)) moved = true; });
+  if (moved) render();
+}, 1500);
+
+function startTask({ mode, target, text, scenario }) {
+  text = (text || "").trim() || (mode === "team" ? "เพิ่มหน้า reset password ทางอีเมล" : "เพิ่ม index ให้ users.email หน่อย");
+  const title = text.length > 34 ? text.slice(0, 34) + "…" : text;
+  let t, kind, first;
+  if (mode === "team") {
+    const tm = TM(target);
+    t = newTask(tm.entry, title, null, tm.id);
+    kind = tm.id === "dev" ? "dev" : "team";
+    first = `คุณเริ่ม Task กับทีม ${tm.name} ข้อความไปที่ Entry: ${A(tm.entry).name}`;
+  } else {
+    t = newTask(target, title, null, null);
+    kind = "solo";
+    first = `คุณเริ่ม Task คุยเดี่ยวกับ ${A(target).name}`;
+  }
+  messageIn(t, text);
+  S.runs.push({ root: t.id, kind, scenario: scenario || S.scenario, step: 0, auto: true, notes: [first] });
+  S.focus = t.id;
+  S.sheet = null;
+  // Sent from an empty chat: the chat becomes the Task, as a new conversation does in Messages.
+  if (cur().screen === "compose") cur().screen = "task", (cur().p = { id: t.id });
+  else { goTab("inbox"); pushScreen("task", { id: t.id }); }
+  return t;
+}
+// A message into a Task that already exists: it queues behind a running Turn, or starts a short reply.
+function sendInTask(t, text) {
+  if (!text.trim()) return;
+  if (ACTIVE.includes(t.state)) {
+    push(t, { t: "message", text, queued: true });
+    return;
+  }
+  messageIn(t, text);
+  S.runs = S.runs.filter((r) => r.root !== t.id || !r.done);
+  S.runs.push({ root: t.id, kind: "reply", step: 0, auto: true, notes: ["ข้อความใหม่ใน Task เดิมเริ่ม Turn ใหม่"] });
+}
+
+// ---------- Teams and their Flow
+function machineEdges(machine) {
+  return S.teams.filter((t) => t.machine === machine).flatMap((t) => t.lines.map((l) => ({ ...l, team: t.id })));
+}
+function findPath(edges, from, to) {
+  const prev = {}, seen = new Set([from]), q = [from];
+  while (q.length) {
+    const x = q.shift();
+    for (const e of edges) if (e.from === x && !seen.has(e.to)) { seen.add(e.to); prev[e.to] = e; q.push(e.to); }
+  }
+  if (!seen.has(to)) return null;
+  const path = [];
+  for (let c = to; c !== from; c = prev[c].from) path.unshift(prev[c]);
+  return path;
+}
+// Adding from → to closes a loop when to already reaches from, along the lines of every Team on the Machine.
+const cycleFor = (tm, from, to) => (from === to ? [] : findPath(machineEdges(tm.machine), to, from));
+function tryAddLine(tm, from, to) {
+  if (from === to) return;
+  if (tm.lines.some((l) => l.from === from && l.to === to)) { S.sheet = { k: "line", team: tm.id, from, to }; return; }
+  const path = cycleFor(tm, from, to);
+  if (path) {
+    const loop = [from, to, ...path.map((e) => e.to)].map((id) => A(id).name).join(" → ");
+    const other = path.find((e) => e.team !== tm.id);
+    S.toast = `ลากเส้น ${A(from).name} → ${A(to).name} ไม่ได้ จะเกิดวง ${loop}<div class="sm">${other ? `ชนกับเส้น ${A(other.from).name} → ${A(other.to).name} ของทีม ${TM(other.team).name} · Agent ที่อยู่หลายทีมอาจรอกันจนค้าง (ADR 0003)` : "ตีงานกลับใช้การคุยต่อใน Task ย่อยเดิม ไม่ต้องลากเส้นย้อน"}</div>`;
+    return;
+  }
+  tm.lines.push({ from, to, note: "", limit: 3 });
+  S.sheet = { k: "line", team: tm.id, from, to, fresh: true };
+}
+function layout(tm) {
+  const depth = { [tm.entry]: 0 };
+  for (let i = 0; i < tm.members.length; i++)
+    tm.lines.forEach((l) => { if (depth[l.from] !== undefined && tm.members.includes(l.to)) depth[l.to] = Math.max(depth[l.to] ?? 0, depth[l.from] + 1); });
+  const maxD = Math.max(0, ...Object.values(depth));
+  tm.members.forEach((m) => { if (depth[m] === undefined) depth[m] = maxD + 1; });
+  const rows = {};
+  tm.members.forEach((m) => (rows[depth[m]] ||= []).push(m));
+  const pos = {};
+  Object.entries(rows).forEach(([d, ms]) => ms.forEach((m, i) => { pos[m] = tm.pos[m] || { x: Math.round(((i + 1) * 340) / (ms.length + 1)), y: 64 + d * 116 }; }));
+  return pos;
+}
+
+// ---------- navigation
+const cur = () => S.stack[S.stack.length - 1];
+function goTab(tab) { S.tab = tab; S.stack = [{ screen: tab, p: {} }]; S.sel = null; }
+function pushScreen(screen, p = {}) { S.stack.push({ screen, p }); S.sel = null; }
+function ensureWs() { if (!S.ws) { S.ws = { name: "บ้านของฉัน" }; goTab("inbox"); } S.toast = null; S.sheet = null; }
+
+// ---------- screens
+function view() {
+  const { screen, p } = cur();
+  if (!S.ws || screen === "onboard") return { title: "", body: onboard(), tabs: false };
+  if (screen === "inbox") return { title: "Inbox", body: inbox() };
+  if (screen === "task") return taskScreen(T(p.id));
+  if (screen === "compose") return composeScreen(p);
+  if (screen === "teams") return { title: "Team", right: `<button class="btn round" data-a="team-new" aria-label="สร้าง Team">${ic("plus")}</button>`, body: teamsList() };
+  if (screen === "team") return teamScreen(TM(p.id));
+  if (screen === "machines") return { title: "Machine", right: `<button class="btn round" data-a="pair" aria-label="Pair Machine">${ic("plus")}</button>`, body: machinesList() };
+  if (screen === "machine") return machineScreen(M(p.id));
+  if (screen === "settings") return { title: "ตั้งค่า", body: settings() };
+  return { title: "?", body: "" };
+}
+function onboard() {
+  return `<div class="onboard">${head({ color: "#9DC3E6", shell: "capsule", top: "antenna", sides: "pods", decal: "lights" }, "idle", 120)}
+  <h1>Veeloe</h1><p class="sub">Agent บนเครื่องของคุณ ทำงานเป็นทีม สั่งได้จากทุกที่</p>
+  <button class="btn primary" data-a="ws-create">สร้าง Workspace</button>
+  <button class="btn" data-a="ws-create" data-demo="1">ลอง Demo Workspace</button>
+  <p class="sub2">ไม่มีรหัสผ่าน กุญแจของคุณเกิดบนเครื่องนี้ (ADR 0013)</p></div>`;
+}
+function rootTasks(match) { return S.tasks.filter((t) => !t.parent && match(t)).sort((a, b) => b.at - a.at); }
+function statusLine(t) {
+  if (!t) return { text: "ยังไม่มี Task", em: false };
+  const st = statusOf(t);
+  return { text: `${st === "waiting" ? ic("hand", 15, "c-orange") + " " : ""}${STATUS_LABEL[st]} · ${esc(t.title)}`, em: st === "waiting" };
+}
+function previewOf(t) {
+  if (!t) return "";
+  const e = [...t.events].reverse().find((x) => ["text", "message", "approval", "result", "refused"].includes(x.t));
+  if (!e) return "";
+  if (e.t === "approval") return `<span class="mono">${esc(e.command)}</span>`;
+  if (e.t === "result") return `${esc(A(e.from).name)}: ${esc(e.text)}`;
+  return esc(e.text);
+}
+function cluster(tm, size = 30) {
+  return `<span class="cluster">${tm.members.slice(0, 3).map((m, i) => `<span class="head" style="left:${i * 11}px;top:${i % 2 ? 14 : 0}px;width:${size}px;height:${size}px">${headSvg(A(m).look, moodOfAgent(m), size)}</span>`).join("")}</span>`;
+}
+function inbox() {
+  const rows = [];
+  S.teams.forEach((tm) => { const t = rootTasks((x) => x.team === tm.id)[0]; rows.push({ kind: "team", id: tm.id, t, wait: t && statusOf(t) === "waiting" }); });
+  S.agents.forEach((a) => { const t = rootTasks((x) => x.agent === a.id && !x.team)[0]; rows.push({ kind: "agent", id: a.id, t, wait: t && statusOf(t) === "waiting" }); });
+  const order = (r) => (r.wait ? 0 : r.t && ACTIVE.includes(r.t.state) ? 1 : r.t ? 2 : 3);
+  rows.sort((a, b) => order(a) - order(b) || (b.t?.at || 0) - (a.t?.at || 0));
+  return `<p class="hint">${ic("info", 14)} ตัวที่รอคุณขึ้นก่อน · แถวของ Team ใช้หน้าของสมาชิก</p>` + rows.map((r) => {
+    const st = statusLine(r.t);
+    if (r.kind === "team") {
+      const tm = TM(r.id);
+      return `<button class="row" data-a="open-row" data-kind="team" data-id="${tm.id}">${cluster(tm)}<div class="row-main"><div class="row-top"><b>ทีม ${esc(tm.name)}</b><span class="sub">${esc(M(tm.machine).name)} · ${tm.members.length} ตัว</span><span class="sub2">${r.t ? ago(r.t.at) : ""}</span>${ic("chev", 12, "c-3")}</div>
+      <div class="status ${st.em ? "em" : ""}">${st.text}</div><div class="preview">${previewOf(r.t)}</div></div></button>`;
+    }
+    const a = A(r.id);
+    return `<button class="row" data-a="open-row" data-kind="agent" data-id="${a.id}">${head(a.look, moodOfAgent(a.id), 44)}<div class="row-main"><div class="row-top"><b>${esc(a.name)}</b><span class="sub">${esc(M(a.machine).name)}</span><span class="sub2">${r.t ? ago(r.t.at) : ""}</span>${ic("chev", 12, "c-3")}</div>
+    <div class="status ${st.em ? "em" : ""}">${st.text}</div><div class="preview">${previewOf(r.t) || esc(a.desc)}</div></div></button>`;
+  }).join("");
+}
+function sendsOf(t) {
+  return Object.entries(t.sends).map(([to, n]) => `<span class="pill-sm">${ic("lock", 11)}${esc(A(to).name)} ${n}/${lineOf(t, to)?.limit ?? "?"}</span>`).join(" ");
+}
+function treeCard(root, openId) {
+  const rows = [];
+  const walk = (t, d) => {
+    rows.push(`<button class="trow ${t.id === openId ? "on" : ""}" data-a="open-task" data-id="${t.id}" style="padding-left:${8 + d * 20}px">${head(A(t.agent).look, moodOfTask(t), 28)}<span class="nm">${esc(A(t.agent).name)}</span><span class="st">${t.state === "waiting" ? ic("hand", 13, "c-orange") + " " : ""}${LABEL[t.state]}</span>${sendsOf(t)}</button>`);
+    kids(t).forEach((k) => walk(k, d + 1));
+  };
+  walk(root, 0);
+  return `<div class="card tree"><h4>ต้นไม้ของ Task · แตะเพื่อเปิดกิ่ง</h4>${rows.join("")}</div>`;
+}
+// What the Controller shows for a Task (entities/task/model/state.ts): a team's Task waits when anyone in it does.
+const STATUS_LABEL = { waiting: "รอคุณอนุมัติ", working: "กำลังทำงาน", done: "เสร็จแล้ว", offline: "ออฟไลน์" };
+function statusOf(t) {
+  if (!M(A(t.agent).machine).online) return "offline";
+  if ((t.parent ? [t] : subtree(t)).some((x) => x.state === "waiting")) return "waiting";
+  return ACTIVE.includes(t.state) ? "working" : "done";
+}
+const statusHtml = (t) => `${statusOf(t) === "waiting" ? ic("hand", 13, "c-orange") + " " : ""}${STATUS_LABEL[statusOf(t)]}`;
+const inline = (text) => esc(text).replace(/`([^`]+)`/g, "<code>$1</code>");
+const EFFORT = { low: "Effort ต่ำ", medium: "Effort กลาง", high: "Effort สูง", max: "Effort สูงสุด" };
+
+// Commands run back to back fold into one line, as pages/task/model/items.ts does.
+function chatItems(t) {
+  const out = [];
+  t.events.forEach((e, i) => {
+    const last = out[out.length - 1];
+    if (e.t === "tool" && last && last.tools) last.tools.push(e);
+    else if (e.t === "tool") out.push({ tools: [e], key: `${t.id}:${i}` });
+    else out.push({ e });
+  });
+  return out;
+}
+function toolRow(e, running) {
+  return `<div class="toolrow"><span class="st">${running ? `<span class="spin"></span>` : ic(e.ok ? "check" : "x", 16, e.ok ? "c-green" : "c-red")}</span><div><div class="cmd">${esc(e.cmd)}</div>${running ? "" : `<div class="out">${esc(e.out)}</div>`}</div></div>`;
+}
+function toolsHtml(item, t) {
+  const last = t.events[t.events.length - 1], running = (e) => t.state === "working" && e === last;
+  if (item.tools.length === 1) return toolRow(item.tools[0], running(item.tools[0]));
+  const now = item.tools.some(running), failed = item.tools.filter((e) => !e.ok).length, open = S.open.includes(item.key);
+  const summary = now ? `กำลังรัน ${item.tools[item.tools.length - 1].cmd}` : `รัน ${item.tools.length} คำสั่ง${failed ? ` · ล้มเหลว ${failed}` : " · ผ่านทั้งหมด"}`;
+  return `<div class="toolgroup"><button class="toolsum" data-a="fold" data-key="${item.key}" aria-expanded="${open}"><span class="st">${now ? `<span class="spin"></span>` : ic(failed ? "x" : "check", 16, failed ? "c-red" : "c-green")}</span><span class="cmd">${esc(summary)}</span>${ic(open ? "up" : "down", 12)}</button>${open ? item.tools.map((e) => toolRow(e, running(e))).join("") : ""}</div>`;
+}
+function eventHtml(e, t) {
+  switch (e.t) {
+    case "message":
+      if (e.from) return `<div class="inmsg"><div class="cap">${head(A(e.from).look, "idle", 18, "still")} ${esc(A(e.from).name)} ส่งงานมา</div><div class="bubble in">${inline(e.text)}</div></div>`;
+      return `<div class="me"><div class="bubble">${esc(e.text)}</div>${e.queued && ACTIVE.includes(t.state) ? `<span class="cap">${ic("clock", 12)} รอคิว · ${esc(A(t.agent).name)} จะอ่านเมื่อ Turn นี้จบ</span>` : ""}</div>`;
+    case "text": return `<div class="atext">${inline(e.text)}</div>`;
+    case "delegate": {
+      const sub = T(e.sub);
+      return `<button class="deleg" data-a="open-task" data-id="${e.sub}">${head(A(e.to).look, moodOfTask(sub), 34)}<div class="main"><div class="top"><b>${e.again ? "คุยต่อกับ" : "ส่งงานให้"} ${esc(A(e.to).name)}</b><span class="pill-sm">${ic("lock", 11)}ครั้งที่ ${e.n}/${e.limit}</span></div><div class="sub">${esc(e.text)}</div><div class="sub2">${LABEL[sub.state]}</div></div>${ic("chev", 16, "c-3")}</button>`;
+    }
+    case "result": return `<div class="result">${ic(e.ok === true ? "check" : e.ok === "partial" ? "info" : "x", 16, e.ok === true ? "c-green" : e.ok === "partial" ? "c-orange" : "c-red")}<div><b>${esc(A(e.from).name)}</b> ส่งผลกลับ: ${esc(e.text)}</div></div>`;
+    case "refused": return `<div class="lbl">${ic("lock", 14, "c-red")}<span>${esc(e.text)}</span></div>`;
+    case "queued": case "note": return `<div class="lbl">${ic("clock", 14)}<span>${esc(e.text)}</span></div>`;
+    case "stop": return `<div class="lbl center">${ic("stop", 14)}<span>คุณหยุด Turn นี้ · ${ago(e.at)}</span></div>`;
+    case "approval": {
+      // The one orange thing on the screen while it waits (pages/task/ui/ApprovalCard.tsx).
+      const open = e.status === "open", out = { approved: ["check", "c-green", "คุณอนุมัติแล้ว"], denied: ["x", "c-red", "คุณปฏิเสธแล้ว"] }[e.status];
+      return `<div class="card ap"><div class="t">${ic("hand", 18, open ? "c-orange" : "c-3")}<b>${esc(A(t.agent).name)} ขออนุมัติ</b>${open ? `<span class="lbl">${ic("clock", 13, "c-orange")}<span>หมดอายุใน 59 นาที</span></span>` : ""}</div>
+      <div>${esc(e.reason)}</div><div class="cmd"><code>${esc(e.command)}</code></div>
+      ${open ? `<div class="sub2">ไม่อยู่ใน Allowlist ถ้าไม่ตอบก่อนหมดอายุจะนับว่าปฏิเสธ</div><div class="btns" style="margin-top:4px">
+        <button class="btn primary" data-a="ap" data-task="${t.id}" data-id="${e.id}" data-ans="approved">อนุมัติ</button>
+        <button class="btn" data-a="ap" data-task="${t.id}" data-id="${e.id}" data-ans="denied">ปฏิเสธ</button>
+        <button class="btn" data-a="ap" data-task="${t.id}" data-id="${e.id}" data-ans="steer">บอกให้ทำอย่างอื่น</button></div>`
+        : `<div class="lbl">${ic(out[0], 14, out[1])}<span>${out[2]}</span></div>`}</div>`;
+    }
+  }
+  return "";
+}
+// The field on top and, inside the same box, the Effort menu and the main action: send, dimmed until
+// there is something to send, or Stop while a Turn runs and the field is empty (pages/task/ui/Composer.tsx).
+function actionBtn(c, hasText) {
+  if (c.busy && !hasText) return `<button class="btn round primary" data-a="stop" data-id="${c.stop}" aria-label="หยุด">${ic("stop", 16)}</button>`;
+  return `<button class="btn round primary" data-a="${c.kind}" data-id="${c.id || ""}" data-mode="${c.mode || ""}" data-target="${c.target || ""}" aria-label="ส่ง" ${hasText ? "" : "disabled"}>${ic("send", 18)}</button>`;
+}
+function composerHtml(c, to, mode, text = "") {
+  return `<div class="composer-wrap"><div class="mode">${mode}</div><div class="composer" data-c="${esc(JSON.stringify(c))}">
+  <textarea id="msg" rows="1" aria-label="ส่งข้อความถึง ${esc(to)}" placeholder="${c.busy ? `ส่งต่อให้ ${esc(to)} หลัง Turn นี้จบ` : `ส่งข้อความถึง ${esc(to)}`}">${esc(text)}</textarea>
+  <div class="crow"><button class="effort" data-a="effort" aria-label="Effort">${EFFORT[S.effort]} ${ic("choose", 12)}</button><span class="act">${actionBtn(c, !!text.trim())}</span></div></div></div>`;
+}
+const modeLine = (tm, a) => (tm ? `${ic("team", 13)} คุยกับทีม ${esc(tm.name)} ผ่าน Entry · Agent ในทีมส่งงานต่อตามเส้นใน Flow` : `${ic("info", 13)} คุยเดี่ยว · ${esc(a.name)} ส่งงานให้ใครไม่ได้`);
+// Laid out like Messages, as pages/task/ui/TaskPage.tsx: the Agent at the top, your messages in accent
+// bubbles on the right, the Agent's replies without a bubble. Teams add the tree and the Delegation rows.
+function taskScreen(t) {
+  if (!t) return { title: "Task", back: "Inbox", body: `<p class="sub">ไม่พบ Task นี้</p>` };
+  const a = A(t.agent), root = rootOf(t), tm = t.team && TM(t.team), isRoot = t === root;
+  const title = tm && isRoot ? `ทีม ${tm.name}` : a.name;
+  const back = isRoot ? "Inbox" : A(T(t.parent).agent).name;
+  let body = `<div class="task-top"><button class="plain" data-a="toast-character" aria-label="แก้ Character ของ ${esc(a.name)}">${head(a.look, moodOfTask(t), 56)}</button>
+    <div class="foot2">${esc(t.title)}</div><div class="cap">${esc(M(a.machine).name)} · ${ago(t.events[0]?.at ?? t.at)}${tm && isRoot ? ` · ${esc(a.name)} เป็น Entry` : ""}</div></div>`;
+  if (!isRoot) body += `<p class="hint">${ic("info", 14)} Task ย่อยที่ ${esc(A(T(t.parent).agent).name)} ส่งมา · อ่านอย่างเดียว</p>`;
+  if (tm) body += treeCard(root, t.id);
+  const running = ["thinking", "working", "delegating"].includes(t.state);
+  body += `<div class="chat">${chatItems(t).map((it) => (it.tools ? toolsHtml(it, t) : eventHtml(it.e, t))).join("")}
+    ${running ? `<div class="lbl"><span class="spin"></span><span>${t.state === "delegating" ? "รอทีมส่งผลกลับ…" : "กำลังทำงาน…"}</span></div>` : ""}</div>`;
+  let foot;
+  if (!isRoot) {
+    const stoppable = subtree(t).some((x) => ACTIVE.includes(x.state));
+    foot = `<div class="composer-wrap"><div class="readonly"><span>พิมพ์ได้แค่ใน Task ของ Entry (${esc(A(root.agent).name)})</span>${stoppable ? `<button class="btn sm" data-a="stop" data-id="${t.id}">${ic("stop", 14)} หยุดกิ่งนี้</button>` : `<button class="btn sm" data-a="open-task" data-id="${root.id}">ไปที่ Entry</button>`}</div></div>`;
+  } else {
+    const busyNow = subtree(root).some((x) => ACTIVE.includes(x.state));
+    foot = composerHtml({ kind: "send", id: t.id, busy: busyNow, stop: root.id }, tm ? `ทีม ${tm.name}` : a.name, modeLine(tm, a));
+  }
+  const right = isRoot ? `<button class="btn round" data-a="compose" data-mode="${tm ? "team" : "agent"}" data-target="${tm ? tm.id : a.id}" aria-label="Task ใหม่">${ic("compose")}</button>` : "";
+  return { title, sub: statusHtml(t), back, body, foot, right, stick: true };
+}
+// An empty chat with one Agent or Team, the same screen before its first message: that message starts the Task.
+function composeScreen(p) {
+  const tm = p.mode === "team" && TM(p.target), a = tm ? A(tm.entry) : A(p.target);
+  const prev = rootTasks((x) => (tm ? x.team === tm.id : x.agent === a.id && !x.team));
+  let body = `<div class="task-top">${tm ? cluster(tm, 40) : head(a.look, moodOfAgent(a.id), 56)}<div class="foot2">${tm ? `Entry: ${esc(a.name)} · ${tm.members.length} ตัวในทีม` : esc(a.desc)}</div><div class="cap">${esc(M(a.machine).name)}${!tm && busy(a.id) ? " · ไม่ว่าง ข้อความแรกจะต่อคิว" : ""}</div></div>`;
+  if (tm) body += `<p class="hint" style="justify-content:center">${ic("check", 14, "c-green")} คุณมี Use ครบทั้ง ${tm.members.length} ตัวในทีมนี้ (ADR 0010)</p>`;
+  body += `<p class="cap" style="justify-content:center;margin:32px 0">ข้อความแรกที่ส่งจะเริ่ม Task ใหม่</p>`;
+  if (prev.length) body += `<div class="sec">Task ก่อนหน้า</div>` + prev.map((t) => `<button class="row" data-a="open-task" data-id="${t.id}"><div class="row-main"><div class="row-top"><b style="font-size:15px">${esc(t.title)}</b><span class="sub"></span><span class="sub2">${ago(t.at)}</span>${ic("chev", 14, "c-3")}</div><div class="status">${statusHtml(t)}</div></div></button>`).join("");
+  const to = tm ? `ทีม ${tm.name}` : a.name;
+  return { title: to, sub: "Task ใหม่", back: S.stack.length > 1 && S.stack[S.stack.length - 2].screen === "team" ? "ทีม" : "Inbox", body, foot: composerHtml({ kind: "start", mode: p.mode, target: p.target }, to, modeLine(tm, a), p.text || "") };
+}
+// Stop asks first and says what stops with it (ADR 0017); the alert is the platform's, as on the Task screen.
+function alertHtml() {
+  const t = T(S.alert.id), hit = subtree(t).filter((x) => x !== t && ACTIVE.includes(x.state)), who = A(t.agent).name;
+  const parent = t.parent && A(T(t.parent).agent).name;
+  return `<div class="ascrim"><div class="alert" role="alertdialog" aria-label="หยุด Turn นี้?"><div class="at">หยุด Turn นี้?</div>
+  <div class="am">${esc(who)} จะหยุดทันที ไฟล์ที่แก้ไปแล้วยังอยู่ และคุยต่อได้\nTask ย่อยที่จะหยุดตาม: ${hit.length ? hit.map((x) => esc(A(x.agent).name)).join(", ") : "ไม่มี"}${parent ? `\n${esc(parent)} จะได้รับแจ้งแล้วตัดสินใจเอง` : ""}</div>
+  <div class="ab"><button data-a="alert-cancel">ยกเลิก</button><button class="destructive" data-a="stop-go" data-id="${t.id}">หยุด</button></div></div></div>`;
+}
+function teamsList() {
+  return S.machines.map((m) => {
+    const tms = S.teams.filter((t) => t.machine === m.id);
+    return `<div class="sec">${esc(m.name)}</div>` + (tms.length ? tms.map((tm) => `<button class="row" data-a="open-team" data-id="${tm.id}">${cluster(tm)}<div class="row-main"><div class="row-top"><b>ทีม ${esc(tm.name)}</b></div>
+      <div class="status">Entry: ${esc(A(tm.entry).name)} · ${tm.members.length} ตัว · ${tm.lines.length} เส้น</div></div>${ic("chev", 16, "c-3")}</button>`).join("") : `<p class="hint">ยังไม่มีทีมบนเครื่องนี้</p>`);
+  }).join("") + `<p class="hint" style="margin-top:16px">${ic("info", 14)} ทีมอยู่บนเครื่องเดียวกับ Entry ทีมข้ามเครื่องยังไม่มีใน v0.1 (ADR 0026)</p>`;
+}
+function teamScreen(tm) {
+  if (!tm) return { title: "Team", back: "Team", body: "" };
+  const vb = variant === "A" ? canvasA(tm) : variant === "B" ? outlineB(tm) : matrixC(tm);
+  const body = `<div class="card"><div class="members">${tm.members.map((m) => head(A(m).look, moodOfAgent(m), 30)).join("")}<button class="btn sm" data-a="add-member" data-team="${tm.id}">${ic("plus", 14)} เพิ่ม Agent</button></div>
+  <div class="sub">อยู่บน ${esc(M(tm.machine).name)} · Entry: <b>${esc(A(tm.entry).name)}</b> <button class="btn sm" data-a="entry" data-team="${tm.id}">เปลี่ยน</button></div>
+  <div class="btns"><button class="btn primary" data-a="compose" data-mode="team" data-target="${tm.id}" data-push="1">คุยกับทีมนี้</button></div></div>
+  ${vb}
+  <div class="card"><div class="kind">${ic("quote", 14)} คำแนะนำ</div><div class="sub">Agent ต้นทางอ่านใน prompt แต่ไม่ได้บังคับ</div>
+  <div class="kind">${ic("lock", 14)} เพดาน</div><div class="sub">ส่งข้ามเส้นได้กี่ครั้งต่อ Turn Runtime บังคับ ครบแล้วข่าวไล่ขึ้นไปหา Entry</div>
+  <div class="sub2" style="margin-top:8px">ระบบไม่ส่งงานไปเอง Agent ตัดสินใจทุกครั้ง · เส้นของทุกทีมบนเครื่องเดียวกันรวมกันต้องไม่มีวง</div></div>`;
+  return { title: `ทีม ${tm.name}`, back: "Team", body };
+}
+function canvasA(tm) {
+  const pos = layout(tm);
+  const edges = tm.lines.filter((l) => pos[l.from] && pos[l.to]).map((l) => {
+    const a = pos[l.from], b = pos[l.to], ay = a.y + 34, by = b.y - 34;
+    const mx = (a.x + b.x) / 2, my = (ay + by) / 2;
+    return `<path class="edge" d="M${a.x} ${ay}C${a.x} ${ay + 40} ${b.x} ${by - 40} ${b.x} ${by}" marker-end="url(#arr)"/>
+    <g class="lbl" data-a="line" data-team="${tm.id}" data-from="${l.from}" data-to="${l.to}" transform="translate(${mx} ${my})"><rect x="-17" y="-11" width="34" height="22" rx="11"/><text>${l.limit}×</text></g>`;
+  }).join("");
+  const nodes = tm.members.map((m) => {
+    const p = pos[m], a = A(m);
+    return `<g class="node" data-node="${m}" data-team="${tm.id}" transform="translate(${p.x} ${p.y})">${S.sel === m ? `<circle r="40" class="halo"/>` : ""}
+    ${headSvg(a.look, moodOfAgent(m), 56, -28, -32)}<text class="nm" y="42">${esc(a.name)}</text>
+    ${m === tm.entry ? `<g class="etag" transform="translate(0 -42)"><rect x="-22" y="-9" width="44" height="18" rx="9"/><text>Entry</text></g>` : ""}</g>`;
+  }).join("");
+  const h = Math.max(...Object.values(pos).map((p) => p.y)) + 70;
+  return `<div class="card"><div class="chint">${S.sel ? `แตะ Agent ปลายทาง ให้ <b>${esc(A(S.sel).name)}</b> ส่งงานให้ได้ · แตะตัวเดิมเพื่อยกเลิก` : "ลากเพื่อจัดที่ · แตะตัวหนึ่งแล้วแตะอีกตัวเพื่อลากเส้น · แตะตัวเลขบนเส้นเพื่อตั้งค่า"}</div>
+  <svg class="canvas" data-canvas="${tm.id}" viewBox="0 0 340 ${Math.max(h, 300)}"><defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--label3)"/></marker></defs>${edges}${nodes}</svg></div>`;
+}
+function outlineB(tm) {
+  const seen = new Set();
+  const node = (id, d) => {
+    const a = A(id), outs = tm.lines.filter((l) => l.from === id);
+    if (seen.has(id)) return `<div class="ol-ref" style="margin-left:${d * 20}px">${head(a.look, "idle", 22, "still")} ${esc(a.name)} · อยู่ด้านบนแล้ว</div>`;
+    seen.add(id);
+    return `<div class="ol-node" style="margin-left:${d * 20}px"><div class="ol-head">${head(a.look, moodOfAgent(id), 36)}<div><b>${esc(a.name)}</b>${id === tm.entry ? `<span class="tag">Entry</span>` : ""}<div class="sub">${esc(a.desc)}</div></div></div>
+    ${outs.map((l) => `<button class="ol-line" data-a="line" data-team="${tm.id}" data-from="${l.from}" data-to="${l.to}">${ic("arrow", 14)}<span>ส่งงานให้ <b>${esc(A(l.to).name)}</b></span><span class="pill-sm">${ic("lock", 11)}${l.limit}×</span><span class="q">${esc(l.note || "ยังไม่มีคำแนะนำ")}</span></button>`).join("")}
+    <button class="ol-add" data-a="add-target" data-team="${tm.id}" data-from="${id}">${ic("plus", 13)} ส่งงานให้…</button></div>` + outs.map((l) => node(l.to, d + 1)).join("");
+  };
+  const top = node(tm.entry, 0), rest = tm.members.filter((m) => !seen.has(m));
+  return `<div class="card">${top}</div>` + (rest.length ? `<div class="sec">ยังไม่มีใครส่งงานถึง</div><div class="card">${rest.map((m) => node(m, 0)).join("")}</div>` : "");
+}
+function matrixC(tm) {
+  const ms = tm.members;
+  const cell = (f, t) => {
+    if (f === t) return `<td><div class="cell self">·</div></td>`;
+    const l = tm.lines.find((x) => x.from === f && x.to === t);
+    if (l) return `<td><button class="cell on" data-a="line" data-team="${tm.id}" data-from="${f}" data-to="${t}" aria-label="${esc(A(f).name)} ส่งให้ ${esc(A(t).name)}">${l.limit}</button></td>`;
+    const cyc = cycleFor(tm, f, t);
+    return `<td><button class="cell ${cyc ? "off" : ""}" data-a="cell" data-team="${tm.id}" data-from="${f}" data-to="${t}" aria-label="ลากเส้น ${esc(A(f).name)} ไป ${esc(A(t).name)}">${ic(cyc ? "x" : "plus", 13)}</button></td>`;
+  };
+  return `<div class="card"><div class="chint">แถว = ผู้ส่ง · คอลัมน์ = ผู้รับ · ตัวเลขคือเพดาน · กากบาทคือเส้นที่จะทำให้เกิดวง</div>
+  <table class="mx"><tr><th></th>${ms.map((m) => `<th>${head(A(m).look, "idle", 26, "still")}${esc(A(m).name)}</th>`).join("")}</tr>
+  ${ms.map((f) => `<tr><th>${head(A(f).look, "idle", 26, "still")}${esc(A(f).name)}${f === tm.entry ? "<br><span class=\"tag\" style=\"margin:0\">Entry</span>" : ""}</th>${ms.map((t) => cell(f, t)).join("")}</tr>`).join("")}</table></div>`;
+}
+function machinesList() {
+  return S.machines.map((m) => `<button class="row" data-a="open-machine" data-id="${m.id}"><span class="head" style="width:44px;height:44px;display:grid;place-items:center;background:var(--surface);border-radius:14px;box-shadow:var(--sh)">${ic("machine", 22)}</span><div class="row-main"><div class="row-top"><b>${esc(m.name)}</b></div>
+  <div class="status">${ic("check", 14, m.online ? "c-green" : "c-3")} ${m.online ? "ออนไลน์" : "ออฟไลน์"} · Agent ${S.agents.filter((a) => a.machine === m.id).length} ตัว · Runtime ${m.version}</div></div>${ic("chev", 16, "c-3")}</button>`).join("")
+    + `<div class="btns" style="margin:12px 8px"><button class="btn" data-a="pair">${ic("plus", 15)} Pair Machine</button></div>`;
+}
+function machineScreen(m) {
+  const ags = S.agents.filter((a) => a.machine === m.id), tms = S.teams.filter((t) => t.machine === m.id);
+  return { title: m.name, back: "Machine", body: `<div class="card"><div class="sub">${ic("check", 14, m.online ? "c-green" : "c-3")} ${m.online ? "ออนไลน์" : "ออฟไลน์"} · Runtime ${m.version} อัปเดตตัวเองจาก release ที่เซ็นแล้ว (ADR 0009)</div></div>
+  <div class="sec">Agent บนเครื่องนี้</div>${ags.map((a) => `<div class="row" style="cursor:default">${head(a.look, moodOfAgent(a.id), 40)}<div class="row-main"><div class="row-top"><b>${esc(a.name)}</b></div><div class="sub">${esc(a.desc)}</div><div class="sub2">${ic("folder", 13)} ${esc(a.workdir)}</div></div></div>`).join("") || `<p class="hint">ยังไม่มี Agent</p>`}
+  <div class="btns" style="margin:4px 8px 8px"><button class="btn" data-a="agent-new" data-machine="${m.id}">${ic("plus", 15)} สร้าง Agent</button></div>
+  <div class="sec">Team บนเครื่องนี้</div>${tms.map((tm) => `<button class="row" data-a="open-team-x" data-id="${tm.id}">${cluster(tm)}<div class="row-main"><b>ทีม ${esc(tm.name)}</b><div class="status">Entry: ${esc(A(tm.entry).name)}</div></div></button>`).join("") || `<p class="hint">ยังไม่มีทีม</p>`}
+  <div class="sec">Egress · ใช้ร่วมกันทุก Agent บนเครื่องนี้</div>
+  <div class="card"><div class="chips">${m.egress.map((d) => `<span class="chip">${ic("globe", 13)} ${esc(d)}</span>`).join("")}</div>
+  <div style="display:flex;gap:8px;margin-top:10px"><input class="input" id="egress" placeholder="เพิ่มโดเมน เช่น api.stripe.com"><button class="btn" data-a="egress" data-id="${m.id}">เพิ่ม</button></div>
+  <div class="sub2" style="margin-top:8px">Agent ทุกตัวบน ${esc(m.name)} ออกไปโดเมนเหล่านี้ได้ เป็นคนละเรื่องกับ Allowlist (ADR 0008)</div></div>` };
+}
+function settings() {
+  return `<div class="card"><b>${esc(S.ws.name)}</b><div class="sub">คุณเป็น Owner · มี Manage กับ Agent ทุกตัว · v0.1 มี Member คนเดียว</div></div>
+  <div class="sec">อุปกรณ์ที่ไว้ใจ</div><div class="card">${S.devices.map((d) => `<div style="display:flex;gap:8px;align-items:center;padding:4px 0">${ic("link", 16)}<div><b>${esc(d.name)}</b><div class="sub2">${esc(d.note)}</div></div></div>`).join("")}
+  <div class="btns" style="margin-top:8px"><button class="btn" data-a="link">${ic("plus", 15)} เพิ่มอุปกรณ์ (Linking)</button></div></div>
+  <div class="sec">ยังไม่อยู่ใน v0.1</div><div class="card"><div class="sub">Schedule ให้ทีมทำงานเองตามเวลา (#29) · Subagent · ทีมข้ามเครื่อง · push ที่อ่านข้อความได้เมื่อมี E2E</div></div>`;
+}
+
+// ---------- sheets
+function sheetHtml() {
+  const s = S.sheet, top = (t) => `<div class="grab"></div><div class="sheet-top"><span></span><div class="tt">${t}</div><button class="btn round x" data-a="close" aria-label="ปิด">${ic("close", 16)}</button></div>`;
+  let h = "";
+  if (s.k === "line") {
+    const tm = TM(s.team), l = tm.lines.find((x) => x.from === s.from && x.to === s.to);
+    if (!l) { S.sheet = null; return ""; }
+    h = top("เส้นใน Flow") + `<div class="card" style="display:flex;gap:10px;align-items:center;justify-content:center">${head(A(l.from).look, "idle", 44)}${ic("arrow", 20, "c-3")}${head(A(l.to).look, "idle", 44)}</div>
+      <p class="sub" style="text-align:center;margin-top:-4px">${esc(A(l.from).name)} ส่งงานให้ ${esc(A(l.to).name)} ได้ · ทีม ${esc(tm.name)}</p>
+      <div class="kind">${ic("quote", 14)} คำแนะนำ · Agent อ่าน ไม่บังคับ</div>
+      <textarea class="input" id="note" data-team="${tm.id}" data-from="${l.from}" data-to="${l.to}" placeholder="เส้นนี้ใช้ส่งงานแบบไหน เมื่อไหร่">${esc(l.note)}</textarea>
+      <p class="sub2">${esc(A(l.from).name)} จะเห็นข้อความนี้กับคำอธิบายของ ${esc(A(l.to).name)} ใน prompt</p>
+      <div class="kind" style="margin-top:12px">${ic("lock", 14)} เพดาน · Runtime บังคับ</div>
+      <div class="card stepper"><button class="btn round" data-a="limit" data-d="-1">−</button><b>${l.limit}</b><button class="btn round" data-a="limit" data-d="1">+</button><span class="sub">ครั้งต่อ Turn ของ ${esc(A(l.from).name)} นับทั้ง Task ย่อยใหม่และการคุยต่อ</span></div>
+      <div class="btns"><button class="btn primary" data-a="close">เสร็จ</button><button class="btn" data-a="del-line">ลบเส้น</button></div>`;
+  } else if (s.k === "add-target") {
+    const tm = TM(s.team);
+    h = top(`${esc(A(s.from).name)} ส่งงานให้…`) + tm.members.filter((m) => m !== s.from).map((m) => {
+      const has = tm.lines.some((l) => l.from === s.from && l.to === m), cyc = !has && cycleFor(tm, s.from, m);
+      return `<button class="pick" data-a="pick-target" data-to="${m}" ${has || cyc ? "disabled" : ""}>${head(A(m).look, "idle", 36)}<div class="main"><b>${esc(A(m).name)}</b><div class="sub2">${has ? "มีเส้นนี้แล้ว" : cyc ? "จะเกิดวง ลากไม่ได้" : esc(A(m).desc)}</div></div></button>`;
+    }).join("");
+  } else if (s.k === "add-member") {
+    const tm = TM(s.team);
+    h = top(`เพิ่ม Agent เข้าทีม ${esc(tm.name)}`) + S.agents.filter((a) => !tm.members.includes(a.id)).map((a) => {
+      const other = a.machine !== tm.machine;
+      return `<button class="pick" data-a="pick-member" data-id="${a.id}" ${other ? "disabled" : ""}>${head(a.look, moodOfAgent(a.id), 36)}<div class="main"><b>${esc(a.name)}</b><div class="sub2">${other ? `อยู่บน ${esc(M(a.machine).name)} ไม่ใช่เครื่องเดียวกับ Entry (ADR 0026)` : esc(a.desc)}</div></div></button>`;
+    }).join("") || `<p class="sub">Agent ทุกตัวอยู่ในทีมแล้ว</p>`;
+  } else if (s.k === "confirm-member") {
+    const tm = TM(s.team), a = A(s.id);
+    h = top("เพิ่มเข้าทีม?") + `<div class="card" style="display:flex;gap:12px;align-items:center">${head(a.look, "idle", 48)}<div><b>${esc(a.name)}</b><div class="sub">เข้าทีม ${esc(tm.name)}</div></div></div>
+      <div class="card"><div class="kind">${ic("folder", 14)} Agent ในทีมเดียวกันอ่าน Workdir ของกันได้</div><div class="sub">${esc(a.name)} จะอ่านไฟล์ของ ${tm.members.map((m) => esc(A(m).name)).join(", ")} ได้ และอีกฝั่งก็อ่านของ ${esc(a.name)} ได้ รวมถึงไฟล์อย่าง .env แต่เขียนได้แค่ Workdir ของตัวเอง</div></div>
+      <div class="btns"><button class="btn primary" data-a="confirm-member">เพิ่มเข้าทีม</button><button class="btn" data-a="close">ยกเลิก</button></div>`;
+  } else if (s.k === "entry") {
+    const tm = TM(s.team);
+    h = top("Entry ของทีม") + `<p class="sub">ข้อความของ Member ใน Task ของทีมไปที่ตัวนี้ ทีมหนึ่งมี Entry ตัวเดียว ต้องมี Manage ที่ตัวนั้น</p>` + tm.members.map((m) => `<button class="pick ${m === tm.entry ? "on" : ""}" data-a="pick-entry" data-id="${m}">${head(A(m).look, "idle", 36)}<div class="main"><b>${esc(A(m).name)}</b></div></button>`).join("");
+  } else if (s.k === "pair") {
+    h = top("Pair Machine") + `<div class="card"><b>1 · บนเครื่องใหม่</b><div class="sub">ติดตั้ง Runtime แล้วรัน</div><div class="cmd" style="background:var(--fill);border-radius:8px;padding:6px 10px;margin-top:6px"><code>veeloe pair</code></div></div>
+      <div class="card"><b>2 · สแกน QR ที่ขึ้นบนจอเครื่องนั้น</b><div class="sub">รหัสใช้ครั้งเดียว กุญแจแลกกันผ่าน QR Hub ไม่เคยเห็น</div>${qr(7)}</div>
+      <div class="btns"><button class="btn primary" data-a="pair-go">PROTOTYPE · จำลองว่าสแกนแล้ว</button></div>`;
+  } else if (s.k === "agent-new") {
+    s.look ||= randomLook();
+    h = top("สร้าง Agent") + `<div class="card" style="display:flex;gap:12px;align-items:center">${head(s.look, "idle", 64)}<div class="sub">Character เป็นแค่หน้าตา<br><button class="btn sm" data-a="shuffle" style="margin-top:6px">${ic("shuffle", 14)} สุ่มหน้าตา</button></div></div>
+      <label class="field"><span>ชื่อ</span><input class="input" id="an" value="Designer"></label>
+      <label class="field"><span>คำอธิบาย · ทีมจะอ่านว่ารับงานแบบไหน</span><textarea class="input" id="ad">ออกแบบหน้าจอใน Figma export เป็น spec ให้ frontend</textarea></label>
+      <label class="field"><span>Workdir</span><input class="input" id="aw" value="~/work/design"></label>
+      <label class="field"><span>Machine</span><select class="input" id="am">${S.machines.map((m) => `<option value="${m.id}" ${m.id === s.machine ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select></label>
+      <label class="field"><span>Provider</span><select class="input"><option>Anthropic</option><option>OpenRouter</option><option>OpenCode Zen</option></select></label>
+      <label class="field"><span>Provider key · แอปเข้ารหัสให้ Machine นี้ Hub อ่านไม่ได้</span><input class="input" type="password" placeholder="วาง key ของคุณ (prototype ไม่เก็บ)" autocomplete="off"></label>
+      <div class="btns"><button class="btn primary" data-a="agent-go">สร้าง</button></div>`;
+  } else if (s.k === "team-new") {
+    h = top("สร้าง Team") + `<label class="field"><span>ชื่อทีม</span><input class="input" id="tn" value="Docs"></label>
+      <label class="field"><span>Entry · ทีมอยู่บนเครื่องเดียวกับตัวนี้</span><select class="input" id="te">${S.agents.map((a) => `<option value="${a.id}">${esc(a.name)} · ${esc(M(a.machine).name)}</option>`).join("")}</select></label>
+      <div class="btns"><button class="btn primary" data-a="team-go">สร้าง</button></div>`;
+  } else if (s.k === "link") {
+    h = top("เพิ่มอุปกรณ์") + `<div class="card"><div class="sub">เปิด Veeloe บนอุปกรณ์ใหม่ แล้วใช้เครื่องนี้สแกน QR ที่ขึ้นบนนั้น เป็นทางเดียวที่อุปกรณ์ใหม่จะสั่งงานได้ (ADR 0013)</div>${qr(3)}</div>
+      <div class="btns"><button class="btn primary" data-a="link-go">PROTOTYPE · จำลองว่าสแกนแล้ว</button></div>`;
+  }
+  return `<div class="scrim" data-a="scrim"><div class="sheet" role="dialog">${h}</div></div>`;
+}
+function qr(seed) {
+  let x = seed, cells = "";
+  for (let r = 0; r < 21; r++) for (let c = 0; c < 21; c++) {
+    x = (x * 9301 + 49297) % 233280;
+    const finder = (r < 7 && c < 7) || (r < 7 && c > 13) || (r > 13 && c < 7);
+    const on = finder ? (r % 6 === 0 || c % 6 === 0 || (r % 14 > 1 && r % 14 < 5 && c % 14 > 1 && c % 14 < 5) || (c > 13 && (c - 14) % 6 === 0)) : x / 233280 > 0.55;
+    if (on) cells += `<rect x="${c}" y="${r}" width="1" height="1"/>`;
+  }
+  return `<svg class="qr" viewBox="0 0 21 21" fill="#0f1520" aria-label="QR">${cells}</svg>`;
+}
+
+// ---------- rendering
+const phone = $("#phone");
+let lastKey = "";
+function render() {
+  const v = view(), key = JSON.stringify(cur()) + S.tab;
+  const old = phone.querySelector(".scroll"), keep = old && key === lastKey ? old.scrollTop : null, atEnd = old && old.scrollHeight - old.scrollTop - old.clientHeight < 40;
+  const draft = $("#msg")?.value;
+  phone.innerHTML = `
+  ${v.tabs === false ? "" : `<div class="nav">${v.back ? `<button class="nav-back" data-a="back">${ic("back", 20)}<span>${esc(v.back)}</span></button>` : "<span></span>"}<div class="nav-title"><div>${esc(v.title)}</div>${v.sub ? `<div class="cap">${v.sub}</div>` : ""}</div><div class="nav-right">${v.right || ""}</div></div>`}
+  <div class="scroll">${v.body}</div>
+  ${v.foot || ""}
+  ${v.tabs === false ? "" : `<nav class="tabs">${[["inbox", "inbox", "Inbox"], ["teams", "team", "Team"], ["machines", "machine", "Machine"], ["settings", "gear", "ตั้งค่า"]].map(([id, icon, name]) => `<button class="${S.tab === id ? "on" : ""}" data-a="tab" data-id="${id}">${ic(icon, 22)}${name}</button>`).join("")}</nav>`}
+  ${S.sheet ? sheetHtml() : ""}
+  ${S.alert ? alertHtml() : ""}
+  ${S.toast ? `<div class="toast" data-a="toast">${S.toast}</div>` : ""}`;
+  const sc = phone.querySelector(".scroll");
+  if (v.stick && (key !== lastKey || atEnd)) sc.scrollTop = sc.scrollHeight;
+  else if (keep !== null) sc.scrollTop = keep;
+  if (draft && key === lastKey && $("#msg")) { $("#msg").value = draft; syncAction(); }
+  lastKey = key;
+  renderGuide();
+  const sw = $("#switcher");
+  sw.hidden = !(S.ws && cur().screen === "team" && !S.sheet);
+  sw.innerHTML = `<button data-v="-1" aria-label="แบบก่อนหน้า">‹</button><span>${variant} · ${variants[variant]} <small style="opacity:.6">← → สลับ</small></span><button data-v="1" aria-label="แบบถัดไป">›</button>`;
+}
+let toastTimer;
+function toastSoon() { clearTimeout(toastTimer); toastTimer = setTimeout(() => { S.toast = null; render(); }, 6000); }
+
+// ---------- actions in the phone
+const actions = {
+  "ws-create": (d) => { S.ws = { name: d.demo ? "Demo Workspace" : "บ้านของฉัน" }; goTab("inbox"); S.toast = d.demo ? "Demo Workspace · ข้อมูลตัวอย่าง คำสั่งไม่ถูกส่งไปที่ไหน" : "สร้าง Workspace แล้ว · สมมติว่า pair mac-studio กับ build-box ไว้แล้ว"; },
+  tab: (d) => goTab(d.id),
+  back: () => { if (S.stack.length > 1) S.stack.pop(); S.sel = null; },
+  "open-row": (d) => {
+    const t = d.kind === "team" ? rootTasks((x) => x.team === d.id)[0] : rootTasks((x) => x.agent === d.id && !x.team)[0];
+    if (t) pushScreen("task", { id: t.id }); else pushScreen("compose", { mode: d.kind === "team" ? "team" : "agent", target: d.id });
+  },
+  "open-task": (d) => { const c = cur(); if (c.screen === "task") c.p = { id: d.id }; else pushScreen("task", { id: d.id }); S.sheet = null; },
+  "open-team": (d) => pushScreen("team", { id: d.id }),
+  "open-team-x": (d) => { goTab("teams"); pushScreen("team", { id: d.id }); },
+  "open-machine": (d) => pushScreen("machine", { id: d.id }),
+  // New Task from inside a chat replaces it, as starting a new conversation does; from a Team's page it pushes.
+  compose: (d) => { const p = { mode: d.mode, target: d.target }; if (d.push) pushScreen("compose", p); else Object.assign(cur(), { screen: "compose", p }); },
+  start: (d) => startTask({ mode: d.mode, target: d.target, text: $("#msg")?.value }),
+  send: (d) => { const el = $("#msg"); sendInTask(T(d.id), el.value); el.value = ""; },
+  stop: (d) => { S.alert = { id: d.id }; },
+  "stop-go": (d) => { stopTree(d.id); S.alert = null; },
+  "alert-cancel": () => { S.alert = null; },
+  fold: (d) => { S.open = S.open.includes(d.key) ? S.open.filter((k) => k !== d.key) : [...S.open, d.key]; },
+  effort: () => { const ks = Object.keys(EFFORT); S.effort = ks[(ks.indexOf(S.effort) + 1) % ks.length]; },
+  "toast-character": () => { S.toast = "แตะหน้าของ Agent เพื่อแก้ Character ซึ่งมีอยู่แล้วใน Controller"; },
+  // "บอกให้ทำอย่างอื่น" is a no that steers: it answers no and puts the cursor in the composer.
+  ap: (d) => { const e = T(d.task).events.find((x) => x.id === d.id); e.status = d.ans === "steer" ? "denied" : d.ans; const r = runOf(d.task); if (r) stepRun(r); if (d.ans === "steer") setTimeout(() => $("#msg")?.focus()); },
+  close: () => { S.sheet = null; },
+  scrim: (d, ev) => { if (ev.target.classList.contains("scrim")) S.sheet = null; },
+  toast: () => { S.toast = null; },
+  line: (d) => { S.sheet = { k: "line", team: d.team, from: d.from, to: d.to }; },
+  limit: (d) => { const tm = TM(S.sheet.team), l = tm.lines.find((x) => x.from === S.sheet.from && x.to === S.sheet.to); l.limit = Math.min(9, Math.max(1, l.limit + Number(d.d))); },
+  "del-line": () => { const tm = TM(S.sheet.team); tm.lines = tm.lines.filter((x) => !(x.from === S.sheet.from && x.to === S.sheet.to)); S.sheet = null; },
+  cell: (d) => { tryAddLine(TM(d.team), d.from, d.to); if (S.toast) toastSoon(); },
+  "add-target": (d) => { S.sheet = { k: "add-target", team: d.team, from: d.from }; },
+  "pick-target": (d) => { const s = S.sheet; S.sheet = null; tryAddLine(TM(s.team), s.from, d.to); },
+  "add-member": (d) => { S.sheet = { k: "add-member", team: d.team }; },
+  "pick-member": (d) => { S.sheet = { k: "confirm-member", team: S.sheet.team, id: d.id }; },
+  "confirm-member": () => { TM(S.sheet.team).members.push(S.sheet.id); S.sheet = null; },
+  entry: (d) => { S.sheet = { k: "entry", team: d.team }; },
+  "pick-entry": (d) => { TM(S.sheet.team).entry = d.id; TM(S.sheet.team).pos = {}; S.sheet = null; },
+  pair: () => { S.sheet = { k: "pair" }; },
+  "pair-go": () => {
+    if (!M("office")) S.machines.push({ id: "office", name: "office-pc", online: true, version: "0.1.0", egress: ["api.anthropic.com"] });
+    S.sheet = null; goTab("machines"); S.toast = "Pair office-pc แล้ว · Machine ฟรีมีเครื่องเดียว เครื่องถัดไปคิดเงินตามจำนวน Machine (ADR 0001)";
+  },
+  "agent-new": (d) => { S.sheet = { k: "agent-new", machine: d.machine || "mac" }; },
+  shuffle: () => { S.sheet.look = randomLook(); },
+  "agent-go": () => {
+    const id = "a" + Date.now(), m = $("#am").value;
+    S.agents.push({ id, name: $("#an").value || "Agent", desc: $("#ad").value, workdir: $("#aw").value, machine: m, look: S.sheet.look });
+    S.sheet = null; S.toast = `สร้าง ${esc($("#an")?.value || "Agent")} แล้ว · ค่าตัวจริงอยู่ที่ Runtime ของ ${esc(M(m).name)} Hub รู้แค่ชื่อ คำอธิบาย และ Character`;
+  },
+  "team-new": () => { S.sheet = { k: "team-new" }; },
+  "team-go": () => {
+    const e = $("#te").value, id = "tm" + Date.now();
+    S.teams.push({ id, name: $("#tn").value || "ทีมใหม่", machine: A(e).machine, entry: e, members: [e], lines: [], pos: {} });
+    S.sheet = null; goTab("teams"); pushScreen("team", { id });
+  },
+  link: () => { S.sheet = { k: "link" }; },
+  "link-go": () => { S.devices.push({ name: "MacBook · เว็บ", note: "เพิ่มด้วย Linking เมื่อกี้" }); S.sheet = null; },
+  egress: (d) => { const v = $("#egress").value.trim(); if (v) M(d.id).egress.push(v); },
+};
+phone.addEventListener("click", (ev) => {
+  if (dragMoved) { dragMoved = false; return; }
+  const el = ev.target.closest("[data-a]");
+  if (!el || el.closest("[disabled]")) return;
+  const fn = actions[el.dataset.a];
+  if (!fn) return;
+  fn(el.dataset, ev);
+  if (S.toast && !["toast"].includes(el.dataset.a)) toastSoon();
+  render();
+});
+// Notes save as they are typed, without redrawing under the cursor.
+// Send stays dimmed until there is something to send; with a Turn running, an empty field offers Stop.
+function syncAction() {
+  const el = $("#msg"), box = el?.closest(".composer");
+  if (box) box.querySelector(".act").innerHTML = actionBtn(JSON.parse(box.dataset.c), !!el.value.trim());
+}
+phone.addEventListener("input", (ev) => {
+  if (ev.target.id === "msg") syncAction();
+  if (ev.target.id === "note") { const d = ev.target.dataset; TM(d.team).lines.find((l) => l.from === d.from && l.to === d.to).note = ev.target.value; }
+});
+phone.addEventListener("keydown", (ev) => {
+  if (ev.target.id === "msg" && ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); phone.querySelector('[data-a="send"], [data-a="start"]')?.click(); }
+});
+
+// Team canvas: drag to place, tap one then another to draw a line.
+let drag = null, dragMoved = false;
+phone.addEventListener("pointerdown", (ev) => {
+  const n = ev.target.closest("[data-node]");
+  if (!n) return;
+  const svg = n.closest("svg.canvas"), r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+  const tm = TM(n.dataset.team), pos = layout(tm)[n.dataset.node];
+  drag = { id: n.dataset.node, team: tm.id, sx: ev.clientX, sy: ev.clientY, ox: pos.x, oy: pos.y, k: vb.width / r.width, moved: false };
+});
+window.addEventListener("pointermove", (ev) => {
+  if (!drag) return;
+  const dx = (ev.clientX - drag.sx) * drag.k, dy = (ev.clientY - drag.sy) * drag.k;
+  if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+  drag.moved = true;
+  TM(drag.team).pos[drag.id] = { x: Math.round(Math.min(310, Math.max(30, drag.ox + dx))), y: Math.round(Math.max(50, drag.oy + dy)) };
+  render();
+});
+window.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  if (d.moved) { dragMoved = true; setTimeout(() => (dragMoved = false), 0); return; }
+  const tm = TM(d.team);
+  if (!S.sel) S.sel = d.id;
+  else if (S.sel === d.id) S.sel = null;
+  else { const from = S.sel; S.sel = null; tryAddLine(tm, from, d.id); if (S.toast) toastSoon(); }
+  dragMoved = true;
+  setTimeout(() => (dragMoved = false), 0);
+  render();
+});
+function setVariant(step) {
+  const keys = Object.keys(variants);
+  variant = keys[(keys.indexOf(variant) + step + keys.length) % keys.length];
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set("variant", variant);
+    history.replaceState(null, "", u);
+  } catch { /* ponytail: opened as a data: or sandboxed page, the variant just isn't kept in the URL */ }
+  S.sel = null;
+  render();
+}
+$("#switcher").addEventListener("click", (ev) => { const b = ev.target.closest("[data-v]"); if (b) setVariant(Number(b.dataset.v)); });
+window.addEventListener("keydown", (ev) => {
+  if (ev.target.closest("input, textarea, select, [contenteditable]")) return;
+  if (cur().screen !== "team") return;
+  if (ev.key === "ArrowLeft") setVariant(-1);
+  if (ev.key === "ArrowRight") setVariant(1);
+});
+
+// ---------- the walkthrough panel
+const latestRoot = (kind) => S.tasks.filter((t) => !t.parent && runOf(t.id)?.kind === kind).pop();
+function openRun(kind, scenario, steps = 0, text) {
+  ensureWs();
+  const t = startTask({ mode: kind === "solo" ? "agent" : "team", target: kind === "solo" ? "backend" : "dev", text, scenario });
+  const r = runOf(t.id);
+  for (let i = 0; i < steps; i++) stepRun(r);
+  return t;
+}
+const GUIDE = [
+  { id: "setup", name: "ตั้งต้น", steps: [
+    { t: "สร้าง Workspace", i: "#8", d: "เปิดแอปครั้งแรก กุญแจของคุณเกิดบนเครื่องนี้ ไม่มีรหัสผ่าน", go: () => { const g = S.gtab; S = fresh(); S.gtab = g; } },
+    { t: "Pair Machine", i: "#9", d: "รัน veeloe pair บนเครื่องใหม่ แล้วสแกน QR บนจอเครื่องนั้น", go: () => { ensureWs(); goTab("machines"); S.sheet = { k: "pair" }; } },
+    { t: "Machine และ Egress", i: "#19 #25 #26", d: "Agent บนเครื่อง ทีมบนเครื่อง และโดเมนที่ Agent ทุกตัวบนเครื่องนี้ออกไปได้", go: () => { ensureWs(); goTab("machines"); pushScreen("machine", { id: "mac" }); } },
+    { t: "สร้าง Agent", i: "#11", d: "ชื่อ คำอธิบายว่ารับงานแบบไหน Workdir และ Provider key ที่แอปเข้ารหัสให้เครื่องนั้น", go: () => { ensureWs(); goTab("machines"); pushScreen("machine", { id: "mac" }); S.sheet = { k: "agent-new", machine: "mac" }; } },
+    { t: "เพิ่มอุปกรณ์ด้วย Linking", i: "#24", d: "อุปกรณ์ใหม่ต้องให้เครื่องที่ไว้ใจอยู่แล้วสแกน QR", go: () => { ensureWs(); goTab("settings"); S.sheet = { k: "link" }; } },
+  ] },
+  { id: "solo", name: "คุยเดี่ยว", steps: [
+    { t: "Inbox", i: "#12 #23", d: "หนึ่งแถวต่อ Agent และต่อ Team หน้าตาบอก Mood ตัวที่รอคุณขึ้นก่อน", go: () => { ensureWs(); goTab("inbox"); } },
+    { t: "แตะ Agent แล้วคุยเลย", i: "#12", d: "แตะแถวใน Inbox แล้วเข้าแชตทันที ข้อความแรกเริ่ม Task ใหม่ ปุ่มมุมขวาบนในแชตใช้เริ่ม Task ใหม่กับตัวเดิม คุยเดี่ยวไม่มี tool ส่งงาน", go: () => { ensureWs(); goTab("inbox"); pushScreen("compose", { mode: "agent", target: "backend", text: "เพิ่ม index ให้ users.email หน่อย query หาอีเมลช้า" }); } },
+    { t: "ดู Turn เดินแล้วอนุมัติ", i: "#13 #15 #16 #17", d: "tool ใน sandbox แล้วขออนุมัติคำสั่งที่ไม่อยู่ใน Allowlist ลองกดอนุมัติหรือปฏิเสธบนการ์ด", go: () => openRun("solo", null, 4, "เพิ่ม index ให้ users.email หน่อย query หาอีเมลช้า") },
+    { t: "ส่งตอน Agent ไม่ว่าง", i: "#14", d: "ข้อความต่อคิวที่ Runtime และบอกว่าอยู่คิวที่เท่าไหร่", go: () => { const t = openRun("solo", null, 2, "รัน test ทั้งหมดให้หน่อย"); sendInTask(t, "แล้วอัปเดต README ด้วยนะ"); } },
+    { t: "Stop", i: "#18", d: "ระหว่าง Turn ปุ่มส่งกลายเป็นปุ่มหยุด ไฟล์ที่แก้แล้วคงอยู่ และคุยต่อได้", go: () => { const t = openRun("solo", null, 2, "ลบไฟล์ log เก่าใน ~/work/api/logs"); runOf(t.id).auto = false; S.alert = { id: t.id }; } },
+  ] },
+  { id: "build", name: "สร้างทีม", steps: [
+    { t: "รายชื่อ Team", i: "#20", d: "ทีมจัดตามเครื่อง ทีมอยู่บนเครื่องเดียวกับ Entry", go: () => { ensureWs(); goTab("teams"); } },
+    { t: "Flow ของทีม Dev", i: "#20", d: "แถบด้านล่างสลับได้สามแบบ: A ผังอิสระ, B ต้นไม้จาก Entry, C ตารางเส้น · กดลูกศรซ้ายขวาก็ได้", go: () => { ensureWs(); goTab("teams"); pushScreen("team", { id: "dev" }); } },
+    { t: "คำแนะนำกับเพดานบนเส้น", i: "#20", d: "คำแนะนำ Agent อ่านแต่ไม่บังคับ ส่วนเพดาน Runtime บังคับ", go: () => { ensureWs(); goTab("teams"); pushScreen("team", { id: "dev" }); S.sheet = { k: "line", team: "dev", from: "frontend", to: "reviewer" }; } },
+    { t: "ลากเส้นย้อนในทีม", i: "#20", d: "Reviewer → Frontend จะปิดวงกับ Frontend → Reviewer ตีกลับใช้การคุยต่อแทน", go: () => { ensureWs(); goTab("teams"); pushScreen("team", { id: "dev" }); tryAddLine(TM("dev"), "reviewer", "frontend"); toastSoon(); } },
+    { t: "วงข้ามทีม", i: "#20", d: "ทีม Content มี Writer → Reviewer ถ้าเพิ่ม Writer เข้าทีม Dev แล้วลาก Reviewer → Writer จะชนกัน", go: () => { ensureWs(); goTab("teams"); pushScreen("team", { id: "dev" }); if (!TM("dev").members.includes("writer")) TM("dev").members.push("writer"); tryAddLine(TM("dev"), "reviewer", "writer"); toastSoon(); } },
+    { t: "เพิ่ม Agent จากเครื่องอื่นไม่ได้", i: "#20", d: "Tester อยู่บน build-box จึงเข้าทีมบน mac-studio ไม่ได้ และตอนเพิ่มจะเตือนเรื่องอ่าน Workdir ของกัน", go: () => { ensureWs(); goTab("teams"); pushScreen("team", { id: "dev" }); S.sheet = { k: "add-member", team: "dev" }; } },
+  ] },
+  { id: "run", name: "ทีมทำงาน", steps: [
+    { t: "แตะทีม Dev แล้วคุยเลย", i: "#21", d: "แถวของทีมเปิดแชตกับทีม ข้อความไปที่ Entry และต้องมี Use ครบทุกตัวในทีม เลือกบทของ Reviewer ได้ในกล่อง PROTOTYPE ด้านล่าง", go: () => { ensureWs(); goTab("inbox"); pushScreen("compose", { mode: "team", target: "dev", text: "เพิ่มหน้า reset password ทางอีเมล" }); } },
+    { t: "ทีมทำงานจนขออนุมัติ", i: "#21", d: "ส่งงานพร้อมกัน ต่อคิวที่ Reviewer ตีกลับหนึ่งรอบ แล้ว Lead ขออนุมัติ push", go: () => openRun("dev", "pass", 0, "เพิ่มหน้า reset password ทางอีเมล") },
+    { t: "แบบตกลงกันไม่ได้", i: "#21", d: "Reviewer ไม่ผ่านจนครบเพดาน 3 ครั้ง tool ปฏิเสธ แล้วข่าวไล่ขึ้นไปถึง Entry", go: () => openRun("dev", "limit", 0, "เพิ่มหน้า reset password ทางอีเมล") },
+    { t: "เปิดกิ่งแบบอ่านอย่างเดียว", i: "#21", d: "Member อ่าน Task ย่อยได้ พิมพ์ได้แค่ใน Task ของ Entry", go: () => { let root = latestRoot("dev"); if (!root) root = openRun("dev", "pass", 5); const f = subtree(root).find((x) => x.agent === "frontend"); goTab("inbox"); pushScreen("task", { id: root.id }); if (f) pushScreen("task", { id: f.id }); } },
+    { t: "Stop ทั้งสาย", i: "#22", d: "หยุดทุก Task ข้างใต้ในครั้งเดียว ก่อนกดแอปบอกว่าจะหยุดอะไรบ้าง", go: () => { const t = openRun("dev", "pass", 5, "ทำหน้า profile ใหม่"); runOf(t.id).auto = false; S.alert = { id: t.id }; } },
+  ] },
+  { id: "later", name: "หลัง v0.1", steps: [] },
+];
+function stateText() {
+  const lines = [`หน้าจอ: ${S.ws ? cur().screen : "onboard"}${cur().screen === "team" ? ` · แบบ ${variant}` : ""}`];
+  S.teams.forEach((tm) => lines.push(`ทีม ${tm.name} (${M(tm.machine).name}) Entry=${A(tm.entry).name}`, ...tm.lines.map((l) => `  ${A(l.from).name} → ${A(l.to).name} · เพดาน ${l.limit}`)));
+  const roots = S.tasks.filter((t) => !t.parent);
+  if (roots.length) lines.push("", "Task:");
+  roots.forEach((r) => {
+    const walk = (t, d) => {
+      const sends = Object.entries(t.sends).map(([to, n]) => `${A(to).name} ${n}/${lineOf(t, to)?.limit ?? "?"}`).join(", ");
+      lines.push(`${"  ".repeat(d + 1)}${t.id} ${A(t.agent).name} [${LABEL[t.state]}]${sends ? ` ส่ง: ${sends}` : ""}`);
+      kids(t).forEach((k) => walk(k, d + 1));
+    };
+    walk(r, 0);
+  });
+  const q = Object.entries(S.queue).filter(([, v]) => v.length);
+  if (q.length) lines.push("", "คิว:", ...q.map(([a, v]) => `  ${A(a).name} ← ${v.join(", ")}`));
+  return lines.join("\n");
+}
+function renderGuide() {
+  const tab = GUIDE.find((g) => g.id === S.gtab);
+  const run = S.focus ? runOf(S.focus) : null;
+  const focused = cur().screen === "task" ? runOf(cur().p.id) : run;
+  $("#guide").innerHTML = `<h2>Veeloe v0.1 · ภาพรวมที่คาดหวัง</h2>
+  <p class="lede">ไล่ตามขั้นทางซ้าย หรือกดในมือถือได้เลย ทุกอย่างอยู่ในหน่วยความจำ Agent ตอบตามบทที่เขียนไว้แทน LLM</p>
+  <div class="gtabs">${GUIDE.map((g) => `<button class="${g.id === S.gtab ? "on" : ""}" data-g="gtab" data-id="${g.id}">${g.name}</button>`).join("")}</div>
+  ${tab.id === "later" ? `<div class="gcard later"><h3>ตัดสินใจแล้วแต่ไม่อยู่ใน v0.1</h3>
+    <div><b>Schedule (#29)</b> · Member ตั้งข้อความตามเวลาให้ Agent หรือ Team ทุกรอบเปิด Task ใหม่ ไม่มีอะไรก็เงียบ มีเรื่องก็ขึ้น Inbox พร้อม push (ADR 0027)</div>
+    <div><b>Subagent</b> · ตัวช่วยอ่านอย่างเดียวที่ Agent แตกออกไปเองให้คิดและอ่านขนานกัน รันคำสั่งที่เขียนไฟล์ไม่ได้ (ADR 0011)</div>
+    <div><b>ทีมข้ามเครื่อง</b> · รอคำตอบว่าไฟล์จะข้ามเครื่องยังไง ตอนนั้น Hub กลับมาตรวจเส้น (ADR 0026)</div>
+    <div><b>push ที่อ่านข้อความได้</b> · เมื่อมี E2E ให้ push พกข้อความเข้ารหัส แอปถอดบนเครื่อง (ADR 0005)</div></div>`
+    : `<div class="gcard">${tab.steps.map((s, i) => `<button class="gstep ${i === S.gstep ? "on" : ""}" data-g="step" data-i="${i}"><span class="n">${i + 1}</span><span><span class="tt">${esc(s.t)}</span><span class="iss">${esc(s.i)}</span><div class="dd">${esc(s.d)}</div></span></button>`).join("")}
+    <div class="gnext"><button class="btn primary" data-g="next">${S.gstep + 1 < tab.steps.length ? "ขั้นถัดไป" : "ไปหมวดถัดไป"}</button></div></div>`}
+  ${tab.id === "run" ? `<div class="gcard"><h3>PROTOTYPE · บทของ Reviewer ใน Task ถัดไปของทีม Dev</h3><div class="btns">
+    <button class="btn sm ${S.scenario === "pass" ? "primary" : ""}" data-g="scenario" data-v="pass">ผ่านรอบสอง แล้วขออนุมัติ push</button>
+    <button class="btn sm ${S.scenario === "limit" ? "primary" : ""}" data-g="scenario" data-v="limit">ไม่ผ่านจนครบเพดาน</button></div></div>` : ""}
+  ${focused ? `<div class="gcard sim"><h3>เกิดอะไรขึ้น ${focused.done ? "· จบแล้ว" : focused.halted ? "· ถูก Stop" : focused.blocked ? "· รอคุณ" : ""}</h3>
+    <div class="btns"><button class="btn sm" data-g="tick" ${focused.done || focused.halted ? "disabled" : ""}>ขั้นต่อไป</button><button class="btn sm" data-g="auto">${focused.auto ? "หยุดเล่นอัตโนมัติ" : "เล่นอัตโนมัติ"}</button></div>
+    <ul class="narr">${focused.notes.slice(0, 6).map((n) => `<li>${esc(n)}</li>`).join("")}</ul></div>` : ""}
+  <div class="gcard"><h3>สถานะทั้งหมด</h3><pre class="state">${esc(stateText())}</pre></div>`;
+}
+$("#guide").addEventListener("click", (ev) => {
+  const el = ev.target.closest("[data-g]");
+  if (!el || el.disabled) return;
+  const g = el.dataset.g, tab = GUIDE.find((x) => x.id === S.gtab);
+  const focused = cur().screen === "task" ? runOf(cur().p.id) : S.focus && runOf(S.focus);
+  if (g === "gtab") { S.gtab = el.dataset.id; S.gstep = 0; if (GUIDE.find((x) => x.id === S.gtab).steps[0]) GUIDE.find((x) => x.id === S.gtab).steps[0].go(); }
+  if (g === "step") { S.gstep = Number(el.dataset.i); tab.steps[S.gstep].go(); }
+  if (g === "next") {
+    if (S.gstep + 1 < tab.steps.length) { S.gstep++; tab.steps[S.gstep].go(); }
+    else { const i = GUIDE.indexOf(tab), nxt = GUIDE[i + 1] || GUIDE[0]; S.gtab = nxt.id; S.gstep = 0; nxt.steps[0]?.go(); }
+  }
+  if (g === "scenario") S.scenario = el.dataset.v;
+  if (g === "tick" && focused) stepRun(focused);
+  if (g === "auto" && focused) focused.auto = !focused.auto;
+  render();
+});
+document.querySelector(".proto").addEventListener("click", (ev) => {
+  const g = ev.target.closest("[data-g]")?.dataset.g;
+  if (g === "theme") {
+    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.dataset.theme = dark ? "light" : "dark";
+  }
+  if (g === "reset") { S = fresh(); }
+  render();
+});
+render();
+</script>
+</body>
+</html>
