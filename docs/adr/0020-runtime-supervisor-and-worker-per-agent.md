@@ -12,5 +12,8 @@ Runtime ออกมาเป็น binary ไฟล์เดียวที่�
 
 ## Consequences
 
+- Agent ที่รันหลาย Turn พร้อมกันในคนละ Worktree (ADR 0047) หรือตอบ Ask ไปพร้อมกับงาน (ADR 0046) มี worker หลายโปรเซส หนึ่งตัวต่อ Turn ที่รันอยู่ แต่ละตัวมี sandbox ตามที่เขียนของ Turn นั้น
+- harness ใน worker ส่งคำขอไป LLM ผ่าน proxy ใน supervisor ซึ่งถือ key ของ Provider (ADR 0042)
+
 - การแยกโปรเซสไม่ได้เพิ่มความปลอดภัยระหว่าง Agent ด้วยกัน เพราะยังใช้ OS user คนเดียวกัน ตัวกันจริงยังเป็น sandbox (ADR 0008) ถ้าวันหลังจะแยก OS user ก็ทำได้โดยไม่ต้องรื้อโครงสร้าง
 - ใช้ RAM ราว 30-50 MB ต่อ Agent

@@ -16,7 +16,7 @@ Egress ของ Agent ตั้งให้ออกได้ทั้งเน
 
 ## Consequences
 
-- Agent ติดต่อ Provider ได้เสมอโดยไม่ต้องอยู่ในรายชื่อ
+- คำขอไป Provider วิ่งผ่าน proxy ใน supervisor (ADR 0042) จึงไม่ต้องอยู่ใน Egress
 - งาน research ที่แค่อ่านหรือค้นข้อมูล ใช้ web search กับ web fetch ของ Provider ได้โดยไม่ต้องเปิด Egress เพราะเซิร์ฟเวอร์ของ Provider เป็นคนเข้าเว็บ และ web fetch ของ Anthropic ดึงได้เฉพาะ URL ที่เคยปรากฏในบทสนทนา แต่ใช้ได้เฉพาะ Provider ที่มี tool นี้ Provider ที่ไม่มีให้ค้นผ่าน Connector และเปิดเว็บด้วย `web_fetch` ของเราที่อยู่ใต้ Egress (ADR 0040)
 - proxy ต่อ Agent ต้อง spike บน sandbox-runtime ก่อนเริ่มทำ
 - ข้อจำกัดเรื่องรายชื่อโดเมนที่ใช้ร่วมกันทั้ง Machine ใน ADR 0008 ใช้กับ v0.1 เท่านั้น

@@ -13,6 +13,7 @@
 
 ## Consequences
 
+- ระหว่าง Turn ที่อยู่ใน Worktree ของ Project Workdir รวมถึง `MEMORY.md` อ่านได้อย่างเดียว Agent จึงจด Memory ได้เฉพาะตอนทำงานที่ไม่ได้อยู่ใน worktree (ADR 0047)
 - Memory โดนวางยาได้ ถ้าหน้าเว็บหรือคนในแชตหลอกให้ Agent จดคำสั่งไว้ คำสั่งนั้นจะติดไปทุก Task รวมถึงของ Member คนอื่น Allowlist กันไม่ได้เพราะการแก้ไฟล์ไม่ผ่าน Allowlist (ADR 0030) ที่ช่วยได้คือการแก้ไฟล์นี้แสดงใน Task และแอปมีหน้าให้อ่าน `MEMORY.md` ได้
 - การจัดระเบียบความจำ เช่นย่อบันทึกรายวันลง `MEMORY.md` ทำด้วย Schedule (ADR 0027) แทน sleep-time agent ของ Letta หรือ heartbeat ของ OpenClaw
 - ถ้าวันหลังต้องการค้นตามความหมาย ค่อยเพิ่มเป็น tool หรือ Connector แบบ additive

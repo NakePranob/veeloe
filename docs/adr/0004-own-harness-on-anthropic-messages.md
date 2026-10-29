@@ -9,5 +9,6 @@
 
 ## Consequences
 
+- Owner ตั้ง Provider ไว้ที่ Machine และ supervisor ถือ key แล้วเป็นทางผ่านของคำขอ ส่วน Agent แต่ละตัวเลือก Provider กับ model เดียว (ADR 0042)
 - model ที่ไม่ใช่ Claude เรียกผ่าน gateway เหล่านี้ได้ แต่ไม่รับประกันว่าจะเรียก tool ได้ดี ถ้าต้องรองรับจริงจัง ค่อยเพิ่ม adapter แบบ OpenAI-compatible เป็นตัวที่สอง
 - Bedrock และ Vertex ต้องใช้ client class ของแพลตฟอร์มนั้นใน Anthropic SDK แค่เปลี่ยน URL ไม่พอ

@@ -1,6 +1,6 @@
 # Veeloe
 
-ระบบ Agent ที่ติดตั้งลงหลายเครื่อง Agent บนเครื่องเดียวกันทำงานร่วมกันเป็นทีมได้ และสั่งการได้จากทุกที่ผ่านแอปมือถือ
+ระบบ Agent ที่ติดตั้งลงหลายเครื่อง Agent บนเครื่องเดียวกันทำงานร่วมกันใน Project ได้ และสั่งการได้จากทุกที่ผ่านแอปมือถือ
 
 ## Language
 
@@ -27,7 +27,7 @@ Member ที่ทำ Pairing ได้ สร้าง Agent ได้ เพ�
 _Avoid_: Admin, root
 
 **Grant**:
-สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงานและดู Task ทุกตัวของ Agent นั้น ไม่ว่าใครเป็นคนเริ่ม), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, Egress, เส้นใน Flow ที่ชี้เข้าหา Agent ตัวนี้ ใส่หรือเอา Agent ตัวนี้ออกจาก Team และตั้ง Agent ตัวนี้เป็น Entry ของ Team) ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
+สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงานและดู Task ทุกตัวของ Agent นั้น ไม่ว่าใครเป็นคนเริ่ม), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, Egress, ใส่หรือเอา Agent ตัวนี้ออกจาก Project และตั้ง Agent ตัวนี้เป็น Entry ของ Project) ส่วนสิทธิ์ต่อ Project มีสี่ระดับคือ View (เห็น Task และ wiki ของ Project), Ask (ถามได้), Use (สั่งงานและกด Stop) และ Manage (ให้สิทธิ์ใน Project ตั้ง Entry และตั้งค่าของ Project) ใน Project ใช้สิทธิ์ของ Project นอก Project ใช้สิทธิ์ของ Agent แต่ Approval ไปที่คนที่มี Approve ที่ Agent ตัวนั้นเสมอ ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
 _Avoid_: Role, permission, ACL
 
 **Controller**:
@@ -39,7 +39,7 @@ Workspace ตัวอย่างที่อยู่บน Controller อย�
 _Avoid_: Demo account, sandbox mode, guest mode
 
 **Pairing**:
-การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียว ถ้า Owner ของ Workspace เดิมเซ็นปล่อย Machine ไว้ก่อน Pairing ครั้งใหม่จะพา Agent, Workdir, Team และประวัติ Task ไปด้วย แต่ Grant ทั้งหมดถูกล้าง และ Schedule กับ Channel หยุด ถ้าไม่ได้ปล่อยไว้ Machine จะเริ่มใหม่จากศูนย์
+การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียว ถ้า Owner ของ Workspace เดิมเซ็นปล่อย Machine ไว้ก่อน Pairing ครั้งใหม่จะพา Agent, Workdir, Project และประวัติ Task ไปด้วย แต่ Grant ทั้งหมดถูกล้าง และ Schedule กับ Channel หยุด ถ้าไม่ได้ปล่อยไว้ Machine จะเริ่มใหม่จากศูนย์
 _Avoid_: Registration, enroll
 
 **Linking**:
@@ -65,7 +65,7 @@ _Avoid_: API, SDK, contract
 ### Agent และงาน
 
 **Agent**:
-ตัวทำงานที่ใช้ LLM ตัดสินใจแล้วลงมือทำผ่าน tool อยู่บน Machine เดียวตลอดและแตะได้แค่สิ่งที่เครื่องนั้นมี ทำได้ทีละ Turn Machine หนึ่งมีได้หลาย Agent
+ตัวทำงานที่ใช้ LLM ตัดสินใจแล้วลงมือทำผ่าน tool อยู่บน Machine เดียวตลอดและแตะได้แค่สิ่งที่เครื่องนั้นมี ทำได้ทีละ Turn ยกเว้น Turn ที่อยู่คนละ Worktree ซึ่งรันพร้อมกันได้ Machine หนึ่งมีได้หลาย Agent
 _Avoid_: Bot, worker
 
 **Character**:
@@ -77,8 +77,8 @@ _Avoid_: Avatar, persona, mascot
 _Avoid_: Emotion, expression, animation
 
 **Workdir**:
-โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Runtime สร้างให้เองในโฟลเดอร์ของ Runtime และ Member เลือกที่อยู่เองไม่ได้ ถ้าจะทำงานกับ repo ที่มีอยู่แล้ว ให้ Agent clone เข้ามา Agent ที่อยู่ Team เดียวกันอ่าน Workdir ของกันได้เฉพาะตอนทำ Task ของ Team นั้น และเขียนของกันไม่ได้
-_Avoid_: Workspace, project, sandbox
+โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Runtime สร้างให้เองในโฟลเดอร์ของ Runtime และ Member เลือกที่อยู่เองไม่ได้ ถ้าจะทำงานกับ repo ที่มีอยู่แล้ว ให้ Agent clone เข้ามา Agent ที่อยู่ Project เดียวกันอ่าน Workdir ของกันได้เฉพาะตอนทำ Task ของ Project นั้น และเขียนของกันไม่ได้
+_Avoid_: Workspace, sandbox
 
 **Skill**:
 คู่มือวิธีทำงานเรื่องหนึ่งที่ติดตั้งให้ Agent เป็นโฟลเดอร์ที่มี `SKILL.md` และอาจมี script ประกอบ Agent เห็นแค่ชื่อกับคำอธิบายของทุก Skill แล้วเปิดอ่านเต็มเมื่องานตรงกับ Skill นั้น Member ที่มี Manage เป็นคนติดตั้ง แก้ หรือลบด้วยคำสั่งที่เซ็น Agent อ่านได้แต่แก้ไม่ได้ และเสนอร่าง Skill ไว้ใน Workdir ให้ Member ติดตั้งได้
@@ -108,43 +108,55 @@ _Avoid_: Permissions, whitelist, rules
 คำขอที่ Agent ส่งไปให้ Member ที่มี Grant ระดับ Approve อนุมัติก่อนทำสิ่งที่ไม่อยู่ใน Allowlist ระหว่างนั้น Task จะหยุดรอจนกว่าจะได้คำตอบ หรือจนกว่า Approval จะหมดอายุตามเวลาที่ตั้งไว้ใน Agent (ค่าเริ่มต้น 1 ชั่วโมง) ซึ่งจะนับว่าถูกปฏิเสธ Member ที่มี Manage เลือกอนุญาตตลอดได้ ซึ่งจะเพิ่มคำนำหน้าของคำสั่งนั้นเข้า Allowlist ไปพร้อมกัน
 _Avoid_: Confirmation, consent, prompt
 
+**Budget**:
+จำนวน token ต่อวันที่ Agent ตัวหนึ่งใช้ได้ คนที่มี Manage เป็นคนตั้ง และ Runtime เป็นคนบังคับ ถ้าหมด Turn ที่ทำอยู่จะจบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนกว่าจะขึ้นวันใหม่หรือมีคนเพิ่ม Budget
+_Avoid_: Quota, limit, credit
+
 **Task**:
-บทสนทนาหนึ่งเรื่องระหว่าง Member กับ Agent ตัวหนึ่ง หรือกับ Team หนึ่ง คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น ส่วน Task ของ Team เป็นของ Entry ถ้า Task ยาวจนใกล้เพดาน context Runtime ย่อสิ่งที่ส่งให้ LLM เป็นบทสรุปก้อนเดียว แต่ประวัติใน Task ยังอยู่ครบ
-_Avoid_: Chat, thread, session, job, run
+บทสนทนาหนึ่งเรื่องระหว่าง Member กับ Agent ตัวหนึ่ง หรือกับ Project หนึ่ง คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น ส่วน Task ของ Project เป็นของ Entry และในแอปอาจเรียก Task ของ Project ว่าห้อง ถ้า Task ยาวจนใกล้เพดาน context Runtime ย่อสิ่งที่ส่งให้ LLM เป็นบทสรุปก้อนเดียว แต่ประวัติใน Task ยังอยู่ครบ
+_Avoid_: Chat, thread, session, job, run, room
 
 **Turn**:
-ช่วงที่ Agent ลงมือทำงานเพื่อตอบข้อความหนึ่งข้อความใน Task เริ่มเมื่อได้รับข้อความ และจบเมื่อ Agent ตอบเสร็จหรือถูก Stop ระหว่าง Turn รวมถึงตอนรอ Approval Agent จะไม่ว่าง ส่วน Task ที่เปิดค้างไว้ไม่ได้ถือ Agent ถ้า worker หรือ Runtime เริ่มใหม่กลาง Turn Turn นั้นจบเหมือนโดน Stop และไม่ทำต่อเอง
+ช่วงที่ Agent ลงมือทำงานเพื่อตอบข้อความหนึ่งข้อความใน Task ทำในนามของคนที่ส่งข้อความนั้น ซึ่งไม่จำเป็นต้องเป็นคนที่เริ่ม Task เพราะ Member หลายคนพิมพ์ใน Task เดียวกันได้ เริ่มเมื่อได้รับข้อความ และจบเมื่อ Agent ตอบเสร็จหรือถูก Stop ระหว่าง Turn รวมถึงตอนรอ Approval Agent จะไม่ว่าง ส่วน Task ที่เปิดค้างไว้ไม่ได้ถือ Agent ถ้า worker หรือ Runtime เริ่มใหม่กลาง Turn Turn นั้นจบเหมือนโดน Stop และไม่ทำต่อเอง
 _Avoid_: Run, step, iteration
 
 **Schedule**:
-ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Team ทุกรอบ เป็นทางเดียวที่งานจะเริ่มได้โดยไม่มีคนพิมพ์ ทำในนามของ Member ที่ตั้ง และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox Schedule หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน ซึ่งรวมถึงตอนที่ Member คนนั้นถูกลบ
+ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Project ทุกรอบ เป็นทางเดียวที่งานจะเริ่มได้โดยไม่มีคนพิมพ์ ทำในนามของ Member ที่ตั้ง ตอนตั้งเลือกได้ว่าเรื่องที่ Agent บอกจะแจ้งแค่คนตั้ง หรือทุกคนที่มี Use ที่ Agent นั้น และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox Schedule หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน ซึ่งรวมถึงตอนที่ Member คนนั้นถูกลบ
 _Avoid_: Heartbeat, cron, automation, routine, trigger
 
 **Channel**:
-แชตภายนอก เช่น กลุ่ม Telegram ที่ Member ผูกเข้ากับ Agent ตัวหนึ่งและเซ็นไว้ ใครในแชตนั้นก็คุยกับ Agent ได้ และงานที่เกิดขึ้นทำในนามของ Member ที่ผูก คนในแชตไม่ได้เป็น Member มีอำนาจเท่ากันหมด และตอบ Approval ไม่ได้ Agent ที่มี Channel อยู่ใน Team ไม่ได้ และอ่านไฟล์ได้แค่ใน Workdir ของตัวเองกับ Library ที่ได้สิทธิ์ Channel หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน แบบเดียวกับ Schedule
+แชตภายนอก เช่น กลุ่ม Telegram ที่ Member ผูกเข้ากับ Agent ตัวหนึ่งและเซ็นไว้ ใครในแชตนั้นก็คุยกับ Agent ได้ และงานที่เกิดขึ้นทำในนามของ Member ที่ผูก คนในแชตไม่ได้เป็น Member มีอำนาจเท่ากันหมด และตอบ Approval ไม่ได้ Agent ที่มี Channel อยู่ใน Project ไม่ได้ และอ่านไฟล์ได้แค่ใน Workdir ของตัวเองกับ Library ที่ได้สิทธิ์ Channel หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน แบบเดียวกับ Schedule
 _Avoid_: Integration, connector, gateway, bot
 
 **Stop**:
-การสั่งให้ Turn ที่กำลังทำอยู่จบทันที พร้อมกับ Turn ของ Task ย่อยทั้งหมดที่อยู่ใต้ Task นั้น ไฟล์ที่แก้ไปแล้วคงสภาพเดิม และ Task ยังคุยต่อได้ Member ที่มี Use กับ Agent ตัวไหน กด Stop ได้ทุก Turn ของ Agent ตัวนั้น ไม่ว่าใครเป็นคนสั่ง
+การสั่งให้ Turn ที่กำลังทำอยู่จบทันที พร้อมกับ Turn ของ Task ย่อยทั้งหมดที่อยู่ใต้ Task นั้น ไฟล์ที่แก้ไปแล้วคงสภาพเดิม และ Task ยังคุยต่อได้ Member ที่มี Use กับ Agent ตัวไหน กด Stop ได้ทุก Turn ของ Agent ตัวนั้น ไม่ว่าใครเป็นคนสั่ง ส่วนใน Project คนที่มี Use ของ Project กด Stop ได้
 _Avoid_: Cancel, abort, kill, close
 
-### ทีม
+### Project
 
-**Team**:
-กลุ่ม Agent ที่ตั้งชื่อไว้ อยู่บน Machine เดียวกัน มี Flow และ Entry ของตัวเอง Member สั่งงานทีมด้วยการเริ่ม Task กับ Team ซึ่งเป็นทางเดียวที่ Delegation จะเกิดได้ Agent ตัวหนึ่งอยู่ได้หลาย Team ยกเว้น Agent ที่มี Channel Team ไม่มีเจ้าของ การลบ Team ต้องมี Manage ที่ Agent ทุกตัวในทีม
-_Avoid_: Swarm, crew, squad, group
+**Project**:
+งานหนึ่งเรื่องที่มี Agent หลายตัวเป็นพนักงาน อยู่บน Machine เดียวกัน และมี Entry ตัวเดียว Member สั่งงานด้วยการเริ่ม Task กับ Project ซึ่งเป็นทางเดียวที่ Delegation จะเกิดได้ Agent ตัวหนึ่งเป็นพนักงานได้หลาย Project ยกเว้น Agent ที่มี Channel การเอา Agent เข้ามาเป็นพนักงานต้องมี Manage ที่ Agent ตัวนั้น ซึ่งเท่ากับยินยอมให้ Agent รับงานจากคนที่มีสิทธิ์ใน Project Project มี Library ของตัวเองเป็น wiki พนักงานทุกตัวอ่านได้ และมีพนักงานที่เขียนได้ตัวเดียว ค่าเริ่มต้นคือ Entry Project มี repo ได้หลายอัน ซึ่งพนักงานเขียนได้ระหว่างทำ Task ของ Project ถ้าเป็นงานที่ไม่ใช่โค้ด Runtime สร้าง repo ไฟล์งานให้เองบนเครื่อง ตอนสร้าง Project เลือกแม่แบบได้ เช่น โค้ด เอกสาร ดีไซน์ หรืองานผ่านระบบอื่น ซึ่งเป็นแค่ค่าตั้งต้นที่แก้ทีหลังได้ Member ที่มี Manage ที่ Agent อย่างน้อยหนึ่งตัวสร้าง Project ได้ และได้ Manage ของ Project นั้น
+_Avoid_: Team, swarm, crew, squad, group
+
+**Worktree**:
+สำเนาของทุก repo ของ Project ที่ Task หนึ่งได้ไปเมื่อติ๊กไว้ตอนเปิด Task อยู่ใน branch ชื่อเดียวกัน worktree หนึ่งมีคนเขียนได้ทีละหนึ่ง Turn Agent รัน Turn ที่อยู่คนละ worktree พร้อมกันได้ และระหว่างนั้น Workdir ของ Agent อ่านได้อย่างเดียว Task ที่ไม่ติ๊กใช้ checkout หลักร่วมกัน ทีละหนึ่ง Turn ส่วน Project ที่ไม่มี repo ให้ Task ได้โฟลเดอร์ว่างของตัวเองแทน ซึ่งใช้กฎเดียวกัน แต่ไม่ต้องรวมงานกลับ
+_Avoid_: Branch, copy, sandbox
 
 **Entry**:
-Agent ใน Team ที่รับข้อความของ Member ใน Task ของ Team นั้น Team หนึ่งมี Entry ตัวเดียว
+พนักงานของ Project ที่รับข้อความของ Member ใน Task ของ Project และส่งงานต่อให้พนักงานตัวอื่นได้ทุกตัว Project หนึ่งมี Entry ตัวเดียว
 _Avoid_: Lead, leader, manager, orchestrator
 
-**Flow**:
-ผังของ Team หนึ่งที่ Member วาดว่า Agent ตัวไหน Delegation ให้ตัวไหนได้ เส้นแต่ละเส้นบอกว่าใช้ส่งงานแบบไหนและส่งข้ามได้กี่ครั้งต่อ Turn ถ้าไม่มีเส้นก็ส่งไม่ได้ ส่วนจะส่งเมื่อไหร่ Agent เป็นคนตัดสินใจเอง
-_Avoid_: Workflow, pipeline, graph
-
 **Delegation**:
-การที่ Agent ใน Task ของ Team สร้าง Task ย่อยส่งให้ Agent อีกตัวตามเส้นใน Flow หรือส่งข้อความต่อใน Task ย่อยเดิม เช่น ตีงานกลับให้แก้ ทำในนามของ Member ที่เริ่ม Task ต้นทางเสมอ
-_Avoid_: Handoff, dispatch
+การที่ Entry ใน Task ของ Project สร้าง Task ย่อยส่งให้พนักงานตัวอื่น หรือส่งข้อความต่อใน Task ย่อยเดิม เช่น ตีงานกลับให้แก้ ส่งได้ชั้นเดียว พนักงานส่งต่ออีกไม่ได้ และใน Turn หนึ่งส่งได้ไม่เกินเพดานของ Project ส่วนจะส่งให้ใครเมื่อไหร่ Entry ตัดสินใจเองจากคำอธิบายของพนักงาน ทำในนามของ Member ที่ส่งข้อความของ Turn ต้นทางเสมอ พนักงานสั่งงานกันเองไม่ได้ แต่ถามกันได้ด้วย Ask
+_Avoid_: Handoff, dispatch, Flow
+
+**Ask**:
+คำถามใน Project ที่ตอบด้วย Turn แบบอ่านอย่างเดียว คนถามคือ Member ที่มีสิทธิ์ Ask ขึ้นไปใน Project หรือพนักงานด้วยกัน คนตอบคือ Entry หรือพนักงานที่ถูก Mention Turn แบบนี้มีแค่ tool อ่านไฟล์ ค้น Task ของ Project และอ่าน wiki ไม่มี bash ไม่ส่งงานต่อ และไม่เรียก Connector จึงไม่ต้องรอคิว path ที่ Project ห้ามและ Task ที่ปิดจาก Ask อ่านไม่ได้ ส่วนหัวข้อที่ห้ามตอบเป็นแค่คำขอที่ LLM อาจไม่ทำตาม
+_Avoid_: Query, read-only mode
+
+**Mention**:
+การแท็กด้วย @ ใน Task ของ Project Mention คนจะส่ง push ให้คนนั้น และทั้ง Member และ Agent Mention คนที่มีสิทธิ์ใน Project ได้ Mention พนักงานในข้อความสั่งงานเป็นการบอก Entry ว่าอยากให้ตัวนั้นทำ ส่วนใน Ask เป็นการถามพนักงานตัวนั้นตรงๆ
+_Avoid_: Tag, ping
 
 **Subagent**:
 ตัวช่วยชั่วคราวที่ Agent สร้างขึ้นเองระหว่างทำ Task อยู่บน Machine เดียวกับ Agent แม่ มีแค่ tool read, glob และ grep จึงอ่านได้อย่างเดียว ส่ง Delegation ไม่ได้ ไม่มี Character และหายไปทันทีที่ส่งคำตอบกลับ ไม่ได้สร้าง Task ใหม่
@@ -153,5 +165,5 @@ _Avoid_: Helper, child agent, worker
 ### LLM
 
 **Provider**:
-ปลายทาง LLM ที่ Runtime เรียกใช้ กำหนดด้วย URL กับ key ของลูกค้า เช่น Anthropic, OpenRouter หรือ OpenCode Zen
+ปลายทาง LLM ที่ Runtime เรียกใช้ กำหนดด้วย URL กับ key ของลูกค้า เช่น Anthropic, OpenRouter หรือ OpenCode Zen Owner ตั้ง Provider ไว้ที่ Machine และเครื่องหนึ่งมีได้หลายตัว supervisor ถือ key และเป็นทางผ่านของทุกคำขอไป LLM Agent จึงไม่เห็น key Agent แต่ละตัวใช้ Provider ตัวเดียวกับ model เดียวจากเครื่องนั้น ซึ่งคนที่มี Manage เป็นคนเลือก ถ้าเปลี่ยน จะมีผลตั้งแต่ Task ถัดไป
 _Avoid_: Vendor, backend, model
