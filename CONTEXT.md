@@ -39,7 +39,7 @@ Workspace ตัวอย่างที่อยู่บน Controller อย�
 _Avoid_: Demo account, sandbox mode, guest mode
 
 **Pairing**:
-การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียว ถ้า Owner ของ Workspace เดิมเซ็นปล่อย Machine ไว้ก่อน Pairing ครั้งใหม่จะพา Agent, Workdir, Project และประวัติ Task ไปด้วย แต่ Grant ทั้งหมดถูกล้าง และ Schedule กับ Channel หยุด ถ้าไม่ได้ปล่อยไว้ Machine จะเริ่มใหม่จากศูนย์
+การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียว ถ้า Owner ของ Workspace เดิมเซ็นปล่อย Machine ไว้ก่อน Pairing ครั้งใหม่จะพา Agent, Workdir, Project และประวัติ Task ไปด้วย แต่ Grant ทั้งหมดถูกล้าง และ Schedule กับ Channel หยุด คำสั่งปล่อยใช้ได้กับ Pairing ครั้งถัดไปครั้งเดียว หมดอายุใน 7 วัน และ Owner คนไหนก็ยกเลิกได้ ระหว่างนั้น Machine ยังทำงานใน Workspace เดิม ถ้าไม่ได้ปล่อยไว้ Machine จะเริ่มใหม่จากศูนย์
 _Avoid_: Registration, enroll
 
 **Linking**:
@@ -85,11 +85,11 @@ _Avoid_: Workspace, sandbox
 _Avoid_: Plugin, tool, prompt template
 
 **Connector**:
-บริการภายนอกที่ต่อเข้ากับ Agent ผ่าน MCP ถ้าเป็นบริการบนเน็ต supervisor เป็นคนต่อและถือ credential ไว้เอง Agent เห็นแค่ tool และอ่าน credential ไม่ได้ ถ้าเป็นโปรแกรมบนเครื่อง จะรันใน sandbox ของ Agent และไม่ถือความลับ Connector หนึ่งตัวใช้บัญชีเดียว ซึ่งคนที่มี Manage เป็นคนผูก ใครที่มี Use ที่ Agent ก็ใช้บัญชีนั้นผ่าน Agent ได้ tool ของ Connector ถูกตรึงไว้ตั้งแต่ตอนติดตั้ง ถ้า server เปลี่ยนหรือเพิ่ม tool ต้องอนุมัติใหม่
+บริการภายนอกที่ต่อเข้ากับ Agent ผ่าน MCP ถ้าเป็นบริการบนเน็ต supervisor เป็นคนต่อและถือ credential ไว้เอง Agent เห็นแค่ tool และอ่าน credential ไม่ได้ ถ้าเป็นโปรแกรมบนเครื่อง จะรันใน sandbox ของ Agent และไม่ถือความลับ Connector หนึ่งตัวใช้บัญชีเดียว ซึ่งคนที่มี Manage เป็นคนผูก ใครที่มี Use ที่ Agent ก็ใช้บัญชีนั้นผ่าน Agent ได้ Connector หยุดทันทีเมื่อกุญแจที่เซ็นมันถูกถอน แบบเดียวกับ Schedule และ Channel ถ้าลบ Member แล้ว Owner ไม่ได้เซ็นใหม่ supervisor จะลบ credential ทิ้ง tool ของ Connector ถูกตรึงไว้ตั้งแต่ตอนติดตั้ง ถ้า server เปลี่ยนหรือเพิ่ม tool ต้องอนุมัติใหม่
 _Avoid_: Integration, plugin, MCP server
 
 **Memory**:
-ไฟล์ `MEMORY.md` ใน Workdir ที่ Agent จดสิ่งที่ทุก Task ต้องรู้ Runtime ใส่เข้า prompt ตอนเริ่ม Task และตรึงไว้ทั้ง Task มีเพดานขนาด และ Agent แก้เองได้ เรื่องที่ไม่ต้องรู้ทุกครั้ง Agent ค้นเอาจาก Task เก่าของตัวเอง ส่วนความรู้ที่ใช้ร่วมกันหลาย Agent อยู่ใน Library
+ไฟล์ `MEMORY.md` ใน Workdir ที่ Agent จดสิ่งที่ทุก Task ต้องรู้ Runtime ใส่เข้า prompt ตอนเริ่ม Task และตรึงไว้ทั้ง Task มีเพดาน 4,000 ตัวอักษร และ Agent แก้เองได้ เรื่องที่ไม่ต้องรู้ทุกครั้ง Agent ค้นเอาจาก Task เก่าของตัวเอง ส่วนความรู้ที่ใช้ร่วมกันหลาย Agent อยู่ใน Library
 _Avoid_: Knowledge, notes, context
 
 **Library**:
@@ -109,7 +109,7 @@ _Avoid_: Permissions, whitelist, rules
 _Avoid_: Confirmation, consent, prompt
 
 **Budget**:
-จำนวน token ต่อวันที่ Agent ตัวหนึ่งใช้ได้ คนที่มี Manage เป็นคนตั้ง และ Runtime เป็นคนบังคับ ถ้าหมด Turn ที่ทำอยู่จะจบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนกว่าจะขึ้นวันใหม่หรือมีคนเพิ่ม Budget
+จำนวน token ต่อวันที่ Agent ตัวหนึ่งใช้ได้ นับทุก token ที่ Provider รายงาน ทั้ง input ที่รวมส่วนที่อ่านจาก cache และ output ค่าเริ่มต้น 10M token คนที่มี Manage เป็นคนตั้ง และ Runtime เป็นคนบังคับ วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine ถ้าหมด Turn ที่ทำอยู่จะจบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนกว่าจะขึ้นวันใหม่หรือมีคนเพิ่ม Budget
 _Avoid_: Quota, limit, credit
 
 **Task**:
@@ -121,11 +121,11 @@ _Avoid_: Chat, thread, session, job, run, room
 _Avoid_: Run, step, iteration
 
 **Schedule**:
-ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Project ทุกรอบ เป็นทางเดียวที่งานจะเริ่มได้โดยไม่มีคนพิมพ์ ทำในนามของ Member ที่ตั้ง ตอนตั้งเลือกได้ว่าเรื่องที่ Agent บอกจะแจ้งแค่คนตั้ง หรือทุกคนที่มี Use ที่ Agent นั้น และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox Schedule หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน ซึ่งรวมถึงตอนที่ Member คนนั้นถูกลบ
+ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Project ทุกรอบ เป็นทางเดียวที่งานจะเริ่มได้โดยไม่มีคนพิมพ์ ทำในนามของ Member ที่ตั้ง ตอนตั้งเลือกได้ว่าเรื่องที่ Agent บอกจะแจ้งแค่คนตั้ง หรือทุกคนที่มี Use ที่ Agent นั้น และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox ถ้า Machine ปิดอยู่ตอนถึงเวลา รอบที่พลาดรันชดเชยครั้งเดียวตอนเครื่องกลับมา ไม่ว่าจะพลาดกี่รอบ และ Agent ได้รู้ว่ารอบนั้นควรรันตอนกี่โมง Schedule หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน ซึ่งรวมถึงตอนที่ Member คนนั้นถูกลบ
 _Avoid_: Heartbeat, cron, automation, routine, trigger
 
 **Channel**:
-แชตภายนอก เช่น กลุ่ม Telegram ที่ Member ผูกเข้ากับ Agent ตัวหนึ่งและเซ็นไว้ ใครในแชตนั้นก็คุยกับ Agent ได้ และงานที่เกิดขึ้นทำในนามของ Member ที่ผูก คนในแชตไม่ได้เป็น Member มีอำนาจเท่ากันหมด และตอบ Approval ไม่ได้ Agent ที่มี Channel อยู่ใน Project ไม่ได้ และอ่านไฟล์ได้แค่ใน Workdir ของตัวเองกับ Library ที่ได้สิทธิ์ Channel หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน แบบเดียวกับ Schedule
+แชตภายนอก เช่น กลุ่ม Telegram ที่ Member ผูกเข้ากับ Agent ตัวหนึ่งและเซ็นไว้ ใครในแชตนั้นก็คุยกับ Agent ได้ และงานที่เกิดขึ้นทำในนามของ Member ที่ผูก แต่ละแชตที่ผูกมี Task ของวันละหนึ่ง Task ข้อความที่เรียก Agent ทั้ง mention และ reply เข้า Task ของวันนั้น ข้อความแรกหลังเวลาตัดวันเปิด Task ใหม่ เวลาตัดวันเป็นเวลาของ Machine ค่าเริ่มต้น 04:00 ตั้งได้ต่อ Channel และใครในแชตก็พิมพ์ `/new` หรือ `/reset` เพื่อเปิด Task ใหม่ได้ ในแอป Task ของ Channel อ่านได้อย่างเดียว Member กด Stop และตอบ Approval ได้ แต่พิมพ์ลงไปไม่ได้ คนในแชตไม่ได้เป็น Member มีอำนาจเท่ากันหมด และตอบ Approval ไม่ได้ Agent ที่มี Channel อยู่ใน Project ไม่ได้ และอ่านไฟล์ได้แค่ใน Workdir ของตัวเองกับ Library ที่ได้สิทธิ์ Channel หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน แบบเดียวกับ Schedule
 _Avoid_: Integration, connector, gateway, bot
 
 **Stop**:
@@ -147,7 +147,7 @@ _Avoid_: Branch, copy, sandbox
 _Avoid_: Lead, leader, manager, orchestrator
 
 **Delegation**:
-การที่ Entry ใน Task ของ Project สร้าง Task ย่อยส่งให้พนักงานตัวอื่น หรือส่งข้อความต่อใน Task ย่อยเดิม เช่น ตีงานกลับให้แก้ ส่งได้ชั้นเดียว พนักงานส่งต่ออีกไม่ได้ และใน Turn หนึ่งส่งได้ไม่เกินเพดานของ Project ส่วนจะส่งให้ใครเมื่อไหร่ Entry ตัดสินใจเองจากคำอธิบายของพนักงาน ทำในนามของ Member ที่ส่งข้อความของ Turn ต้นทางเสมอ พนักงานสั่งงานกันเองไม่ได้ แต่ถามกันได้ด้วย Ask
+การที่ Entry ใน Task ของ Project สร้าง Task ย่อยส่งให้พนักงานตัวอื่น หรือส่งข้อความต่อใน Task ย่อยเดิม เช่น ตีงานกลับให้แก้ ส่งได้ชั้นเดียว พนักงานส่งต่ออีกไม่ได้ และใน Turn หนึ่งส่งได้ไม่เกินเพดานของ Project ซึ่งค่าเริ่มต้นคือ 5 ครั้ง ส่วนจะส่งให้ใครเมื่อไหร่ Entry ตัดสินใจเองจากคำอธิบายของพนักงาน ทำในนามของ Member ที่ส่งข้อความของ Turn ต้นทางเสมอ พนักงานสั่งงานกันเองไม่ได้ แต่ถามกันได้ด้วย Ask
 _Avoid_: Handoff, dispatch, Flow
 
 **Ask**:
@@ -155,7 +155,7 @@ _Avoid_: Handoff, dispatch, Flow
 _Avoid_: Query, read-only mode
 
 **Mention**:
-การแท็กด้วย @ ใน Task ของ Project Mention คนจะส่ง push ให้คนนั้น และทั้ง Member และ Agent Mention คนที่มีสิทธิ์ใน Project ได้ Mention พนักงานในข้อความสั่งงานเป็นการบอก Entry ว่าอยากให้ตัวนั้นทำ ส่วนใน Ask เป็นการถามพนักงานตัวนั้นตรงๆ
+การแท็กด้วย @ ใน Task ของ Project Mention คนจะส่ง push ให้คนนั้น และทั้ง Member และ Agent Mention คนที่มีสิทธิ์ใน Project ได้ Mention พนักงานในข้อความสั่งงานเป็นการบอก Entry ว่าอยากให้ตัวนั้นทำ ส่วนใน Ask เป็นการถามพนักงานตัวนั้นตรงๆ ถ้า Agent Mention คนเดิมซ้ำใน Task เดิมขณะที่ Mention ก่อนหน้ายังไม่ถูกอ่าน จะไม่ส่ง push ซ้ำ
 _Avoid_: Tag, ping
 
 **Subagent**:

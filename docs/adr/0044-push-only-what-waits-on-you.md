@@ -19,4 +19,4 @@ Task จาก Channel ไม่ส่ง push ยกเว้น Approval เ�
 
 ## Consequences
 
-- Agent Mention คนได้ จึงต้องมีเพดานไม่ให้ Agent ที่โดนหลอกส่ง push ถี่จนเป็นสแปม
+- Agent Mention คนได้ Agent ที่โดนหลอกจึงพยายามส่ง push ถี่ได้ ADR 0046 กันไว้ด้วยการไม่ส่ง push ซ้ำจนกว่า Mention ก่อนหน้าจะถูกอ่าน
