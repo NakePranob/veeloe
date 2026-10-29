@@ -7,7 +7,7 @@
 ### ที่อยู่และความไว้ใจ
 
 **Workspace**:
-ขอบเขตความเป็นเจ้าของ Machine และ Agent ทุกตัวเป็นของ Workspace เดียว และมองไม่เห็นของ Workspace อื่น
+ขอบเขตความเป็นเจ้าของ Machine และ Agent ทุกตัวเป็นของ Workspace เดียว และมองไม่เห็นของ Workspace อื่น คนคนหนึ่งเป็น Member ได้หลาย Workspace โดยใช้กุญแจแยกกันในแต่ละที่ และไม่มีตัวตนกลางที่โยงข้าม Workspace
 _Avoid_: Account, tenant, organization
 
 **Machine**:
@@ -23,15 +23,15 @@ _Avoid_: Daemon, client, worker
 _Avoid_: User, account, seat
 
 **Owner**:
-Member ที่ทำ Pairing ได้ เพิ่มหรือลบ Member ได้ และแจก Grant ได้ มีสิทธิ์ Manage กับ Agent ทุกตัว และกุญแจของ Owner คือจุดเริ่มต้นของความไว้ใจทั้ง Workspace
+Member ที่ทำ Pairing ได้ สร้าง Agent ได้ เพิ่มหรือลบ Member ได้ และแจก Grant ได้ มีสิทธิ์ Manage กับ Agent ทุกตัว และกุญแจของ Owner คือจุดเริ่มต้นของความไว้ใจทั้ง Workspace Workspace มี Owner ได้หลายคน Owner เลื่อน Member คนอื่นขึ้นเป็น Owner หรือปลด Owner คนอื่นได้ แต่ Owner คนสุดท้ายออกจาก Workspace ไม่ได้
 _Avoid_: Admin, root
 
 **Grant**:
-สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งและดู Task), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, เส้นใน Flow ที่ชี้เข้าหา Agent ตัวนี้ และตั้ง Agent ตัวนี้เป็น Entry ของ Team) ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
+สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงานและดู Task ทุกตัวของ Agent นั้น ไม่ว่าใครเป็นคนเริ่ม), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, เส้นใน Flow ที่ชี้เข้าหา Agent ตัวนี้ และตั้ง Agent ตัวนี้เป็น Entry ของ Team) ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
 _Avoid_: Role, permission, ACL
 
 **Controller**:
-แอปที่ Member คนหนึ่งติดตั้งบนมือถือหรือเบราว์เซอร์และได้รับความไว้ใจจาก Workspace คำสั่งทุกอย่างต้องมาจาก Controller และถือว่าเป็นคำสั่งของ Member เจ้าของ Controller นั้น
+แอปที่ Member คนหนึ่งติดตั้งบนมือถือหรือเบราว์เซอร์และได้รับความไว้ใจจาก Workspace คำสั่งทุกอย่างต้องมาจาก Controller และถือว่าเป็นคำสั่งของ Member เจ้าของ Controller นั้น ข้อยกเว้นเดียวคือข้อความในแชตของ Channel ซึ่งทำในนามของ Member ที่ผูก Channel นั้นไว้
 _Avoid_: Device, client, phone, app
 
 **Demo Workspace**:
@@ -43,8 +43,12 @@ _Avoid_: Demo account, sandbox mode, guest mode
 _Avoid_: Registration, enroll
 
 **Linking**:
-การเพิ่ม Controller ใหม่เข้า Workspace โดยให้ Controller ที่ได้รับความไว้ใจอยู่แล้วสแกน QR บนเครื่องใหม่ เป็นทางเดียวที่เครื่องใหม่จะสั่งงานได้
+การเพิ่ม Controller เครื่องใหม่ของ Member คนเดิม โดยให้ Controller ที่ได้รับความไว้ใจอยู่แล้วสแกน QR บนเครื่องใหม่ เครื่องใหม่จะสั่งงานได้ก็ต่อเมื่อผ่าน Linking หรือ Invitation เท่านั้น
 _Avoid_: Login, sign-in, device registration
+
+**Invitation**:
+การเพิ่ม Member ใหม่เข้า Workspace จากที่ไกล Owner ส่งลิงก์ที่ใช้ได้ครั้งเดียวไปให้ แล้วทั้งสองฝั่งเทียบรหัสสั้นที่คำนวณจากกุญแจของคนที่ถูกเชิญ ก่อนที่ Owner จะเซ็นรับรอง รหัสที่ไม่ตรงกันแปลว่ามีคนสลับกุญแจระหว่างทาง
+_Avoid_: Signup, registration, join link
 
 **Hub**:
 บริการกลางที่เรา host ส่งต่อข้อความระหว่าง Controller กับ Runtime ไม่รัน Agent และไม่ถือ key ของ LLM
@@ -69,19 +73,19 @@ _Avoid_: Avatar, persona, mascot
 _Avoid_: Emotion, expression, animation
 
 **Workdir**:
-โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Agent ที่อยู่ Team เดียวกันอ่าน Workdir ของกันได้แต่เขียนไม่ได้
+โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Agent ที่อยู่ Team เดียวกันอ่าน Workdir ของกันได้เฉพาะตอนทำ Task ของ Team นั้น และเขียนของกันไม่ได้
 _Avoid_: Workspace, project, sandbox
 
 **Egress**:
-รายชื่อโดเมนที่ Agent บน Machine หนึ่งออกไปได้ ตั้งต่อ Machine และ Agent ทุกตัวบนเครื่องนั้นใช้ร่วมกัน เป็นคนละเรื่องกับ Allowlist
+รายชื่อโดเมนที่ Agent ตัวหนึ่งออกไปได้ Agent แต่ละตัวมีของตัวเอง ไม่มีรายชื่อกลางของ Machine จะตั้งให้ออกได้ทั้งเน็ตสาธารณะก็ได้ ซึ่งไม่รวมที่อยู่ภายใน และระหว่างที่ตั้งแบบนั้น Agent อ่านไฟล์ได้แค่ใน Workdir ของตัวเอง เป็นคนละเรื่องกับ Allowlist
 _Avoid_: Network allowlist, whitelist, firewall rules
 
 **Allowlist**:
-รายการสิ่งที่ Agent ตัวหนึ่งทำได้ทันทีโดยไม่ต้องขอ Approval
+รายการคำนำหน้าของคำสั่ง bash ที่ Agent ตัวหนึ่งรันได้ทันทีโดยไม่ต้องขอ Approval เช่น `npm test` คำสั่งที่ต่อกันหลายท่อนต้องผ่านทุกท่อน ส่วน tool ที่ทำกับไฟล์ไม่ต้องผ่าน Allowlist เพราะ sandbox คุมอยู่แล้ว ทุกรายการมาจากการที่ Member เซ็นเพิ่ม ไม่มีคำสั่งที่ผ่านเสมอโดยไม่อยู่ในรายการ Allowlist กันความผิดพลาด ไม่ได้กัน Agent ที่โดนหลอกให้เลี่ยง กำแพงจริงคือ sandbox กับ Egress
 _Avoid_: Permissions, whitelist, rules
 
 **Approval**:
-คำขอที่ Agent ส่งไปให้ Member ที่มี Grant ระดับ Approve อนุมัติก่อนทำสิ่งที่ไม่อยู่ใน Allowlist ระหว่างนั้น Task จะหยุดรอจนกว่าจะได้คำตอบ หรือจนกว่า Approval จะหมดอายุตามเวลาที่ตั้งไว้ใน Agent (ค่าเริ่มต้น 1 ชั่วโมง) ซึ่งจะนับว่าถูกปฏิเสธ
+คำขอที่ Agent ส่งไปให้ Member ที่มี Grant ระดับ Approve อนุมัติก่อนทำสิ่งที่ไม่อยู่ใน Allowlist ระหว่างนั้น Task จะหยุดรอจนกว่าจะได้คำตอบ หรือจนกว่า Approval จะหมดอายุตามเวลาที่ตั้งไว้ใน Agent (ค่าเริ่มต้น 1 ชั่วโมง) ซึ่งจะนับว่าถูกปฏิเสธ Member ที่มี Manage เลือกอนุญาตตลอดได้ ซึ่งจะเพิ่มคำนำหน้าของคำสั่งนั้นเข้า Allowlist ไปพร้อมกัน
 _Avoid_: Confirmation, consent, prompt
 
 **Task**:
@@ -93,8 +97,12 @@ _Avoid_: Chat, thread, session, job, run
 _Avoid_: Run, step, iteration
 
 **Schedule**:
-ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Team ทุกรอบ เป็นทางเดียวที่งานจะเริ่มได้โดยไม่มีคนพิมพ์ ทำในนามของ Member ที่ตั้ง และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox
+ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Team ทุกรอบ เป็นทางเดียวที่งานจะเริ่มได้โดยไม่มีคนพิมพ์ ทำในนามของ Member ที่ตั้ง และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox Schedule หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน ซึ่งรวมถึงตอนที่ Member คนนั้นถูกลบ
 _Avoid_: Heartbeat, cron, automation, routine, trigger
+
+**Channel**:
+แชตภายนอก เช่น กลุ่ม Telegram ที่ Member ผูกเข้ากับ Agent ตัวหนึ่งและเซ็นไว้ ใครในแชตนั้นก็คุยกับ Agent ได้ และงานที่เกิดขึ้นทำในนามของ Member ที่ผูก คนในแชตไม่ได้เป็น Member มีอำนาจเท่ากันหมด และตอบ Approval ไม่ได้ Agent ที่มี Channel อยู่ใน Team ไม่ได้ และอ่านไฟล์ได้แค่ใน Workdir ของตัวเอง Channel หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน แบบเดียวกับ Schedule
+_Avoid_: Integration, connector, gateway, bot
 
 **Stop**:
 การสั่งให้ Turn ที่กำลังทำอยู่จบทันที พร้อมกับ Turn ของ Task ย่อยทั้งหมดที่อยู่ใต้ Task นั้น ไฟล์ที่แก้ไปแล้วคงสภาพเดิม และ Task ยังคุยต่อได้
@@ -103,7 +111,7 @@ _Avoid_: Cancel, abort, kill, close
 ### ทีม
 
 **Team**:
-กลุ่ม Agent ที่ตั้งชื่อไว้ อยู่บน Machine เดียวกัน มี Flow และ Entry ของตัวเอง Member สั่งงานทีมด้วยการเริ่ม Task กับ Team ซึ่งเป็นทางเดียวที่ Delegation จะเกิดได้ Agent ตัวหนึ่งอยู่ได้หลาย Team
+กลุ่ม Agent ที่ตั้งชื่อไว้ อยู่บน Machine เดียวกัน มี Flow และ Entry ของตัวเอง Member สั่งงานทีมด้วยการเริ่ม Task กับ Team ซึ่งเป็นทางเดียวที่ Delegation จะเกิดได้ Agent ตัวหนึ่งอยู่ได้หลาย Team ยกเว้น Agent ที่มี Channel
 _Avoid_: Swarm, crew, squad, group
 
 **Entry**:
