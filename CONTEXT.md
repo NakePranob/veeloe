@@ -80,12 +80,28 @@ _Avoid_: Emotion, expression, animation
 โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Runtime สร้างให้เองในโฟลเดอร์ของ Runtime และ Member เลือกที่อยู่เองไม่ได้ ถ้าจะทำงานกับ repo ที่มีอยู่แล้ว ให้ Agent clone เข้ามา Agent ที่อยู่ Team เดียวกันอ่าน Workdir ของกันได้เฉพาะตอนทำ Task ของ Team นั้น และเขียนของกันไม่ได้
 _Avoid_: Workspace, project, sandbox
 
+**Skill**:
+คู่มือวิธีทำงานเรื่องหนึ่งที่ติดตั้งให้ Agent เป็นโฟลเดอร์ที่มี `SKILL.md` และอาจมี script ประกอบ Agent เห็นแค่ชื่อกับคำอธิบายของทุก Skill แล้วเปิดอ่านเต็มเมื่องานตรงกับ Skill นั้น Member ที่มี Manage เป็นคนติดตั้ง แก้ หรือลบด้วยคำสั่งที่เซ็น Agent อ่านได้แต่แก้ไม่ได้ และเสนอร่าง Skill ไว้ใน Workdir ให้ Member ติดตั้งได้
+_Avoid_: Plugin, tool, prompt template
+
+**Connector**:
+บริการภายนอกที่ต่อเข้ากับ Agent ผ่าน MCP ถ้าเป็นบริการบนเน็ต supervisor เป็นคนต่อและถือ credential ไว้เอง Agent เห็นแค่ tool และอ่าน credential ไม่ได้ ถ้าเป็นโปรแกรมบนเครื่อง จะรันใน sandbox ของ Agent และไม่ถือความลับ Connector หนึ่งตัวใช้บัญชีเดียว ซึ่งคนที่มี Manage เป็นคนผูก ใครที่มี Use ที่ Agent ก็ใช้บัญชีนั้นผ่าน Agent ได้ tool ของ Connector ถูกตรึงไว้ตั้งแต่ตอนติดตั้ง ถ้า server เปลี่ยนหรือเพิ่ม tool ต้องอนุมัติใหม่
+_Avoid_: Integration, plugin, MCP server
+
+**Memory**:
+ไฟล์ `MEMORY.md` ใน Workdir ที่ Agent จดสิ่งที่ทุก Task ต้องรู้ Runtime ใส่เข้า prompt ตอนเริ่ม Task และตรึงไว้ทั้ง Task มีเพดานขนาด และ Agent แก้เองได้ เรื่องที่ไม่ต้องรู้ทุกครั้ง Agent ค้นเอาจาก Task เก่าของตัวเอง ส่วนความรู้ที่ใช้ร่วมกันหลาย Agent อยู่ใน Library
+_Avoid_: Knowledge, notes, context
+
+**Library**:
+คลังความรู้บน Machine ที่แยกออกจาก Workdir ของ Agent Owner เป็นคนสร้าง และกำหนดว่า Agent ตัวไหนอ่านได้ และตัวไหนเป็นตัวเดียวที่เขียนได้ Agent หลายตัวจึงใช้ความรู้ชุดเดียวกันได้โดยไม่มีใครแก้ทับกัน ใครที่มี Use ที่ Agent ที่อ่าน Library ได้ ก็ขอดูเนื้อหาของ Library ผ่าน Agent นั้นได้ Library อยู่บน Machine เดียว และเป็นไฟล์ Markdown ที่ลิงก์กันด้วย `[[...]]` ซึ่ง Obsidian เปิดดูเป็นกราฟได้
+_Avoid_: Knowledge base, vault, wiki, memory
+
 **Egress**:
-รายชื่อโดเมนที่ Agent ตัวหนึ่งออกไปได้ Agent แต่ละตัวมีของตัวเอง ไม่มีรายชื่อกลางของ Machine จะตั้งให้ออกได้ทั้งเน็ตสาธารณะก็ได้ ซึ่งไม่รวมที่อยู่ภายใน และระหว่างที่ตั้งแบบนั้น Agent อ่านไฟล์ได้แค่ใน Workdir ของตัวเอง เป็นคนละเรื่องกับ Allowlist
+รายชื่อโดเมนที่ Agent ตัวหนึ่งออกไปได้ Agent แต่ละตัวมีของตัวเอง ไม่มีรายชื่อกลางของ Machine จะตั้งให้ออกได้ทั้งเน็ตสาธารณะก็ได้ ซึ่งไม่รวมที่อยู่ภายใน และระหว่างที่ตั้งแบบนั้น Agent อ่านไฟล์ได้แค่ใน Workdir ของตัวเองกับ Library ที่ได้สิทธิ์ เป็นคนละเรื่องกับ Allowlist
 _Avoid_: Network allowlist, whitelist, firewall rules
 
 **Allowlist**:
-รายการคำนำหน้าของคำสั่ง bash ที่ Agent ตัวหนึ่งรันได้ทันทีโดยไม่ต้องขอ Approval เช่น `npm test` คำสั่งที่ต่อกันหลายท่อนต้องผ่านทุกท่อน ส่วน tool ที่ทำกับไฟล์ไม่ต้องผ่าน Allowlist เพราะ sandbox คุมอยู่แล้ว ทุกรายการมาจากการที่ Member เซ็นเพิ่ม ไม่มีคำสั่งที่ผ่านเสมอโดยไม่อยู่ในรายการ Allowlist กันความผิดพลาด ไม่ได้กัน Agent ที่โดนหลอกให้เลี่ยง กำแพงจริงคือ sandbox กับ Egress
+รายการสิ่งที่ Agent ตัวหนึ่งทำได้ทันทีโดยไม่ต้องขอ Approval มีสองแบบ คือคำนำหน้าของคำสั่ง bash เช่น `npm test` และชื่อเต็มของ tool จาก Connector เช่น `github/create_pull_request` คำสั่งที่ต่อกันหลายท่อนต้องผ่านทุกท่อน ส่วน tool ที่ทำกับไฟล์ไม่ต้องผ่าน Allowlist เพราะ sandbox คุมอยู่แล้ว ทุกรายการมาจากการที่ Member เซ็นเพิ่ม ไม่มีอะไรที่ผ่านเสมอโดยไม่อยู่ในรายการ สำหรับ bash Allowlist กันความผิดพลาด ไม่ได้กัน Agent ที่โดนหลอกให้เลี่ยง กำแพงจริงคือ sandbox กับ Egress แต่สำหรับ tool ของ Connector Allowlist เป็นกำแพงจริง เพราะ supervisor เป็นคนบังคับ
 _Avoid_: Permissions, whitelist, rules
 
 **Approval**:
@@ -93,7 +109,7 @@ _Avoid_: Permissions, whitelist, rules
 _Avoid_: Confirmation, consent, prompt
 
 **Task**:
-บทสนทนาหนึ่งเรื่องระหว่าง Member กับ Agent ตัวหนึ่ง หรือกับ Team หนึ่ง คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น ส่วน Task ของ Team เป็นของ Entry
+บทสนทนาหนึ่งเรื่องระหว่าง Member กับ Agent ตัวหนึ่ง หรือกับ Team หนึ่ง คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น ส่วน Task ของ Team เป็นของ Entry ถ้า Task ยาวจนใกล้เพดาน context Runtime ย่อสิ่งที่ส่งให้ LLM เป็นบทสรุปก้อนเดียว แต่ประวัติใน Task ยังอยู่ครบ
 _Avoid_: Chat, thread, session, job, run
 
 **Turn**:
@@ -105,7 +121,7 @@ _Avoid_: Run, step, iteration
 _Avoid_: Heartbeat, cron, automation, routine, trigger
 
 **Channel**:
-แชตภายนอก เช่น กลุ่ม Telegram ที่ Member ผูกเข้ากับ Agent ตัวหนึ่งและเซ็นไว้ ใครในแชตนั้นก็คุยกับ Agent ได้ และงานที่เกิดขึ้นทำในนามของ Member ที่ผูก คนในแชตไม่ได้เป็น Member มีอำนาจเท่ากันหมด และตอบ Approval ไม่ได้ Agent ที่มี Channel อยู่ใน Team ไม่ได้ และอ่านไฟล์ได้แค่ใน Workdir ของตัวเอง Channel หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน แบบเดียวกับ Schedule
+แชตภายนอก เช่น กลุ่ม Telegram ที่ Member ผูกเข้ากับ Agent ตัวหนึ่งและเซ็นไว้ ใครในแชตนั้นก็คุยกับ Agent ได้ และงานที่เกิดขึ้นทำในนามของ Member ที่ผูก คนในแชตไม่ได้เป็น Member มีอำนาจเท่ากันหมด และตอบ Approval ไม่ได้ Agent ที่มี Channel อยู่ใน Team ไม่ได้ และอ่านไฟล์ได้แค่ใน Workdir ของตัวเองกับ Library ที่ได้สิทธิ์ Channel หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน แบบเดียวกับ Schedule
 _Avoid_: Integration, connector, gateway, bot
 
 **Stop**:

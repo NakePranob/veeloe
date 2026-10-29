@@ -5,15 +5,17 @@ sandbox ปล่อยให้ Agent เขียนอะไรก็ได�
 ```
 ~/.veeloe/
 ├── config.json, กุญแจของ Machine
-├── runtime/             ของ supervisor: รายชื่อกุญแจที่ไว้ใจ, เลขกันส่งซ้ำ, SQLite
+├── runtime/             ของ supervisor: รายชื่อกุญแจที่ไว้ใจ, เลขกันส่งซ้ำ, SQLite, credential ของ Connector (ADR 0039)
 ├── bin/                 binary ที่ updater เปลี่ยน (ADR 0009)
+├── libraries/<id>/      Library (ADR 0037)
 └── agents/<agent-id>/
-    ├── workdir/         Workdir
+    ├── workdir/         Workdir ซึ่งมี MEMORY.md อยู่ที่ root (ADR 0036)
+    ├── skills/          Skill ที่ Member ติดตั้ง Agent อ่านได้อย่างเดียว (ADR 0038)
     ├── tasks.db         SQLite ของ worker (ADR 0020)
     └── tmp/             TMPDIR ของ worker (ADR 0008)
 ```
 
-สิทธิ์แบบเจ้าของเข้าได้คนเดียวของ `~/.veeloe` กัน Agent ไม่ได้ เพราะ worker ใช้ OS user เดียวกับเจ้าของเครื่อง (ADR 0020) sandbox ของ worker จึงต้องห้ามทั้งอ่านและเขียนทุกอย่างใน `~/.veeloe` ยกเว้นโฟลเดอร์ของ Agent ตัวนั้น และยกเว้นการอ่าน Workdir ของเพื่อนร่วมทีมระหว่างทำ Task ของทีม (ADR 0026) `tasks.db` กับ `tmp/` อยู่ข้าง Workdir ไม่ได้อยู่ข้างใน เพื่อไม่ให้ `git clean` หรือ `rm -rf *` ใน Workdir ลบประวัติ Task ทิ้งโดยไม่ตั้งใจ ชื่อโฟลเดอร์ใช้ id ของ Agent จึงเปลี่ยนชื่อ Agent ได้โดยไม่ต้องย้ายโฟลเดอร์
+สิทธิ์แบบเจ้าของเข้าได้คนเดียวของ `~/.veeloe` กัน Agent ไม่ได้ เพราะ worker ใช้ OS user เดียวกับเจ้าของเครื่อง (ADR 0020) sandbox ของ worker จึงต้องห้ามทั้งอ่านและเขียนทุกอย่างใน `~/.veeloe` ยกเว้นโฟลเดอร์ของ Agent ตัวนั้น ซึ่งในนั้น `skills/` อ่านได้อย่างเดียว ยกเว้นการอ่าน Workdir ของเพื่อนร่วมทีมระหว่างทำ Task ของทีม (ADR 0026) และยกเว้น Library ที่ได้สิทธิ์อ่านหรือเขียน (ADR 0037) `tasks.db` กับ `tmp/` อยู่ข้าง Workdir ไม่ได้อยู่ข้างใน เพื่อไม่ให้ `git clean` หรือ `rm -rf *` ใน Workdir ลบประวัติ Task ทิ้งโดยไม่ตั้งใจ ชื่อโฟลเดอร์ใช้ id ของ Agent จึงเปลี่ยนชื่อ Agent ได้โดยไม่ต้องย้ายโฟลเดอร์
 
 ## Considered Options
 
