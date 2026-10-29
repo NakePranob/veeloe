@@ -16,3 +16,5 @@ Task ทุกตัวในสาย Delegation พกชื่อ Member ท�
 - ช่อง confused deputy เดียวกันเกิดได้ทางไฟล์และทางเน็ตด้วย จึงอ่าน Workdir ของเพื่อนร่วมทีมได้เฉพาะใน Task ของ Team ซึ่งคนเริ่มมี Use ที่ทุกตัวในทีมแล้ว (ADR 0026) และ Egress แยกต่อ Agent (ADR 0029)
 - Use ดูได้ทุก Task ของ Agent ตัวนั้น ไม่ว่าใครเป็นคนเริ่ม เพราะทุก Task ใช้ Workdir เดียวกัน (ADR 0031)
 - งานจาก Channel ทำในนามของ Member ที่ผูก Channel และตรวจ Use ของคนนั้น (ADR 0028)
+- Team ไม่มีเจ้าของ ถ้าจะใส่หรือเอา Agent ตัวไหนออกจาก Team ต้องมี Manage ที่ Agent ตัวนั้น เพราะการร่วมทีมคือการเปิด Workdir ให้เพื่อนร่วมทีมอ่าน (ADR 0026) การสร้าง Team คือการใส่ Agent ตัวแรก และการลบ Team ต้องมี Manage ที่ Agent ทุกตัวในทีม
+- Member ที่มี Use กด Stop ได้ทุก Turn ของ Agent ตัวนั้น (ADR 0017)

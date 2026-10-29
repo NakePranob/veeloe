@@ -27,7 +27,7 @@ Member ที่ทำ Pairing ได้ สร้าง Agent ได้ เพ�
 _Avoid_: Admin, root
 
 **Grant**:
-สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงานและดู Task ทุกตัวของ Agent นั้น ไม่ว่าใครเป็นคนเริ่ม), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, เส้นใน Flow ที่ชี้เข้าหา Agent ตัวนี้ และตั้ง Agent ตัวนี้เป็น Entry ของ Team) ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
+สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงานและดู Task ทุกตัวของ Agent นั้น ไม่ว่าใครเป็นคนเริ่ม), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, Egress, เส้นใน Flow ที่ชี้เข้าหา Agent ตัวนี้ ใส่หรือเอา Agent ตัวนี้ออกจาก Team และตั้ง Agent ตัวนี้เป็น Entry ของ Team) ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
 _Avoid_: Role, permission, ACL
 
 **Controller**:
@@ -39,7 +39,7 @@ Workspace ตัวอย่างที่อยู่บน Controller อย�
 _Avoid_: Demo account, sandbox mode, guest mode
 
 **Pairing**:
-การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียว
+การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียว ถ้า Owner ของ Workspace เดิมเซ็นปล่อย Machine ไว้ก่อน Pairing ครั้งใหม่จะพา Agent, Workdir, Team และประวัติ Task ไปด้วย แต่ Grant ทั้งหมดถูกล้าง และ Schedule กับ Channel หยุด ถ้าไม่ได้ปล่อยไว้ Machine จะเริ่มใหม่จากศูนย์
 _Avoid_: Registration, enroll
 
 **Linking**:
@@ -50,8 +50,12 @@ _Avoid_: Login, sign-in, device registration
 การเพิ่ม Member ใหม่เข้า Workspace จากที่ไกล Owner ส่งลิงก์ที่ใช้ได้ครั้งเดียวไปให้ แล้วทั้งสองฝั่งเทียบรหัสสั้นที่คำนวณจากกุญแจของคนที่ถูกเชิญ ก่อนที่ Owner จะเซ็นรับรอง รหัสที่ไม่ตรงกันแปลว่ามีคนสลับกุญแจระหว่างทาง
 _Avoid_: Signup, registration, join link
 
+**Revocation**:
+การถอนกุญแจของ Controller เครื่องหนึ่ง ทำได้โดยเจ้าของจากเครื่องอื่นของตัวเอง หรือโดย Owner และการลบ Member คือการถอนกุญแจทุกเครื่องของคนนั้น Hub ตัดสายของกุญแจนั้นทันที และ Runtime จดไว้เองตอนต่อเข้ามาครั้งถัดไป ของที่เซ็นด้วยกุญแจนั้นแล้วทำงานเอง ได้แก่ Schedule และ Channel หยุดตามไปด้วย
+_Avoid_: Logout, ban, block, unlink
+
 **Hub**:
-บริการกลางที่เรา host ส่งต่อข้อความระหว่าง Controller กับ Runtime ไม่รัน Agent และไม่ถือ key ของ LLM
+บริการกลางที่เรา host ส่งต่อข้อความระหว่าง Controller กับ Runtime ไม่รัน Agent และไม่ถือ key ของ LLM Hub ไม่รู้ Grant และส่งต่อตามรายชื่อผู้รับที่ Runtime ใส่ไว้ในหัวซอง
 _Avoid_: Server, gateway, relay, broker
 
 **Protocol**:
@@ -73,7 +77,7 @@ _Avoid_: Avatar, persona, mascot
 _Avoid_: Emotion, expression, animation
 
 **Workdir**:
-โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Agent ที่อยู่ Team เดียวกันอ่าน Workdir ของกันได้เฉพาะตอนทำ Task ของ Team นั้น และเขียนของกันไม่ได้
+โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Runtime สร้างให้เองในโฟลเดอร์ของ Runtime และ Member เลือกที่อยู่เองไม่ได้ ถ้าจะทำงานกับ repo ที่มีอยู่แล้ว ให้ Agent clone เข้ามา Agent ที่อยู่ Team เดียวกันอ่าน Workdir ของกันได้เฉพาะตอนทำ Task ของ Team นั้น และเขียนของกันไม่ได้
 _Avoid_: Workspace, project, sandbox
 
 **Egress**:
@@ -93,7 +97,7 @@ _Avoid_: Confirmation, consent, prompt
 _Avoid_: Chat, thread, session, job, run
 
 **Turn**:
-ช่วงที่ Agent ลงมือทำงานเพื่อตอบข้อความหนึ่งข้อความใน Task เริ่มเมื่อได้รับข้อความ และจบเมื่อ Agent ตอบเสร็จหรือถูก Stop ระหว่าง Turn รวมถึงตอนรอ Approval Agent จะไม่ว่าง ส่วน Task ที่เปิดค้างไว้ไม่ได้ถือ Agent
+ช่วงที่ Agent ลงมือทำงานเพื่อตอบข้อความหนึ่งข้อความใน Task เริ่มเมื่อได้รับข้อความ และจบเมื่อ Agent ตอบเสร็จหรือถูก Stop ระหว่าง Turn รวมถึงตอนรอ Approval Agent จะไม่ว่าง ส่วน Task ที่เปิดค้างไว้ไม่ได้ถือ Agent ถ้า worker หรือ Runtime เริ่มใหม่กลาง Turn Turn นั้นจบเหมือนโดน Stop และไม่ทำต่อเอง
 _Avoid_: Run, step, iteration
 
 **Schedule**:
@@ -105,13 +109,13 @@ _Avoid_: Heartbeat, cron, automation, routine, trigger
 _Avoid_: Integration, connector, gateway, bot
 
 **Stop**:
-การสั่งให้ Turn ที่กำลังทำอยู่จบทันที พร้อมกับ Turn ของ Task ย่อยทั้งหมดที่อยู่ใต้ Task นั้น ไฟล์ที่แก้ไปแล้วคงสภาพเดิม และ Task ยังคุยต่อได้
+การสั่งให้ Turn ที่กำลังทำอยู่จบทันที พร้อมกับ Turn ของ Task ย่อยทั้งหมดที่อยู่ใต้ Task นั้น ไฟล์ที่แก้ไปแล้วคงสภาพเดิม และ Task ยังคุยต่อได้ Member ที่มี Use กับ Agent ตัวไหน กด Stop ได้ทุก Turn ของ Agent ตัวนั้น ไม่ว่าใครเป็นคนสั่ง
 _Avoid_: Cancel, abort, kill, close
 
 ### ทีม
 
 **Team**:
-กลุ่ม Agent ที่ตั้งชื่อไว้ อยู่บน Machine เดียวกัน มี Flow และ Entry ของตัวเอง Member สั่งงานทีมด้วยการเริ่ม Task กับ Team ซึ่งเป็นทางเดียวที่ Delegation จะเกิดได้ Agent ตัวหนึ่งอยู่ได้หลาย Team ยกเว้น Agent ที่มี Channel
+กลุ่ม Agent ที่ตั้งชื่อไว้ อยู่บน Machine เดียวกัน มี Flow และ Entry ของตัวเอง Member สั่งงานทีมด้วยการเริ่ม Task กับ Team ซึ่งเป็นทางเดียวที่ Delegation จะเกิดได้ Agent ตัวหนึ่งอยู่ได้หลาย Team ยกเว้น Agent ที่มี Channel Team ไม่มีเจ้าของ การลบ Team ต้องมี Manage ที่ Agent ทุกตัวในทีม
 _Avoid_: Swarm, crew, squad, group
 
 **Entry**:
@@ -127,7 +131,7 @@ _Avoid_: Workflow, pipeline, graph
 _Avoid_: Handoff, dispatch
 
 **Subagent**:
-ตัวช่วยชั่วคราวที่ Agent สร้างขึ้นเองระหว่างทำ Task อยู่บน Machine เดียวกับ Agent แม่ อ่านได้อย่างเดียว ส่ง Delegation ไม่ได้ ไม่มี Character และหายไปทันทีที่ส่งคำตอบกลับ ไม่ได้สร้าง Task ใหม่
+ตัวช่วยชั่วคราวที่ Agent สร้างขึ้นเองระหว่างทำ Task อยู่บน Machine เดียวกับ Agent แม่ มีแค่ tool read, glob และ grep จึงอ่านได้อย่างเดียว ส่ง Delegation ไม่ได้ ไม่มี Character และหายไปทันทีที่ส่งคำตอบกลับ ไม่ได้สร้าง Task ใหม่
 _Avoid_: Helper, child agent, worker
 
 ### LLM
