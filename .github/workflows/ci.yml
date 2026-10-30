@@ -22,8 +22,8 @@ jobs:
       - run: bun run typecheck
       - name: Unit tests (Protocol, Runtime)
         run: bun run test
-      - name: Steiger (Controller, Feature-Sliced Design)
-        run: bun run check:controller
+      - name: Steiger (Controller prototype, Feature-Sliced Design)
+        run: bun run check:prototype
       - name: dependency-cruiser (Runtime, supervisor and worker)
         run: bun run check:runtime
       - name: go-scaffold check (Hub)

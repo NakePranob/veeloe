@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Veeloe",
-    "slug": "veeloe",
+    "name": "Veeloe Prototype",
+    "slug": "veeloe-prototype",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -30,6 +30,6 @@
         }
       ]
     ],
-    "scheme": "veeloe"
+    "scheme": "veeloe-prototype"
   }
 }

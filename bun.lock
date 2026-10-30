@@ -10,8 +10,8 @@
         "typescript": "~6.0.3",
       },
     },
-    "controller": {
-      "name": "@veeloe/controller",
+    "controller-prototype": {
+      "name": "@veeloe/controller-prototype",
       "version": "1.0.0",
       "dependencies": {
         "@expo/metro-runtime": "~58.0.15",
@@ -462,7 +462,7 @@
 
     "@ungap/structured-clone": ["@ungap/structured-clone@1.4.0", "", {}, "sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ=="],
 
-    "@veeloe/controller": ["@veeloe/controller@workspace:controller"],
+    "@veeloe/controller-prototype": ["@veeloe/controller-prototype@workspace:controller-prototype"],
 
     "@veeloe/e2e": ["@veeloe/e2e@workspace:e2e"],
 

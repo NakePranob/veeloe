@@ -2,12 +2,13 @@
   "name": "veeloe",
   "private": true,
   "packageManager": "bun@1.3.14",
-  "workspaces": ["packages/*", "controller", "e2e"],
+  "workspaces": ["packages/*", "controller-prototype", "e2e"],
   "scripts": {
-    "test": "cd packages && bun test && cd ../controller && bun test",
-    "check": "bun run typecheck && bun run check:controller && bun run check:runtime && bun run check:hub",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p controller",
-    "check:controller": "cd controller && steiger ./src",
+    "test": "cd packages && bun test && cd ../controller-prototype && bun test",
+    "check": "bun run typecheck && bun run check:prototype && bun run check:runtime && bun run check:hub",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p controller-prototype",
+    "check:prototype": "cd controller-prototype && steiger ./src",
+    "prototype": "cd controller-prototype && bunx expo start --web",
     "check:runtime": "cd packages/runtime && depcruise src",
     "check:hub": "cd hub && go-scaffold check"
   },

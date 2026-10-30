@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "jsx": "react-jsx"
   },
-  "include": ["packages/*/src", "e2e", "controller/src/**/*.test.ts"]
+  "include": ["packages/*/src", "e2e", "controller-prototype/src/**/*.test.ts"]
 }

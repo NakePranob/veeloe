@@ -1,5 +1,5 @@
 {
-  "name": "@veeloe/controller",
+  "name": "@veeloe/controller-prototype",
   "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",

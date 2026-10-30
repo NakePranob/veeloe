@@ -2,7 +2,8 @@
 
 This is the whole of Veeloe (`veeloe` on GitHub), under AGPL-3.0 (`LICENSE`):
 Protocol (`packages/protocol`), Runtime (`packages/runtime`), Hub (`hub/`),
-Controller (`controller/`) and the e2e seam tests (`e2e/`). It is **public** —
+Controller (`controller/`, not started yet; `controller-prototype/` is a
+throwaway UI prototype on Demo data) and the e2e seam tests (`e2e/`). It is **public** —
 everything pushed here, a commit message or a PR description included, is
 public the moment it lands. Never commit a secret: the Runtime release signing
 key, push and Expo credentials, billing keys and the hosted Hub's env stay in
@@ -31,9 +32,9 @@ bun run test
 ```
 
 `check` runs the type check and each part's structure check (ADR 0022):
-Steiger on the Controller, dependency-cruiser on the Runtime and
+Steiger on the Controller prototype, dependency-cruiser on the Runtime and
 `go-scaffold check` on the Hub. `test` runs the Protocol's, the Runtime's and
-the Controller's unit tests. `bun run --cwd e2e test` starts Postgres in Docker, applies the
+the Controller prototype's unit tests. `bun run --cwd e2e test` starts Postgres in Docker, applies the
 Hub's migrations, builds the Runtime binary and starts the real Hub, then runs
 the seam tests; it needs Go and Docker. CI runs all three, plus the Hub's
 build, lint and tests.
