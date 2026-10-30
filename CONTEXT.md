@@ -19,7 +19,7 @@ _Avoid_: Node, host, device
 _Avoid_: Daemon, client, worker
 
 **Member**:
-คนหนึ่งคนที่อยู่ใน Workspace และมี Grant ต่อ Agent แต่ละตัว
+คนหนึ่งคนที่อยู่ใน Workspace และมี Grant ต่อ Agent แต่ละตัว ระบบรู้จัก Member จากรหัส เช่น `m_kai` ไม่ใช่จากชื่อ ชื่อที่แสดงตั้งโดย Owner ตอน Invitation แล้ว Member เปลี่ยนเองหรือให้ Owner เปลี่ยนได้ด้วยคำสั่งที่เซ็น ห้ามซ้ำกับคนอื่นใน Workspace และ Hub เก็บไว้เป็น metadata Controller แต่ละเครื่องมีชื่อเครื่องของตัวเองไว้ใช้ตอนถอนกุญแจ
 _Avoid_: User, account, seat
 
 **Owner**:
@@ -31,7 +31,7 @@ _Avoid_: Admin, root
 _Avoid_: Role, permission, ACL
 
 **Controller**:
-แอปที่ Member คนหนึ่งติดตั้งบนมือถือหรือเบราว์เซอร์และได้รับความไว้ใจจาก Workspace คำสั่งทุกอย่างต้องมาจาก Controller และถือว่าเป็นคำสั่งของ Member เจ้าของ Controller นั้น ข้อยกเว้นเดียวคือข้อความในแชตของ Channel ซึ่งทำในนามของ Member ที่ผูก Channel นั้นไว้
+แอปที่ Member คนหนึ่งติดตั้งบนมือถือหรือเบราว์เซอร์และได้รับความไว้ใจจาก Workspace คำสั่งทุกอย่างต้องมาจาก Controller และถือว่าเป็นคำสั่งของ Member เจ้าของ Controller นั้น ข้อยกเว้นเดียวคือข้อความในแชตของ Channel ซึ่งทำในนามของ Member ที่ผูก Channel นั้นไว้ กุญแจของ Controller ใช้ได้หลังยืนยันตัวด้วย Face ID ลายนิ้วมือ หรือรหัสเครื่อง ตอนเปิดแอปและหลังไม่ได้ใช้เกิน 5 นาที และต้องยืนยันใหม่ทุกครั้งก่อนอนุมัติ Approval, Link เครื่อง, เปลี่ยน Grant หรือ Owner, ติดตั้ง Skill, Connector หรือ Blueprint, แก้ Allowlist หรือ Egress, Pairing, ปล่อย Machine และถอนกุญแจ
 _Avoid_: Device, client, phone, app
 
 **Demo Workspace**:
@@ -43,7 +43,7 @@ _Avoid_: Demo account, sandbox mode, guest mode
 _Avoid_: Registration, enroll
 
 **Linking**:
-การเพิ่ม Controller เครื่องใหม่ของ Member คนเดิม โดยให้ Controller ที่ได้รับความไว้ใจอยู่แล้วสแกน QR บนเครื่องใหม่ เครื่องใหม่จะสั่งงานได้ก็ต่อเมื่อผ่าน Linking หรือ Invitation เท่านั้น
+การเพิ่ม Controller เครื่องใหม่ของ Member คนเดิม โดยให้ Controller ที่ได้รับความไว้ใจอยู่แล้วสแกน QR บนเครื่องใหม่ หรือให้เครื่องใหม่ login ด้วย email ที่ Hub เพื่อส่งคำขอไปที่เครื่องเดิม แล้วอนุมัติบนเครื่องเดิมหลังเทียบรหัสสั้นตรงกัน login ที่ Hub มีไว้ให้เครื่องใหม่หาเจ้าของเจอเท่านั้น ไม่ได้รับรองว่าเป็นใคร คนรับรองคือเครื่องเดิมที่เซ็นกุญแจใหม่ เครื่องใหม่จะสั่งงานได้ก็ต่อเมื่อผ่าน Linking หรือ Invitation เท่านั้น
 _Avoid_: Login, sign-in, device registration
 
 **Invitation**:
@@ -51,7 +51,7 @@ _Avoid_: Login, sign-in, device registration
 _Avoid_: Signup, registration, join link
 
 **Revocation**:
-การถอนกุญแจของ Controller เครื่องหนึ่ง ทำได้โดยเจ้าของจากเครื่องอื่นของตัวเอง หรือโดย Owner และการลบ Member คือการถอนกุญแจทุกเครื่องของคนนั้น Hub ตัดสายของกุญแจนั้นทันที และ Runtime จดไว้เองตอนต่อเข้ามาครั้งถัดไป ของที่เซ็นด้วยกุญแจนั้นแล้วทำงานเอง ได้แก่ Schedule และ Channel หยุดตามไปด้วย
+การถอนกุญแจของ Controller เครื่องหนึ่ง ทำได้โดยเจ้าของจากเครื่องอื่นของตัวเอง หรือโดย Owner และการลบ Member คือการถอนกุญแจทุกเครื่องของคนนั้น Hub ตัดสายของกุญแจนั้นทันที และ Runtime จดไว้เองตอนต่อเข้ามาครั้งถัดไป ของที่เซ็นด้วยกุญแจนั้นแล้วทำงานเอง ได้แก่ Schedule และ Channel หยุดตามไปด้วย ถอนกุญแจดอกไหนมีผลแค่เครื่องนั้น เพราะใบรับรองของ Linking ผูกกับ Member ไม่ได้ผูกกับเครื่องที่เซ็น ใบที่เซ็นไว้ก่อนถูกถอนยังใช้ได้
 _Avoid_: Logout, ban, block, unlink
 
 **Hub**:
