@@ -43,6 +43,11 @@ The JSON Schema and test vectors in `packages/protocol/schema/` and
 handshake, rebuild them with `bun run --cwd packages/protocol fixtures`. The
 Hub's Go tests read the same files.
 
+Write tests where there is a rule or a security check, not for coverage
+(ADR 0022). Every supervisor slice needs a test that it refuses a bad
+signature, a revoked key and a Member without the Grant; a new Protocol
+message needs test vectors; each feature gets one e2e happy path.
+
 In `hub/`, never run `go-scaffold add auth`, `add rbac` or `add worker`
 (ADR 0014).
 

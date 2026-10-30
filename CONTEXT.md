@@ -84,6 +84,10 @@ _Avoid_: Workspace, sandbox
 คู่มือวิธีทำงานเรื่องหนึ่งที่ติดตั้งให้ Agent เป็นโฟลเดอร์ที่มี `SKILL.md` และอาจมี script ประกอบ Agent เห็นแค่ชื่อกับคำอธิบายของทุก Skill แล้วเปิดอ่านเต็มเมื่องานตรงกับ Skill นั้น Member ที่มี Manage เป็นคนติดตั้ง แก้ หรือลบด้วยคำสั่งที่เซ็น Agent อ่านได้แต่แก้ไม่ได้ และเสนอร่าง Skill ไว้ใน Workdir ให้ Member ติดตั้งได้
 _Avoid_: Plugin, tool, prompt template
 
+**Blueprint**:
+แม่แบบของ Agent ที่คนอื่นทำมาให้ติดตั้ง มีคำสั่งของ Agent, Skill, รายชื่อ Connector ที่ต้องใช้, Allowlist กับ Egress ที่แนะนำ และ Character ตอนติดตั้ง แอปแสดงว่าขออะไรบ้าง แล้ว Member ที่มี Manage เซ็นทับ hash แบบเดียวกับ Skill ผลที่ได้คือ Agent ปกติหนึ่งตัวที่ใช้ Provider และ Budget ของลูกค้าเอง ส่วนขยายจากคนอื่นมีแค่ Skill, Connector และ Blueprint ไม่มี plugin ที่รันอยู่ใน Runtime ยังไม่ได้ทำ และจะมาพร้อม marketplace หลัง v0.3
+_Avoid_: Plugin, template, preset, package
+
 **Connector**:
 บริการภายนอกที่ต่อเข้ากับ Agent ผ่าน MCP ถ้าเป็นบริการบนเน็ต supervisor เป็นคนต่อและถือ credential ไว้เอง Agent เห็นแค่ tool และอ่าน credential ไม่ได้ ถ้าเป็นโปรแกรมบนเครื่อง จะรันใน sandbox ของ Agent และไม่ถือความลับ Connector หนึ่งตัวใช้บัญชีเดียว ซึ่งคนที่มี Manage เป็นคนผูก ใครที่มี Use ที่ Agent ก็ใช้บัญชีนั้นผ่าน Agent ได้ Connector หยุดทันทีเมื่อกุญแจที่เซ็นมันถูกถอน แบบเดียวกับ Schedule และ Channel ถ้าลบ Member แล้ว Owner ไม่ได้เซ็นใหม่ supervisor จะลบ credential ทิ้ง tool ของ Connector ถูกตรึงไว้ตั้งแต่ตอนติดตั้ง ถ้า server เปลี่ยนหรือเพิ่ม tool ต้องอนุมัติใหม่
 _Avoid_: Integration, plugin, MCP server
@@ -115,6 +119,10 @@ _Avoid_: Quota, limit, credit
 **Task**:
 บทสนทนาหนึ่งเรื่องระหว่าง Member กับ Agent ตัวหนึ่ง หรือกับ Project หนึ่ง คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น ส่วน Task ของ Project เป็นของ Entry และในแอปอาจเรียก Task ของ Project ว่าห้อง ถ้า Task ยาวจนใกล้เพดาน context Runtime ย่อสิ่งที่ส่งให้ LLM เป็นบทสรุปก้อนเดียว แต่ประวัติใน Task ยังอยู่ครบ
 _Avoid_: Chat, thread, session, job, run, room
+
+**Attachment**:
+ไฟล์ที่แนบมากับข้อความใน Task ทั้งจาก Member ไปหา Agent และจาก Agent กลับมาด้วย tool `send_file` ไฟล์ละไม่เกิน 20MB ข้อความที่เซ็นแล้วประกาศชื่อ ขนาด และ hash ของไฟล์ก่อน แล้วตัวไฟล์ตามมาเป็นซอง `file.chunk` ก้อนละ 256KB ผ่าน Hub ซึ่งส่งต่ออย่างเดียวไม่เก็บ Runtime รับเฉพาะก้อนที่ประกาศไว้และเทียบ hash ก่อนเริ่ม Turn ไฟล์ที่ Agent ส่งกลับ Controller ดึงมาเมื่อกดเปิดด้วยคำขอที่เซ็น event log เก็บแค่ชื่อ ขนาด hash และ path
+_Avoid_: Upload, file message
 
 **Turn**:
 ช่วงที่ Agent ลงมือทำงานเพื่อตอบข้อความหนึ่งข้อความใน Task ทำในนามของคนที่ส่งข้อความนั้น ซึ่งไม่จำเป็นต้องเป็นคนที่เริ่ม Task เพราะ Member หลายคนพิมพ์ใน Task เดียวกันได้ เริ่มเมื่อได้รับข้อความ และจบเมื่อ Agent ตอบเสร็จหรือถูก Stop ระหว่าง Turn รวมถึงตอนรอ Approval Agent จะไม่ว่าง ส่วน Task ที่เปิดค้างไว้ไม่ได้ถือ Agent ถ้า worker หรือ Runtime เริ่มใหม่กลาง Turn Turn นั้นจบเหมือนโดน Stop และไม่ทำต่อเอง
