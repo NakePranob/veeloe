@@ -12,7 +12,6 @@
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
     "@expo/ui": "~58.0.23",
-    "@veeloe/protocol": "workspace:*",
     "expo": "~58.0.16",
     "expo-constants": "~58.0.12",
     "expo-haptics": "~58.0.7",

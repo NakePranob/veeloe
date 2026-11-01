@@ -1,18 +1,16 @@
 # Agent Guidance: veeloe
 
-This is the whole of Veeloe (`veeloe` on GitHub), under AGPL-3.0 (`LICENSE`):
-Protocol (`packages/protocol`), Runtime (`packages/runtime`), Hub (`hub/`),
-Controller (`controller/`, not started yet; `controller-prototype/` is a
-throwaway UI prototype on Demo data) and the e2e seam tests (`e2e/`). It is **public** —
-everything pushed here, a commit message or a PR description included, is
-public the moment it lands. Never commit a secret: the Runtime release signing
+This is Veeloe (`veeloe` on GitHub), under AGPL-3.0 (`LICENSE`). The design is
+here: the Protocol, Runtime, Hub and Controller are specified in `docs/adr/` but
+have no code yet, and `controller-prototype/` is a throwaway UI prototype on
+Demo data. It is **public** — everything pushed here, a commit message or a PR
+description included, is public the moment it lands. Never commit a secret: the Runtime release signing
 key, push and Expo credentials, billing keys and the hosted Hub's env stay in
 GitHub environments or the host, never in git.
 
 `CONTEXT.md` is the glossary — use its terms. `docs/adr/` holds the
 architecture decisions: do not contradict one; if a change has to, say so and
-change the ADR in the same commit. `openspec/` holds the specs and changes for
-every part, versioned with the code.
+change the ADR in the same commit.
 
 GitHub Releases are for the Runtime only — its updater takes the latest
 release as its own (ADR 0009, 0025). The Hub ships as an image on GHCR, the
@@ -31,26 +29,11 @@ bun run check
 bun run test
 ```
 
-`check` runs the type check and each part's structure check (ADR 0022):
-Steiger on the Controller prototype, dependency-cruiser on the Runtime and
-`go-scaffold check` on the Hub. `test` runs the Protocol's, the Runtime's and
-the Controller prototype's unit tests. `bun run --cwd e2e test` starts Postgres in Docker, applies the
-Hub's migrations, builds the Runtime binary and starts the real Hub, then runs
-the seam tests; it needs Go and Docker. CI runs all three, plus the Hub's
-build, lint and tests.
-
-The JSON Schema and test vectors in `packages/protocol/schema/` and
-`packages/protocol/vectors/` are generated; after changing the envelope or the
-handshake, rebuild them with `bun run --cwd packages/protocol fixtures`. The
-Hub's Go tests read the same files.
+`check` runs the type check and Steiger on the Controller prototype (ADR 0022).
+`test` runs the Controller prototype's unit tests. CI runs both.
 
 Write tests where there is a rule or a security check, not for coverage
-(ADR 0022). Every supervisor slice needs a test that it refuses a bad
-signature, a revoked key and a Member without the Grant; a new Protocol
-message needs test vectors; each feature gets one e2e happy path.
-
-In `hub/`, never run `go-scaffold add auth`, `add rbac` or `add worker`
-(ADR 0014).
+(ADR 0022).
 
 ## Git hooks
 
@@ -98,8 +81,7 @@ issue), so pushing it to `develop`, the default branch, closes the issue.
 ## Commits on develop (v0.1)
 
 Until v0.1 ships, the maintainer commits straight to `develop`: no branch, no
-PR. Run `bun run check` (and the e2e tests when the change touches a seam)
-before pushing, because nothing on GitHub gates the push — CI runs after it
+PR. Run `bun run check` before pushing, because nothing on GitHub gates the push — CI runs after it
 lands, and a red run is fixed with the next commit. The `develop` ruleset only
 refuses force-pushes and deleting the branch. When v0.1 ships, the PR rule and
 the required `english` check go back on `develop`, and work moves to branches
