@@ -10,7 +10,8 @@ GitHub environments or the host, never in git.
 
 `CONTEXT.md` is the glossary — use its terms. `docs/adr/` holds the
 architecture decisions: do not contradict one; if a change has to, say so and
-change the ADR in the same commit.
+change the ADR in the same commit. `openspec/` holds the specs and changes,
+versioned with the code; it starts empty until the build restarts.
 
 GitHub Releases are for the Runtime only — its updater takes the latest
 release as its own (ADR 0009, 0025). The Hub ships as an image on GHCR, the
