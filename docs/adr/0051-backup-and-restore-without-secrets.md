@@ -13,5 +13,5 @@
 ## Consequences
 
 - backup ยังมีประวัติ Task และไฟล์งาน ต้องเก็บไว้ในที่ปลอดภัย
-- สิ่งที่เกิดหลัง backup ครั้งล่าสุดหายไป Controller มี event ของ Task อยู่ ถ้าต้องการวันหลังให้ส่ง event ที่ขาดกลับไปที่ Runtime ได้ แต่ไม่อยู่ใน v0.1
+- สิ่งที่เกิดหลัง backup ครั้งล่าสุดหายไป Controller มี event ของ Task อยู่ ถ้าต้องการวันหลังให้ส่ง event ที่ขาดกลับไปที่ Runtime ได้ แต่ยังไม่ทำ
 - หลังกู้ต้อง login Connector และใส่ key ของ Provider กับ token ของ bot ใหม่
