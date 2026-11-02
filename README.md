@@ -11,7 +11,7 @@ on Demo data (`controller-prototype/`). The parts below are designed in
   to talk: envelope and message shapes, signing, and sealed keys.
 - **Runtime** — the program installed on each Machine. It hosts Agents and
   their staff, runs every command they make inside an OS sandbox, lets one Entry
-  agent hand work to any staff agent in the same Project, and keeps each
+  agent hand work to any staff agent in the same Team, and keeps each
   Task's history on that Machine.
 - **Hub** — the relay between Controllers and Runtimes. It runs no Agent and
   stores no Task content.

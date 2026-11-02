@@ -27,7 +27,7 @@ Member ที่ทำ Pairing ได้ สร้าง Agent ได้ เพ�
 _Avoid_: Admin, root
 
 **Grant**:
-สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงาน และเปิดดู Task ของ Agent นั้นที่คนเริ่มเปิดให้เห็น), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, Egress, ใส่หรือเอา Agent ตัวนี้ออกจาก Project และตั้ง Agent ตัวนี้เป็น Entry ของ Project) นอก Project Turn ของคนที่มี Manage อ่านไฟล์บนเครื่องได้ทุกไฟล์ที่ไม่ใช่ไฟล์ลับ ส่วน Turn ของคนที่มีแค่ Use หรือ Approve อ่านได้แค่ Workdir กับ Library ส่วนสิทธิ์ต่อ Project มีสี่ระดับคือ View (เห็น Task และ wiki ของ Project), Ask (ถามได้), Use (สั่งงานและกด Stop) และ Manage (ให้สิทธิ์ใน Project ตั้ง Entry และตั้งค่าของ Project) ใน Project ใช้สิทธิ์ของ Project นอก Project ใช้สิทธิ์ของ Agent แต่ Approval ไปที่คนที่มี Approve ที่ Agent ตัวนั้นเสมอ ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
+สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงาน และเปิดดู Task ของ Agent นั้นที่คนเริ่มเปิดให้เห็น), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, Egress, ใส่หรือเอา Agent ตัวนี้ออกจาก Project หรือ Team และตั้ง Agent ตัวนี้เป็น Entry ของ Team) นอก Project Turn ของคนที่มี Manage อ่านไฟล์บนเครื่องได้ทุกไฟล์ที่ไม่ใช่ไฟล์ลับ ส่วน Turn ของคนที่มีแค่ Use หรือ Approve อ่านได้แค่ Workdir กับ Library ส่วนสิทธิ์ต่อ Project มีสี่ระดับคือ View (เห็น Task และ wiki ของ Project), Ask (ถามได้), Use (สั่งงานและกด Stop) และ Manage (ให้สิทธิ์ใน Project จัดรายชื่อผู้ทำงาน และตั้งค่าของ Project) Owner มี Manage ของทุก Project ใน Project ใช้สิทธิ์ของ Project นอก Project ใช้สิทธิ์ของ Agent แต่ Approval ไปที่คนที่มี Approve ที่ Agent ตัวนั้นเสมอ ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
 _Avoid_: Role, permission, ACL
 
 **Controller**:
@@ -117,7 +117,7 @@ _Avoid_: Confirmation, consent, prompt
 _Avoid_: Quota, limit, credit
 
 **Task**:
-บทสนทนาหนึ่งเรื่องระหว่าง Member กับ Agent ตัวหนึ่ง หรือกับ Project หนึ่ง คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น ส่วน Task ของ Project เป็นของ Entry และในแอปอาจเรียก Task ของ Project ว่าห้อง ถ้า Task ยาวจนใกล้เพดาน context Runtime ย่อสิ่งที่ส่งให้ LLM เป็นบทสรุปก้อนเดียว แต่ประวัติใน Task ยังอยู่ครบ Task ที่ Member เริ่มคุยกับ Agent ในแอปเปิดดูได้เฉพาะคนเริ่ม จนกว่าคนเริ่มจะเปิดให้คนที่มี Use เห็น ซึ่งย้อนกลับไม่ได้ เรื่องนี้ทำให้แอปไม่รก ไม่ได้ทำให้เป็นความลับ เพราะ Workdir กับ Memory ใช้ร่วมกัน และเจ้าของ Machine เข้าถึงได้ Agent ค้น Task ของคนอื่นตอนคุยผ่าน Controller ได้ เว้นแต่คนที่มี Manage ปิดไว้ ค่านี้ตรึงตอนเริ่มแต่ละ Task Task ของ Project ไม่อยู่ในกฎนี้
+บทสนทนาหนึ่งเรื่องระหว่าง Member กับ Agent ตัวหนึ่ง หรือกับ Team หนึ่ง จะทำงานใน Project หรือไม่ก็ได้ ยกเว้น Team ที่ต้องอยู่ใน Project คุยต่อได้หลายข้อความ Agent ที่ได้รับเป็นเจ้าของ Task นั้น ส่วน Task ของ Project เป็นของ Agent ที่เป็นผู้ทำงาน หรือของ Entry ถ้าผู้ทำงานคือ Team ถ้า Task ยาวจนใกล้เพดาน context Runtime ย่อสิ่งที่ส่งให้ LLM เป็นบทสรุปก้อนเดียว แต่ประวัติใน Task ยังอยู่ครบ Task ที่ Member เริ่มคุยกับ Agent ในแอปเปิดดูได้เฉพาะคนเริ่ม จนกว่าคนเริ่มจะเปิดให้คนที่มี Use เห็น ซึ่งย้อนกลับไม่ได้ เรื่องนี้ทำให้แอปไม่รก ไม่ได้ทำให้เป็นความลับ เพราะ Workdir กับ Memory ใช้ร่วมกัน และเจ้าของ Machine เข้าถึงได้ Agent ค้น Task ของคนอื่นตอนคุยผ่าน Controller ได้ เว้นแต่คนที่มี Manage ปิดไว้ ค่านี้ตรึงตอนเริ่มแต่ละ Task Task ของ Project ไม่อยู่ในกฎนี้
 _Avoid_: Chat, thread, session, job, run, room, Private Task
 
 **Attachment**:
@@ -129,7 +129,7 @@ _Avoid_: Upload, file message
 _Avoid_: Run, step, iteration
 
 **Schedule**:
-ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Project ทุกรอบ ทำในนามของ Member ที่ตั้ง ตอนตั้งเลือกได้ว่าเรื่องที่ Agent บอกจะแจ้งแค่คนตั้ง หรือทุกคนที่มี Use ที่ Agent นั้น และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox ถ้า Machine ปิดอยู่ตอนถึงเวลา รอบที่พลาดรันชดเชยครั้งเดียวตอนเครื่องกลับมา ไม่ว่าจะพลาดกี่รอบ และ Agent ได้รู้ว่ารอบนั้นควรรันตอนกี่โมง Schedule หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน ซึ่งรวมถึงตอนที่ Member คนนั้นถูกลบ
+ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือกับผู้ทำงานใน Project ทุกรอบ ทำในนามของ Member ที่ตั้ง ตอนตั้งเลือกได้ว่าเรื่องที่ Agent บอกจะแจ้งแค่คนตั้ง หรือทุกคนที่มี Use ที่ Agent นั้น และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox ถ้า Machine ปิดอยู่ตอนถึงเวลา รอบที่พลาดรันชดเชยครั้งเดียวตอนเครื่องกลับมา ไม่ว่าจะพลาดกี่รอบ และ Agent ได้รู้ว่ารอบนั้นควรรันตอนกี่โมง Schedule หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน ซึ่งรวมถึงตอนที่ Member คนนั้นถูกลบ
 _Avoid_: Heartbeat, cron, automation, routine, trigger
 
 **Idle Work**:
@@ -151,23 +151,31 @@ _Avoid_: Cancel, abort, kill, close
 ### Project
 
 **Project**:
-งานหนึ่งเรื่องที่มี Agent หลายตัวเป็นพนักงาน อยู่บน Machine เดียวกัน และมี Entry ตัวเดียว Member สั่งงานด้วยการเริ่ม Task กับ Project ซึ่งเป็นทางเดียวที่ Delegation จะเกิดได้ Agent ตัวหนึ่งเป็นพนักงานได้หลาย Project ยกเว้น Agent ที่มี Channel การเอา Agent เข้ามาเป็นพนักงานต้องมี Manage ที่ Agent ตัวนั้น ซึ่งเท่ากับยินยอมให้ Agent รับงานจากคนที่มีสิทธิ์ใน Project Project มี Library ของตัวเองเป็น wiki พนักงานทุกตัวอ่านได้ และมีพนักงานที่เขียนได้ตัวเดียว ค่าเริ่มต้นคือ Entry Project มี repo ได้หลายอัน ซึ่งพนักงานเขียนได้ระหว่างทำ Task ของ Project ถ้าเป็นงานที่ไม่ใช่โค้ด Runtime สร้าง repo ไฟล์งานให้เองบนเครื่อง ตอนสร้าง Project เลือกแม่แบบได้ เช่น โค้ด เอกสาร ดีไซน์ หรืองานผ่านระบบอื่น ซึ่งเป็นแค่ค่าตั้งต้นที่แก้ทีหลังได้ Member ที่มี Manage ที่ Agent อย่างน้อยหนึ่งตัวสร้าง Project ได้ และได้ Manage ของ Project นั้น
-_Avoid_: Team, swarm, crew, squad, group
+ที่ทำงานหนึ่งแห่งบน Machine เดียว มี repo หรือไฟล์งาน มี Library ของตัวเองเป็น wiki มีสิทธิ์ของ Member สี่ระดับ และมีรายชื่อผู้ทำงานที่อนุญาต Task ของ Project แต่ละ Task มีผู้ทำงานหนึ่งราย การเอาผู้ทำงานเข้ารายชื่อต้องมี Manage ของ Project และ Manage ที่ Agent ทุกตัวของผู้ทำงานนั้น ซึ่งเท่ากับยินยอมให้ Agent รับงานจากคนที่มีสิทธิ์ใน Project ผู้ทำงานเขียน repo ได้ระหว่างทำ Task ของ Project และ wiki มีคนเขียนได้ตัวเดียว ถ้าเป็นงานที่ไม่ใช่โค้ด Runtime สร้าง repo ไฟล์งานให้เองบนเครื่อง ตอนสร้าง Project เลือกแม่แบบได้ เช่น โค้ด เอกสาร ดีไซน์ หรืองานผ่านระบบอื่น ซึ่งเป็นแค่ค่าตั้งต้นที่แก้ทีหลังได้ Member ที่มี Manage ที่ Agent อย่างน้อยหนึ่งตัวสร้าง Project ได้ และได้ Manage ของ Project นั้น
+_Avoid_: Chat room, swarm, crew, squad, group
+
+**ผู้ทำงาน**:
+Agent ตัวเดียวหรือ Team ที่รับงานใน Task ของ Project
+_Avoid_: Worker, assignee
+
+**Team**:
+กลุ่ม Agent บน Machine เดียวที่มี Entry ตัวเดียวและมีเพดานการส่งงาน Team หนึ่งเข้าได้หลาย Project และทำงานได้เฉพาะใน Project สมาชิกของ Team เรียกว่าพนักงาน Agent ตัวหนึ่งอยู่ได้หลาย Team ยกเว้น Agent ที่มี Channel การเพิ่ม Agent เข้า Team ต้องมี Manage ที่ Agent ตัวนั้น ซึ่งเท่ากับยินยอมให้รับงานในทุก Project ที่ Team นั้นเข้าอยู่
+_Avoid_: Swarm, crew, squad, group
 
 **Worktree**:
 สำเนาของทุก repo ของ Project ที่ Task หนึ่งได้ไปเมื่อติ๊กไว้ตอนเปิด Task อยู่ใน branch ชื่อเดียวกัน worktree หนึ่งมีคนเขียนได้ทีละหนึ่ง Turn Agent รัน Turn ที่อยู่คนละ worktree พร้อมกันได้ และระหว่างนั้น Workdir ของ Agent อ่านได้อย่างเดียว Task ที่ไม่ติ๊กใช้ checkout หลักร่วมกัน ทีละหนึ่ง Turn ส่วน Project ที่ไม่มี repo ให้ Task ได้โฟลเดอร์ว่างของตัวเองแทน ซึ่งใช้กฎเดียวกัน แต่ไม่ต้องรวมงานกลับ
 _Avoid_: Branch, copy, sandbox
 
 **Entry**:
-พนักงานของ Project ที่รับข้อความของ Member ใน Task ของ Project และส่งงานต่อให้พนักงานตัวอื่นได้ทุกตัว Project หนึ่งมี Entry ตัวเดียว
+พนักงานของ Team ที่รับข้อความของ Member ใน Task ของ Team นั้น และส่งงานต่อให้พนักงานตัวอื่นในทีมได้ทุกตัว Team หนึ่งมี Entry ตัวเดียว
 _Avoid_: Lead, leader, manager, orchestrator
 
 **Delegation**:
-การที่ Entry ใน Task ของ Project สร้าง Task ย่อยส่งให้พนักงานตัวอื่น หรือส่งข้อความต่อใน Task ย่อยเดิม เช่น ตีงานกลับให้แก้ ส่งได้ชั้นเดียว พนักงานส่งต่ออีกไม่ได้ และใน Turn หนึ่งส่งได้ไม่เกินเพดานของ Project ซึ่งค่าเริ่มต้นคือ 5 ครั้ง ส่วนจะส่งให้ใครเมื่อไหร่ Entry ตัดสินใจเองจากคำอธิบายของพนักงาน ทำในนามของ Member ที่ส่งข้อความของ Turn ต้นทางเสมอ การส่งงานของทุก Project บนเครื่องเดียวกันรวมกันแล้วห้ามเป็นวง พนักงานสั่งงานกันเองไม่ได้ แต่ถามกันได้ด้วย Ask
+การที่ Entry ใน Task ของ Team สร้าง Task ย่อยส่งให้พนักงานตัวอื่น หรือส่งข้อความต่อใน Task ย่อยเดิม เช่น ตีงานกลับให้แก้ ส่งได้ชั้นเดียว พนักงานส่งต่ออีกไม่ได้ และใน Turn หนึ่งส่งได้ไม่เกินเพดานของ Team ซึ่งค่าเริ่มต้นคือ 5 ครั้ง ส่วนจะส่งให้ใครเมื่อไหร่ Entry ตัดสินใจเองจากคำอธิบายของพนักงาน ทำในนามของ Member ที่ส่งข้อความของ Turn ต้นทางเสมอ การส่งงานของทุก Team บนเครื่องเดียวกันรวมกันแล้วห้ามเป็นวง พนักงานสั่งงานกันเองไม่ได้ แต่ถามกันได้ด้วย Ask
 _Avoid_: Handoff, dispatch, Flow
 
 **Ask**:
-คำถามใน Project ที่ตอบด้วย Turn แบบอ่านอย่างเดียว คนถามคือ Member ที่มีสิทธิ์ Ask ขึ้นไปใน Project หรือพนักงานด้วยกัน คนตอบคือ Entry หรือพนักงานที่ถูก Mention Turn แบบนี้มีแค่ tool อ่านไฟล์ ค้น Task ของ Project และอ่าน wiki ไม่มี bash ไม่ส่งงานต่อ และไม่เรียก Connector จึงไม่ต้องรอคิว path ที่ Project ห้ามและ Task ที่ปิดจาก Ask อ่านไม่ได้ ส่วนหัวข้อที่ห้ามตอบเป็นแค่คำขอที่ LLM อาจไม่ทำตาม นอก Project Member ที่มี Use ถาม Agent ที่ไม่ว่างด้วย Ask แทนการต่อคิวได้
+คำถามใน Project ที่ตอบด้วย Turn แบบอ่านอย่างเดียว คนถามคือ Member ที่มีสิทธิ์ Ask ขึ้นไปใน Project หรือพนักงานด้วยกัน คนตอบคือเจ้าของ Task หรือพนักงานที่ถูก Mention Turn แบบนี้มีแค่ tool อ่านไฟล์ ค้น Task ของ Project และอ่าน wiki ไม่มี bash ไม่ส่งงานต่อ และไม่เรียก Connector จึงไม่ต้องรอคิว path ที่ Project ห้ามและ Task ที่ปิดจาก Ask อ่านไม่ได้ ส่วนหัวข้อที่ห้ามตอบเป็นแค่คำขอที่ LLM อาจไม่ทำตาม นอก Project Member ที่มี Use ถาม Agent ที่ไม่ว่างด้วย Ask แทนการต่อคิวได้
 _Avoid_: Query, read-only mode
 
 **Mention**:
