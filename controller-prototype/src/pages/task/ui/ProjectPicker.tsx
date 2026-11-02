@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { useCurrentMember } from "../../../entities/member";
+import { useCurrentMember, useMembers } from "../../../entities/member";
 import { hasRight, useProjects, type Project } from "../../../entities/project";
 import type { Task } from "../../../entities/task";
 import { setTaskProject } from "../../../features/demo-runtime";
@@ -9,6 +9,7 @@ import { Label, Select, space } from "../../../shared/ui";
 // because the files, Worktree and rights are the Project's from then on (ADR 0064).
 export function ProjectPicker({ task }: { task: Task }) {
   const me = useCurrentMember();
+  const members = useMembers();
   const places = useProjects().filter((project) => hasRight(project, me, "ask") && project.doers.some((doer) => (task.team ? doer.kind === "team" && doer.id === task.team : doer.kind === "agent" && doer.id === task.agent)));
   const chosen: Project | undefined = places.find((project) => project.id === task.project);
   if (!places.length) return task.team ? <Label icon="lock">Team นี้ยังไม่อยู่ใน Project ที่คุณมีสิทธิ์ จึงเริ่มงานไม่ได้</Label> : null;
@@ -22,6 +23,11 @@ export function ProjectPicker({ task }: { task: Task }) {
         options={[...(task.team ? [] : [{ value: "", label: "ไม่มี Project" }]), ...places.map((project) => ({ value: project.id, label: project.name }))]}
         onChange={(id) => setTaskProject(task.id, places.find((project) => project.id === id), places.find((project) => project.id === id)?.worktreeDefault ?? false)}
       />
+      {chosen && (
+        <Label icon="members" variant="caption">
+          {members.filter((member) => member.id !== me.id && !member.removed && hasRight(chosen, member, "view")).map((member) => member.name).join(", ") || "คนอื่นที่มีสิทธิ์ใน Project"} จะเห็นแชตนี้ และย้อนกลับไม่ได้หลังส่งข้อความแรก
+        </Label>
+      )}
       {!!chosen?.repos.length && hasRight(chosen, me, "use") && (
         <Select
           raised
