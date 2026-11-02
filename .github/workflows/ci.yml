@@ -20,7 +20,7 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
-      - name: Unit tests (Controller prototype)
+      - name: Unit tests (Protocol, Controller prototype)
         run: bun run test
       - name: Steiger (Controller prototype, Feature-Sliced Design)
         run: bun run check:prototype

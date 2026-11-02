@@ -2,9 +2,9 @@
   "name": "veeloe",
   "private": true,
   "packageManager": "bun@1.3.14",
-  "workspaces": ["controller-prototype"],
+  "workspaces": ["packages/*", "controller-prototype"],
   "scripts": {
-    "test": "cd controller-prototype && bun test",
+    "test": "cd packages && bun test && cd ../controller-prototype && bun test",
     "check": "bun run typecheck && bun run check:prototype",
     "typecheck": "tsc --noEmit && tsc --noEmit -p controller-prototype",
     "check:prototype": "cd controller-prototype && steiger ./src",

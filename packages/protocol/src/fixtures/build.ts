@@ -1,0 +1,101 @@
+import { z } from "zod";
+import { fromBase64url, toBase64url } from "../crypto/base64url";
+import { publicKeyOf, sign, verifySignature } from "../crypto/ed25519";
+import { EnvelopeSchema, type Route } from "../envelope/schema";
+import { MemorySeenSequences, verify } from "../envelope/verify";
+
+// The files every implementation checks itself against (Go included): the
+// header's JSON Schema and the test vectors. Rebuild them with
+// `bun run --cwd packages/protocol fixtures`.
+//
+// TEST-ONLY KEYS. Every secret below is a fixed, public seed. Never use one
+// outside a test.
+const TEST_SENDER = new Uint8Array(32).fill(0x11);
+const TEST_STRANGER = new Uint8Array(32).fill(0x22);
+
+const encoder = new TextEncoder();
+const keyOf = (secret: Uint8Array) => toBase64url(publicKeyOf(secret));
+const sigOver = (text: string, secret: Uint8Array) => toBase64url(sign(encoder.encode(text), secret));
+
+/** Who the receiver in the vectors is: what it hosts, and whose Controller it is. */
+const SELF = { destinations: ["agent-1"], member: "member-1" };
+
+export function isForSelf(self: typeof SELF) {
+  return (route: Route) => ("to" in route ? self.destinations.includes(route.to) : route.recipients.includes(self.member));
+}
+
+export function headerSchema() {
+  return z.toJSONSchema(EnvelopeSchema);
+}
+
+type EnvelopeCase = { name: string; seen?: Record<string, number>; header: Record<string, unknown>; signed: string; secret?: Uint8Array };
+
+function envelopeCases(): EnvelopeCase[] {
+  const route = { type: "task.message", to: "agent-1", task: "task-1", member: "member-1" };
+  const body = { text: "สวัสดี \"ครับ\" \\ bell:\u0007 tab:\t" };
+  const plain = JSON.stringify({ ...route, seq: 8, body });
+  const members = { type: "task.event", recipients: ["member-1", "member-2"], task: "task-1" };
+  const toMembers = JSON.stringify({ ...members, seq: 8, body });
+  return [
+    { name: "valid, with Thai text and characters that need escaping", header: route, signed: plain },
+    {
+      name: "valid, with any key order, whitespace and \\u escapes in the signed bytes",
+      header: route,
+      signed: '{ "body" : { "text": "\\u0e2a\\u0e27\\u0e31\\u0e2a\\u0e14\\u0e35" },\n  "seq": 3, "member": "member-1", "task": "task-1", "to": "agent-1", "type": "task.message" }',
+    },
+    {
+      name: "valid, with fields the receiver does not know in header and signed part",
+      header: { ...route, hint: "newer sender" },
+      signed: JSON.stringify({ ...route, seq: 4, body, priority: "high" }),
+    },
+    { name: "redirected to another destination", header: { ...route, to: "agent-2" }, signed: plain },
+    { name: "swapped originating Member", header: { ...route, member: "member-2" }, signed: plain },
+    { name: "changed message type", header: { ...route, type: "approval.answer" }, signed: plain },
+    { name: "one changed byte in the signed part", header: route, signed: plain, secret: TEST_SENDER, tamper: true } as EnvelopeCase,
+    { name: "untrusted sender key", header: route, signed: plain, secret: TEST_STRANGER },
+    { name: "replayed sequence number", seen: { [keyOf(TEST_SENDER)]: 8 }, header: route, signed: plain },
+    { name: "older sequence number", seen: { [keyOf(TEST_SENDER)]: 20 }, header: route, signed: plain },
+    { name: "gap in sequence numbers", seen: { [keyOf(TEST_SENDER)]: 2 }, header: route, signed: plain },
+    { name: "valid, to a recipient list", header: members, signed: toMembers },
+    { name: "changed recipient", header: { ...members, recipients: ["member-1", "member-3"] }, signed: toMembers },
+    { name: "changed order of recipients", header: { ...members, recipients: ["member-2", "member-1"] }, signed: toMembers },
+    { name: "both a destination and recipients", header: { ...route, recipients: ["member-1"] }, signed: JSON.stringify({ ...route, recipients: ["member-1"], seq: 8, body }) },
+    { name: "no route", header: { type: "task.event" }, signed: JSON.stringify({ type: "task.event", seq: 8, body }) },
+    { name: "empty recipient list", header: { type: "task.event", recipients: [] }, signed: JSON.stringify({ type: "task.event", recipients: [], seq: 8, body }) },
+    { name: "signed part that is not the expected shape", header: route, signed: JSON.stringify({ ...route, seq: 0, body }) },
+    { name: "signed for another destination, unchanged", header: { ...route, to: "agent-2" }, signed: JSON.stringify({ ...route, to: "agent-2", seq: 8, body }) },
+    { name: "recipient list leaves out this Member", header: { ...members, recipients: ["member-2"] }, signed: JSON.stringify({ ...members, recipients: ["member-2"], seq: 8, body }) },
+  ];
+}
+
+export function envelopeVectors() {
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds. `frame` is the envelope exactly as it travels.",
+    trusted: [keyOf(TEST_SENDER)],
+    self: SELF,
+    vectors: envelopeCases().map((c) => {
+      const secret = c.secret ?? TEST_SENDER;
+      const sig = sigOver(c.signed, secret);
+      const signed = (c as { tamper?: boolean }).tamper ? c.signed.replace("ดี", "ดิ") : c.signed;
+      const frame = JSON.stringify({ v: 1, ...c.header, from: keyOf(secret), signed, sig });
+      const seen = new MemorySeenSequences();
+      for (const [key, seq] of Object.entries(c.seen ?? {})) seen.record(key, seq);
+      const result = verify(JSON.parse(frame), new Set([keyOf(TEST_SENDER)]), isForSelf(SELF), seen);
+      return {
+        name: c.name,
+        seen: c.seen ?? {},
+        frame,
+        /** Ed25519 over the UTF-8 of `signed` with the key in `from`, nothing else. */
+        signatureValid: verifySignature(fromBase64url(sig), encoder.encode(signed), publicKeyOf(secret)),
+        expect: result.ok ? "ok" : result.reason,
+      };
+    }),
+  };
+}
+
+export const FIXTURES = {
+  "schema/envelope-header.schema.json": headerSchema,
+  "vectors/envelopes.json": envelopeVectors,
+};
+
+export const render = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;

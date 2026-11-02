@@ -1,0 +1,160 @@
+{
+  "note": "TEST-ONLY KEYS from fixed public seeds. `frame` is the envelope exactly as it travels.",
+  "trusted": [
+    "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+  ],
+  "self": {
+    "destinations": [
+      "agent-1"
+    ],
+    "member": "member-1"
+  },
+  "vectors": [
+    {
+      "name": "valid, with Thai text and characters that need escaping",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"01Z_nD6FVNBi9R_1LGencR2sTbPYvTlrlvLBxD0H6Gnz0neARQhRBROrlNNBXa_KY95WYm3Vw7vXfqIAz0LtCw\"}",
+      "signatureValid": true,
+      "expect": "ok"
+    },
+    {
+      "name": "valid, with any key order, whitespace and \\u escapes in the signed bytes",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{ \\\"body\\\" : { \\\"text\\\": \\\"\\\\u0e2a\\\\u0e27\\\\u0e31\\\\u0e2a\\\\u0e14\\\\u0e35\\\" },\\n  \\\"seq\\\": 3, \\\"member\\\": \\\"member-1\\\", \\\"task\\\": \\\"task-1\\\", \\\"to\\\": \\\"agent-1\\\", \\\"type\\\": \\\"task.message\\\" }\",\"sig\":\"jMS7gKN4eSuYgz-qIORUlKOKQBq5ymxec6TeXBOfI-3xy-bp35fqy2NEXe0gdBZXE4BbXea34oREkUeGBeakBA\"}",
+      "signatureValid": true,
+      "expect": "ok"
+    },
+    {
+      "name": "valid, with fields the receiver does not know in header and signed part",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"hint\":\"newer sender\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":4,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"},\\\"priority\\\":\\\"high\\\"}\",\"sig\":\"BVgKnpaGvJFrDpiis1aS5I1bZY_6nVkGXc8QHmnlCauLfXlFH-JPe5DZmxrH1svSNmH4UqSCTdae4VPk9Zq1BA\"}",
+      "signatureValid": true,
+      "expect": "ok"
+    },
+    {
+      "name": "redirected to another destination",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-2\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"01Z_nD6FVNBi9R_1LGencR2sTbPYvTlrlvLBxD0H6Gnz0neARQhRBROrlNNBXa_KY95WYm3Vw7vXfqIAz0LtCw\"}",
+      "signatureValid": true,
+      "expect": "header-mismatch"
+    },
+    {
+      "name": "swapped originating Member",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-2\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"01Z_nD6FVNBi9R_1LGencR2sTbPYvTlrlvLBxD0H6Gnz0neARQhRBROrlNNBXa_KY95WYm3Vw7vXfqIAz0LtCw\"}",
+      "signatureValid": true,
+      "expect": "header-mismatch"
+    },
+    {
+      "name": "changed message type",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"approval.answer\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"01Z_nD6FVNBi9R_1LGencR2sTbPYvTlrlvLBxD0H6Gnz0neARQhRBROrlNNBXa_KY95WYm3Vw7vXfqIAz0LtCw\"}",
+      "signatureValid": true,
+      "expect": "header-mismatch"
+    },
+    {
+      "name": "one changed byte in the signed part",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดิ \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"01Z_nD6FVNBi9R_1LGencR2sTbPYvTlrlvLBxD0H6Gnz0neARQhRBROrlNNBXa_KY95WYm3Vw7vXfqIAz0LtCw\"}",
+      "signatureValid": false,
+      "expect": "bad-signature"
+    },
+    {
+      "name": "untrusted sender key",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"oJql9HpnWYAv-VX43C0qFKXJnSO-l_hkEn_5ODRVpPA\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"O1EWCiZda2d0shWNpDnahNRAy5Hn0AxmCNyM4PMGQ2xv4N8KopmN39zNaQr3vjXXKSCbsIcv2_yOmvmA83kVCQ\"}",
+      "signatureValid": true,
+      "expect": "untrusted-key"
+    },
+    {
+      "name": "replayed sequence number",
+      "seen": {
+        "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc": 8
+      },
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"01Z_nD6FVNBi9R_1LGencR2sTbPYvTlrlvLBxD0H6Gnz0neARQhRBROrlNNBXa_KY95WYm3Vw7vXfqIAz0LtCw\"}",
+      "signatureValid": true,
+      "expect": "replayed"
+    },
+    {
+      "name": "older sequence number",
+      "seen": {
+        "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc": 20
+      },
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"01Z_nD6FVNBi9R_1LGencR2sTbPYvTlrlvLBxD0H6Gnz0neARQhRBROrlNNBXa_KY95WYm3Vw7vXfqIAz0LtCw\"}",
+      "signatureValid": true,
+      "expect": "replayed"
+    },
+    {
+      "name": "gap in sequence numbers",
+      "seen": {
+        "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc": 2
+      },
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"01Z_nD6FVNBi9R_1LGencR2sTbPYvTlrlvLBxD0H6Gnz0neARQhRBROrlNNBXa_KY95WYm3Vw7vXfqIAz0LtCw\"}",
+      "signatureValid": true,
+      "expect": "ok"
+    },
+    {
+      "name": "valid, to a recipient list",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.event\",\"recipients\":[\"member-1\",\"member-2\"],\"task\":\"task-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.event\\\",\\\"recipients\\\":[\\\"member-1\\\",\\\"member-2\\\"],\\\"task\\\":\\\"task-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"VwHVZ4lmuMWYZvoERmjbMR_A580Vunhy5gtd_oQ6eSyZQ1M6ZjF4LkGfuQZ2GnEfand4_ByIxQjjCrbd4YkfAg\"}",
+      "signatureValid": true,
+      "expect": "ok"
+    },
+    {
+      "name": "changed recipient",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.event\",\"recipients\":[\"member-1\",\"member-3\"],\"task\":\"task-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.event\\\",\\\"recipients\\\":[\\\"member-1\\\",\\\"member-2\\\"],\\\"task\\\":\\\"task-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"VwHVZ4lmuMWYZvoERmjbMR_A580Vunhy5gtd_oQ6eSyZQ1M6ZjF4LkGfuQZ2GnEfand4_ByIxQjjCrbd4YkfAg\"}",
+      "signatureValid": true,
+      "expect": "header-mismatch"
+    },
+    {
+      "name": "changed order of recipients",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.event\",\"recipients\":[\"member-2\",\"member-1\"],\"task\":\"task-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.event\\\",\\\"recipients\\\":[\\\"member-1\\\",\\\"member-2\\\"],\\\"task\\\":\\\"task-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"VwHVZ4lmuMWYZvoERmjbMR_A580Vunhy5gtd_oQ6eSyZQ1M6ZjF4LkGfuQZ2GnEfand4_ByIxQjjCrbd4YkfAg\"}",
+      "signatureValid": true,
+      "expect": "header-mismatch"
+    },
+    {
+      "name": "both a destination and recipients",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"recipients\":[\"member-1\"],\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"recipients\\\":[\\\"member-1\\\"],\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"JihI_55tALdQxh2Qu5bB7RiXlrGI_fJ55kAkxVUa5-QMf8dy8gVkHSf-_2l-KJ_ndHTENNPgBBL27Tl9WvK8CQ\"}",
+      "signatureValid": true,
+      "expect": "malformed"
+    },
+    {
+      "name": "no route",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.event\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.event\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"VDajuiE62TNtZsHfWMwtyk1zqCQh6mXAII3nC3cY0-N2wTfJmDHcfB8w0RtRy1KARjNLg74NRlPN8xG9EeVGBQ\"}",
+      "signatureValid": true,
+      "expect": "malformed"
+    },
+    {
+      "name": "empty recipient list",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.event\",\"recipients\":[],\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.event\\\",\\\"recipients\\\":[],\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"MpQX8Xdypmvpl8zY4JKX6yt9x2KUF_Mu_DhBMq2_7EstzYXlwHZPDGA7boEdw2xscEbCga9ShBE-nrirPTv6CQ\"}",
+      "signatureValid": true,
+      "expect": "malformed"
+    },
+    {
+      "name": "signed part that is not the expected shape",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-1\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-1\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":0,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"CvGFXzfZTuwkmcV7Ez_9UK6W332PxEmBFj4Q40cOsrOzjQucRdq7FxxDUHwz953RmQB5NkyDn328qbn8m7vMCw\"}",
+      "signatureValid": true,
+      "expect": "malformed"
+    },
+    {
+      "name": "signed for another destination, unchanged",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.message\",\"to\":\"agent-2\",\"task\":\"task-1\",\"member\":\"member-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.message\\\",\\\"to\\\":\\\"agent-2\\\",\\\"task\\\":\\\"task-1\\\",\\\"member\\\":\\\"member-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"cwZbvtll3ZdosG3_tkJml_hMd59Nd3UAQ5G6lFkmcofZFfhCyFgnKLY1FaHQrAG6dKPEZ2wzCYILBdQfDbDkBw\"}",
+      "signatureValid": true,
+      "expect": "not-addressed"
+    },
+    {
+      "name": "recipient list leaves out this Member",
+      "seen": {},
+      "frame": "{\"v\":1,\"type\":\"task.event\",\"recipients\":[\"member-2\"],\"task\":\"task-1\",\"from\":\"0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc\",\"signed\":\"{\\\"type\\\":\\\"task.event\\\",\\\"recipients\\\":[\\\"member-2\\\"],\\\"task\\\":\\\"task-1\\\",\\\"seq\\\":8,\\\"body\\\":{\\\"text\\\":\\\"สวัสดี \\\\\\\"ครับ\\\\\\\" \\\\\\\\ bell:\\\\u0007 tab:\\\\t\\\"}}\",\"sig\":\"g57N1KjLz48xN-3t6N0mqSztZ8S1a95wdjjra9l6LhHuFgAlG8TOdsExKpYrI6bgl6MkpNxd0UUFTsAE_1qkCQ\"}",
+      "signatureValid": true,
+      "expect": "not-addressed"
+    }
+  ]
+}

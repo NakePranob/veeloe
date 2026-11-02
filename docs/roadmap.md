@@ -15,7 +15,7 @@
 
 พิสูจน์ความเสี่ยงหลักก่อน คือการเซ็นคำสั่ง sandbox และ Approval เมื่อจบชุดนี้ ต้องสั่งงานจากมือถือ และอนุมัติคำสั่งที่รันใน sandbox บนเครื่องจริงได้
 
-- [ ] `protocol-envelope`: หัวซอง รายชื่อผู้รับ การเซ็น และรูปแบบ error code (ADR 0006, 0012, 0019, 0023, 0034, 0065)
+- [x] `protocol-envelope`: หัวซอง รายชื่อผู้รับ การเซ็น และรูปแบบ error code (ADR 0006, 0012, 0019, 0023, 0034, 0065)
 - [ ] `hub-relay`: Hub ส่งต่อซองโดยไม่เก็บเนื้อหา รอ `protocol-envelope` (ADR 0005, 0007, 0014)
 - [ ] `controller-foundation`: แอป local-first, กุญแจบนเครื่อง และระบบข้อความ TH กับ EN พร้อมตรวจ key ใน CI รอ `protocol-envelope` (ADR 0012, 0021, 0022, 0065)
 - [ ] `machine-pairing`: ผูก Machine กับ Controller ด้วย QR รอ `hub-relay`, `controller-foundation` (ADR 0013)
