@@ -1,0 +1,41 @@
+# ponytail: hand-written, not generated from annotations — cheap while the
+# endpoint count is low. Generated module/method stubs keep the index wired,
+# but request/response schemas still need to be completed with the code.
+# Switch to swaggo (comment-generated) if drift becomes a recurring problem.
+# multi-file: split by domain module (health/<domain>) + common/ for shared
+# pieces — this file is just the index. `generate module` and `generate method`
+# add path entries automatically.
+openapi: 3.0.3
+info:
+  title: hub API
+  version: "1.0.0"
+  description: Every resource uses UUID v7 as its id; list endpoints return the {data, limit, offset} envelope.
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /livez:
+    $ref: './health/health-livez.yaml'
+  /readyz:
+    $ref: './health/health-readyz.yaml'
+  # go-scaffold:paths
+
+components:
+  schemas:
+    PageEnvelope: { $ref: './common/schemas.yaml#/PageEnvelope' }
+    Error: { $ref: './common/schemas.yaml#/Error' }
+    # go-scaffold:schemas
+  responses:
+    ValidationError: { $ref: './common/responses.yaml#/ValidationError' }
+    NotFoundError: { $ref: './common/responses.yaml#/NotFoundError' }
+    ConflictError: { $ref: './common/responses.yaml#/ConflictError' }
+    UnprocessableEntityError: { $ref: './common/responses.yaml#/UnprocessableEntityError' }
+    UnauthorizedError: { $ref: './common/responses.yaml#/UnauthorizedError' }
+    ForbiddenError: { $ref: './common/responses.yaml#/ForbiddenError' }
+    TooManyRequestsError: { $ref: './common/responses.yaml#/TooManyRequestsError' }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "access token from POST /auth/login or /auth/register, sent as `Authorization: Bearer <token>`"

@@ -24,3 +24,43 @@ jobs:
         run: bun run test
       - name: Steiger (Controller prototype, Feature-Sliced Design)
         run: bun run check:prototype
+      - name: go-scaffold check (Hub)
+        run: bun run check:hub
+
+  hub:
+    name: Hub
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: hub/go.mod
+          cache-dependency-path: hub/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - name: gofmt
+        run: test -z "$(gofmt -l . | tee /dev/stderr)"
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          # keep in step with GOLANGCI_LINT_VERSION in hub/Makefile
+          version: v2.12.2
+          working-directory: hub
+      - run: go test -race ./...
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: hub/go.mod
+          cache-dependency-path: hub/go.sum
+      - run: bun install --frozen-lockfile
+      - run: bun run test:e2e

@@ -1,0 +1,410 @@
+# Agent Guidance: hub
+
+This project was scaffolded by `@nakedev/go-scaffold`. It is a modular
+monolith: each business capability lives in its own feature package, while
+`cmd/api/wiring.go` is the process composition root. This file is the working
+contract for AI coding agents and humans; keep generated structure and the
+runtime safety rules below intact.
+
+## Start every task here
+
+1. Read the relevant code, `docs/architect/`, tests, and this file before
+   editing. Search for an existing module or port before creating one.
+2. Check `git status --short --branch`. Work on a dedicated, non-protected
+   branch and preserve unrelated changes. Never edit a protected branch just
+   to make a quick fix.
+3. Classify the request: generated surface, business behavior, schema, auth /
+   security, infrastructure, or documentation. Ask the owner before changing
+   schema/migrations, authentication or security behavior, architecture,
+   dependencies, or deployment configuration when the project workflow
+   requires approval.
+4. Make the smallest complete change, add a focused test, and report exact
+   commands and output. Do not claim a check passed if it was skipped or
+   failed.
+
+## Architecture contract
+
+This scaffold combines modular boundaries with Hexagonal Architecture,
+domain-oriented design, and an optional CQRS style. They are compatible:
+apply them inside each feature instead of creating a second architecture or
+an empty layer for every noun.
+
+- **Inbound adapter:** `adapters/inbound/http/dto.go` owns JSON/binding request
+  DTOs, response DTOs, and mapping at the HTTP boundary; `handler.go` parses
+  HTTP and calls the relevant application service or command/query port.
+  Another transport gets its own folder, such as `adapters/inbound/ws/`, and
+  the same inbound rules.
+- **Application boundary:** `application/service.go` (or
+  `application/commands.go`/`application/queries.go` when
+  the module uses `--cqrs`) orchestrates use cases. It owns
+  workflow decisions and depends on narrow consumer-owned ports.
+- **Domain:** entities, value rules, and invariants stay independent of Gin,
+  GORM, Redis, HTTP status codes, and environment variables.
+- **Outbound adapter:** `adapters/outbound/postgres/repository.go`, token
+  stores, mail/queue clients,
+  and other platform integrations translate a port into persistence or I/O.
+- **Composition:** the feature-local `composition.go` constructs its
+  repository, application boundary, and handler. `internal/composition/` owns
+  process-level cross-feature adapters. `cmd/api/wiring.go` selects shared
+  infrastructure, supplies those adapters and security dependencies, and
+  registers feature routes; it does not contain cross-feature adapter logic.
+
+The project defaults new modules to `service` application
+handling and a `none` surface. The `generate module` wizard
+starts there through the named Lean/CRUD/CQRS profiles; `Advanced` exposes the
+two axes for unusual combinations. `--profile` is the clear per-module
+override, while `--cqrs`/`--full` remain supported for existing scripts, and
+`go-scaffold config` changes defaults for future modules only. A module that
+owns no table (a WebSocket relay, a proxy) uses `--surface none`: no repository
+port, Postgres adapter, DTO seams, or migration, and `generate method` does not
+apply to it.
+
+Use CQRS when a feature has genuinely different command and query models,
+consistency needs, or scaling/read-shape pressure: commands mutate state and
+queries read state. For simple CRUD, one application service and one port are
+clearer. Do not introduce a broker, a second database, or a command/query
+folder only to satisfy a label.
+
+Keep feature boundaries real. Do not import another feature's private model,
+repository, or handler. Expose a small public application port, call a
+documented feature API, or use an explicit event when cross-feature behavior
+is required. Put synchronous adapters in `internal/composition/`, import only
+the other feature's public package root, and keep one-way dependencies. Keep
+dependency direction flowing inward:
+
+```text
+handler -> application/use case -> domain + ports -> adapters
+                                  ^                 |
+                                  +--- composition -+
+```
+
+The generated CRUD shape is an intentionally incremental starter. It gives
+each module a testable application/inbound seam and a feature-local
+composition root; it does not decide the final aggregate, fields, invariants,
+or split between commands and queries for the product.
+
+For a CQRS module, `application/commands.go` and
+`application/queries.go` are the primary application boundary and
+`composition.go` passes separate command and query handlers to the inbound
+adapter's `NewHandler`. A CQRS module must not also grow an
+`application/service.go` facade. Service and CQRS may coexist across modules;
+they are mutually exclusive inside one module.
+
+Auth and RBAC are security-sensitive modules, but they use the same canonical
+split boundary as every other feature. Auth owns user application use cases
+and ports; RBAC owns role policy and authorization adapters. Their public
+module roots compose those pieces, and one canonical implementation tree is
+generated.
+
+`Authz.Require` matches one exact permission code and implies nothing, so a
+screen guarded by `<resource>:read` stays shut to a role holding only
+`<resource>:manage`. `SetPermissions` closes that on the way in instead: any
+code that is not a `:read` is stored with its own resource's `:read` beside it,
+when that read exists in the catalogue. Grant a permission and its read comes
+with it; what a role holds is still exactly the rows stored for it.
+
+## Hard rule: use the CLI for generated surface
+
+If you are creating a **new domain** (`internal/app/<name>/` with its own
+domain/application/ports/adapters boundary), or adding a **new endpoint** to
+an existing domain, stop and run the CLI:
+
+```bash
+go-scaffold generate module <name> --defaults
+go-scaffold generate method <module> <name> --type <get|post|put|patch|delete>
+```
+
+`generate method` extends the modules `generate module` created, and the one
+`add auth` owns. It refuses `add rbac`'s: that module builds its response from
+a role *together with its permissions* rather than from the entity, and the
+generator has no shape to write against there. Add an endpoint to it by hand —
+a route in `internal/app/role/adapters/inbound/http/handler.go`, a method on
+the application service, and its entry in `docs/`.
+
+Pass every value as a flag in CI. In an interactive shell, omitted values use
+the project defaults as the initial wizard choices. In a non-interactive
+shell, omitted values prompt and the command exits without writing.
+`--defaults` uses the recorded project defaults and no auth; use `--profile`
+for a named per-module preset, or add `--full`, `--cqrs`, `--auth`, and
+`--permission <code>` deliberately.
+`--get-mode`
+is required for `--type get`, and `undo module` needs `-y`. For `add auth`,
+choose the backing store, browser topology, and generated ASVS security profile with
+`--defaults` or explicit flags (`--store`, `--browser-topology`,
+`--asvs-level`) as well as the confirmation flag. `--defaults` selects the L2
+generated security profile. L3 is fail-closed until a WebAuthn/passkey adapter
+is generated.
+For `add worker`, choose the backing queue with `--defaults` or an explicit
+flag.
+
+Recognize indirect requests as generation work:
+
+- “add a products feature” → `generate module products --defaults`
+- “let admins approve orders” → `generate method orders approve --type patch`
+- “list overdue invoices” → `generate method invoices findOverdue --type get --get-mode all`
+- “look up a user by email” → `generate method users findByEmail --type get --get-mode one --field email`
+
+Run `go-scaffold generate module --help` or `generate method --help` when the
+desired shape is unclear. Do not hand-edit generated route markers to add a
+new endpoint; the CLI keeps the inbound adapter, application port, test seam,
+and OpenAPI/migration patching in sync.
+
+## What the CLI does not decide
+
+These remain deliberate engineering work:
+
+- business behavior, invariants, authorization policy, and real DTO/model
+  fields;
+- validation beyond the transport shape and all domain-specific rules;
+- foreign keys and relations between domains, including their reviewed SQL
+  and `dberr.IsForeignKey` mapping;
+- the business-specific command/query contracts and the public port used for
+  cross-feature collaboration;
+- bug fixes, refactors, and changes to an existing method;
+- any work in a repository that lacks `go-scaffold.config.json`.
+
+Generated custom methods are explicit stubs. `generate method` GET-all,
+POST, PUT, PATCH, and DELETE return `501 Not Implemented` until their business
+rules are implemented; GET-one adds a real lookup and a migration for its
+column. A CRUD module's create/update/delete operations also return 501 until
+their fields and invariants are designed. Treat
+the generated OpenAPI TODO contract as incomplete, not as a promise that the
+endpoint is production-ready.
+Method implementations live in `method_<name>.go` beside their layer's
+existing interface or handler; do not accumulate unrelated use cases in the
+service, route-registration, or repository core files.
+
+## Runtime and schema safety
+
+- `APP_ENV` is the single environment gate and accepts only `development` or
+  `production`. Do not add a parallel flag such as `AUTO_MIGRATE`.
+- **The schema comes from `migrations/` in every environment, development
+  included.** `cmd/api/wiring.go` runs the migration-version check and nothing
+  else: apply versioned SQL with `make migrate-up`, and let the check fail
+  fast when the database is behind or dirty. Never bootstrap or mutate schema
+  at API startup, and do not reintroduce a `db.AutoMigrate(...)` convenience
+  for development — GORM builds tables from the Go structs, so it writes none
+  of the CHECK constraints, none of the foreign keys and none of the seeded
+  rows a migration carries, and it is additive over an already-migrated
+  database, so a column a model has and a migration does not shows up on one
+  developer's machine and nowhere else.
+- Any schema change is a reviewed pair of versioned files in `migrations/`.
+  Use `go-scaffold generate migration <name>` for changes outside a new
+  module, write both directions, and test them against a disposable database.
+  Write the SQL first and the Go struct second: the SQL is what exists, the
+  struct is Go's view of it, and doing it the other way round feels finished
+  while the database still has nothing.
+- **A destructive change takes two deploys, never one.** During a rolling
+  deploy the old binary and the new one serve traffic at the same time, so a
+  migration has to be readable by the version of the code still running.
+  `CheckMigrationVersion` is built for that order — a database ahead of the
+  binary is a warning, behind it is fatal — which only works if migrations go
+  out first and stay backward compatible.
+
+  | change | deploys |
+  |---|---|
+  | add a nullable column, add a table, add an index | 1 |
+  | add `NOT NULL` with a `DEFAULT` | 1 — but it rewrites the table, so check its size first |
+  | rename a column | **2** |
+  | drop a column or a table | **2** |
+  | change a column's type | **2** |
+
+  The two are *expand* then *contract*: add the new shape and have the code
+  write both and prefer the new one; deploy that everywhere; only then drop the
+  old shape. `DROP COLUMN` in one round pulls the floor out from under the pods
+  still serving requests.
+- `make migrate-verify` (up → down -all → up) runs in CI and is the only thing
+  that catches a `down.sql` which has quietly stopped reversing its `up.sql`.
+  Without it that is found during a rollback, which is the worst moment to find
+  out. Never run it against a database whose data matters — `down -all` means
+  it.
+- Keep `*sql.DB`, Redis, queue, mail, and other external resources owned by
+  their composition root. Close them on every exit path and preserve the
+  signal-driven graceful shutdown; do not call `os.Exit` from a goroutine or
+  hide a startup error.
+- Keep liveness and readiness semantics intact. Readiness may check external
+  dependencies; liveness must not turn a transient dependency failure into a
+  process restart.
+
+## Auth and error boundaries
+
+The optional `asvs` config records the generated OWASP ASVS 5.0.0 security
+profile, not a compliance result. `docs/security/asvs-auth.md` lists generated
+controls and remaining deployment evidence. Review the complete deployed
+application before claiming a level.
+
+Treat auth and security changes as high-risk and get the required owner
+approval before changing their contract.
+
+- Never log passwords, raw access/refresh/reset/verification tokens, JWT
+  secrets, OAuth client secrets, or authorization headers.
+- Auth rate-limit middleware fails closed with `503` and `Retry-After` when a
+  shared limiter store is unavailable. Do not turn a Redis/limiter error into
+  an allowed authentication request; the Postgres-store profile remains
+  process-local and needs an explicit distributed-abuse policy when scaled.
+- Refresh rotation is an atomic consume: Postgres uses one SQL unit and Redis
+  uses one Lua operation, including active-session cleanup and the reuse
+  tombstone. Its inactivity expiry may move on rotation, but its persisted
+  absolute expiry never moves. Never replace it with a read-then-delete
+  sequence.
+- Authenticated users can inspect active refresh sessions through
+  `GET /users/me/sessions` and revoke one with
+  `DELETE /users/me/sessions/:id`. Session IDs remain stable through refresh
+  rotation; responses expose only safe parsed device metadata and lifecycle
+  timestamps, never raw User-Agent/IP values, refresh tokens, or token hashes.
+  The current access token carries the session ID as `sid`; every protected
+  route validates that the refresh session is still active. Logout, session
+  revoke, password change, and password reset therefore invalidate existing
+  access tokens immediately. If the token store cannot be checked, fail closed.
+  Secure cookie mode reads only the `__Host-` names; legacy unprefixed names
+  are development-only compatibility names and must never be accepted in
+  production.
+- Authenticated users can manage login identities through
+  `GET /users/me/identities`, `POST /users/me/identities/local`, and
+  `POST /users/me/identities/:provider/link`,
+  `POST /users/me/identities/:provider/link/exchange`, and
+  `DELETE /users/me/identities/:provider`. The link transaction is bound to
+  the current user as well as provider/server-bound-state/PKCE/nonce; the state
+  is bound to an HttpOnly browser cookie and it can never create a
+  session or silently move a provider account between users. Return only safe
+  provider metadata, allow at most one identity per provider per user, and
+  refuse to unlink the last remaining login method.
+- Auth persistence keeps account profile, email addresses, password
+  credentials, and external provider identities in separate tables. Resolve an
+  external login by `(issuer, subject)`; never use an email address as the
+  provider identity key. Adding a password to a Google/OIDC account must write
+  a password credential for that existing user.
+- Password reset and email verification consume a one-time token in the same
+  retry-safe transaction as the user/identity update. A failed post-commit
+  session revocation must not make a successful reset impossible to retry.
+- `cmd/auth-cleanup` is the explicit maintenance boundary for expired auth
+  rows. Schedule `make auth-cleanup` (or the command directly) from cron or a
+  CronJob; do not add an API-process ticker. The command is idempotent and
+  request correctness already enforces token/challenge expiry.
+- The generated auth implementation is canonical: use cases live in
+  `application/`, domain rules in `domain/`, contracts in `ports/`, and
+  provider/HTTP/Postgres details in their adapters. Do not import Gin, provider
+  SDKs, or persistence models into new application use cases; keep the
+  token/OAuth/MFA tests as the security gate.
+- Browser provider exchange consumes a one-time server-side transaction bound
+  to provider, server-generated state, an HttpOnly browser cookie, S256 PKCE
+  challenge, and OIDC nonce. Google ID tokens
+  must be signature, issuer, audience/azp, time-claim, nonce, and subject
+  validated before identity resolution. Token responses use
+  `Cache-Control: no-store` and `Pragma: no-cache`; SameSite=None also needs an
+  exact allowed Origin guard in addition to CORS.
+- Sensitive account operations use a short-lived reauthentication proof bound
+  to the bearer user; password changes revoke all refresh sessions before the
+  password write, and session,
+  MFA, and identity mutations require that proof.
+
+MFA has an operator capability switch and a separate per-user enrollment:
+
+- The generated password policy always includes a small readable development
+  baseline. Production must also set `AUTH_COMMON_PASSWORDS_FILE` to an
+  operator-owned newline-delimited corpus with at least 3,000 unique entries
+  that match the application's password policy; L2 additionally requires
+  `AUTH_CONTEXT_PASSWORDS_FILE` for context-derived password entries and
+  `AUTH_BREACHED_PASSWORDS_FILE`.
+
+- `AUTH_MFA_ENABLED=false` is the default. When enabled, the composition root
+  must validate `MFA_ENCRYPTION_KEY` as a base64-encoded 32-byte key before
+  serving traffic. Keep the issuer, challenge TTL, TOTP window, and recovery
+  code count explicit and within their safety limits.
+- Authenticated users manage enrollment through `GET /users/me/mfa`,
+  `POST /users/me/mfa/setup`, `POST /users/me/mfa/confirm`, and
+  `POST /users/me/mfa/disable` (the last requires the current TOTP code).
+  Setup material is pending-only; recovery codes are returned once. A lost
+  factor can be replaced through `POST /users/me/mfa/recover`, which requires
+  an authenticated session plus one unused recovery code, revokes refresh
+  sessions, and returns a setup-only enrollment token. The caller must finish
+  the normal setup/confirm flow before receiving a new application session.
+- Password login and provider exchange may return a pre-session
+  `{ "mfa_required": true, "challenge": "..." }`. Do not issue an access
+  token or refresh cookie until `POST /auth/mfa/verify` succeeds. Challenges
+  are hashed, short-lived, and one-use; failed verification consumes the
+  challenge and counts against a durable per-user throttle before another
+  challenge can be created. Recovery codes are hashed, atomic one-use login
+  factors. Recovery codes are accepted for the explicit factor-replacement
+  flow only, never for ordinary MFA disable.
+- MFA data is durable in Postgres for both refresh-token store choices. The
+  `create_mfa` migration must be applied before production and covered by
+  real-store/concurrency tests.
+
+Keep auth construction explicit: `NewService(deps Dependencies, cfg
+AuthConfig)`. `Dependencies` owns narrow ports such as `MFA`, `Providers`,
+`RefreshTokens`, `RecoveryTokens`, `Mailer`, `Roles`, and `Clock`; `AuthConfig`
+owns JWT, OAuth, recovery, and `MFASettings` policy. Do not pass the generated
+shared config package into the application service or replace these contracts
+with a positional constructor.
+- Return a stable, generic client error for unexpected failures. Wrap causes
+  with `%w` or pass them to `apperror.NewInternal(cause)` so middleware can
+  log the server-side cause with `request_id`; production responses must not
+  expose that cause or internal field details.
+
+## Verification workflow
+
+After changing Go templates or generated Go code, run the checks that match
+the change (from the generated project root):
+
+```bash
+gofmt -w <changed-go-files>
+go test ./...
+go test -race ./...       # required for concurrency/auth/token changes
+go vet ./...
+golangci-lint run
+```
+
+For schema/repository/auth adapter work, run the real-store tests with a
+migrated disposable PostgreSQL/Redis instance and `REQUIRE_TEST_DB=true` or
+`REQUIRE_TEST_REDIS=true`; a skipped integration test is not evidence of
+correctness. MFA state still requires PostgreSQL even when refresh tokens use
+Redis. When routes or OpenAPI templates change, inspect the updated
+`docs/openapi.yaml` and run the configured OpenAPI linter.
+
+When a River worker is installed, run `make river-migrate-test` in addition to
+`make migrate-up-test`. The queue integration test must enqueue a real job and
+observe the worker handler; a worker process that merely boots is not enough.
+
+Only in the `go-scaffold` source repository, run the generator project's
+`pnpm run verify` for CLI/template changes, then generate fresh sample projects
+to inspect the output. A generated Go project does not contain the generator's
+`package.json` or pnpm scripts; from that project run the Go checks above and
+use the installed/local CLI for generation checks.
+
+At each checkpoint record: branch and base, files changed, generated output
+shape, tests and their exact result, and any limitation. Before handoff,
+review `git diff --check`, `git diff`, and `git status --short`; leave unrelated
+work untouched.
+
+## Command quick reference
+
+- `go-scaffold generate module <name> --defaults` — minimal domain entity,
+  errors, ports, application boundary, inbound/outbound adapters,
+  feature-local `composition.go`, root route registration, and versioned module
+  migrations. Add endpoints with
+  `generate method`, use `--profile crud` for a CRUD skeleton, or
+  `--profile cqrs` for separate command/query application handlers.
+- `go-scaffold generate method <module> <name> --type <get|post|put|patch|delete> [--get-mode all|one] [--field <name>]` — patches an existing
+  module's inbound handler, application service or command/query handler and,
+  for a GET-one lookup, its repository port/adapter plus test seam. It never
+  overwrites a same-named method.
+- `go-scaffold generate migration <name>` — reserves a timestamped SQL
+  migration pair for a reviewed schema change.
+- `go-scaffold config` — interactively change future module defaults;
+  `config show` prints the resolved manifest and `config validate` checks it
+  without writing.
+- `go-scaffold check` — validates every module's split hexagonal layout,
+  forbidden layer dependencies, sibling imports, and the exclusive
+  service-versus-CQRS contract. Every folder under `adapters/inbound/` and
+  `adapters/outbound/` follows its side's rules; a folder outside the known
+  layers is reported as a warning.
+- `go-scaffold undo module <name> -y` — removes an unshipped generated module,
+  its migration, and its wiring. It refuses once those migrations are
+  committed or applied; use a reviewed drop migration for a shipped domain.
+- All routes share the project-wide prefix chosen at `create` time:
+  `(no prefix)`. There is no
+  per-domain versioning.
+
+Read `docs/architect/architecture.md`, `docs/architect/patterns.md`, and
+`docs/architect/techstack.md` for the rationale behind these constraints.

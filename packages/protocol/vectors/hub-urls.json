@@ -1,0 +1,48 @@
+{
+  "vectors": [
+    {
+      "input": "wss://hub.example.com",
+      "normalized": "wss://hub.example.com"
+    },
+    {
+      "input": "WSS://Hub.Example.COM/",
+      "normalized": "wss://hub.example.com"
+    },
+    {
+      "input": "wss://hub.example.com:443",
+      "normalized": "wss://hub.example.com"
+    },
+    {
+      "input": "wss://hub.example.com:8443",
+      "normalized": "wss://hub.example.com:8443"
+    },
+    {
+      "input": "ws://127.0.0.1:18080/",
+      "normalized": "ws://127.0.0.1:18080"
+    },
+    {
+      "input": "ws://localhost:80",
+      "normalized": "ws://localhost"
+    },
+    {
+      "input": "https://hub.example.com",
+      "error": true
+    },
+    {
+      "input": "wss://hub.example.com/connect",
+      "error": true
+    },
+    {
+      "input": "wss://hub.example.com?x=1",
+      "error": true
+    },
+    {
+      "input": "wss://user:pass@hub.example.com",
+      "error": true
+    },
+    {
+      "input": "wss://hub.example.com#frag",
+      "error": true
+    }
+  ]
+}

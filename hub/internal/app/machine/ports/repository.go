@@ -1,0 +1,62 @@
+// Package ports declares the dependencies owned by the machine application.
+// Adapters implement these interfaces; application code never imports a
+// database driver.
+package ports
+
+import (
+	"context"
+
+	"hub/internal/app/machine/domain"
+
+	"github.com/google/uuid"
+)
+
+// ListFilter is the whole question the list endpoint asks. The zero value is
+// "the first page of everything", so a caller only sets what it narrows by.
+//
+// Put this module's own filters here as fields rather than as arguments: one
+// struct travels handler -> application -> repository, so adding a filter
+// later is a field and not a fourth parameter on three signatures.
+type ListFilter struct {
+	// Search is ?q= as shared/pagination parsed it, empty when the caller
+	// sent none.
+	Search string
+	// Sort is ?sort= and Desc is ?order=desc, both as shared/pagination parsed
+	// them. Which column names are accepted is the repository's to say — see
+	// the dbq.Sort beside its FindAll.
+	Sort   string
+	Desc   bool
+	Limit  int
+	Offset int
+}
+
+// Repository is the complete persistence port for service-style modules.
+type Repository interface {
+	Create(context.Context, *domain.Machine) error
+	// FindAll answers one page and the total the filter matched, which is what
+	// a client needs to draw "page 3 of 12".
+	FindAll(context.Context, ListFilter) ([]domain.Machine, int64, error)
+	FindByID(context.Context, uuid.UUID) (*domain.Machine, error)
+	Update(context.Context, *domain.Machine) error
+	Delete(context.Context, uuid.UUID) error
+	// FindByPublicKey answers the Machine that holds this Ed25519 public key,
+	// or domain.ErrNotFound.
+	FindByPublicKey(context.Context, []byte) (*domain.Machine, error)
+	// go-scaffold:repository-interface
+}
+
+// CommandRepository and QueryRepository keep CQRS handlers honest: a write
+// use case cannot grow a read dependency by accident, and vice versa.
+type CommandRepository interface {
+	Create(context.Context, *domain.Machine) error
+	FindByID(context.Context, uuid.UUID) (*domain.Machine, error)
+	Update(context.Context, *domain.Machine) error
+	Delete(context.Context, uuid.UUID) error
+	// go-scaffold:command-repository-interface
+}
+
+type QueryRepository interface {
+	FindAll(context.Context, ListFilter) ([]domain.Machine, int64, error)
+	FindByID(context.Context, uuid.UUID) (*domain.Machine, error)
+	// go-scaffold:query-repository-interface
+}

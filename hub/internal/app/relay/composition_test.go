@@ -1,0 +1,229 @@
+package relay
+
+import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"encoding/base64"
+	"encoding/json"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	httpadapter "hub/internal/app/relay/adapters/inbound/http"
+	"hub/internal/app/relay/adapters/outbound/memory"
+	"hub/internal/app/relay/application"
+	"hub/internal/app/relay/ports"
+	"hub/internal/shared/protocol"
+
+	"github.com/coder/websocket"
+	"github.com/gin-gonic/gin"
+)
+
+// TEST-ONLY KEY: the seed packages/protocol's vectors use for TEST_MACHINE.
+var testMachine = ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x33}, 32))
+
+const hubURL = "ws://hub.test"
+
+// The clients the tests connect as. Another Workspace has a Machine and a
+// Member with the same ids, to show ids alone never cross Workspaces.
+var (
+	testController  = ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x44}, 32))
+	testController2 = ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x45}, 32))
+	otherMachine    = ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x55}, 32))
+	otherController = ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x56}, 32))
+	onlyMachine     = ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x57}, 32))
+)
+
+func keyText(k ed25519.PrivateKey) string {
+	return base64.RawURLEncoding.EncodeToString(k.Public().(ed25519.PublicKey))
+}
+
+type keys struct{}
+
+func (keys) ByKey(_ context.Context, key []byte) (ports.Identity, bool, error) {
+	known := map[string]ports.Identity{
+		keyText(testMachine):     {Kind: ports.KindMachine, ID: "machine-1", Workspace: "w-1"},
+		keyText(testController):  {Kind: ports.KindController, ID: "member-1", Workspace: "w-1"},
+		keyText(testController2): {Kind: ports.KindController, ID: "member-1", Workspace: "w-1"},
+		keyText(otherMachine):    {Kind: ports.KindMachine, ID: "machine-1", Workspace: "w-2"},
+		keyText(otherController): {Kind: ports.KindController, ID: "member-1", Workspace: "w-2"},
+		keyText(onlyMachine):     {Kind: ports.KindMachine, ID: "machine-only-there", Workspace: "w-2"},
+	}
+	text := base64.RawURLEncoding.EncodeToString(key)
+	who, ok := known[text]
+	who.Key = text
+	return who, ok, nil
+}
+
+// startHub runs the relay behind an http.Server with deliberately short
+// timeouts, so a test also sees whether they leak onto upgraded connections.
+func startHub(t *testing.T, heartbeat time.Duration) (string, *application.Service) {
+	t.Helper()
+	return startHubWith(t, Config{HeartbeatInterval: heartbeat})
+}
+
+func startHubWith(t *testing.T, cfg Config) (string, *application.Service) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	svc := application.NewService(keys{}, memory.NewPresence())
+	r := gin.New()
+	cfg.PublicURL, cfg.HandshakeTimeout = hubURL, time.Second
+	httpadapter.NewHandler(svc, cfg).Register(r)
+	srv := httptest.NewUnstartedServer(r)
+	srv.Config.ReadTimeout = 300 * time.Millisecond
+	srv.Config.WriteTimeout = 300 * time.Millisecond
+	srv.Start()
+	t.Cleanup(srv.Close)
+	return "ws" + strings.TrimPrefix(srv.URL, "http") + "/connect", svc
+}
+
+// connect dials and completes the handshake as testMachine.
+func connect(t *testing.T, url string) *websocket.Conn {
+	t.Helper()
+	conn, ready := connectAs(t, url, testMachine)
+	if ready.Machine != "machine-1" || ready.Member != "" {
+		t.Fatalf("want hub.ready for machine-1, got %+v", ready)
+	}
+	return conn
+}
+
+func connectAs(t *testing.T, url string, key ed25519.PrivateKey) (*websocket.Conn, protocol.Ready) {
+	t.Helper()
+	ctx := context.Background()
+	conn, _, err := websocket.Dial(ctx, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn.SetReadLimit(4 << 20)
+	t.Cleanup(func() { _ = conn.CloseNow() })
+	_, data, err := conn.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c protocol.Challenge
+	_ = json.Unmarshal(data, &c)
+	answer, _ := json.Marshal(protocol.Auth{
+		Type: "hub.auth",
+		Key:  keyText(key),
+		Sig:  base64.RawURLEncoding.EncodeToString(ed25519.Sign(key, protocol.HandshakeBytes(hubURL, c.Nonce))),
+	})
+	if err := conn.Write(ctx, websocket.MessageText, answer); err != nil {
+		t.Fatal(err)
+	}
+	_, data, err = conn.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ready protocol.Ready
+	if err := json.Unmarshal(data, &ready); err != nil || ready.Type != "hub.ready" {
+		t.Fatalf("want hub.ready, got %s", data)
+	}
+	return conn, ready
+}
+
+// keepReading answers the Hub's pings (coder/websocket does so only while
+// reading) and reports how the connection ended.
+func keepReading(conn *websocket.Conn) <-chan error {
+	done := make(chan error, 1)
+	go func() {
+		for {
+			if _, _, err := conn.Read(context.Background()); err != nil {
+				done <- err
+				return
+			}
+		}
+	}()
+	return done
+}
+
+func eventually(t *testing.T, within time.Duration, cond func() bool, what string) {
+	t.Helper()
+	deadline := time.Now().Add(within)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("not %s within %s", what, within)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestRelay_CleanDisconnectGoesOfflineAtOnce(t *testing.T) {
+	url, svc := startHub(t, time.Second)
+	conn := connect(t, url)
+	eventually(t, time.Second, func() bool { return svc.Online("w-1", "machine-1") }, "online")
+
+	_ = conn.Close(websocket.StatusNormalClosure, "bye")
+	eventually(t, 200*time.Millisecond, func() bool { return !svc.Online("w-1", "machine-1") }, "offline")
+}
+
+func TestRelay_ConnectionThatStopsAnsweringGoesOfflineWithinOneInterval(t *testing.T) {
+	const interval = 200 * time.Millisecond
+	url, svc := startHub(t, interval)
+	connect(t, url) // and never read again, so no pong goes back
+	eventually(t, time.Second, func() bool { return svc.Online("w-1", "machine-1") }, "online")
+
+	start := time.Now()
+	eventually(t, 2*interval, func() bool { return !svc.Online("w-1", "machine-1") }, "offline")
+	if took := time.Since(start); took > interval+50*time.Millisecond {
+		t.Fatalf("went offline after %s, want within one interval (%s)", took, interval)
+	}
+}
+
+func TestRelay_NewerConnectionReplacesTheOlder(t *testing.T) {
+	url, svc := startHub(t, time.Second)
+	older := connect(t, url)
+	olderEnded := keepReading(older)
+
+	connect(t, url)
+	select {
+	case err := <-olderEnded:
+		if code := websocket.CloseStatus(err); code != protocol.CloseReplaced {
+			t.Fatalf("older connection: want close %d, got %d (%v)", protocol.CloseReplaced, code, err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("older connection was not closed")
+	}
+	time.Sleep(50 * time.Millisecond) // let the older connection's cleanup run
+	if !svc.Online("w-1", "machine-1") {
+		t.Fatal("the Machine must stay online on the newer connection")
+	}
+}
+
+func TestRelay_UnknownFrameAfterAuthIsSkipped(t *testing.T) {
+	url, svc := startHub(t, 200*time.Millisecond)
+	conn := connect(t, url)
+	ended := keepReading(conn)
+	if err := conn.Write(context.Background(), websocket.MessageText, []byte(`{"type":"runtime.something-new"}`)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-ended:
+		t.Fatalf("connection closed after an unknown frame: %v", err)
+	case <-time.After(500 * time.Millisecond):
+	}
+	if !svc.Online("w-1", "machine-1") {
+		t.Fatal("still online after an unknown frame")
+	}
+}
+
+// startHub sets a 300ms server ReadTimeout and WriteTimeout. A connection must
+// outlive both, or every Machine would drop as soon as the timeouts pass.
+func TestRelay_ConnectionOutlivesTheServerTimeouts(t *testing.T) {
+	url, svc := startHub(t, 200*time.Millisecond)
+	conn := connect(t, url)
+	ended := keepReading(conn)
+
+	select {
+	case err := <-ended:
+		t.Fatalf("connection dropped: %v", err)
+	case <-time.After(time.Second):
+	}
+	if err := conn.Write(context.Background(), websocket.MessageText, []byte(`{"type":"still.here"}`)); err != nil {
+		t.Fatalf("write after the server timeouts: %v", err)
+	}
+	if !svc.Online("w-1", "machine-1") {
+		t.Fatal("still online after the server timeouts")
+	}
+}

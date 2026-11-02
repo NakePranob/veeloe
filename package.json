@@ -2,15 +2,18 @@
   "name": "veeloe",
   "private": true,
   "packageManager": "bun@1.3.14",
-  "workspaces": ["packages/*", "controller-prototype"],
+  "workspaces": ["packages/*", "controller-prototype", "e2e"],
   "scripts": {
     "test": "cd packages && bun test && cd ../controller-prototype && bun test",
-    "check": "bun run typecheck && bun run check:prototype",
+    "test:e2e": "cd e2e && bun test",
+    "check": "bun run typecheck && bun run check:prototype && bun run check:hub",
     "typecheck": "tsc --noEmit && tsc --noEmit -p controller-prototype",
     "check:prototype": "cd controller-prototype && steiger ./src",
+    "check:hub": "cd hub && go-scaffold check",
     "prototype": "cd controller-prototype && bunx expo start --web"
   },
   "devDependencies": {
+    "@nakedev/go-scaffold": "0.14.0",
     "@types/bun": "^1.3.14",
     "typescript": "~6.0.3"
   }

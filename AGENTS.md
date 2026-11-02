@@ -1,8 +1,8 @@
 # Agent Guidance: veeloe
 
 This is Veeloe (`veeloe` on GitHub), under AGPL-3.0 (`LICENSE`). The design is
-here: the Runtime, Hub and Controller are specified in `docs/adr/` but have no
-code yet, the Protocol is being built in `packages/protocol`, and `controller-prototype/` is a throwaway UI prototype on
+here: the Runtime and Controller are specified in `docs/adr/` but have no code yet,
+the Protocol is being built in `packages/protocol` and the Hub in `hub/`, and `controller-prototype/` is a throwaway UI prototype on
 Demo data. It is **public** — everything pushed here, a commit message or a PR
 description included, is public the moment it lands. Never commit a secret: the Runtime release signing
 key, push and Expo credentials, billing keys and the hosted Hub's env stay in
@@ -33,8 +33,10 @@ bun run test
 ```
 
 `check` runs the type check and Steiger on the Controller prototype (ADR 0022).
-`check` also type-checks `packages/`. `test` runs the unit tests of `packages/`
-and the Controller prototype. CI runs both.
+`check` also type-checks `packages/` and `e2e/`, and runs `go-scaffold check` on
+the Hub. `test` runs the unit tests of `packages/` and the Controller prototype.
+CI runs both, plus `go test -race ./...` in `hub/` and `bun run test:e2e`, which
+sends signed envelopes through a real relay and needs Go.
 
 Write tests where there is a rule or a security check, not for coverage
 (ADR 0022).

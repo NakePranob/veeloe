@@ -1,0 +1,134 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+
+	"hub/internal/app/machine/domain"
+	"hub/internal/app/machine/ports"
+	"hub/internal/shared/dberr"
+	"hub/internal/shared/dbq"
+	"hub/internal/shared/tx"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+var _ ports.Repository = (*Repository)(nil)
+
+type Repository struct {
+	db *gorm.DB
+}
+
+func NewRepository(db *gorm.DB) *Repository {
+	return &Repository{db: db}
+}
+
+func (r *Repository) Create(ctx context.Context, m *domain.Machine) error {
+	if err := tx.From(ctx, r.db).WithContext(ctx).Create(fromDomain(m)).Error; err != nil {
+		return mapDatabaseError(err)
+	}
+	return nil
+}
+
+// sortable is the whole of what ?sort= may say for this list: dbq.Sort
+// resolves the requested name against Columns, so nothing off the request is
+// ever interpolated into the ORDER BY.
+//
+// TODO: name the columns this list may be ordered by, mapping the name the API
+// accepts to the SQL it means — {"name": "name", "created_at": "created_at"}.
+// Until then ?sort= is accepted and ignored, the same way dbq.Search is until
+// it has columns.
+var sortable = dbq.Sort{
+	Columns:  map[string]string{},
+	Default:  "created_at desc",
+	Tiebreak: "id",
+}
+
+// FindAll answers one page of the filter and how many rows it matched
+// altogether. Two queries, because a count over a LIMITed query would only
+// ever count the page.
+func (r *Repository) FindAll(ctx context.Context, filter ports.ListFilter) ([]domain.Machine, int64, error) {
+	// A closure rather than one *gorm.DB reused twice: conditions accumulate
+	// on the value, so the count would silently inherit the page's LIMIT.
+	matching := func() *gorm.DB {
+		q := tx.From(ctx, r.db).WithContext(ctx).Model(&MachineModel{})
+		// TODO: name the columns this list is searched by. dbq.Search is a
+		// no-op until it has at least one, so ?q= is accepted and ignored
+		// until then. Add this module's own filters beside it.
+		q = dbq.Search(q, filter.Search /*, "name", "code" */)
+		return q
+	}
+
+	var total int64
+	if err := matching().Count(&total).Error; err != nil {
+		return nil, 0, mapDatabaseError(err)
+	}
+
+	var rows []MachineModel
+	// Newest first until a client asks for something else, and always with the
+	// tiebreaker sortable carries: without it two rows written in the same
+	// instant can swap between page 1 and page 2, showing one twice and hiding
+	// the other.
+	order := sortable.OrderBy(filter.Sort, filter.Desc)
+	if err := matching().Order(order).Limit(filter.Limit).Offset(filter.Offset).Find(&rows).Error; err != nil {
+		return nil, 0, mapDatabaseError(err)
+	}
+	items := make([]domain.Machine, len(rows))
+	for i := range rows {
+		items[i] = *toDomain(&rows[i])
+	}
+	return items, total, nil
+}
+
+func (r *Repository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Machine, error) {
+	var row MachineModel
+	if err := tx.From(ctx, r.db).WithContext(ctx).First(&row, "id = ?", id).Error; err != nil {
+		return nil, mapDatabaseError(err)
+	}
+	return toDomain(&row), nil
+}
+
+func (r *Repository) Update(ctx context.Context, m *domain.Machine) error {
+	expected := m.Version
+	row := fromDomain(m)
+	row.Version = expected + 1
+	result := tx.From(ctx, r.db).WithContext(ctx).
+		Model(&MachineModel{}).
+		Where("id = ? AND version = ?", m.ID, expected).
+		Select("*").Omit("id", "created_at").Updates(row)
+	if result.Error != nil {
+		return mapDatabaseError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrStaleVersion
+	}
+	m.Version = row.Version
+	return nil
+}
+
+func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
+	result := tx.From(ctx, r.db).WithContext(ctx).Delete(&MachineModel{}, "id = ?", id)
+	if result.Error != nil {
+		return mapDatabaseError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func mapDatabaseError(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return domain.ErrNotFound
+	}
+	if dberr.IsDuplicate(err) {
+		return domain.ErrConflict
+	}
+	if dberr.IsForeignKey(err) {
+		return domain.ErrHasReferences
+	}
+	return err
+}
+
+// go-scaffold:repository-methods

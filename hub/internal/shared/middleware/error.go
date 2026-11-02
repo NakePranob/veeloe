@@ -1,0 +1,55 @@
+package middleware
+
+import (
+	"errors"
+	"log/slog"
+
+	"hub/internal/shared/apperror"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Error reads the last error attached via c.Error() and renders it once, so
+// handlers only ever do c.Error(err); return — no c.JSON per call site.
+//
+// exposeDetail controls whether an error's Details (a validation field map,
+// or an unexpected error's real message) is echoed back in the response body
+// — wire this to !cfg.IsProd() so a caller hitting the API directly never
+// learns field names/shape from prod responses; devs still get it locally.
+func Error(exposeDetail bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+
+		err := c.Errors.Last()
+		if err == nil {
+			return
+		}
+
+		var appErr *apperror.AppError
+		if !errors.As(err.Err, &appErr) {
+			// Unexpected error: log the real thing, answer the client generically.
+			slog.Error("unhandled error", "error", err.Err, "request_id", c.GetString(RequestIDKey))
+			appErr = apperror.NewInternal(err.Err)
+			if exposeDetail {
+				appErr.Details = err.Err.Error()
+			}
+		} else {
+			// Internal AppErrors carry a technical cause for one structured log;
+			// known domain errors (validation, not-found, etc.) stay quiet.
+			if cause := appErr.Unwrap(); cause != nil {
+				slog.Error("request failed", "error", cause, "request_id", c.GetString(RequestIDKey))
+				if exposeDetail {
+					appErr.Details = cause.Error()
+				}
+			}
+			if !exposeDetail {
+				// Known AppError (e.g. VALIDATION_ERROR): still strip Details in
+				// prod, so a direct API call doesn't get field-level hints.
+				appErr.Details = nil
+			}
+		}
+
+		appErr.RequestID = c.GetString(RequestIDKey)
+		c.JSON(appErr.HTTPStatus, gin.H{"error": appErr})
+	}
+}
