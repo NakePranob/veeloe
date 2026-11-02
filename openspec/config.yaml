@@ -1,5 +1,9 @@
 schema: spec-driven
 
+context: |
+  เขียน artifact ทุกไฟล์ของ OpenSpec เป็นภาษาไทย และใช้คำใน CONTEXT.md ตามที่เขียนไว้ เช่น Agent, Task, Approval
+  คงเป็นภาษาอังกฤษเฉพาะสิ่งที่เครื่องมืออ่าน (## ADDED Requirements, ### Requirement:, #### Scenario:, WHEN, THEN, SHALL, MUST) รวมถึงชื่อโค้ด field และคำสั่ง
+
 # Project context (optional)
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.

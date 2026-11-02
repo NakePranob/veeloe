@@ -1,124 +1,124 @@
 ## Purpose
 
-The signed envelope that carries every Veeloe message, and the checks a receiver makes before trusting it, so that a compromised Hub can neither forge, redirect nor replay a message that someone else signed.
+ซองที่เซ็นแล้วซึ่งใช้ส่งข้อความทุกชิ้นของ Veeloe และสิ่งที่ผู้รับตรวจก่อนจะเชื่อซองนั้น เพื่อให้ Hub ที่โดนเจาะปลอม เปลี่ยนทาง หรือส่งซ้ำข้อความที่คนอื่นเซ็นไว้ไม่ได้
 
 ## ADDED Requirements
 
-### Requirement: The sender signs the exact bytes it sends
-The sender SHALL serialize the signed part of an envelope to bytes once, sign those bytes with its Ed25519 key, and carry the same bytes in the envelope unchanged. A receiver SHALL verify the signature over the bytes as carried, never over a re-serialization of a parsed object.
+### Requirement: ผู้ส่งเซ็น byte ตามที่ส่งจริง
+ผู้ส่ง SHALL แปลงส่วนที่เซ็นเป็น byte ครั้งเดียว เซ็น byte ชุดนั้นด้วยกุญแจ Ed25519 ของตัวเอง และพก byte ชุดเดิมไปในซองโดยไม่เปลี่ยน ผู้รับ SHALL ตรวจลายเซ็นกับ byte ตามที่ได้รับ ห้าม serialize จาก object ที่ parse แล้วมาตรวจ
 
-#### Scenario: Bytes verify as carried
-- **WHEN** a receiver gets an envelope whose carried bytes and signature are untouched
-- **THEN** the signature verifies, whatever key order or whitespace those bytes use
+#### Scenario: byte ตรวจผ่านตามที่ได้รับ
+- **WHEN** ผู้รับได้ซองที่ byte และลายเซ็นไม่ถูกแตะต้อง
+- **THEN** ลายเซ็นตรวจผ่าน ไม่ว่า byte จะเรียง key หรือเว้นวรรคแบบไหน
 
-#### Scenario: A changed byte is rejected
-- **WHEN** any byte of the carried signed part differs from what the sender signed
-- **THEN** the receiver rejects the envelope
+#### Scenario: byte เปลี่ยนแล้วถูกปฏิเสธ
+- **WHEN** byte ใดในส่วนที่เซ็นต่างจากที่ผู้ส่งเซ็นไว้
+- **THEN** ผู้รับปฏิเสธซองนั้น
 
-### Requirement: An envelope is routed by one destination or by a recipient list
-An envelope header SHALL name exactly one of a single destination or a non-empty list of recipient Member ids. A message to a Runtime SHALL use the destination, and a message from a Runtime to Controllers SHALL use the recipient list.
+### Requirement: ซองระบุเส้นทางเป็นปลายทางเดียวหรือรายชื่อผู้รับ
+หัวซอง SHALL ระบุอย่างใดอย่างหนึ่งเท่านั้น คือปลายทางเดียว หรือรายชื่อ Member ผู้รับที่ไม่ว่าง ข้อความถึง Runtime SHALL ใช้ปลายทาง และข้อความจาก Runtime ถึง Controller SHALL ใช้รายชื่อผู้รับ
 
-#### Scenario: Message to Controllers
-- **WHEN** a Runtime sends a message to the Members allowed to see it
-- **THEN** the header carries those Member ids as the recipient list and no destination
+#### Scenario: ข้อความถึง Controller
+- **WHEN** Runtime ส่งข้อความถึง Member ที่มีสิทธิ์เห็น
+- **THEN** หัวซองมีรหัส Member เหล่านั้นเป็นรายชื่อผู้รับ และไม่มีปลายทาง
 
-#### Scenario: Both routes present
-- **WHEN** an envelope names both a destination and a recipient list
-- **THEN** the receiver rejects it as malformed
+#### Scenario: มีทั้งสองเส้นทาง
+- **WHEN** ซองระบุทั้งปลายทางและรายชื่อผู้รับ
+- **THEN** ผู้รับปฏิเสธว่ารูปแบบผิด
 
-#### Scenario: No route present
-- **WHEN** an envelope names neither a destination nor any recipient
-- **THEN** the receiver rejects it as malformed
+#### Scenario: ไม่มีเส้นทาง
+- **WHEN** ซองไม่ระบุทั้งปลายทางและผู้รับ
+- **THEN** ผู้รับปฏิเสธว่ารูปแบบผิด
 
-### Requirement: The signed part copies the routing header
-The signed part SHALL contain copies of the header's message type, destination, recipient list, Task id and originating Member (each when the header has it) and a per-sender sequence number. The receiver SHALL reject an envelope when any of those header values differs from its signed copy, including the order of the recipient list.
+### Requirement: ส่วนที่เซ็นมีสำเนาของหัวซอง
+ส่วนที่เซ็น SHALL มีสำเนาของชนิดข้อความ ปลายทาง รายชื่อผู้รับ รหัส Task และ Member ต้นทาง (เท่าที่หัวซองมี) พร้อมเลขลำดับต่อผู้ส่ง ผู้รับ SHALL ปฏิเสธซองเมื่อค่าใดในหัวซองต่างจากสำเนา รวมถึงลำดับของรายชื่อผู้รับ
 
-#### Scenario: Redirected envelope
-- **WHEN** an envelope signed for one destination arrives with a header naming a different destination
-- **THEN** the receiver rejects it
+#### Scenario: ซองถูกเปลี่ยนทาง
+- **WHEN** ซองที่เซ็นให้ปลายทางหนึ่งมาถึงโดยหัวซองระบุปลายทางอื่น
+- **THEN** ผู้รับปฏิเสธซองนั้น
 
-#### Scenario: Changed recipient list
-- **WHEN** the header's recipient list differs from the signed copy
-- **THEN** the receiver rejects it
+#### Scenario: รายชื่อผู้รับถูกเปลี่ยน
+- **WHEN** รายชื่อผู้รับในหัวซองต่างจากสำเนาที่เซ็น
+- **THEN** ผู้รับปฏิเสธซองนั้น
 
-#### Scenario: Swapped originating Member
-- **WHEN** the header names a different originating Member than the signed part
-- **THEN** the receiver rejects it
+#### Scenario: Member ต้นทางถูกสลับ
+- **WHEN** หัวซองระบุ Member ต้นทางต่างจากส่วนที่เซ็น
+- **THEN** ผู้รับปฏิเสธซองนั้น
 
-### Requirement: A receiver accepts only what is addressed to it
-The receiver SHALL reject a validly signed envelope when its destination is not one the receiver answers for, or when its recipient list does not include the receiver's Member.
+### Requirement: ผู้รับรับเฉพาะซองที่ส่งถึงตัวเอง
+ผู้รับ SHALL ปฏิเสธซองที่เซ็นถูกต้อง เมื่อปลายทางไม่ใช่สิ่งที่ผู้รับดูแล หรือเมื่อรายชื่อผู้รับไม่มี Member ของผู้รับ
 
-#### Scenario: Delivered to the wrong Runtime
-- **WHEN** a Hub delivers an unmodified, validly signed envelope to a Runtime that does not host its destination
-- **THEN** that Runtime rejects it
+#### Scenario: ส่งผิด Runtime
+- **WHEN** Hub ส่งซองที่เซ็นถูกต้องและไม่ถูกแก้ ไปให้ Runtime ที่ไม่ได้ดูแลปลายทางนั้น
+- **THEN** Runtime นั้นปฏิเสธซอง
 
-#### Scenario: Delivered to the wrong Controller
-- **WHEN** a Controller receives a validly signed envelope whose recipient list leaves out its Member
-- **THEN** that Controller rejects it
+#### Scenario: ส่งผิด Controller
+- **WHEN** Controller ได้ซองที่เซ็นถูกต้องแต่รายชื่อผู้รับไม่มี Member ของตัวเอง
+- **THEN** Controller นั้นปฏิเสธซอง
 
-### Requirement: Verify before parsing
-The receiver SHALL check that the sender key named in the header is one it trusts and that the signature verifies, before it parses the signed part. Only then SHALL it parse the signed part and check its shape.
+### Requirement: ตรวจก่อน parse
+ผู้รับ SHALL ตรวจว่าเชื่อกุญแจผู้ส่งที่หัวซองระบุ และลายเซ็นถูกต้อง ก่อน parse ส่วนที่เซ็น หลังจากนั้นจึง SHALL parse และตรวจรูปร่าง
 
-#### Scenario: Untrusted sender key
-- **WHEN** the header names a sender key the receiver does not trust
-- **THEN** the receiver rejects the envelope without parsing the signed part
+#### Scenario: กุญแจผู้ส่งที่ไม่เชื่อ
+- **WHEN** หัวซองระบุกุญแจผู้ส่งที่ผู้รับไม่เชื่อ
+- **THEN** ผู้รับปฏิเสธซองโดยไม่ parse ส่วนที่เซ็น
 
-#### Scenario: Invalid signature
-- **WHEN** the signature does not verify with the named sender key
-- **THEN** the receiver rejects the envelope without parsing the signed part
+#### Scenario: ลายเซ็นไม่ถูกต้อง
+- **WHEN** ลายเซ็นตรวจกับกุญแจผู้ส่งที่ระบุไม่ผ่าน
+- **THEN** ผู้รับปฏิเสธซองโดยไม่ parse ส่วนที่เซ็น
 
-### Requirement: Sequence numbers only go up per sender
-The receiver SHALL accept an envelope only when its sequence number is greater than the last one it accepted from the same sender key, and SHALL remember the new number. A rejected envelope SHALL NOT change the remembered number. This SHALL NOT depend on any clock.
+### Requirement: เลขลำดับเพิ่มขึ้นเท่านั้นต่อผู้ส่ง
+ผู้รับ SHALL รับซองเฉพาะเมื่อเลขลำดับมากกว่าเลขล่าสุดที่รับจากกุญแจเดียวกัน และ SHALL จำเลขใหม่ ซองที่ถูกปฏิเสธ SHALL NOT เปลี่ยนเลขที่จำไว้ และเรื่องนี้ SHALL NOT พึ่งนาฬิกา
 
-#### Scenario: Replayed envelope
-- **WHEN** an envelope arrives with the same sequence number as one already accepted from that sender key
-- **THEN** the receiver rejects it
+#### Scenario: ซองถูกส่งซ้ำ
+- **WHEN** ซองมาพร้อมเลขเดียวกับที่รับจากกุญแจนั้นแล้ว
+- **THEN** ผู้รับปฏิเสธซองนั้น
 
-#### Scenario: Older envelope
-- **WHEN** an envelope arrives with a lower sequence number than the last one accepted from that sender key
-- **THEN** the receiver rejects it
+#### Scenario: ซองเก่า
+- **WHEN** ซองมาพร้อมเลขต่ำกว่าเลขล่าสุดที่รับจากกุญแจนั้น
+- **THEN** ผู้รับปฏิเสธซองนั้น
 
-#### Scenario: Gap in sequence numbers
-- **WHEN** an envelope arrives with a sequence number more than one above the last accepted
-- **THEN** the receiver accepts it
+#### Scenario: เลขข้าม
+- **WHEN** ซองมาพร้อมเลขที่มากกว่าเลขล่าสุดเกินหนึ่ง
+- **THEN** ผู้รับรับซองนั้น
 
-#### Scenario: Rejected envelope leaves the number alone
-- **WHEN** an envelope with a high sequence number is rejected for any other reason
-- **THEN** a later valid envelope with a lower sequence number is still accepted
+#### Scenario: ซองที่ถูกปฏิเสธไม่เปลี่ยนเลข
+- **WHEN** ซองเลขสูงถูกปฏิเสธด้วยเหตุผลอื่น
+- **THEN** ซองที่ถูกต้องซึ่งมาทีหลังด้วยเลขต่ำกว่ายังรับได้
 
-### Requirement: Receivers skip what they do not know
-A receiver SHALL accept and ignore fields it does not know in the header and in the signed part, and SHALL skip a message type it does not know without failing or closing the connection.
+### Requirement: ผู้รับข้ามสิ่งที่ไม่รู้จัก
+ผู้รับ SHALL รับและเมิน field ที่ไม่รู้จักทั้งในหัวซองและส่วนที่เซ็น และ SHALL ข้ามชนิดข้อความที่ไม่รู้จักโดยไม่พังหรือปิดการเชื่อมต่อ
 
-#### Scenario: Unknown field
-- **WHEN** a correctly signed envelope carries a field the receiver does not know
-- **THEN** the signature verifies and the receiver handles the message as if the field were absent
+#### Scenario: field ที่ไม่รู้จัก
+- **WHEN** ซองที่เซ็นถูกต้องมี field ที่ผู้รับไม่รู้จัก
+- **THEN** ลายเซ็นตรวจผ่าน และผู้รับทำงานเหมือนไม่มี field นั้น
 
-#### Scenario: Unknown message type
-- **WHEN** a receiver gets a correctly signed envelope whose message type it does not know
-- **THEN** it reports that type as unknown and keeps handling the envelopes that follow
+#### Scenario: ชนิดข้อความที่ไม่รู้จัก
+- **WHEN** ผู้รับได้ซองที่เซ็นถูกต้องซึ่งเป็นชนิดข้อความที่ไม่รู้จัก
+- **THEN** ผู้รับรายงานว่าไม่รู้จักชนิดนั้น และทำงานกับซองถัดไปต่อ
 
-### Requirement: Errors are codes, not sentences
-An `error` message SHALL carry a machine-readable code and optional parameters made of strings, numbers and booleans. It SHALL NOT rely on a human-readable sentence, because the Controller renders the words in the Member's language.
+### Requirement: Error เป็น code ไม่ใช่ประโยค
+ข้อความ `error` SHALL มี code ที่เครื่องอ่านได้ และค่าประกอบที่เป็น string, number หรือ boolean ซึ่งไม่บังคับ และ SHALL NOT พึ่งประโยคที่คนอ่าน เพราะ Controller เป็นคนแสดงคำตามภาษาของ Member
 
-#### Scenario: Known error
-- **WHEN** a receiver gets an `error` message with a code and parameters
-- **THEN** it gets that code and those parameters as sent
+#### Scenario: error ที่รู้จัก
+- **WHEN** ผู้รับได้ข้อความ `error` ที่มี code และค่าประกอบ
+- **THEN** ผู้รับได้ code และค่าประกอบตามที่ส่ง
 
-#### Scenario: Error code from a newer sender
-- **WHEN** a receiver gets an `error` message whose code it has never seen
-- **THEN** the message still parses, with the unfamiliar code preserved so the Controller can show a general message with that code
+#### Scenario: code จากผู้ส่งรุ่นใหม่กว่า
+- **WHEN** ผู้รับได้ข้อความ `error` ที่มี code ซึ่งไม่เคยเห็น
+- **THEN** ข้อความยัง parse ได้ และเก็บ code ไว้ให้ Controller แสดงข้อความกลางพร้อม code นั้น
 
-#### Scenario: Malformed error
-- **WHEN** an `error` message has no code, or a code that is not lowercase words separated by dots
-- **THEN** the receiver treats that message as invalid and keeps handling the envelopes that follow
+#### Scenario: error รูปแบบผิด
+- **WHEN** ข้อความ `error` ไม่มี code หรือ code ไม่ใช่คำตัวพิมพ์เล็กคั่นด้วยจุด
+- **THEN** ผู้รับถือว่าข้อความนั้นไม่ถูกต้อง และทำงานกับซองถัดไปต่อ
 
-### Requirement: Published header schema and shared test vectors
-The Protocol SHALL publish a JSON Schema of the envelope header and a set of test vectors (test keys, signed bytes, signatures and expected results) that cover every rejection reason. Every implementation of the Protocol in this repository SHALL check itself against them in CI.
+### Requirement: เผยแพร่ schema ของหัวซองและ test vector
+Protocol SHALL เผยแพร่ JSON Schema ของหัวซอง และ test vector (กุญแจทดสอบ byte ที่เซ็น ลายเซ็น และผลที่คาดไว้) ซึ่งครอบคลุมเหตุผลการปฏิเสธทุกแบบ implementation ของ Protocol ทุกตัวใน repo นี้ SHALL ตรวจตัวเองกับไฟล์เหล่านี้ใน CI
 
-#### Scenario: Published files drift from the code
-- **WHEN** the header schema or the vectors no longer match what the Protocol code produces
-- **THEN** the CI check fails
+#### Scenario: ไฟล์ที่เผยแพร่ไม่ตรงกับโค้ด
+- **WHEN** schema หรือ vector ไม่ตรงกับสิ่งที่โค้ดของ Protocol สร้าง
+- **THEN** CI ล้มเหลว
 
-#### Scenario: Vectors reach their expected results
-- **WHEN** the TypeScript implementation checks the published vectors
-- **THEN** every vector reaches its expected result
+#### Scenario: vector ได้ผลตามที่คาด
+- **WHEN** implementation ฝั่ง TypeScript ตรวจ vector ที่เผยแพร่
+- **THEN** ทุก vector ได้ผลตามที่คาดไว้

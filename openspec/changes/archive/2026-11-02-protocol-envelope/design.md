@@ -1,45 +1,45 @@
 ## Context
 
-See `proposal.md` for why. The removed package at `33deb1a^:packages/protocol` already implements exact-bytes signing, header copies, per-sender sequence numbers, loose schemas and generated vectors, with tests. No Runtime, Hub or Controller code exists yet, so nothing consumes this package until later changes.
+เหตุผลดูที่ `proposal.md` package ที่ถูกลบที่ `33deb1a^:packages/protocol` มีการเซ็น byte ตรงตามที่ส่ง สำเนาหัวซอง เลขลำดับต่อผู้ส่ง schema แบบหลวม และ vector ที่สร้างเองพร้อม test อยู่แล้ว ตอนนี้ยังไม่มีโค้ดของ Runtime, Hub หรือ Controller จึงยังไม่มีใครใช้ package นี้จนกว่าจะถึง change ถัดไป
 
 ## Goals / Non-Goals
 
 **Goals:**
-- A package the Runtime and Controller can both import, running on Bun, Hermes and the web.
-- Tests and vectors for every path that rejects an envelope.
+- package ที่ Runtime และ Controller import ได้ทั้งคู่ และรันได้บน Bun, Hermes และเว็บ
+- มี test และ vector ทุกเส้นทางที่ปฏิเสธซอง
 
 **Non-Goals:**
-- Hub handshake (`hub.challenge`, `hub.auth`, `hub.ready`) and Go code: `hub-relay`.
-- Durable sequence storage and trusted-key management: `controller-foundation`, `machine-pairing`, `agent-and-task`.
-- Message types other than `error`: each arrives with its own change (ADR 0022).
-- Unsigned `file.chunk` envelopes (ADR 0050): `attachments`.
-- Encryption (ADR 0063): added later, additively.
+- handshake ของ Hub (`hub.challenge`, `hub.auth`, `hub.ready`) และโค้ด Go: อยู่ใน `hub-relay`
+- ที่เก็บเลขลำดับแบบถาวรและการจัดการกุญแจที่เชื่อ: อยู่ใน `controller-foundation`, `machine-pairing` และ `agent-and-task`
+- ข้อความชนิดอื่นนอกจาก `error`: มาพร้อม change ของตัวเอง (ADR 0022)
+- ซอง `file.chunk` ที่ไม่ได้เซ็น (ADR 0050): อยู่ใน `attachments`
+- การเข้ารหัส (ADR 0063): เพิ่มทีหลังแบบ additive
 
 ## Decisions
 
-**Restore the old package and change it, rather than rewrite.** Its behaviour was tested and matches ADR 0019 and 0023. Restore `crypto/`, `envelope/`, `fixtures/` and the vectors build, then drop the `hub-*` messages and their vectors. Writing it again would risk losing rejection cases it already covers.
+**กู้ package เดิมแล้วแก้ แทนการเขียนใหม่** พฤติกรรมเดิมผ่าน test และตรงกับ ADR 0019 และ 0023 จึงกู้ `crypto/`, `envelope/`, `fixtures/` และตัวสร้าง vector แล้วตัดข้อความ `hub-*` กับ vector ของมัน การเขียนใหม่เสี่ยงทำกรณีปฏิเสธที่มีอยู่หาย
 
-**`to` and `recipients` are mutually exclusive header fields.** A command names one destination, and an event names the Members who may see it (ADR 0034).
-- *Alternative: a required `to` holding a special value such as `members`, next to the list.* That keeps a field with no meaning on half of all messages.
-- Zod's refinement enforces "exactly one". The JSON Schema from `z.toJSONSchema` marks both optional, so the vectors carry this rule to other languages.
+**`to` กับ `recipients` ในหัวซองใช้พร้อมกันไม่ได้** คำสั่งระบุปลายทางเดียว ส่วน event ระบุ Member ที่มีสิทธิ์เห็น (ADR 0034)
+- *ทางอื่น: บังคับมี `to` โดยใส่ค่าพิเศษอย่าง `members` คู่กับรายชื่อ* จะเหลือ field ที่ไม่มีความหมายในครึ่งหนึ่งของข้อความ
+- refinement ของ Zod บังคับกฎ "อย่างใดอย่างหนึ่ง" ส่วน JSON Schema จาก `z.toJSONSchema` ระบุว่าทั้งคู่ไม่บังคับ vector จึงเป็นตัวส่งกฎนี้ให้ภาษาอื่น
 
-**Recipients are signed, and order counts.** Comparing the header to the signed copy element by element keeps the check simple, and a sender has no reason to reorder. Before E2E a compromised Hub can still deliver content to anyone, as ADR 0005 and 0034 accept, but it cannot change what the signature says or make a Controller accept a message that leaves out its Member.
+**`recipients` ถูกเซ็น และลำดับมีความหมาย** การเทียบหัวซองกับสำเนาทีละตัวทำให้ตรวจง่าย และผู้ส่งไม่มีเหตุให้สลับลำดับ ก่อนมี E2E Hub ที่โดนเจาะยังส่งเนื้อหาให้ใครก็ได้ ตามที่ ADR 0005 และ 0034 ยอมรับไว้ แต่แก้สิ่งที่ลายเซ็นระบุไม่ได้ และทำให้ Controller รับข้อความที่ไม่มี Member ของตัวเองไม่ได้
 
-**`verify` gains an `isForMe` predicate.** The caller passes `{ isForMe(route): boolean }`: a Runtime answers for the Agents and Machine it hosts, and a Controller answers for its Member. The Protocol cannot know these itself. The new rejection reason is `not-addressed`.
+**`verify` รับ predicate `isForMe` เพิ่ม** ผู้เรียกส่งฟังก์ชันที่รับเส้นทางแล้วคืน boolean: Runtime ตอบตาม Agent และ Machine ที่ดูแล ส่วน Controller ตอบตาม Member ของตัวเอง Protocol รู้เรื่องนี้เองไม่ได้ เหตุผลการปฏิเสธใหม่คือ `not-addressed`
 
-**Check order is: header shape, trusted key, signature, signed part shape, header copies, addressing, sequence.** Sequence stays last so that no rejected envelope moves the counter.
-- *Alternative: check addressing first.* It could avoid signature work, but it would answer for unauthenticated content, which ADR 0019 rules out.
+**ลำดับการตรวจคือ รูปร่างหัวซอง กุญแจที่เชื่อ ลายเซ็น รูปร่างส่วนที่เซ็น สำเนาหัวซอง การส่งถึง และเลขลำดับ** เลขลำดับอยู่ท้ายสุดเพื่อไม่ให้ซองที่ถูกปฏิเสธขยับตัวนับ
+- *ทางอื่น: ตรวจการส่งถึงก่อน* ประหยัดการตรวจลายเซ็นได้ แต่จะตอบจากเนื้อหาที่ยังไม่พิสูจน์ ซึ่ง ADR 0019 ไม่ให้ทำ
 
-**A registry parses verified bodies.** `parseMessage(signed)` returns `message`, `unknown` or `invalid`, the same three outcomes as the old `parseFrame`. It starts with one entry, `error`, in `messages/error.ts` (ADR 0022).
+**ใช้ตารางชนิดข้อความ parse เนื้อในที่ตรวจแล้ว** `parseMessage(signed)` คืน `message`, `unknown` หรือ `invalid` สามแบบเหมือน `parseFrame` เดิม เริ่มด้วยชนิดเดียวคือ `error` ที่ `messages/error.ts` (ADR 0022)
 
-**Error codes are open strings matching `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$`.** The schema does not list known codes, because ADR 0023 lets a newer sender add one. `params` is a record of string, number or boolean. A field linking an error to the command it answers is left out until a change needs it, which ADR 0023 allows adding later.
+**code ของ error เป็น string เปิดตามรูปแบบ `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$`** schema ไม่ระบุรายการ code เพราะ ADR 0023 ให้ผู้ส่งรุ่นใหม่เพิ่มได้ `params` เป็น record ของ string, number หรือ boolean ส่วน field ที่โยง error กับคำสั่งต้นทางยังไม่ใส่จนกว่า change ไหนจะต้องใช้ ซึ่ง ADR 0023 ให้เพิ่มทีหลังได้
 
-**Dependencies stay pinned exactly**, at the old `@noble/curves` 2.4.0 and `zod` 4.6.7, and are installed with Bun so `bun.lock` records them. Moving to newer versions is a separate decision.
+**ตรึง dependency ตรงตัว** ที่ `@noble/curves` 2.4.0 และ `zod` 4.6.7 ตาม package เดิม และติดตั้งด้วย Bun ให้ `bun.lock` บันทึก การขยับเวอร์ชันเป็นการตัดสินใจแยก
 
 ## Risks / Trade-offs
 
-- [A Hub delivers envelopes out of order, so the earlier one is rejected as replayed] → Sequence numbers are per sender and the path is one ordered connection. `hub-relay` must keep per-sender order.
-- [A sender's counter resets after reinstalling, so all its messages are rejected] → The signer leaves counter storage to the caller, and its doc comment says the counter must survive restarts. Durable storage is required of the later changes that sign.
-- [`MemorySeenSequences` is used in production by mistake, which reopens replay after a restart] → Keep it marked as test and early-development only, and require a durable store in `agent-and-task`.
-- [The Hub's Go Ed25519 and noble differ on edge-case signatures] → The Hub verifies only its handshake, not envelopes (ADR 0012). `hub-relay` handles this with its own vectors.
-- [Published vectors go stale] → A test rebuilds them and compares bytes, and `UPDATE_FIXTURES=1` regenerates them deliberately.
+- [Hub ส่งซองสลับลำดับ ซองที่มาก่อนจึงถูกปฏิเสธว่าส่งซ้ำ] → เลขลำดับแยกต่อผู้ส่งและเส้นทางเป็นสายเดียวที่เรียงลำดับ `hub-relay` ต้องรักษาลำดับต่อผู้ส่ง
+- [ตัวนับของผู้ส่งเริ่มใหม่หลังติดตั้งใหม่ ข้อความทั้งหมดจึงถูกปฏิเสธ] → ตัวเซ็นให้ผู้เรียกเก็บตัวนับเอง และ doc comment บอกว่าตัวนับต้องอยู่รอดข้ามการเริ่มใหม่ change ถัดไปที่เซ็นต้องใช้ที่เก็บถาวร
+- [นำ `MemorySeenSequences` ไปใช้จริงโดยไม่ตั้งใจ ทำให้ส่งซ้ำได้หลังเริ่มใหม่] → ระบุไว้ว่าใช้กับ test และช่วงพัฒนาเท่านั้น และกำหนดให้ `agent-and-task` ใช้ที่เก็บถาวร
+- [Ed25519 ของ Go กับ noble เห็นต่างกันในลายเซ็นแปลกๆ] → Hub ตรวจแค่ handshake ไม่ตรวจซอง (ADR 0012) `hub-relay` จัดการด้วย vector ของตัวเอง
+- [vector ที่เผยแพร่ล้าสมัย] → test สร้างใหม่แล้วเทียบ byte และ `UPDATE_FIXTURES=1` ใช้สร้างใหม่โดยตั้งใจ
