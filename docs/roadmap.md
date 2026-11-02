@@ -42,6 +42,6 @@
 ยังไม่แตกเป็น change จนกว่าจะใกล้ถึงคิว ขอบเขตเต็มอยู่ใน ADR 0048
 
 - **v0.2 Agent ทำงานเองได้มากขึ้น**: Schedule, Idle Work, Watch, เส้นร้อย Task, เว็บ, Skill, Connector และ Library
-- **v0.3 องค์กรและเปิดให้คนอื่นใช้**: เริ่มจาก E2E แล้วตามด้วยการแยกสิทธิ์ของหลาย Member และชุดเปิดตัว
+- **v0.3 องค์กรและเปิดให้คนอื่นใช้**: เริ่มจาก E2E แล้วตามด้วยการแยกสิทธิ์ของหลาย Member, รูปโปรไฟล์ของ Member ที่เก็บบน Runtime (ADR 0053) และชุดเปิดตัว
 - **v0.4 Project และ Team**: Project, Team, Ask, Mention, Worktree และหลาย Turn พร้อมกัน (ADR 0064)
 - **v0.5 Channel**: Telegram และ `/claim`
