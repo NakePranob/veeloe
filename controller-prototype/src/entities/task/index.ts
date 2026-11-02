@@ -1,4 +1,3 @@
-export { answerApproval, sendMessage, stopTurn, type Answer } from "./model/demo-runtime";
 export {
   approvals,
   lastActivity,
@@ -17,6 +16,6 @@ export {
   type TaskState,
   type ToolResult,
 } from "./model/state";
-export { useTask, useTasks } from "./model/store";
-export type { Effort, Task, TaskEvent } from "./model/types";
+export { append, createTask, deleteTasks, deleteTasksOf, eventsOf, getTask, getTasks, subscribeTasks, updateTask, useTask, useTasks } from "./model/store";
+export type { Attachment, Effort, EventBody, Task, TaskEvent, TaskSource } from "./model/types";
 export { TaskStatus } from "./ui/TaskStatus";

@@ -6,7 +6,7 @@ import { radius, useColors } from "./theme";
 // The web's Select (iOS and Android have their own files): an invisible
 // <select> laid over our chip, so the browser opens its own list, and keyboards
 // and screen readers get a real select.
-export function Select<T extends string>({ label, value, options, onChange }: SelectProps<T>) {
+export function Select<T extends string>({ label, value, options, onChange, raised }: SelectProps<T>) {
   const colors = useColors();
   const [hovered, setHovered] = useState(false);
   // The select is invisible, so the chip draws its keyboard focus ring.
@@ -21,7 +21,7 @@ export function Select<T extends string>({ label, value, options, onChange }: Se
         outlineColor: colors.label,
       }}
     >
-      <SelectChip text={chosenLabel({ value, options })} pressed={hovered} />
+      <SelectChip text={chosenLabel({ value, options })} pressed={hovered} raised={raised} />
       <select
         aria-label={label}
         value={value}

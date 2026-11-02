@@ -1,5 +1,6 @@
+import { router } from "expo-router";
 import { View } from "react-native";
-import { Icon, space, Text, useSplit } from "../../../shared/ui";
+import { HeaderAction, Icon, space, Text, useSplit } from "../../../shared/ui";
 import { AgentInbox } from "../../../widgets/agent-inbox";
 
 export function InboxPage() {
@@ -12,5 +13,10 @@ export function InboxPage() {
       </View>
     );
   }
-  return <AgentInbox />;
+  return (
+    <>
+      <HeaderAction label="Workspace" icon="settings" onPress={() => router.navigate("/workspace")} />
+      <AgentInbox />
+    </>
+  );
 }

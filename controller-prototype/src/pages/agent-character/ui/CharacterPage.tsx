@@ -1,10 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { HeaderButton } from "expo-router/react-navigation";
 import { useState, type ReactNode } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { Character, COLORS, DECALS, pick, SHELLS, shuffleLook, SIDES, TOPS, updateCharacter, useAgent, useAgents, type Agent, type Look } from "../../../entities/agent";
-import { Button, column, radius, space, Text, useColors, useShadows } from "../../../shared/ui";
+import { Button, column, HeaderAction, radius, space, Text, useColors, useShadows } from "../../../shared/ui";
 
 // The Moods the Member will see this look in, at inbox size, so they can tell they still read.
 const MOODS = [
@@ -114,22 +113,14 @@ function Editor({ agent }: { agent: Agent }) {
               </Text>
             </View>
           ),
-          headerLeft: () => (
-            <HeaderButton onPress={close} accessibilityLabel="ยกเลิก">
-              <Text>ยกเลิก</Text>
-            </HeaderButton>
-          ),
-          headerRight: () => (
-            <HeaderButton
-              accessibilityLabel="เสร็จ"
-              onPress={() => {
-                updateCharacter(agent.id, draft);
-                close();
-              }}
-            >
-              <Text strong>เสร็จ</Text>
-            </HeaderButton>
-          ),
+        }}
+      />
+      <HeaderAction label="ยกเลิก" placement="left" onPress={close} />
+      <HeaderAction
+        label="เสร็จ"
+        onPress={() => {
+          updateCharacter(agent.id, draft);
+          close();
         }}
       />
       <View style={{ alignItems: "center", gap: space.lg }}>
@@ -206,16 +197,8 @@ export function CharacterPage() {
   if (!agent) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, padding: space.lg }}>
-        <Stack.Screen
-          options={{
-            title: "Character",
-            headerLeft: () => (
-              <HeaderButton onPress={close} accessibilityLabel="ปิด">
-                <Text>ปิด</Text>
-              </HeaderButton>
-            ),
-          }}
-        />
+        <Stack.Screen options={{ title: "Character" }} />
+        <HeaderAction label="ปิด" placement="left" onPress={close} />
         <Text tone="secondary">ไม่พบ Agent นี้</Text>
         <Button label="กลับไป Inbox" onPress={() => router.replace("/")} />
       </View>

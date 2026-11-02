@@ -1,3 +1,30 @@
-export { useAgent, useAgents, updateCharacter, type Agent, type Machine } from "./model/agents";
+export {
+  addMachine,
+  addProvider,
+  charge,
+  createAgent,
+  deleteAgent,
+  getAgent,
+  getAgents,
+  getMachines,
+  newDay,
+  READ_ONLY_COMMANDS,
+  removeMachine,
+  removeProvider,
+  subscribeAgents,
+  subscribeMachines,
+  updateAgent,
+  updateCharacter,
+  updateMachine,
+  useAgent,
+  useAgents,
+  useMachine,
+  useMachines,
+  type Agent,
+  type Machine,
+  type Provider,
+  type UsageSource,
+} from "./model/agents";
+export { allowed, commandParts, covers, missingParts } from "./model/allowlist";
 export { COLORS, DECALS, lookOf, pick, sameLook, SHELLS, shuffleLook, SIDES, TOPS, type Look } from "./model/look";
 export { Character } from "./ui/Character";

@@ -1,9 +1,10 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useGlobalSearchParams } from "expo-router";
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useGlobalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Card, SIDEBAR_WIDTH, space, Text, useColors, useSplit } from "../../shared/ui";
+import { Button, Card, SIDEBAR_WIDTH, space, Text, useColors, useSplit } from "../../shared/ui";
 import { AgentInbox } from "../../widgets/agent-inbox";
+import { PushBanner } from "../../widgets/push-banner";
 import "../styles/web-reset";
 
 // Web draws its own header, Material-style by default; give it iOS's chevron
@@ -34,9 +35,10 @@ function Sidebar({ selectedTaskId }: { selectedTaskId?: string }) {
         overflow: "hidden",
       }}
     >
-      <Text variant="largeTitle" style={{ paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.xs }}>
-        Inbox
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.xs }}>
+        <Text variant="largeTitle">Inbox</Text>
+        <Button label="Workspace" icon="settings" onPress={() => router.navigate("/workspace")} />
+      </View>
       <AgentInbox selectedTaskId={selectedTaskId} split />
     </Card>
   );
@@ -59,7 +61,7 @@ export function RootLayout() {
               Titles sit in the middle on every platform, as iOS puts them; Android and web start them on the left. */}
           <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTitleAlign: "center", ...webHeader }}>
             {/* A plain title, as on the Task screen and on web, so the list starts right under the header;
-                a large title would leave an empty bar above it, since the inbox has no header buttons. */}
+                a large title would leave an empty bar above it. */}
             <Stack.Screen name="index" options={split ? { headerShown: false } : { title: "Inbox" }} />
             {/* In split view the inbox is already beside the Task, so there is nothing to go back to.
                 Web ignores headerBackVisible when a deep link anchors the inbox underneath, hence headerLeft. */}
@@ -69,6 +71,7 @@ export function RootLayout() {
           </Stack>
         </View>
       </View>
+      <PushBanner />
     </ThemeProvider>
   );
 }

@@ -1,8 +1,12 @@
 # Controller prototype (ทิ้งได้)
 
-นี่คือ **prototype** ของ Controller ไม่ใช่ตัวจริง ทำงานบนข้อมูลของ Demo Workspace ที่อยู่ในหน่วยความจำ ไม่ต่อ Hub ไม่มีกุญแจ และไม่เซ็นอะไร
+นี่คือ **prototype** ของ Controller ไม่ใช่ตัวจริง ทำงานบนข้อมูลของ Demo Workspace ที่อยู่ในหน่วยความจำ ไม่ต่อ Hub ไม่มีกุญแจ และไม่เซ็นอะไร reload แล้วข้อมูลเริ่มใหม่
 
-**คำถามที่ตอบ:** Controller ควรมีหน้าตาและการใช้งานแบบไหน
+**คำถามที่ตอบ:** Controller ควรมีหน้าตาและการใช้งานแบบไหน เมื่อทำตาม ADR ครบทุก phase ตั้งแต่ v0.1 ถึง v0.5
+
+Runtime กับ Hub เป็นตัวจำลองใน `src/features/demo-runtime` ซึ่งใช้กฎจริงของ ADR เช่น คิว, Allowlist, Approval, Budget และการ restart ส่วนสิ่งที่มีได้แค่ในระบบจริง เช่น กล้องสแกน QR, Face ID, OAuth, การเฝ้าไฟล์ และ Telegram มีปุ่มจำลองให้กดแทน
+
+เริ่มลองจาก Inbox แล้วกดปุ่ม Workspace หน้า "ตัวควบคุม Demo" ใช้ปิดเครื่อง, restart กลาง Turn, ทำให้ Budget ใกล้หมด และสลับคนที่ถือเครื่องเป็น Nok (มี Use กับ Manage บางตัว) หรือ Mint (มี Approve) ในแชตลองพิมพ์ `` `ls` `` หรือ `` `npm run deploy:prod` ``
 
 **คำตอบที่ได้ และให้ Controller ตัวจริงเอาไปใช้**
 - หน้าตาขาวดำโทนฟ้าอ่อนแบบเดียวกันทุก platform มีปุ่มทรง pill กับการ์ดสีขาวที่มีเงา และใช้ navigation, alert กับเมนูของ platform เอง (design system: https://claude.ai/artifact/FLFrmUHanU1rdq7qF6bR8R)

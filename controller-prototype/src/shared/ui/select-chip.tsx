@@ -1,7 +1,7 @@
 import { View } from "react-native";
 import { Icon } from "./icon";
 import { Text } from "./text";
-import { radius, space, useColors } from "./theme";
+import { radius, space, useColors, useShadows } from "./theme";
 
 export interface SelectProps<T extends string> {
   // What is being chosen, for a screen reader: the chip itself shows only the chosen option.
@@ -9,6 +9,8 @@ export interface SelectProps<T extends string> {
   value: T;
   options: readonly { value: T; label: string }[];
   onChange: (value: T) => void;
+  // White with a shadow, for a chip that stands alone on the screen rather than inside a card.
+  raised?: boolean;
 }
 
 export const chosenLabel = <T extends string>({ value, options }: Pick<SelectProps<T>, "value" | "options">) =>
@@ -16,8 +18,9 @@ export const chosenLabel = <T extends string>({ value, options }: Pick<SelectPro
 
 // What a Select looks like on every platform: the chosen option on a chip, with
 // the up-and-down chevron that says a menu opens. Only the menu is the platform's.
-export function SelectChip({ text, pressed }: { text: string; pressed?: boolean }) {
+export function SelectChip({ text, pressed, raised }: { text: string; pressed?: boolean; raised?: boolean }) {
   const colors = useColors();
+  const shadows = useShadows();
   return (
     <View
       style={{
@@ -29,7 +32,8 @@ export function SelectChip({ text, pressed }: { text: string; pressed?: boolean 
         paddingLeft: space.lg,
         paddingRight: space.md,
         borderRadius: radius.pill,
-        backgroundColor: pressed ? colors.chipPressed : colors.chip,
+        backgroundColor: pressed ? colors.chipPressed : raised ? colors.surface : colors.chip,
+        boxShadow: raised ? shadows.card : undefined,
       }}
     >
       <Text variant="subheadline" strong numberOfLines={1}>

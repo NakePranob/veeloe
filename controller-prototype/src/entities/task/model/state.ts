@@ -4,12 +4,12 @@ import type { TaskEvent } from "./types";
 // Everything a screen shows about a Task is worked out here from its event log
 // (ADR 0018), once, so no two screens can disagree.
 
-export type TaskState = "waiting" | "working" | "done";
+export type TaskState = "waiting" | "working" | "budget" | "interrupted" | "done";
 
 // What a Member sees for an Agent's Task: its state, or offline when its Machine is.
 export type Status = TaskState | "offline";
 
-export const STATUS_LABEL: Record<Status, string> = { waiting: "รอคุณอนุมัติ", working: "กำลังทำงาน", done: "เสร็จแล้ว", offline: "ออฟไลน์" };
+export const STATUS_LABEL: Record<Status, string> = { waiting: "รออนุมัติ", working: "กำลังทำงาน", budget: "Budget ของวันนี้หมด", interrupted: "Turn ถูกขัดจังหวะ", done: "เสร็จแล้ว", offline: "ออฟไลน์" };
 
 type Request = Extract<TaskEvent, { type: "approval_request" }>;
 
@@ -73,7 +73,10 @@ export function toolResults(events: TaskEvent[]): Map<string, ToolResult> {
 
 export function stateOf(events: TaskEvent[], now = Date.now()): TaskState {
   if (pendingApproval(events, now)) return "waiting";
-  return turnOpen(events) ? "working" : "done";
+  if (turnOpen(events)) return "working";
+  const last = events[lastIndex(events, ["turn_start", "budget_out", "budget_restored", "interrupted"])];
+  if (last?.type === "budget_out") return "budget";
+  return last?.type === "interrupted" ? "interrupted" : "done";
 }
 
 export function statusOf(events: TaskEvent[], online: boolean, now = Date.now()): Status {
@@ -110,7 +113,7 @@ export function preview(events: TaskEvent[], now = Date.now()) {
   if (pending) return pending.command;
   const last = events[lastIndex(events, ["text", "message", "tool_call", "stop"])];
   if (last?.type === "tool_call") return last.command;
-  if (last?.type === "stop") return "คุณหยุด Turn นี้";
+  if (last?.type === "stop") return "Turn นี้ถูกหยุด";
   if (last?.type === "text" || last?.type === "message") return plainFirstLine(last.text);
   return "";
 }

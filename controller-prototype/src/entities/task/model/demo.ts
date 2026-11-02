@@ -12,6 +12,9 @@ export function demoTasks(now: number): Task[] {
   return [
     {
       id: "deploy",
+      starter: "m_kai",
+      source: "app",
+      shared: false,
       agent: "deployer",
       title: "deploy 2.4.0 ขึ้น production",
       events: log(now, [
@@ -28,6 +31,9 @@ export function demoTasks(now: number): Task[] {
     },
     {
       id: "review",
+      starter: "m_kai",
+      source: "app",
+      shared: true,
       agent: "reviewer",
       title: "รีวิว PR #42",
       events: log(now, [
@@ -41,6 +47,9 @@ export function demoTasks(now: number): Task[] {
     },
     {
       id: "e2e",
+      starter: "m_kai",
+      source: "app",
+      shared: false,
       agent: "tester",
       title: "e2e ของ PR #42",
       events: log(now, [
@@ -54,6 +63,9 @@ export function demoTasks(now: number): Task[] {
     },
     {
       id: "notes",
+      starter: "m_kai",
+      source: "app",
+      shared: false,
       agent: "writer",
       title: "ร่าง release notes",
       events: log(now, [
@@ -61,6 +73,20 @@ export function demoTasks(now: number): Task[] {
         [150, { type: "turn_start" }],
         [148, { type: "text", text: "ร่างไว้ที่ `docs/releases/2.4.0.md` แล้ว มีสามหัวข้อ: หน้าชำระเงินใหม่, index ของ orders และการแก้ bug 6 ตัว" }],
         [148, { type: "turn_end" }],
+      ]),
+    },
+    {
+      id: "refactor",
+      starter: "m_nok",
+      source: "app",
+      shared: false,
+      agent: "reviewer",
+      title: "แยก module ของ orders",
+      events: log(now, [
+        [90, { type: "message", member: "m_nok", text: "ช่วยดูว่าแยก module ของ orders ยังไงดี" }],
+        [90, { type: "turn_start" }],
+        [88, { type: "text", text: "แยกเป็น `orders/read` กับ `orders/write` จะเริ่มได้ง่ายสุด" }],
+        [88, { type: "turn_end" }],
       ]),
     },
   ];

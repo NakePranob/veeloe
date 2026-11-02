@@ -5,7 +5,7 @@ import { chosenLabel, SelectChip, type SelectProps } from "./select-chip";
 import { space, useColors } from "./theme";
 
 // Our chip opens a Material dropdown menu anchored to it.
-export function Select<T extends string>({ label, value, options, onChange }: SelectProps<T>) {
+export function Select<T extends string>({ label, value, options, onChange, raised }: SelectProps<T>) {
   const colors = useColors();
   const [open, setOpen] = useState(false);
   return (
@@ -14,7 +14,7 @@ export function Select<T extends string>({ label, value, options, onChange }: Se
         <DropdownMenu.Trigger>
           <RNHostView matchContents>
             <Pressable role="button" aria-label={label} aria-expanded={open} onPress={() => setOpen(true)} hitSlop={space.xs}>
-              {({ pressed }) => <SelectChip text={chosenLabel({ value, options })} pressed={pressed} />}
+              {({ pressed }) => <SelectChip text={chosenLabel({ value, options })} pressed={pressed} raised={raised} />}
             </Pressable>
           </RNHostView>
         </DropdownMenu.Trigger>

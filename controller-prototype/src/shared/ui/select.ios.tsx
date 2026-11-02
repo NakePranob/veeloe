@@ -4,14 +4,14 @@ import { chosenLabel, SelectChip, type SelectProps } from "./select-chip";
 import { useColors } from "./theme";
 
 // Our chip opens a SwiftUI menu, which ticks the chosen option.
-export function Select<T extends string>({ label, value, options, onChange }: SelectProps<T>) {
+export function Select<T extends string>({ label, value, options, onChange, raised }: SelectProps<T>) {
   const colors = useColors();
   return (
     <Host matchContents seedColor={colors.accent}>
       <Menu
         label={
           <RNHostView matchContents>
-            <SelectChip text={chosenLabel({ value, options })} />
+            <SelectChip text={chosenLabel({ value, options })} raised={raised} />
           </RNHostView>
         }
         modifiers={[accessibilityLabel(label)]}

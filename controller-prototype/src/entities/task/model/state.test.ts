@@ -24,7 +24,7 @@ test("answering, expiry or a Stop closes the Approval", () => {
   expect(stateOf(deploy.events, NOW + 2 * 60 * 60_000)).toBe("working");
   const stopped = after(deploy.events, { type: "stop" }, { type: "turn_end" });
   expect(stateOf(stopped, NOW)).toBe("done");
-  expect(preview(stopped, NOW)).toBe("คุณหยุด Turn นี้");
+  expect(preview(stopped, NOW)).toBe("Turn นี้ถูกหยุด");
 });
 
 test("each Approval has one outcome, whatever closed it", () => {
