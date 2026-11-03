@@ -13,6 +13,7 @@ import (
 
 	"hub/internal/app/controller"
 	"hub/internal/app/machine"
+	"hub/internal/app/pairing"
 	"hub/internal/app/relay"
 	"hub/internal/composition"
 	"hub/internal/platform/database"
@@ -85,7 +86,7 @@ func run() error {
 	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return fmt.Errorf("trusted proxies: %w", err)
 	}
-	r.Use(gin.Recovery(), middleware.CORS(cfg.CORSAllowedOrigins), middleware.SecurityHeaders(cfg.IsProd()), middleware.RequestID(), middleware.Logger(logger), middleware.Error(!cfg.IsProd()))
+	r.Use(gin.Recovery(), middleware.CORS(cfg.CORSAllowedOrigins, "/pairings"), middleware.SecurityHeaders(cfg.IsProd()), middleware.RequestID(), middleware.Logger(logger), middleware.Error(!cfg.IsProd()))
 
 	// liveness = is the process up / readiness = ready for traffic (can it reach the DB)
 	r.GET("/livez", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
@@ -115,6 +116,7 @@ func run() error {
 	}).Register(api)
 	machine.NewHandlerFromDB(db).Register(api)
 	controller.NewHandlerFromDB(db).Register(api)
+	pairing.NewHandlerFromDB(db, cfg.HubPublicURL).Register(api)
 	// go-scaffold:routes
 
 	srv := &http.Server{

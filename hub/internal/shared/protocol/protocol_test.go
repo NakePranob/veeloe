@@ -197,3 +197,41 @@ func TestHubURLVectors(t *testing.T) {
 		}
 	}
 }
+
+// Every request in the published vectors must sign exactly as the Hub reads it.
+func TestPairingVectors(t *testing.T) {
+	var v struct {
+		HubURL            string `json:"hubUrl"`
+		LinkSignedText    string `json:"linkSignedText"`
+		RequestSignedText string `json:"requestSignedText"`
+		Expires           int64  `json:"expires"`
+		Requests          []struct {
+			Name    string `json:"name"`
+			Valid   bool   `json:"valid"`
+			Request struct {
+				Machine       string `json:"machine"`
+				Controller    string `json:"controller"`
+				Expires       int64  `json:"expires"`
+				MachineSig    string `json:"machineSig"`
+				ControllerSig string `json:"controllerSig"`
+			} `json:"request"`
+		} `json:"requests"`
+	}
+	readJSON(t, "vectors/pairings.json", &v)
+	decode := base64.RawURLEncoding.DecodeString
+	for _, c := range v.Requests {
+		machine, _ := decode(c.Request.Machine)
+		controller, _ := decode(c.Request.Controller)
+		machineSig, _ := decode(c.Request.MachineSig)
+		controllerSig, _ := decode(c.Request.ControllerSig)
+		linkBytes := PairingLinkBytes(v.HubURL, machine, c.Request.Expires)
+		requestBytes := PairingRequestBytes(v.HubURL, machine, controller, c.Request.Expires)
+		if c.Valid && (string(linkBytes) != v.LinkSignedText || string(requestBytes) != v.RequestSignedText) {
+			t.Errorf("%s: the bytes differ from the published text", c.Name)
+		}
+		got := ed25519.Verify(machine, linkBytes, machineSig) && ed25519.Verify(controller, requestBytes, controllerSig)
+		if got != c.Valid {
+			t.Errorf("%s: verified %v, want %v", c.Name, got, c.Valid)
+		}
+	}
+}

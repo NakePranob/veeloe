@@ -1,0 +1,26 @@
+{
+  "title": "เพิ่ม Machine",
+  "enter": {
+    "heading": "ที่ Machine ให้รัน",
+    "command": "veeloe pair --hub <url>",
+    "body": "แล้วสแกน QR ที่แสดง หรือวางลิงก์ที่นี่",
+    "scan": "สแกน QR",
+    "stopScan": "หยุดสแกน",
+    "paste": "วางลิงก์",
+    "continue": "ถัดไป",
+    "noCamera": "Veeloe ใช้กล้องที่นี่ไม่ได้ ให้วางลิงก์แทน"
+  },
+  "confirm": {
+    "heading": "ผูกกับ Machine เครื่องนี้ไหม",
+    "body": "Machine จะเชื่อกุญแจของอุปกรณ์นี้ และทำตามคำสั่งที่คุณส่งผ่าน Hub นี้ ทำต่อเมื่อคุณเป็นคนรัน veeloe pair เองเท่านั้น",
+    "hub": "Hub",
+    "machine": "กุญแจของ Machine",
+    "action": "ผูก",
+    "cancel": "ยกเลิก",
+    "prompt": "ยืนยันการ Pairing กับ Machine เครื่องนี้"
+  },
+  "pairing": {
+    "heading": "กำลังทำ Pairing…",
+    "body": "ปล่อยให้ veeloe pair ทำงานที่ Machine จนกว่าจะเสร็จ"
+  }
+}

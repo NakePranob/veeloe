@@ -31,6 +31,14 @@
           "root": "./app"
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Veeloe uses the camera to scan the QR code your Machine shows.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-localization",
       "expo-sqlite",
       [

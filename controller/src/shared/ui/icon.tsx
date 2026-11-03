@@ -5,6 +5,7 @@ import { icon as sizes, useColors, type Colors } from "./theme";
 // Android and web: one icon family per platform (expo-native-ui).
 const SYMBOLS = {
   check: { ios: "checkmark", android: "check", web: "check" },
+  scan: { ios: "qrcode.viewfinder", android: "qr_code_scanner", web: "qr_code_scanner" },
   settings: { ios: "gearshape", android: "settings", web: "settings" },
   machine: { ios: "desktopcomputer", android: "computer", web: "computer" },
   window: { ios: "macwindow", android: "tab", web: "tab" },

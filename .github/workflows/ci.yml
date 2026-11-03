@@ -77,6 +77,23 @@ jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hub_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    # Without these the Pairing test skips, and a broken one stays green.
+    env:
+      TEST_DB_DSN: postgres://postgres:postgres@localhost:5432/hub_test?sslmode=disable
+      REQUIRE_TEST_DB: "true"
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -87,4 +104,10 @@ jobs:
           go-version-file: hub/go.mod
           cache-dependency-path: hub/go.sum
       - run: bun install --frozen-lockfile
+      - name: Apply migrations
+        working-directory: hub
+        run: |
+          # keep in step with MIGRATE_VERSION in hub/Makefile
+          go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+          "$(go env GOPATH)/bin/migrate" -path migrations -database "$TEST_DB_DSN" up
       - run: bun run test:e2e

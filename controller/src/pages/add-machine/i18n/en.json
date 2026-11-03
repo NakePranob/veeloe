@@ -1,0 +1,26 @@
+{
+  "title": "Add Machine",
+  "enter": {
+    "heading": "On the Machine, run",
+    "command": "veeloe pair --hub <url>",
+    "body": "Then scan the QR code it shows, or paste its link here.",
+    "scan": "Scan QR code",
+    "stopScan": "Stop scanning",
+    "paste": "Paste the link",
+    "continue": "Continue",
+    "noCamera": "Veeloe can't use the camera here. Paste the link instead."
+  },
+  "confirm": {
+    "heading": "Pair with this Machine?",
+    "body": "It will trust this device's key and run what you send through this Hub. Only continue if you started veeloe pair yourself.",
+    "hub": "Hub",
+    "machine": "Machine key",
+    "action": "Pair",
+    "cancel": "Cancel",
+    "prompt": "Confirm Pairing with this Machine"
+  },
+  "pairing": {
+    "heading": "Pairing…",
+    "body": "Keep veeloe pair running on the Machine until this finishes."
+  }
+}

@@ -4,5 +4,6 @@
   "empty": {
     "title": "ยังไม่มี Machine",
     "body": "Agent ของคุณจะมาอยู่ที่นี่หลังทำ Pairing ระหว่าง Machine กับแอปนี้"
-  }
+  },
+  "add": "เพิ่ม Machine"
 }

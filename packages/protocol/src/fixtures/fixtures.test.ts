@@ -4,6 +4,8 @@ import { verifySignature } from "../crypto/ed25519";
 import { MemorySeenSequences, verify } from "../envelope/verify";
 import { parseFrame } from "../frame";
 import { handshakeBytes, HubAuthSchema } from "../messages/hub-auth";
+import { pairingProof } from "../messages/pairing-claim";
+import { parsePairingLink } from "../messages/pairing-link";
 import { FIXTURES, isForSelf, render } from "./build";
 
 const root = `${import.meta.dir}/../..`;
@@ -42,4 +44,20 @@ test("a ready frame names exactly one of a Machine and a Member, and an error ne
   expect(parseFrame(JSON.stringify({ type: "hub.ready" })).kind).toBe("invalid");
   expect(parseFrame(JSON.stringify({ type: "hub.ready", machine: "m", member: "n" })).kind).toBe("invalid");
   expect(parseFrame(JSON.stringify({ type: "hub.error", code: "Machine is offline" })).kind).toBe("invalid");
+});
+
+test("the pairing vectors agree with the code that reads them", async () => {
+  const { link, now, secret, proof, proofText, member, claim, done } = await Bun.file(`${root}/vectors/pairings.json`).json();
+  const parsed = parsePairingLink(link, now * 1000);
+  if (!parsed.ok) throw new Error(parsed.reason);
+  expect(parsed.link.secret).toBe(secret);
+
+  const controller = JSON.parse(claim).from;
+  expect(proofText).toBe(`veeloe-pairing-proof/1\n${parsed.link.machine}\n${controller}\n${member}`);
+  expect(pairingProof({ secret, machine: parsed.link.machine, controller, member })).toBe(proof);
+
+  const atMachine = verify(JSON.parse(claim), new Set([controller]), (route) => "to" in route && route.to === "machine-1", new MemorySeenSequences());
+  expect(atMachine).toMatchObject({ ok: true, signed: { body: { member, proof } } });
+  const atController = verify(JSON.parse(done), new Set([parsed.link.machine]), (route) => "recipients" in route && route.recipients.includes(member), new MemorySeenSequences());
+  expect(atController).toMatchObject({ ok: true, signed: { body: { name: "my-mac" } } });
 });

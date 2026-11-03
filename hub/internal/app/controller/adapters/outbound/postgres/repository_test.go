@@ -58,11 +58,24 @@ func repositoryDBForTest(t *testing.T) *gorm.DB {
 	return tx
 }
 
+// workspaceForTest adds the Workspace a row's foreign key needs; the test
+// transaction takes it away again.
+func workspaceForTest(t *testing.T, db *gorm.DB) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	if err := db.Exec("INSERT INTO workspace_svc.workspaces (id) VALUES (?)", id).Error; err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	return id
+}
+
 func TestRepository_CreateFindDelete(t *testing.T) {
-	repo := NewRepository(repositoryDBForTest(t))
+	db := repositoryDBForTest(t)
+	repo := NewRepository(db)
+	workspace := workspaceForTest(t, db)
 	ctx := context.Background()
 	id := uuid.New()
-	item := &domain.Controller{ID: id, Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(1)}
+	item := &domain.Controller{ID: id, Version: 1, WorkspaceID: workspace, MemberID: "m-1", PublicKey: testKey(1)}
 
 	if err := repo.Create(ctx, item); err != nil {
 		t.Fatalf("create: %v", err)
@@ -83,9 +96,11 @@ func TestRepository_CreateFindDelete(t *testing.T) {
 // overwriting the first. Runs against the real database because the guard is
 // a WHERE clause — a stub would only be testing itself.
 func TestRepository_Update_RefusesStaleVersion(t *testing.T) {
-	repo := NewRepository(repositoryDBForTest(t))
+	db := repositoryDBForTest(t)
+	repo := NewRepository(db)
+	workspace := workspaceForTest(t, db)
 	ctx := context.Background()
-	item := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(2)}
+	item := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: workspace, MemberID: "m-1", PublicKey: testKey(2)}
 
 	if err := repo.Create(ctx, item); err != nil {
 		t.Fatalf("create: %v", err)

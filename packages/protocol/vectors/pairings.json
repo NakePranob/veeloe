@@ -1,0 +1,73 @@
+{
+  "note": "TEST-ONLY KEYS from fixed public seeds. The Hub is configured with `hubUrl`, and `now` is the time to check at, in Unix seconds.",
+  "hubUrl": "wss://hub.example.com",
+  "now": 1999999940,
+  "expires": 2000000000,
+  "skewSeconds": 120,
+  "linkSignedText": "veeloe-pairing-link/1\nwss://hub.example.com\nF8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\n2000000000",
+  "requestSignedText": "veeloe-pairing-request/1\nwss://hub.example.com\nF8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\n11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\n2000000000",
+  "proofText": "veeloe-pairing-proof/1\nF8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\n11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\nm_vector",
+  "secret": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU",
+  "member": "m_vector",
+  "proof": "xEJbsI7Qp8A0pN2A9BXMpnryogFFV1RMoQA9WB4JrQY",
+  "link": "veeloe://pair?hub=wss%3A%2F%2Fhub.example.com&machine=F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4&secret=VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU&expires=2000000000&sig=eJwo9nU1dhkY_cSCUsg1qVfAttLfejBJJ7e0zUDE293Bh6v4RIPyuIuRCXnJk3EfEBtm5LEqBUZtg0ANTO1rCA",
+  "claim": "{\"v\":1,\"type\":\"pairing.claim\",\"to\":\"machine-1\",\"from\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"signed\":\"{\\\"type\\\":\\\"pairing.claim\\\",\\\"to\\\":\\\"machine-1\\\",\\\"seq\\\":1,\\\"body\\\":{\\\"member\\\":\\\"m_vector\\\",\\\"proof\\\":\\\"xEJbsI7Qp8A0pN2A9BXMpnryogFFV1RMoQA9WB4JrQY\\\"}}\",\"sig\":\"SAZmKHoEC7LGCuqIuTq_TQ28rDpwcPrUAlcqWi4yq7A9em2inuEkfz0mrZvpqcWRRdBble-KU04pAuHRVUI1Bw\"}",
+  "done": "{\"v\":1,\"type\":\"pairing.done\",\"recipients\":[\"m_vector\"],\"from\":\"F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\",\"signed\":\"{\\\"type\\\":\\\"pairing.done\\\",\\\"recipients\\\":[\\\"m_vector\\\"],\\\"seq\\\":1,\\\"body\\\":{\\\"name\\\":\\\"my-mac\\\"}}\",\"sig\":\"-7CGIRBL1bKTJ0oAu060GrQx2br7q_y-g1OelJZh3fRhyivpAmSnNTR6ZQBrE2wm_fZuGsJPSpsd3MECxwRwDA\"}",
+  "requests": [
+    {
+      "name": "valid",
+      "request": {
+        "machine": "F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4",
+        "controller": "11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg",
+        "expires": 2000000000,
+        "machineSig": "eJwo9nU1dhkY_cSCUsg1qVfAttLfejBJJ7e0zUDE293Bh6v4RIPyuIuRCXnJk3EfEBtm5LEqBUZtg0ANTO1rCA",
+        "controllerSig": "4p0O6O-zQUwEPC1xQSoT0_n3pl9Kt1MeN_Uh0W1WvNVEP4ynf2zCHom7bRDKejV087j0A3r85jS2pYR4d1blDw"
+      },
+      "valid": true
+    },
+    {
+      "name": "a Machine signature by another key",
+      "request": {
+        "machine": "F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4",
+        "controller": "11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg",
+        "expires": 2000000000,
+        "machineSig": "WklVpiuLQQQ810uZTTcKOTx3t507PkT-mSx7Ew2DNW0xLMJu3JCe1EgfGysBbL5MvpD4Uy_DyAF34WmNqbd1CQ",
+        "controllerSig": "4p0O6O-zQUwEPC1xQSoT0_n3pl9Kt1MeN_Uh0W1WvNVEP4ynf2zCHom7bRDKejV087j0A3r85jS2pYR4d1blDw"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Machine signature for another expiry",
+      "request": {
+        "machine": "F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4",
+        "controller": "11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg",
+        "expires": 2000001000,
+        "machineSig": "eJwo9nU1dhkY_cSCUsg1qVfAttLfejBJJ7e0zUDE293Bh6v4RIPyuIuRCXnJk3EfEBtm5LEqBUZtg0ANTO1rCA",
+        "controllerSig": "4p0O6O-zQUwEPC1xQSoT0_n3pl9Kt1MeN_Uh0W1WvNVEP4ynf2zCHom7bRDKejV087j0A3r85jS2pYR4d1blDw"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Controller signature by another key",
+      "request": {
+        "machine": "F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4",
+        "controller": "11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg",
+        "expires": 2000000000,
+        "machineSig": "eJwo9nU1dhkY_cSCUsg1qVfAttLfejBJJ7e0zUDE293Bh6v4RIPyuIuRCXnJk3EfEBtm5LEqBUZtg0ANTO1rCA",
+        "controllerSig": "QZrnmmPLNoQdbKoT1zqSldmEM3TTDjCCPN-Agoif2z8bkWhw_xgZYOS_LX69rXTIqMkfqa2IZRFjiGcMIZDjCQ"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Controller signature for another Hub",
+      "request": {
+        "machine": "F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4",
+        "controller": "11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg",
+        "expires": 2000000000,
+        "machineSig": "eJwo9nU1dhkY_cSCUsg1qVfAttLfejBJJ7e0zUDE293Bh6v4RIPyuIuRCXnJk3EfEBtm5LEqBUZtg0ANTO1rCA",
+        "controllerSig": "ewC_EgFWyA5CEAoIElD0YtQ1Ud_fUl5nIhVwZRL9iFMw1T5z9EVs4K9uhUW9LZpM6oyCkO93vw2-9-jiBBLNBQ"
+      },
+      "valid": false
+    }
+  ]
+}

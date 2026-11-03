@@ -1,6 +1,13 @@
 {
   "_unknown": "Something went wrong ({{code}})",
   "hub.machine_offline": "That Machine is offline, so it did not get this",
+  "hub.machine_taken": "That Machine already belongs to another Workspace. Run veeloe unpair on it, then pair again",
+  "hub.pairing_invalid": "The Hub refused this link because the signatures did not check out or it has expired. Run veeloe pair again",
   "hub.route_not_allowed": "The Hub refused where this was going",
-  "hub.sender_mismatch": "The Hub refused this because the sender did not match"
+  "hub.sender_mismatch": "The Hub refused this because the sender did not match",
+  "pairing.hub_unreachable": "Couldn't reach the Hub in this link. Check its address and your connection",
+  "pairing.link_bad_signature": "This link was changed after the Machine made it, so it can't be used",
+  "pairing.link_expired": "This link has expired. Run veeloe pair on the Machine again",
+  "pairing.link_malformed": "That isn't a Pairing link. Copy the whole link veeloe pair shows",
+  "pairing.timed_out": "The Machine didn't answer in time. Check veeloe pair is still running, then try again"
 }

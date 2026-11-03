@@ -1,8 +1,8 @@
 # Agent Guidance: veeloe
 
 This is Veeloe (`veeloe` on GitHub), under AGPL-3.0 (`LICENSE`). The design is
-here: the Runtime is specified in `docs/adr/` but has no code yet,
-the Protocol is being built in `packages/protocol`, the Hub in `hub/` and the Controller in `controller/`, and `controller-prototype/` is a throwaway UI prototype on
+here: the Runtime is being built in `packages/runtime`, the Protocol in
+`packages/protocol`, the Hub in `hub/` and the Controller in `controller/`, and `controller-prototype/` is a throwaway UI prototype on
 Demo data. It is **public** — everything pushed here, a commit message or a PR
 description included, is public the moment it lands. Never commit a secret: the Runtime release signing
 key, push and Expo credentials, billing keys and the hosted Hub's env stay in
@@ -34,11 +34,13 @@ bun run test
 
 `check` runs the type check and Steiger on the Controller and its prototype
 (ADR 0022), and checks that the Controller's Thai and English words match
-(ADR 0065). `check` also type-checks `packages/` and `e2e/`, and runs
-`go-scaffold check` on the Hub. `test` runs the unit tests of `packages/`, the
-Controller and its prototype.
+(ADR 0065). `check` also type-checks `packages/` and `e2e/`, runs
+dependency-cruiser on the Runtime (ADR 0022) and `go-scaffold check` on the Hub.
+`test` runs the unit tests of `packages/`, the Controller and its prototype.
 CI runs both, plus `go test -race ./...` in `hub/` and `bun run test:e2e`, which
-sends signed envelopes through a real relay and needs Go.
+sends signed envelopes through a real relay and needs Go. Its Pairing test also
+needs a migrated Postgres in `TEST_DB_DSN`, and skips without one unless
+`REQUIRE_TEST_DB` is set, as it is in CI.
 
 Write tests where there is a rule or a security check, not for coverage
 (ADR 0022).

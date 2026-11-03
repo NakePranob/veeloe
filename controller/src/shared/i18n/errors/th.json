@@ -1,6 +1,13 @@
 {
   "_unknown": "เกิดข้อผิดพลาด ({{code}})",
   "hub.machine_offline": "Machine ออฟไลน์อยู่ จึงไม่ได้รับข้อความนี้",
+  "hub.machine_taken": "Machine เครื่องนี้อยู่ใน Workspace อื่นแล้ว ให้รัน veeloe unpair ที่เครื่องนั้นแล้วทำ Pairing ใหม่",
+  "hub.pairing_invalid": "Hub ไม่รับลิงก์นี้ เพราะลายเซ็นไม่ถูกต้องหรือลิงก์หมดอายุ ให้รัน veeloe pair อีกครั้ง",
   "hub.route_not_allowed": "Hub ไม่ยอมส่งข้อความนี้ไปยังปลายทางที่ระบุ",
-  "hub.sender_mismatch": "Hub ปฏิเสธข้อความนี้เพราะผู้ส่งไม่ตรงกัน"
+  "hub.sender_mismatch": "Hub ปฏิเสธข้อความนี้เพราะผู้ส่งไม่ตรงกัน",
+  "pairing.hub_unreachable": "ติดต่อ Hub ในลิงก์นี้ไม่ได้ ตรวจที่อยู่ของ Hub และการเชื่อมต่อ",
+  "pairing.link_bad_signature": "ลิงก์นี้ถูกแก้หลัง Machine สร้าง จึงใช้ไม่ได้",
+  "pairing.link_expired": "ลิงก์นี้หมดอายุแล้ว ให้รัน veeloe pair ที่ Machine อีกครั้ง",
+  "pairing.link_malformed": "นี่ไม่ใช่ลิงก์ Pairing ให้คัดลอกลิงก์ทั้งหมดที่ veeloe pair แสดง",
+  "pairing.timed_out": "Machine ไม่ตอบในเวลาที่กำหนด ตรวจว่า veeloe pair ยังทำงานอยู่ แล้วลองใหม่"
 }

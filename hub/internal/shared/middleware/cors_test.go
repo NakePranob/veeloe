@@ -57,3 +57,32 @@ func TestCORS_AllowsReauthenticationHeader(t *testing.T) {
 		t.Fatalf("Allow-Headers = %q, want reauthentication header", got)
 	}
 }
+
+func TestCORS_OpenPathsAnswerAnyOriginWithoutCredentials(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(CORS(nil, "/pairings"))
+	router.POST("/pairings", func(c *gin.Context) { c.Status(http.StatusOK) })
+	router.POST("/other", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	for _, method := range []string{http.MethodOptions, http.MethodPost} {
+		request := httptest.NewRequest(method, "/pairings", nil)
+		request.Header.Set("Origin", "https://anywhere.example")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if got := response.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+			t.Fatalf("%s: Access-Control-Allow-Origin = %q", method, got)
+		}
+		if response.Header().Get("Access-Control-Allow-Credentials") != "" {
+			t.Fatalf("%s: an open path must not allow credentials", method)
+		}
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/other", nil)
+	request.Header.Set("Origin", "https://anywhere.example")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("other path: Access-Control-Allow-Origin = %q", got)
+	}
+}

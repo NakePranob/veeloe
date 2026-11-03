@@ -3,7 +3,10 @@ import { fromBase64url, toBase64url } from "../crypto/base64url";
 import { publicKeyOf, sign, verifySignature } from "../crypto/ed25519";
 import { EnvelopeSchema, type Route } from "../envelope/schema";
 import { MemorySeenSequences, verify } from "../envelope/verify";
+import { createSigner } from "../envelope/sign";
 import { answerChallenge, handshakeBytes, normalizeHubUrl } from "../messages/hub-auth";
+import { pairingProof, pairingProofText } from "../messages/pairing-claim";
+import { buildPairingLink, buildPairingRequest, pairingLinkBytes, pairingRequestBytes, parsePairingLink } from "../messages/pairing-link";
 
 // The files every implementation checks itself against (Go included): the
 // header's JSON Schema and the test vectors. Rebuild them with
@@ -14,6 +17,8 @@ import { answerChallenge, handshakeBytes, normalizeHubUrl } from "../messages/hu
 const TEST_SENDER = new Uint8Array(32).fill(0x11);
 const TEST_STRANGER = new Uint8Array(32).fill(0x22);
 const TEST_MACHINE = new Uint8Array(32).fill(0x33);
+const TEST_CONTROLLER = new Uint8Array(32).fill(0x44);
+const TEST_PAIRING_SECRET = new Uint8Array(32).fill(0x55);
 
 const encoder = new TextEncoder();
 const keyOf = (secret: Uint8Array) => toBase64url(publicKeyOf(secret));
@@ -159,11 +164,57 @@ export function hubUrlVectors() {
   };
 }
 
+export function pairingVectors() {
+  const hubUrl = "wss://hub.example.com";
+  const expires = 2_000_000_000;
+  const member = "m_vector";
+  const link = buildPairingLink({ hub: hubUrl, machineSecretKey: TEST_MACHINE, secret: TEST_PAIRING_SECRET, expires });
+  const parsed = parsePairingLink(link, 0);
+  if (!parsed.ok) throw new Error(parsed.reason);
+  const request = buildPairingRequest(parsed.link, TEST_CONTROLLER);
+  const machine = keyOf(TEST_MACHINE);
+  const controller = keyOf(TEST_CONTROLLER);
+  const secret = toBase64url(TEST_PAIRING_SECRET);
+  const proof = pairingProof({ secret, machine, controller, member });
+  const claim = createSigner(TEST_CONTROLLER, () => 1)({ type: "pairing.claim", to: "machine-1", body: { member, proof } });
+  const done = createSigner(TEST_MACHINE, () => 1)({ type: "pairing.done", recipients: [member], body: { name: "my-mac" } });
+  const stranger = (bytes: Uint8Array) => toBase64url(sign(bytes, TEST_STRANGER));
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds. The Hub is configured with `hubUrl`, and `now` is the time to check at, in Unix seconds.",
+    hubUrl,
+    now: expires - 60,
+    expires,
+    skewSeconds: 120,
+    /** The bytes each side signs, and the text the proof is the HMAC of, as text. */
+    linkSignedText: new TextDecoder().decode(pairingLinkBytes(hubUrl, machine, expires)),
+    requestSignedText: new TextDecoder().decode(pairingRequestBytes(hubUrl, machine, controller, expires)),
+    proofText: pairingProofText({ machine, controller, member }),
+    secret,
+    member,
+    proof,
+    link,
+    claim: JSON.stringify(claim),
+    done: JSON.stringify(done),
+    requests: [
+      { name: "valid", request, valid: true },
+      { name: "a Machine signature by another key", request: { ...request, machineSig: stranger(pairingLinkBytes(hubUrl, machine, expires)) }, valid: false },
+      { name: "a Machine signature for another expiry", request: { ...request, expires: expires + 1000 }, valid: false },
+      { name: "a Controller signature by another key", request: { ...request, controllerSig: stranger(pairingRequestBytes(hubUrl, machine, controller, expires)) }, valid: false },
+      {
+        name: "a Controller signature for another Hub",
+        request: { ...request, controllerSig: toBase64url(sign(pairingRequestBytes("wss://evil.example.com", machine, controller, expires), TEST_CONTROLLER)) },
+        valid: false,
+      },
+    ],
+  };
+}
+
 export const FIXTURES = {
   "schema/envelope-header.schema.json": headerSchema,
   "vectors/envelopes.json": envelopeVectors,
   "vectors/handshakes.json": handshakeVectors,
   "vectors/hub-urls.json": hubUrlVectors,
+  "vectors/pairings.json": pairingVectors,
 };
 
 export const render = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;

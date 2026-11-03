@@ -18,6 +18,8 @@ paths:
     $ref: './health/health-livez.yaml'
   /readyz:
     $ref: './health/health-readyz.yaml'
+  /pairings:
+    $ref: './pairing/pairings.yaml'
   # go-scaffold:paths
 
 components:

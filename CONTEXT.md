@@ -39,7 +39,7 @@ Workspace ตัวอย่างที่อยู่บน Controller อย�
 _Avoid_: Demo account, sandbox mode, guest mode
 
 **Pairing**:
-การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียว ถ้า Owner ของ Workspace เดิมเซ็นปล่อย Machine ไว้ก่อน Pairing ครั้งใหม่จะพา Agent, Workdir, Project และประวัติ Task ไปด้วย แต่ Grant ทั้งหมดถูกล้าง และ Schedule กับ Channel หยุด คำสั่งปล่อยใช้ได้กับ Pairing ครั้งถัดไปครั้งเดียว หมดอายุใน 7 วัน และ Owner คนไหนก็ยกเลิกได้ ระหว่างนั้น Machine ยังทำงานใน Workspace เดิม ถ้าไม่ได้ปล่อยไว้ Machine จะเริ่มใหม่จากศูนย์
+การผูก Machine ใหม่เข้ากับ Workspace ด้วยรหัสใช้ครั้งเดียวจาก QR บนจอ Machine ซึ่ง Hub ไม่เคยเห็น ถ้า Owner ของ Workspace เดิมเซ็นปล่อย Machine ไว้ก่อน Pairing ครั้งใหม่จะพา Agent, Workdir, Project และประวัติ Task ไปด้วย แต่ Grant ทั้งหมดถูกล้าง และ Schedule กับ Channel หยุด คำสั่งปล่อยใช้ได้กับ Pairing ครั้งถัดไปครั้งเดียว หมดอายุใน 7 วัน และ Owner คนไหนก็ยกเลิกได้ ระหว่างนั้น Machine ยังทำงานใน Workspace เดิม ถ้าไม่ได้ปล่อยไว้ Machine จะเริ่มใหม่จากศูนย์
 _Avoid_: Registration, enroll
 
 **Linking**:

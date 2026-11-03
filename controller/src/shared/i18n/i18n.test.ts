@@ -39,7 +39,7 @@ test("a known code gets its words in the language picked", async () => {
 });
 
 test("every code the Hub sends today has words in both languages", () => {
-  for (const code of ["hub.machine_offline", "hub.route_not_allowed", "hub.sender_mismatch"]) {
+  for (const code of ["hub.machine_offline", "hub.machine_taken", "hub.pairing_invalid", "hub.route_not_allowed", "hub.sender_mismatch"]) {
     expect(errorsI18n.th).toHaveProperty([code]);
     expect(errorsI18n.en).toHaveProperty([code]);
   }

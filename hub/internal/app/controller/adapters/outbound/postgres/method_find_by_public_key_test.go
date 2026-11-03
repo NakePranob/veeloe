@@ -14,9 +14,11 @@ import (
 func testKey(b byte) []byte { return bytes.Repeat([]byte{b}, 32) }
 
 func TestRepository_FindByPublicKey(t *testing.T) {
-	repo := NewRepository(repositoryDBForTest(t))
+	db := repositoryDBForTest(t)
+	repo := NewRepository(db)
+	workspace := workspaceForTest(t, db)
 	ctx := context.Background()
-	item := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(3)}
+	item := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: workspace, MemberID: "m-1", PublicKey: testKey(3)}
 	if err := repo.Create(ctx, item); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -32,12 +34,14 @@ func TestRepository_FindByPublicKey(t *testing.T) {
 
 // The schema, not the code, keeps a key owned by one Controller.
 func TestRepository_PublicKeyIsUnique(t *testing.T) {
-	repo := NewRepository(repositoryDBForTest(t))
+	db := repositoryDBForTest(t)
+	repo := NewRepository(db)
+	workspace := workspaceForTest(t, db)
 	ctx := context.Background()
-	if err := repo.Create(ctx, &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(5)}); err != nil {
+	if err := repo.Create(ctx, &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: workspace, MemberID: "m-1", PublicKey: testKey(5)}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	dup := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(5)}
+	dup := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: workspace, MemberID: "m-1", PublicKey: testKey(5)}
 	if err := repo.Create(ctx, dup); !errors.Is(err, domain.ErrConflict) {
 		t.Fatalf("duplicate key: want ErrConflict, got %v", err)
 	}

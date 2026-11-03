@@ -1,9 +1,12 @@
 import type { z } from "zod";
 import type { SignedPart } from "../envelope/schema";
 import { ErrorBodySchema } from "./error";
+import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
 
 const known = {
   error: ErrorBodySchema,
+  "pairing.claim": PairingClaimBodySchema,
+  "pairing.done": PairingDoneBodySchema,
 };
 
 type KnownType = keyof typeof known;

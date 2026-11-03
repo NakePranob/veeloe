@@ -1,3 +1,4 @@
+import { addMachineI18n } from "../../pages/add-machine";
 import { createKeyI18n } from "../../pages/create-key";
 import { lockI18n } from "../../pages/lock";
 import { otherTabI18n } from "../../pages/other-tab";
@@ -9,6 +10,7 @@ import { errorsI18n, type Language } from "../../shared/i18n";
 // One namespace per slice. Only this layer may see them all, since shared cannot import up.
 const slices = {
   errors: errorsI18n,
+  "add-machine": addMachineI18n,
   "create-key": createKeyI18n,
   home: homeI18n,
   lock: lockI18n,

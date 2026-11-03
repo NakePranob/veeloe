@@ -5,6 +5,7 @@
 package protocol
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/netip"
@@ -116,6 +117,8 @@ const (
 	CodeMachineOffline  = "hub.machine_offline"
 	CodeSenderMismatch  = "hub.sender_mismatch"
 	CodeRouteNotAllowed = "hub.route_not_allowed"
+	CodePairingInvalid  = "hub.pairing_invalid"
+	CodeMachineTaken    = "hub.machine_taken"
 )
 
 // Close codes the Hub ends a connection with.
@@ -186,4 +189,16 @@ func normalizeHost(host string) (string, error) {
 // already be normalized; the nonce goes in as its base64url text.
 func HandshakeBytes(hubURL, nonce string) []byte {
 	return []byte("veeloe-hub-auth/1\n" + hubURL + "\n" + nonce)
+}
+
+// PairingLinkBytes is what a Machine signs to consent to a Pairing. hubURL must
+// already be normalized. It leaves out the secret in the link, which a Hub
+// never sees.
+func PairingLinkBytes(hubURL string, machineKey []byte, expires int64) []byte {
+	return []byte("veeloe-pairing-link/1\n" + hubURL + "\n" + base64.RawURLEncoding.EncodeToString(machineKey) + "\n" + strconv.FormatInt(expires, 10))
+}
+
+// PairingRequestBytes is what a Controller signs to ask for the same Pairing.
+func PairingRequestBytes(hubURL string, machineKey, controllerKey []byte, expires int64) []byte {
+	return []byte("veeloe-pairing-request/1\n" + hubURL + "\n" + base64.RawURLEncoding.EncodeToString(machineKey) + "\n" + base64.RawURLEncoding.EncodeToString(controllerKey) + "\n" + strconv.FormatInt(expires, 10))
 }
