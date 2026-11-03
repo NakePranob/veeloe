@@ -25,6 +25,50 @@
       "normalized": "ws://localhost"
     },
     {
+      "input": "ws://localhost:080",
+      "normalized": "ws://localhost"
+    },
+    {
+      "input": "ws://localhost:08080",
+      "normalized": "ws://localhost:8080"
+    },
+    {
+      "input": "ws://[::1]:8080",
+      "normalized": "ws://[::1]:8080"
+    },
+    {
+      "input": "wss://[2001:DB8:0:0:0:0:0:1]",
+      "normalized": "wss://[2001:db8::1]"
+    },
+    {
+      "input": "wss://[::1]:443",
+      "normalized": "wss://[::1]"
+    },
+    {
+      "input": "wss://ไทย.example.com",
+      "normalized": "wss://xn--o3cw4h.example.com"
+    },
+    {
+      "input": "wss://hub.example.com?",
+      "normalized": "wss://hub.example.com"
+    },
+    {
+      "input": "wss://hub.example.com#",
+      "normalized": "wss://hub.example.com"
+    },
+    {
+      "input": "wss://:8443",
+      "error": true
+    },
+    {
+      "input": "wss://[::1%25en0]",
+      "error": true
+    },
+    {
+      "input": "wss://hub.example.com:70000",
+      "error": true
+    },
+    {
       "input": "https://hub.example.com",
       "error": true
     },

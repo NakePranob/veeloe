@@ -13,6 +13,10 @@ Machine หรือ Controller ต่อเข้า Hub ผ่าน WebSocket
 - **WHEN** client เปิด WebSocket มาที่ Hub
 - **THEN** frame แรกที่ได้คือ challenge ที่มี nonce ซึ่งไม่เคยเห็นในการเชื่อมต่อก่อนหน้า
 
+#### Scenario: เบราว์เซอร์จาก origin อื่น
+- **WHEN** Controller บนเว็บเปิด WebSocket จาก origin ที่ต่างจาก Hub
+- **THEN** Hub รับการเชื่อมต่อและส่ง challenge เพราะสิ่งที่พิสูจน์ตัวตนคือลายเซ็น ไม่ใช่ origin
+
 ### Requirement: เข้าได้เฉพาะกุญแจที่รู้จักพร้อมลายเซ็นถูกต้อง
 client SHALL ตอบ challenge ด้วยกุญแจสาธารณะและลายเซ็น Ed25519 ที่ครอบข้อความบริบทคงที่ URL สาธารณะของ Hub และ nonce Hub SHALL รับการเชื่อมต่อเฉพาะเมื่อกุญแจเป็นของ Machine หรือ Controller ที่รู้จักและลายเซ็นถูกต้อง แล้ว SHALL ตอบ ready frame ที่ระบุ Machine นั้น หรือ Member ของ Controller นั้น ไม่อย่างนั้น Hub SHALL ปิดการเชื่อมต่อด้วย error การพิสูจน์ตัวตน
 

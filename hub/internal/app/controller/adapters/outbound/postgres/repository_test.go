@@ -62,7 +62,7 @@ func TestRepository_CreateFindDelete(t *testing.T) {
 	repo := NewRepository(repositoryDBForTest(t))
 	ctx := context.Background()
 	id := uuid.New()
-	item := &domain.Controller{ID: id, Version: 1, WorkspaceID: uuid.New(), PublicKey: testKey(1)}
+	item := &domain.Controller{ID: id, Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(1)}
 
 	if err := repo.Create(ctx, item); err != nil {
 		t.Fatalf("create: %v", err)
@@ -85,13 +85,13 @@ func TestRepository_CreateFindDelete(t *testing.T) {
 func TestRepository_Update_RefusesStaleVersion(t *testing.T) {
 	repo := NewRepository(repositoryDBForTest(t))
 	ctx := context.Background()
-	item := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), PublicKey: testKey(2)}
+	item := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(2)}
 
 	if err := repo.Create(ctx, item); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
-	first := &domain.Controller{ID: item.ID, Version: item.Version, WorkspaceID: item.WorkspaceID, PublicKey: item.PublicKey}
+	first := &domain.Controller{ID: item.ID, Version: item.Version, WorkspaceID: item.WorkspaceID, MemberID: item.MemberID, PublicKey: item.PublicKey}
 	if err := repo.Update(ctx, first); err != nil {
 		t.Fatalf("first update: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestRepository_Update_RefusesStaleVersion(t *testing.T) {
 		t.Fatalf("want version bumped to %d, got %d", item.Version+1, first.Version)
 	}
 
-	stale := &domain.Controller{ID: item.ID, Version: item.Version, WorkspaceID: item.WorkspaceID, PublicKey: item.PublicKey}
+	stale := &domain.Controller{ID: item.ID, Version: item.Version, WorkspaceID: item.WorkspaceID, MemberID: item.MemberID, PublicKey: item.PublicKey}
 	if err := repo.Update(ctx, stale); !errors.Is(err, domain.ErrStaleVersion) {
 		t.Fatalf("want ErrStaleVersion for the second writer, got %v", err)
 	}

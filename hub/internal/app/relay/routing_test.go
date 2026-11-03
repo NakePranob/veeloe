@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"sync"
 	"testing"
@@ -70,6 +71,17 @@ func TestConnect_EachKindGetsItsOwnReady(t *testing.T) {
 	if _, ready := connectAs(t, url, testController); ready.Member != "member-1" || ready.Machine != "" {
 		t.Fatalf("controller: %+v", ready)
 	}
+}
+
+// A Controller on the web sends its own origin; the signature is what counts.
+func TestConnect_AcceptsAnotherOrigin(t *testing.T) {
+	url, _ := startHub(t, time.Second)
+	opts := &websocket.DialOptions{HTTPHeader: http.Header{"Origin": {"https://app.example.com"}}}
+	conn, _, err := websocket.Dial(context.Background(), url, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.CloseNow()
 }
 
 func TestConnect_UnknownKeyIsClosed(t *testing.T) {
@@ -146,6 +158,17 @@ func TestRoute_RefusesAForgedSender(t *testing.T) {
 	machine, _ := connectAs(t, url, testMachine)
 	controller, _ := connectAs(t, url, testController)
 	send(t, controller, envelope(testController2, `"to":"machine-1"`, "sig-1", "b"))
+	receiveError(t, controller, protocol.CodeSenderMismatch, "sig-1")
+	expectNothing(t, machine)
+}
+
+// Go matches JSON names regardless of case, and receivers do not: `FROM` must
+// not pass the check while receivers read the forged `from`.
+func TestRoute_RefusesAForgedSenderBehindAnotherCase(t *testing.T) {
+	url, _ := startHub(t, time.Second)
+	machine, _ := connectAs(t, url, testMachine)
+	controller, _ := connectAs(t, url, testController)
+	send(t, controller, fmt.Appendf(nil, `{"v":1,"type":"x","from":%q,"FROM":%q,"to":"machine-1","signed":"b","sig":"sig-1"}`, keyText(testController2), keyText(testController)))
 	receiveError(t, controller, protocol.CodeSenderMismatch, "sig-1")
 	expectNothing(t, machine)
 }

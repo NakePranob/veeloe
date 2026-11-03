@@ -29,7 +29,10 @@ const (
 // deadlines when the upgrade hijacks the connection (composition_test.go
 // holds it to that).
 func (h *Handler) connect(c *gin.Context) {
-	conn, err := websocket.Accept(c.Writer, c.Request, nil)
+	// The Origin check guards cookies, and this connection carries none: only a
+	// signature over the challenge proves anything. The Controller on the web
+	// lives on another origin than a self-hosted Hub, so it must get through.
+	conn, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		return // Accept has written the HTTP error
 	}

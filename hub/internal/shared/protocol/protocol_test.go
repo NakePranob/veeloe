@@ -165,6 +165,16 @@ func TestHandshakeVectors(t *testing.T) {
 	}
 }
 
+func TestHeaderReadsExactNames(t *testing.T) {
+	var h Header
+	if err := json.Unmarshal([]byte(`{"from":"a","FROM":"b","TO":"c","Recipients":["d"]}`), &h); err != nil {
+		t.Fatal(err)
+	}
+	if h.From != "a" || h.To != "" || h.Recipients != nil {
+		t.Fatalf("read a field by another case: %+v", h)
+	}
+}
+
 func TestHubURLVectors(t *testing.T) {
 	var file struct {
 		Vectors []struct {

@@ -5,9 +5,14 @@
 package protocol
 
 import (
+	"encoding/json"
 	"errors"
+	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
+
+	"golang.org/x/net/idna"
 )
 
 // Header is what the Hub reads of an envelope (ADR 0005, 0007). The signed
@@ -22,6 +27,27 @@ type Header struct {
 	Member     string   `json:"member,omitempty"`
 	Signed     string   `json:"signed"`
 	Sig        string   `json:"sig"`
+}
+
+// UnmarshalJSON reads each field by its exact name. encoding/json alone also
+// takes `FROM` for `from`, so the Hub would route by a field every receiver
+// ignores as unknown (ADR 0023).
+func (h *Header) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for name, field := range map[string]any{
+		"v": &h.V, "type": &h.Type, "from": &h.From, "to": &h.To, "recipients": &h.Recipients,
+		"task": &h.Task, "member": &h.Member, "signed": &h.Signed, "sig": &h.Sig,
+	} {
+		if raw, ok := fields[name]; ok {
+			if err := json.Unmarshal(raw, field); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // IsEnvelope says whether the frame carries what an envelope must have to be
@@ -113,18 +139,47 @@ func NormalizeHubURL(raw string) (string, error) {
 	if scheme != "ws" && scheme != "wss" {
 		return "", errors.New("hub URL must start with ws:// or wss://")
 	}
-	if u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || (u.Path != "" && u.Path != "/") || u.Host == "" {
+	if u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || u.Hostname() == "" {
 		return "", errors.New("hub URL must be just scheme, host and port")
 	}
-	host := strings.ToLower(u.Hostname())
-	port := u.Port()
-	if (scheme == "ws" && port == "80") || (scheme == "wss" && port == "443") {
-		port = ""
+	host, err := normalizeHost(u.Hostname())
+	if err != nil {
+		return "", err
 	}
-	if port != "" {
-		host += ":" + port
+	if u.Port() != "" {
+		port, err := strconv.Atoi(u.Port())
+		if err != nil || port > 65535 {
+			return "", errors.New("hub URL has an invalid port")
+		}
+		isDefault := (scheme == "ws" && port == 80) || (scheme == "wss" && port == 443)
+		if !isDefault {
+			host += ":" + strconv.Itoa(port)
+		}
 	}
 	return scheme + "://" + host, nil
+}
+
+// normalizeHost writes a host as the WHATWG URL parser does, which is what a
+// client's normalizeHubUrl sees: IPv6 compressed in brackets, a non-ASCII name
+// in punycode.
+//
+// ponytail: an IPv4-mapped address, a zone and the odd IPv4 forms like 0x7f.1
+// are not worth porting that parser. The first two refuse the boot; the last
+// fails handshakes. Port the rest if a Hub ever needs them.
+func normalizeHost(host string) (string, error) {
+	if strings.Contains(host, ":") {
+		addr, err := netip.ParseAddr(host)
+		if err != nil || addr.Zone() != "" || addr.Is4In6() {
+			return "", errors.New("hub URL has an IPv6 address it cannot sign")
+		}
+		return "[" + addr.String() + "]", nil
+	}
+	for _, r := range host {
+		if r >= 0x80 {
+			return idna.Lookup.ToASCII(host)
+		}
+	}
+	return strings.ToLower(host), nil
 }
 
 // HandshakeBytes is what a client signs to answer a challenge. hubURL must

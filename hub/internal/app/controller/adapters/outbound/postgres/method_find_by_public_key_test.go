@@ -34,10 +34,10 @@ func TestRepository_FindByPublicKey(t *testing.T) {
 func TestRepository_PublicKeyIsUnique(t *testing.T) {
 	repo := NewRepository(repositoryDBForTest(t))
 	ctx := context.Background()
-	if err := repo.Create(ctx, &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), PublicKey: testKey(5)}); err != nil {
+	if err := repo.Create(ctx, &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(5)}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	dup := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), PublicKey: testKey(5)}
+	dup := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: uuid.New(), MemberID: "m-1", PublicKey: testKey(5)}
 	if err := repo.Create(ctx, dup); !errors.Is(err, domain.ErrConflict) {
 		t.Fatalf("duplicate key: want ErrConflict, got %v", err)
 	}
