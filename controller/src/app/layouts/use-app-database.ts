@@ -22,8 +22,13 @@ export function useAppDatabase() {
       openedDatabase();
       setState({ status: "ready", database });
     } catch (error) {
-      console.error(error);
-      if (!retryOpenAfterReload()) setState({ status: "failed" });
+      if (retryOpenAfterReload()) {
+        // Off the "Use here" page: this page's worker cannot open anything now, so pressing again would only fail.
+        setState({ status: "opening" });
+      } else {
+        console.error(error);
+        setState({ status: "failed" });
+      }
     }
   }, []);
 

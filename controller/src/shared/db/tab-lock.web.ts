@@ -5,11 +5,14 @@
 // expo-sqlite's worker keeps its OPFS handles until the page is gone: closeAsync
 // does not free them, and a failed open breaks that worker for good. So handing
 // over means reloading, both for the tab that lets go and for a tab whose open
-// lost the race against the old worker dying. An open that fails with no hand-over
-// behind it, as in a WebKit private window, is not retried: waiting will not help.
+// lost the race against the old worker dying, which Safari can take seconds over.
+// An open with no hand-over behind it gets one quick retry, since a reload can race
+// its own old worker too, so that a private window, where waiting will not help,
+// is told soon.
 const LOCK = "veeloe-database";
 const RETRY_KEY = "veeloe-database-retry";
-const MAX_RETRIES = 3;
+const RETRY_DELAYS_AFTER_TAKE_OVER_MS = [500, 1000, 2000, 4000];
+const RETRY_DELAYS_AT_START_MS = [500];
 // The lock can free a moment before the old worker's handles do.
 const HANDLES_GRACE_MS = 150;
 
@@ -60,15 +63,16 @@ export async function takeOverDatabase(onTaken: () => Promise<void>) {
   await new Promise((resolve) => setTimeout(resolve, HANDLES_GRACE_MS));
 }
 
-/** True when the page is reloading to open again with a new worker; false when there is no point or the tries ran out. */
+/** True when the page will reload to open again with a new worker; false when there is no point or the tries ran out. */
 export function retryOpenAfterReload() {
-  const tries = Number(sessionStorage.getItem(RETRY_KEY) ?? 0);
-  if ((!tookOver && tries === 0) || tries >= MAX_RETRIES) {
+  const saved = sessionStorage.getItem(RETRY_KEY);
+  const [delay, ...rest]: number[] = saved ? JSON.parse(saved) : tookOver ? RETRY_DELAYS_AFTER_TAKE_OVER_MS : RETRY_DELAYS_AT_START_MS;
+  if (delay === undefined) {
     sessionStorage.removeItem(RETRY_KEY);
     return false;
   }
-  sessionStorage.setItem(RETRY_KEY, String(tries + 1));
-  location.reload();
+  sessionStorage.setItem(RETRY_KEY, JSON.stringify(rest));
+  setTimeout(() => location.reload(), delay);
   return true;
 }
 
