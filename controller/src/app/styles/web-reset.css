@@ -1,0 +1,3 @@
+/* Web only. Lets the browser draw what stays its own, such as the list a
+   Select opens, in the theme the person picked. */
+:root { color-scheme: light dark; }

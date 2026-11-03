@@ -1,0 +1,8 @@
+{
+  "title": "Veeloe",
+  "settings": "Settings",
+  "empty": {
+    "title": "No Machine yet",
+    "body": "Your Agents will be here once a Machine is paired with this app."
+  }
+}

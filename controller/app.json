@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Veeloe",
+    "slug": "veeloe",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "veeloe",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.veeloe.controller"
+    },
+    "android": {
+      "package": "dev.veeloe.controller",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      ["expo-router", { "root": "./app" }],
+      "expo-localization",
+      "expo-sqlite"
+    ]
+  }
+}

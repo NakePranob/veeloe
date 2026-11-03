@@ -1,0 +1,6 @@
+{
+  "_unknown": "Something went wrong ({{code}})",
+  "hub.machine_offline": "That Machine is offline, so it did not get this",
+  "hub.route_not_allowed": "The Hub refused where this was going",
+  "hub.sender_mismatch": "The Hub refused this because the sender did not match"
+}
