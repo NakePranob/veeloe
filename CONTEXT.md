@@ -31,7 +31,7 @@ _Avoid_: Admin, root
 _Avoid_: Role, permission, ACL
 
 **Controller**:
-แอปที่ Member คนหนึ่งติดตั้งบนมือถือหรือเบราว์เซอร์และได้รับความไว้ใจจาก Workspace คำสั่งทุกอย่างต้องมาจาก Controller และถือว่าเป็นคำสั่งของ Member เจ้าของ Controller นั้น ข้อยกเว้นเดียวคือข้อความในแชตของ Channel ซึ่งทำในนามของ Member ที่ผูก Channel นั้นไว้ กุญแจของ Controller ใช้ได้หลังยืนยันตัวด้วย Face ID ลายนิ้วมือ หรือรหัสเครื่อง ตอนเปิดแอปและหลังไม่ได้ใช้เกิน 5 นาที และต้องยืนยันใหม่ทุกครั้งก่อนอนุมัติ Approval, Link เครื่อง, เปลี่ยน Grant หรือ Owner, ติดตั้ง Skill, Connector หรือ Blueprint, แก้ Allowlist หรือ Egress, Pairing, ปล่อย Machine และถอนกุญแจ
+แอปที่ Member คนหนึ่งติดตั้งบนมือถือหรือเบราว์เซอร์และได้รับความไว้ใจจาก Workspace คำสั่งทุกอย่างต้องมาจาก Controller และถือว่าเป็นคำสั่งของ Member เจ้าของ Controller นั้น ข้อยกเว้นเดียวคือข้อความในแชตของ Channel ซึ่งทำในนามของ Member ที่ผูก Channel นั้นไว้ กุญแจของ Controller ใช้ได้หลังยืนยันตัว บนมือถือด้วย Face ID หรือลายนิ้วมือ และบนเว็บด้วย passkey ตอนเปิดแอปและหลังไม่ได้ใช้เกิน 5 นาที และต้องยืนยันใหม่ทุกครั้งก่อนอนุมัติ Approval, Link เครื่อง, เปลี่ยน Grant หรือ Owner, ติดตั้ง Skill, Connector หรือ Blueprint, แก้ Allowlist หรือ Egress, Pairing, ปล่อย Machine และถอนกุญแจ
 _Avoid_: Device, client, phone, app
 
 **Demo Workspace**:

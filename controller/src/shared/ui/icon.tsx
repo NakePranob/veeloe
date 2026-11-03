@@ -8,6 +8,8 @@ const SYMBOLS = {
   settings: { ios: "gearshape", android: "settings", web: "settings" },
   machine: { ios: "desktopcomputer", android: "computer", web: "computer" },
   window: { ios: "macwindow", android: "tab", web: "tab" },
+  key: { ios: "key", android: "key", web: "key" },
+  lock: { ios: "lock", android: "lock", web: "lock" },
   warning: { ios: "exclamationmark.triangle", android: "warning", web: "warning" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 

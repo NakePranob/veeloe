@@ -1,13 +1,13 @@
 ## 1. เอกสาร
 
-- [ ] 1.1 แก้ ADR 0012 และ `CONTEXT.md` ว่าบนมือถือใช้ biometric เท่านั้น พร้อมบันทึกทางเลือกเรื่องรหัสเครื่องกับ PIN และตรวจโดยอ่านเทียบกับ `design.md`
+- [x] 1.1 แก้ ADR 0012 และ `CONTEXT.md` ว่าบนมือถือใช้ biometric เท่านั้น พร้อมบันทึกทางเลือกเรื่องรหัสเครื่องกับ PIN และตรวจโดยอ่านเทียบกับ `design.md`
 
 ## 2. กุญแจ
 
-- [ ] 2.1 ลงทะเบียน polyfill ของ `crypto.getRandomValues` และลองในแอป iOS ด้วยโค้ดชั่วคราวที่ไม่ commit ว่า `generateSecretKey`, `createSigner` และ `verify` ของ `packages/protocol` ใช้ได้บน Hermes
-- [ ] 2.2 เขียน session ของ keystore เป็นโค้ดล้วน ตรวจด้วย test ที่ใช้ clock กับ vault ปลอมเรื่อง `none`, `lost`, `locked`, `unlocked`, ล็อกหลัง 5 นาที, การแตะที่ต่อเวลา, กลับจากพื้นหลัง, ล้างส่วนลับเมื่อล็อก, การยืนยันใหม่ที่ถูกยกเลิก และยกเลิกแล้วไม่ล็อก
-- [ ] 2.3 เขียน vault บนมือถือตาม `design.md` และใส่ `faceIDPermission` ใน config plugin ตรวจบน iOS Simulator ว่าสร้าง ปลดล็อก และล็อกได้
-- [ ] 2.4 เขียน vault บนเว็บด้วย IndexedDB และ passkey ตรวจในเบราว์เซอร์จริงเรื่องสร้าง ปลดล็อก ยกเลิก และเบราว์เซอร์ที่ไม่มี passkey ซึ่งตรวจตัวผู้ใช้ได้
+- [x] 2.1 ลงทะเบียน polyfill ของ `crypto.getRandomValues` และลองในแอป iOS ด้วยโค้ดชั่วคราวที่ไม่ commit ว่า `generateSecretKey`, `createSigner` และ `verify` ของ `packages/protocol` ใช้ได้บน Hermes
+- [x] 2.2 เขียน session ของ keystore เป็นโค้ดล้วน ตรวจด้วย test ที่ใช้ clock กับ vault ปลอมเรื่อง `none`, `lost`, `locked`, `unlocked`, ล็อกหลัง 5 นาที, การแตะที่ต่อเวลา, กลับจากพื้นหลัง, ล้างส่วนลับเมื่อล็อก, การยืนยันใหม่ที่ถูกยกเลิก และยกเลิกแล้วไม่ล็อก
+- [x] 2.3 เขียน vault บนมือถือตาม `design.md` และใส่ `faceIDPermission` ใน config plugin ตรวจบน iOS Simulator ว่าสร้าง ปลดล็อก และล็อกได้
+- [x] 2.4 เขียน vault บนเว็บด้วย IndexedDB และ passkey ตรวจในเบราว์เซอร์จริงเรื่องสร้าง ปลดล็อก ยกเลิก และเบราว์เซอร์ที่ไม่มี passkey ซึ่งตรวจตัวผู้ใช้ได้
 
 ## 3. หน้าจอ
 

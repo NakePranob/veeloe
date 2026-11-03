@@ -25,9 +25,21 @@
       "output": "single"
     },
     "plugins": [
-      ["expo-router", { "root": "./app" }],
+      [
+        "expo-router",
+        {
+          "root": "./app"
+        }
+      ],
       "expo-localization",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Veeloe uses Face ID to unlock the key that signs your commands.",
+          "configureAndroidBackup": true
+        }
+      ]
     ]
   }
 }
