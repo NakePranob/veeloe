@@ -3,12 +3,13 @@ import { useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
-import { dismissPendingMessage, usePendingMessages, useTaskEvents } from "../../../entities/task";
+import { dismissPendingMessage, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useT } from "../../../shared/i18n";
-import { Button, Card, column, HeaderAction, Icon, radius, space, Text, useColors } from "../../../shared/ui";
+import { Button, Card, column, HeaderAction, Label, radius, space, Text, type, useColors } from "../../../shared/ui";
 import { items } from "../model/items";
+import { AgentText } from "./AgentText";
 
 // The Owner's message, in an accent bubble on the right as in Messages.
 function Bubble({ text, note }: { text: string; note?: React.ReactNode }) {
@@ -27,12 +28,9 @@ function Bubble({ text, note }: { text: string; note?: React.ReactNode }) {
 
 function Problem({ code }: { code: string }) {
   return (
-    <View style={{ flexDirection: "row", gap: space.sm, alignItems: "flex-start" }}>
-      <Icon name="warning" color="orange" />
-      <Text selectable variant="footnote" tone="secondary" style={{ flexShrink: 1 }}>
-        {describeError({ code })}
-      </Text>
-    </View>
+    <Label icon="warning" iconColor="orange">
+      {describeError({ code })}
+    </Label>
   );
 }
 
@@ -65,8 +63,22 @@ export function TaskPage() {
 
   return (
     <KeyboardAvoidingView behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-      <Stack.Screen options={{ title: agent.name }} />
-      <HeaderAction label={t("agent")} icon="agent" onPress={() => router.push({ pathname: "/agent/[agent]", params: { agent: agent.id } })} />
+      {/* The Agent's name with what it is doing under it, so the state stays in view however far the log scrolls. */}
+      <Stack.Screen
+        options={{
+          title: agent.name,
+          headerTitle: () => (
+            <View style={{ alignItems: "center" }}>
+              <Text variant="headline" numberOfLines={1}>
+                {agent.name}
+              </Text>
+              {(events.length > 0 || status.online === false) && <TaskStatusLabel status={status.online === false ? "offline" : working ? "working" : "done"} variant="caption" />}
+            </View>
+          ),
+        }}
+      />
+      {/* Other Tasks, a new Task and the settings all live on the Agent's page. */}
+      <HeaderAction label={t("agent")} icon="settings" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} />
       <ScrollView
         ref={scroll}
         keyboardShouldPersistTaps="handled"
@@ -89,9 +101,7 @@ export function TaskPage() {
           item.kind === "member" ? (
             <Bubble key={item.key} text={item.text} />
           ) : item.kind === "agent" ? (
-            <Text key={item.key} selectable>
-              {item.text}
-            </Text>
+            <AgentText key={item.key} text={item.text} />
           ) : (
             <Problem key={item.key} code={item.code} />
           ),
@@ -111,9 +121,9 @@ export function TaskPage() {
                   </Pressable>
                 </View>
               ) : (
-                <Text variant="caption" tone="secondary">
+                <Label icon="time" variant="caption">
                   {t("sending")}
-                </Text>
+                </Label>
               )
             }
           />
@@ -127,27 +137,21 @@ export function TaskPage() {
           </View>
         )}
       </ScrollView>
-      <View style={[column, { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.sm }]}>
-        {status.online === false && (
-          <View style={{ flexDirection: "row", gap: space.sm, justifyContent: "center" }}>
-            <Icon name="offline" />
-            <Text variant="footnote" tone="secondary">
-              {t("offline")}
-            </Text>
-          </View>
-        )}
-        {/* Like the AI apps on iOS: the field and the send button share one raised box. */}
-        <Card raised style={{ flexDirection: "row", alignItems: "flex-end", padding: space.sm, paddingLeft: space.lg, borderRadius: radius.card }}>
+      <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.lg }]}>
+        {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
+        <Card raised style={{ gap: space.xs, padding: space.sm }}>
           <TextInput
             aria-label={t("placeholder", { name: agent.name })}
-            placeholder={t("placeholder", { name: agent.name })}
+            placeholder={status.online === false ? t("offline") : t("placeholder", { name: agent.name })}
             placeholderTextColor={colors.tertiaryLabel}
             value={text}
             onChangeText={setText}
             multiline
-            style={{ flex: 1, minHeight: 36, maxHeight: 160, paddingVertical: space.sm, fontSize: 17, color: colors.label }}
+            style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
           />
-          <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link} onPress={send} />
+          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+            <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link} onPress={send} />
+          </View>
         </Card>
       </View>
     </KeyboardAvoidingView>

@@ -1,0 +1,29 @@
+{
+  "pair": "ผูก Machine",
+  "none": {
+    "title": "ยังไม่มี Machine",
+    "body": "ผูก Machine เครื่องแรกด้วย Pairing"
+  },
+  "footer": "Pairing ทำที่หน้าเครื่องด้วย veeloe pair แล้วสแกนหรือวางลิงก์ในแอปนี้",
+  "agents_one": "{{count}} Agent",
+  "agents_other": "{{count}} Agent",
+  "online": "ออนไลน์",
+  "offline": "ออฟไลน์",
+  "missing": {
+    "title": "ไม่พบ Machine นี้",
+    "body": "Machine อาจถูกเลิกผูกแล้ว"
+  },
+  "status": {
+    "heading": "สถานะ",
+    "checking": "กำลังตรวจ"
+  },
+  "onMachine": "Agent บนเครื่องนี้",
+  "noAgent": "ยังไม่มี Agent",
+  "provider": {
+    "footer": "Provider ตั้งที่ Machine ด้วย veeloe provider add และ key อยู่บนเครื่องนั้นเท่านั้น (ADR 0042)",
+    "none": "Machine นี้ยังไม่มี Provider",
+    "command": "veeloe provider add --name <ชื่อ> --url <base url>",
+    "models_one": "{{count}} model",
+    "models_other": "{{count}} model"
+  }
+}

@@ -1,28 +1,30 @@
-import { addAgentI18n } from "../../pages/add-agent";
 import { addMachineI18n } from "../../pages/add-machine";
-import { agentI18n } from "../../pages/agent";
+import { agentsI18n } from "../../pages/agents";
 import { createKeyI18n } from "../../pages/create-key";
-import { lockI18n } from "../../pages/lock";
-import { otherTabI18n } from "../../pages/other-tab";
 import { homeI18n } from "../../pages/home";
-import { settingsI18n } from "../../pages/settings";
+import { lockI18n } from "../../pages/lock";
+import { machinesI18n } from "../../pages/machines";
+import { otherTabI18n } from "../../pages/other-tab";
 import { storageUnavailableI18n } from "../../pages/storage-unavailable";
 import { taskI18n } from "../../pages/task";
+import { workspaceI18n } from "../../pages/workspace";
+import { taskStatusI18n } from "../../entities/task";
 import { errorsI18n, type Language } from "../../shared/i18n";
 
 // One namespace per slice. Only this layer may see them all, since shared cannot import up.
 const slices = {
   errors: errorsI18n,
-  "add-agent": addAgentI18n,
+  "task-status": taskStatusI18n,
   "add-machine": addMachineI18n,
-  agent: agentI18n,
+  agents: agentsI18n,
   "create-key": createKeyI18n,
   home: homeI18n,
   lock: lockI18n,
+  machines: machinesI18n,
   "other-tab": otherTabI18n,
-  settings: settingsI18n,
   "storage-unavailable": storageUnavailableI18n,
   task: taskI18n,
+  workspace: workspaceI18n,
 };
 
 const inLanguage = <L extends Language>(language: L) => Object.fromEntries(Object.entries(slices).map(([namespace, words]) => [namespace, words[language]]));

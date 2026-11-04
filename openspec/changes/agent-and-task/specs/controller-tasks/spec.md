@@ -20,11 +20,11 @@ Controller SHALL ต่อ Hub ของทุก Machine ที่ Pairing แ�
 - **THEN** Controller ปิดการเชื่อมต่อ และต่อใหม่หลังปลดล็อก
 
 ### Requirement: Owner สร้าง Agent บน Machine
-Controller SHALL ให้ Owner สร้าง Agent บน Machine ที่ออนไลน์ โดยตั้งชื่อ และเลือก Provider กับ model จากรายชื่อที่ Machine ตอบ เมื่อ Machine ยังไม่มี Provider Controller SHALL บอกให้รัน `veeloe provider add` ที่ Machine Agent ใหม่ SHALL ขึ้นบนหน้าแรกใต้ Machine ของมัน
+Controller SHALL ให้ Owner สร้าง Agent บน Machine ที่ออนไลน์ โดยตั้งชื่อ และเลือก Provider กับ model จากรายชื่อที่ Machine ตอบ เมื่อ Machine ยังไม่มี Provider Controller SHALL บอกให้รัน `veeloe provider add` ที่ Machine Agent ใหม่ SHALL ขึ้นใน Inbox บนหน้าแรก หนึ่งแถวต่อ Agent พร้อมชื่อ Machine สถานะ และข้อความล่าสุด
 
 #### Scenario: สร้างสำเร็จ
 - **WHEN** Owner ตั้งชื่อ เลือก Provider กับ model แล้วกดสร้าง
-- **THEN** Agent ขึ้นใต้ Machine นั้น แม้เปิดแอปใหม่ก็ยังอยู่
+- **THEN** Task แรกของ Agent เปิดขึ้น และ Agent มีแถวใน Inbox แม้เปิดแอปใหม่ก็ยังอยู่
 
 #### Scenario: Machine ไม่มี Provider
 - **WHEN** Owner เปิดหน้าสร้าง Agent ของ Machine ที่ยังไม่มี Provider
@@ -35,7 +35,7 @@ Controller SHALL ให้ Owner สร้าง Agent บน Machine ที่�
 - **THEN** Controller บอกว่า Machine ออฟไลน์ และไม่ให้กดสร้าง
 
 ### Requirement: Owner คุยกับ Agent ใน Task
-การแตะ Agent SHALL เปิด Task ล่าสุดของ Agent นั้น หรือ Task ใหม่ถ้ายังไม่มี หน้า Task SHALL แสดงข้อความของ Owner และข้อความที่ Agent ตอบตามลำดับของ event ปุ่มที่หัวหน้า Task SHALL เปิดหน้า Agent ซึ่งมีรายชื่อ Task ของ Agent นั้นและปุ่ม Task ใหม่ ระหว่าง Turn Controller SHALL แสดงว่า Agent กำลังทำงาน error ทุกตัวที่ได้ SHALL แสดงเป็นคำในภาษาของ Owner ตาม code (ADR 0065)
+การแตะแถวของ Agent ใน Inbox SHALL เปิด Task ล่าสุดของ Agent นั้น หรือ Task ใหม่ถ้ายังไม่มี หน้า Task SHALL แสดงข้อความของ Owner และข้อความที่ Agent ตอบตามลำดับของ event ปุ่มที่หัวหน้า Task SHALL เปิดหน้า Agent ซึ่งมีรายชื่อ Task ของ Agent นั้นและปุ่ม Task ใหม่ ระหว่าง Turn Controller SHALL แสดงว่า Agent กำลังทำงาน error ทุกตัวที่ได้ SHALL แสดงเป็นคำในภาษาของ Owner ตาม code (ADR 0065)
 
 #### Scenario: ส่งข้อความ
 - **WHEN** Owner พิมพ์แล้วกดส่ง

@@ -1,12 +1,14 @@
 {
   "title": "Veeloe",
-  "settings": "Settings",
   "empty": {
     "title": "No Machine yet",
     "body": "Your Agents will be here once a Machine is paired with this app."
   },
   "add": "Add Machine",
-  "offline": "Offline",
-  "noAgents": "No Agent on this Machine yet",
-  "addAgent": "New Agent"
+  "start": "Start talking with {{name}}",
+  "noAgents": {
+    "title": "No Agent yet",
+    "body": "Create the first Agent on a paired Machine",
+    "action": "Create Agent"
+  }
 }

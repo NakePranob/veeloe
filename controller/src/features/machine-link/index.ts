@@ -1,2 +1,2 @@
 export type { MachineStatus } from "./model/links";
-export { useMachineLink, useMachineLinks, useMachineStatus } from "./model/use-machine-links";
+export { useMachineLink, useMachineLinks, useMachineStatus, useMachineStatuses } from "./model/use-machine-links";

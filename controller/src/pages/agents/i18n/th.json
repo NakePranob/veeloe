@@ -1,0 +1,38 @@
+{
+  "create": "สร้าง Agent",
+  "createShort": "สร้าง",
+  "new": "Agent ใหม่",
+  "offline": "ออฟไลน์",
+  "online": "ออนไลน์",
+  "none": {
+    "title": "ยังไม่มี Agent",
+    "body": "สร้าง Agent ตัวแรกบน Machine ที่ผูกไว้"
+  },
+  "missing": {
+    "title": "ไม่พบ Agent นี้",
+    "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
+  },
+  "name": "ชื่อ",
+  "namePlaceholder": "เช่น Deployer",
+  "machine": {
+    "heading": "อยู่บน Machine",
+    "footer": "Agent อยู่ Machine เดียวตลอดและแตะได้แค่ไฟล์กับ tool ของเครื่องนั้น Runtime สร้าง Workdir ให้ที่ ~/.veeloe/agents/<id>/workdir เลือก path เองไม่ได้ (ADR 0002, 0032)",
+    "offline": "Machine นี้ออฟไลน์ ให้รัน veeloe ที่เครื่องนั้นก่อน"
+  },
+  "asking": "กำลังถาม Machine ว่ามี Provider อะไร",
+  "provider": {
+    "heading": "Provider และ model",
+    "footer": "รายชื่อ model มาจาก Provider ที่ตั้งบน Machine นี้ (ADR 0042)",
+    "none": "Machine นี้ยังไม่มี Provider",
+    "command": "veeloe provider add --name <ชื่อ> --url <base url>",
+    "agentFooter": "ถ้า Provider ล่ม Agent ทุกตัวบนเครื่องที่ใช้ตัวนั้นหยุดพร้อมกัน (ADR 0042)"
+  },
+  "modelFilter": "ค้นหา model",
+  "noMatch": "ไม่มี model ที่ตรง",
+  "creating": "กำลังสร้างบน Machine",
+  "tasks": {
+    "new": "Task ใหม่",
+    "footer": "แสดงเฉพาะ Task ที่คุณเริ่ม (ADR 0060)",
+    "untitled": "ยังไม่มีข้อความ"
+  }
+}

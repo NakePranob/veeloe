@@ -1,12 +1,14 @@
 {
   "title": "Veeloe",
-  "settings": "ตั้งค่า",
   "empty": {
     "title": "ยังไม่มี Machine",
     "body": "Agent ของคุณจะมาอยู่ที่นี่หลังทำ Pairing ระหว่าง Machine กับแอปนี้"
   },
   "add": "เพิ่ม Machine",
-  "offline": "ออฟไลน์",
-  "noAgents": "Machine เครื่องนี้ยังไม่มี Agent",
-  "addAgent": "Agent ใหม่"
+  "start": "เริ่มคุยกับ {{name}}",
+  "noAgents": {
+    "title": "ยังไม่มี Agent",
+    "body": "สร้าง Agent ตัวแรกบน Machine ที่ผูกไว้",
+    "action": "สร้าง Agent"
+  }
 }

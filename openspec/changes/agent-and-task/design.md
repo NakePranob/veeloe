@@ -75,14 +75,17 @@ Machine นับว่าออนไลน์เมื่อได้ `agent.l
 
 migration ใหม่เพิ่มตาราง `agent`, `task`, `task_event` และ `pending_message` ข้อความที่ Owner ส่งลง `pending_message` ก่อน แล้วถูกลบเมื่อ `member.message` ที่มีรหัสเดียวกันกลับมา หรือถูกตั้งเป็นล้มเหลวพร้อม code เมื่อได้ `error` ที่ `ref` ตรงกัน
 
-### หน้าจอของ Controller
+### หน้าจอของ Controller ตาม prototype
 
-ใช้โครงของหน้า Task ใน `controller-prototype/src/pages/task/` แค่ส่วนที่ต้องใช้ คือ bubble ของข้อความ, ตัวแสดงว่ากำลังทำงาน และช่องพิมพ์ ไม่มี Character, Effort, Approval หรือ tool call ที่พับไว้
+ทุกหน้าทำตามหน้าเดียวกันใน `controller-prototype/src/pages/` และตัดเฉพาะส่วนที่ change นี้ยังไม่มี
 
-- หน้าแรก: การ์ดของ Machine มีรายชื่อ Agent ข้างใน และปุ่มสร้าง Agent แตะ Agent แล้วเปิด Task ล่าสุด หรือ Task ใหม่ถ้ายังไม่มี โดยไม่มีหน้าเลือกคั่น
-- หน้าสร้าง Agent: ชื่อ, Provider และ model จาก `agent.listed` ถ้าไม่มี Provider ให้แสดงคำสั่ง `veeloe provider add`
-- หน้า Task: ปุ่มที่หัวหน้าเปิดหน้า Agent
-- หน้า Agent: รายชื่อ Task และปุ่ม Task ใหม่ รหัส Task สร้างที่ Controller
+- หน้าแรก (`AgentInbox`): หนึ่งแถวต่อ Agent มีชื่อ Machine เวลา สถานะ และข้อความล่าสุด Agent ที่กำลังทำงานขึ้นก่อน แตะแล้วเปิด Task ล่าสุด หรือ Task ใหม่ถ้ายังไม่มี ปุ่มที่หัวหน้าเปิด Workspace
+- Workspace (`WorkspacePage`): Machine กับ Agent พร้อมจำนวน และภาษาของเครื่องนี้ ซึ่ง prototype ไม่มี
+- Machine (`MachinesPage`, `MachinePage`): รายชื่อพร้อมสถานะ ปุ่มผูก Machine และหน้า Machine ที่มีสถานะ Hub, Agent บนเครื่อง และ Provider
+- Agent (`AgentsPage`, `NewAgentPage`, `AgentPage`): รายชื่อ, หน้าสร้างที่เลือก Machine, Provider และ model แล้วกดสร้างที่หัวหน้า จากนั้นเปิด Task แรกแทนหน้าสร้าง และหน้า Agent ที่มี Task ใหม่กับรายชื่อ Task ก่อน แล้วจึง Provider กับ model
+- Task (`TaskPage`, `Composer`, `AgentText`): ชื่อ Agent กับสถานะที่หัวหน้า ปุ่มตั้งค่า Agent, ข้อความ Markdown ของ Agent, ช่องพิมพ์ที่มีปุ่มส่งในกล่องเดียวกัน
+
+ส่วนที่ตัดออกเพราะยังไม่มีใน change นี้: Character (ใช้ไอคอนแทนจนถึง `controller-task-screens`), คำอธิบายกับคำสั่งของ Agent, Allowlist, Budget, Effort, แนบไฟล์, Stop และเมนูเลือกแบบ `@expo/ui` ซึ่งต้อง build native ใหม่ จึงเลือก Provider กับ model ด้วยแถวที่มีเครื่องหมายถูกแบบเดียวกับภาษา
 
 ## Risks / Trade-offs
 

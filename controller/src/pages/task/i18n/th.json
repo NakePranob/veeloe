@@ -1,11 +1,11 @@
 {
   "title": "Task",
-  "agent": "Agent",
+  "agent": "ตั้งค่า Agent",
   "empty": "ส่งข้อความหา {{name}} เพื่อเริ่ม Task นี้",
   "working": "กำลังทำงาน…",
   "sending": "กำลังส่ง…",
   "dismiss": "ลบ",
-  "placeholder": "ข้อความถึง {{name}}",
+  "placeholder": "ส่งข้อความถึง {{name}}",
   "send": "ส่ง",
   "offline": "Machine ออฟไลน์อยู่ ส่งได้เมื่อกลับมา"
 }

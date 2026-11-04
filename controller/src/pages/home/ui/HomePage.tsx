@@ -1,75 +1,51 @@
 import { randomUUID } from "expo-crypto";
 import { router, Stack } from "expo-router";
-import { Pressable, ScrollView, View } from "react-native";
+import { FlatList, Pressable, ScrollView, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
-import { useMachines, type Machine } from "../../../entities/machine";
-import { latestTaskOf } from "../../../entities/task";
-import { useMachineStatus } from "../../../features/machine-link";
-import { useDatabase, type Database } from "../../../shared/db";
-import { useT } from "../../../shared/i18n";
-import { Button, Card, column, HeaderAction, Icon, space, Text, useColors } from "../../../shared/ui";
+import { useMachines } from "../../../entities/machine";
+import { previewOf, TaskStatusLabel, useTaskSummaries, type TaskStatus, type TaskSummary } from "../../../entities/task";
+import { useMachineStatuses } from "../../../features/machine-link";
+import { useLanguage, useT } from "../../../shared/i18n";
+import { useNow, when } from "../../../shared/lib";
+import { AgentAvatar, Button, column, Empty, HeaderAction, Icon, radius, space, Text, useColors } from "../../../shared/ui";
+import { inboxRows } from "../model/inbox";
 
-const addMachine = () => router.navigate("/add-machine");
+const openTask = (agent: string, task?: string) => router.push({ pathname: "/tasks/[task]", params: { task: task ?? randomUUID(), agent } });
 
-// Tapping an Agent goes straight to its chat: the latest Task, or a new one.
-async function openAgent(database: Database, agent: string) {
-  const task = (await latestTaskOf(database, agent)) ?? randomUUID();
-  router.push({ pathname: "/task/[task]", params: { task, agent } });
-}
-
-function MachineCard({ machine, agents }: { machine: Machine; agents: AgentRow[] }) {
+// Laid out like Mail: sender and time, a status line, then two lines of preview (controller-prototype's AgentInbox).
+function InboxRow({ agent, machine, task, status, now }: { agent: AgentRow; machine: string; task?: TaskSummary; status: TaskStatus; now: number }) {
   const t = useT("home");
   const colors = useColors();
-  const database = useDatabase();
-  const status = useMachineStatus(machine.id);
+  const language = useLanguage();
   return (
-    <Card style={{ padding: 0, gap: 0, overflow: "hidden" }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg }}>
-        <Icon name="machine" size="md" />
-        <View style={{ flex: 1 }}>
-          <Text selectable strong>
-            {machine.name}
-          </Text>
-          <Text selectable variant="footnote" tone="secondary">
-            {status.online === false ? t("offline") : machine.hub_url}
-          </Text>
-        </View>
-        <Button label={t("addAgent")} icon="add" onPress={() => router.push({ pathname: "/machine/[machine]/add-agent", params: { machine: machine.id } })} />
-      </View>
-      {agents.length === 0 ? (
-        <Text variant="footnote" tone="secondary" style={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
-          {t("noAgents")}
-        </Text>
-      ) : (
-        agents.map((agent) => (
-          <Pressable
-            key={agent.id}
-            role="button"
-            onPress={() => void openAgent(database, agent.id)}
-            style={({ pressed }) => ({
-              minHeight: 44,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: space.md,
-              paddingHorizontal: space.lg,
-              paddingVertical: space.md,
-              backgroundColor: pressed ? colors.chipPressed : "transparent",
-              borderTopWidth: 0.5,
-              borderTopColor: colors.separator,
-            })}
-          >
-            <Icon name="agent" />
-            <View style={{ flex: 1 }}>
-              <Text>{agent.name}</Text>
-              <Text variant="caption" tone="secondary">
-                {agent.model}
+    <Pressable role="button" onPress={() => openTask(agent.id, task?.id)}>
+      {({ pressed }) => (
+        // An inset rounded highlight, as in an iPadOS sidebar; content still lines up at space.lg.
+        <View style={{ flexDirection: "row", gap: space.md, marginHorizontal: space.sm, paddingHorizontal: space.sm, paddingVertical: space.md, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: pressed ? colors.chipPressed : colors.background }}>
+          <AgentAvatar backdrop={pressed ? "chip" : "fill"} />
+          <View style={{ flex: 1, gap: space.xs / 2 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
+              <Text variant="headline" numberOfLines={1} style={{ flexShrink: 1 }}>
+                {agent.name}
               </Text>
+              <Text variant="subheadline" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                {machine}
+              </Text>
+              {task && task.events > 0 && (
+                <Text variant="subheadline" tone="secondary">
+                  {when(task.updated_at, language, now)}
+                </Text>
+              )}
+              <Icon name="disclosure" size="xs" color="tertiaryLabel" weight="semibold" />
             </View>
-            <Icon name="chevron" color="tertiaryLabel" />
-          </Pressable>
-        ))
+            <TaskStatusLabel status={status} />
+            <Text variant="subheadline" tone="secondary" numberOfLines={2}>
+              {(task && previewOf(task)) || t("start", { name: agent.name })}
+            </Text>
+          </View>
+        </View>
       )}
-    </Card>
+    </Pressable>
   );
 }
 
@@ -77,14 +53,17 @@ export function HomePage() {
   const t = useT("home");
   const machines = useMachines();
   const agents = useAgents();
+  const tasks = useTaskSummaries();
+  const statuses = useMachineStatuses();
+  const now = useNow();
   const header = (
     <>
       <Stack.Screen options={{ title: t("title") }} />
-      <HeaderAction label={t("settings")} icon="settings" onPress={() => router.navigate("/settings")} />
+      <HeaderAction label="Workspace" icon="settings" onPress={() => router.navigate("/workspace")} />
     </>
   );
 
-  if (machines === null || agents === null) return header;
+  if (machines === null || agents === null || tasks === null) return header;
 
   // Mail with no accounts: the screen says what will be here, and how to get it there.
   if (machines.length === 0) {
@@ -102,21 +81,23 @@ export function HomePage() {
               {t("empty.body")}
             </Text>
           </View>
-          <Button label={t("add")} variant="primary" onPress={addMachine} />
+          <Button label={t("add")} variant="primary" onPress={() => router.navigate("/add-machine")} />
         </View>
       </ScrollView>
     );
   }
 
+  const machineName = new Map(machines.map((m) => [m.id, m.name]));
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[column, { gap: space.md, padding: space.lg }]}>
-      {header}
-      {machines.map((machine) => (
-        <MachineCard key={machine.id} machine={machine} agents={agents.filter((a) => a.machine_id === machine.id)} />
-      ))}
-      <View style={{ flexDirection: "row", justifyContent: "center" }}>
-        <Button label={t("add")} onPress={addMachine} />
-      </View>
-    </ScrollView>
+    <FlatList
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={column}
+      data={inboxRows(agents, tasks, (machine) => statuses[machine]?.online ?? null)}
+      keyExtractor={(row) => row.agent.id}
+      ListHeaderComponent={header}
+      ListEmptyComponent={<Empty icon="agent" title={t("noAgents.title")} detail={t("noAgents.body")} action={<Button label={t("noAgents.action")} variant="primary" onPress={() => router.push("/agents/new")} />} />}
+      // No separators: rows are set apart by their spacing, not by lines.
+      renderItem={({ item }) => <InboxRow agent={item.agent} machine={machineName.get(item.agent.machine_id) ?? ""} task={item.task} status={item.status} now={now} />}
+    />
   );
 }

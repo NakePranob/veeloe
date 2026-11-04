@@ -1,0 +1,29 @@
+{
+  "pair": "Pair Machine",
+  "none": {
+    "title": "No Machine yet",
+    "body": "Pair the first Machine with veeloe pair"
+  },
+  "footer": "Pairing starts on the Machine with veeloe pair; then scan or paste its link in this app.",
+  "agents_one": "{{count}} Agent",
+  "agents_other": "{{count}} Agents",
+  "online": "Online",
+  "offline": "Offline",
+  "missing": {
+    "title": "Machine not found",
+    "body": "It may have been unpaired."
+  },
+  "status": {
+    "heading": "Status",
+    "checking": "Checking"
+  },
+  "onMachine": "Agents on this Machine",
+  "noAgent": "No Agent yet",
+  "provider": {
+    "footer": "Providers are set on the Machine with veeloe provider add, and their keys stay on it (ADR 0042).",
+    "none": "This Machine has no Provider yet",
+    "command": "veeloe provider add --name <name> --url <base url>",
+    "models_one": "{{count}} model",
+    "models_other": "{{count}} models"
+  }
+}

@@ -27,6 +27,8 @@ type Client = ReturnType<typeof startHubClient>;
 export function createMachineLinks({ database, secretKey, newId, start = startHubClient }: { database: Database; secretKey: Uint8Array; newId: () => string; start?: typeof startHubClient }) {
   const clients = new Map<string, { client: Client; machines: Machine[] }>();
   const statuses = new Map<string, MachineStatus>();
+  // A new object on every change, so React can tell that something moved.
+  let all: Record<string, MachineStatus> = {};
   const listeners = new Set<() => void>();
   /** Which Machine an envelope went to, by its sig, so an answer about it finds its way back. */
   const sentTo = new Map<string, { machine: string; kind: "create" | "hello" | "other" }>();
@@ -35,6 +37,7 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
 
   function setStatus(machine: string, change: Partial<MachineStatus>) {
     statuses.set(machine, { ...(statuses.get(machine) ?? UNKNOWN), ...change });
+    all = Object.fromEntries(statuses);
     for (const listener of [...listeners]) listener();
   }
 
@@ -131,6 +134,7 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
     },
 
     status: (machine: string) => statuses.get(machine) ?? UNKNOWN,
+    statuses: () => all,
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => void listeners.delete(listener);
@@ -155,6 +159,7 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
       for (const { client } of clients.values()) client.stop();
       clients.clear();
       statuses.clear();
+      all = {};
       for (const listener of [...listeners]) listener();
     },
   };

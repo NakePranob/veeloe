@@ -57,3 +57,14 @@ export function useMachineStatus(machine: string): MachineStatus {
     () => links?.status(machine) ?? UNKNOWN,
   );
 }
+
+const NONE: Record<string, MachineStatus> = {};
+
+/** Every Machine's status at once, for lists. */
+export function useMachineStatuses(): Record<string, MachineStatus> {
+  const links = useCurrent();
+  return useSyncExternalStore(
+    (listener) => links?.subscribe(listener) ?? (() => {}),
+    () => links?.statuses() ?? NONE,
+  );
+}

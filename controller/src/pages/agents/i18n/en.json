@@ -1,0 +1,38 @@
+{
+  "create": "Create Agent",
+  "createShort": "Create",
+  "new": "New Agent",
+  "offline": "Offline",
+  "online": "Online",
+  "none": {
+    "title": "No Agent yet",
+    "body": "Create the first Agent on a paired Machine"
+  },
+  "missing": {
+    "title": "Agent not found",
+    "body": "Its Machine may not have listed its Agents yet, or the Agent is gone."
+  },
+  "name": "Name",
+  "namePlaceholder": "e.g. Deployer",
+  "machine": {
+    "heading": "On Machine",
+    "footer": "An Agent stays on one Machine and can touch only that machine's files and tools. The Runtime makes its Workdir at ~/.veeloe/agents/<id>/workdir; you can't pick the path (ADR 0002, 0032).",
+    "offline": "This Machine is offline. Start veeloe on it first."
+  },
+  "asking": "Asking the Machine which Providers it has",
+  "provider": {
+    "heading": "Provider and model",
+    "footer": "The models come from the Providers set on this Machine (ADR 0042).",
+    "none": "This Machine has no Provider yet",
+    "command": "veeloe provider add --name <name> --url <base url>",
+    "agentFooter": "If a Provider goes down, every Agent on the Machine that uses it stops with it (ADR 0042)."
+  },
+  "modelFilter": "Search models",
+  "noMatch": "No model matches",
+  "creating": "Creating on the Machine",
+  "tasks": {
+    "new": "New Task",
+    "footer": "Only the Tasks you started are here (ADR 0060).",
+    "untitled": "No message yet"
+  }
+}
