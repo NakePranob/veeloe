@@ -1,0 +1,11 @@
+{
+  "title": "Task",
+  "agent": "Agent",
+  "empty": "Send {{name}} a message to start this Task.",
+  "working": "Working…",
+  "sending": "Sending…",
+  "dismiss": "Remove",
+  "placeholder": "Message {{name}}",
+  "send": "Send",
+  "offline": "The Machine is offline. Messages go once it's back."
+}

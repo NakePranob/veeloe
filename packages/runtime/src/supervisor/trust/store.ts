@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { SeenSequences } from "@veeloe/protocol";
+import { supervisorDir } from "../config";
 import { readJsonFile, writeJsonFile } from "../json-file";
 
 export class TrustFileError extends Error {}
@@ -14,7 +15,7 @@ function isTrust(value: unknown): value is Trust {
 
 /** A broken file stops the Runtime instead of reading as "nobody is trusted", which `pair` would then overwrite. */
 export function loadTrust(home: string): Trust {
-  const file = join(home, "trust.json");
+  const file = join(supervisorDir(home), "trust.json");
   let value: unknown;
   try {
     value = readJsonFile(file);
@@ -27,7 +28,7 @@ export function loadTrust(home: string): Trust {
 }
 
 export function saveTrust(home: string, trust: Trust) {
-  writeJsonFile(join(home, "trust.json"), trust);
+  writeJsonFile(join(supervisorDir(home), "trust.json"), trust);
 }
 
 export function trustedKeys(trust: Trust): Set<string> {
@@ -43,7 +44,7 @@ export class FileSeenSequences implements SeenSequences {
   #last: Record<string, number>;
 
   constructor(home: string) {
-    this.#file = join(home, "seen.json");
+    this.#file = join(supervisorDir(home), "seen.json");
     let value: unknown;
     try {
       value = readJsonFile(this.#file);

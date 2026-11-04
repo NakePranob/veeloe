@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { normalizeHubUrl } from "@veeloe/protocol";
@@ -17,6 +17,19 @@ export function runtimeHome(env: Record<string, string | undefined> = process.en
   const home = env.VEELOE_HOME || join(homedir(), ".veeloe");
   mkdirSync(home, { recursive: true, mode: 0o700 });
   return home;
+}
+
+/**
+ * The supervisor's own files (ADR 0032): trust, sequence numbers, Providers and
+ * Agents. Files `machine-pairing` left at the top of the folder move in here.
+ */
+export function supervisorDir(home: string): string {
+  const dir = join(home, "runtime");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  for (const file of ["trust.json", "seen.json"]) {
+    if (existsSync(join(home, file)) && !existsSync(join(dir, file))) renameSync(join(home, file), join(dir, file));
+  }
+  return dir;
 }
 
 /** What `veeloe pair` remembers, so plain `veeloe` needs no setting. */

@@ -5,6 +5,7 @@ import { CreateKeyPage } from "../../pages/create-key";
 import { LockPage } from "../../pages/lock";
 import { OtherTabPage } from "../../pages/other-tab";
 import { StorageUnavailablePage } from "../../pages/storage-unavailable";
+import { useMachineLinks } from "../../features/machine-link";
 import { DatabaseProvider } from "../../shared/db";
 import { deviceLanguage, initI18n } from "../../shared/i18n";
 import { useKeyActivity, useKeyStatus } from "../../shared/keystore";
@@ -19,6 +20,12 @@ const webHeader = process.env.EXPO_OS === "web" ? { headerRightContainerStyle: {
 // Before anything draws. The saved language replaces it once the database opens.
 initI18n(resources, deviceLanguage());
 
+// Keeps every Hub connected while the key is open. Needs the database, so it sits inside the provider.
+function MachineLinks() {
+  useMachineLinks();
+  return null;
+}
+
 export function RootLayout() {
   const colors = useColors();
   const keyStatus = useKeyStatus();
@@ -32,6 +39,7 @@ export function RootLayout() {
       {/* In place of the Stack rather than a route, so the URL is still there afterwards. */}
       {state.status === "ready" ? (
         <DatabaseProvider value={state.database}>
+          <MachineLinks />
           {/* The Stack stays mounted but hidden while locked, so unlocking returns to the same page. */}
           <View onTouchStartCapture={trackActivity} style={{ flex: 1, display: keyStatus === "unlocked" ? "flex" : "none" }}>
             <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTitleAlign: "center", ...webHeader }} />

@@ -6,6 +6,11 @@ import { icon as sizes, useColors, type Colors } from "./theme";
 const SYMBOLS = {
   check: { ios: "checkmark", android: "check", web: "check" },
   scan: { ios: "qrcode.viewfinder", android: "qr_code_scanner", web: "qr_code_scanner" },
+  agent: { ios: "cpu", android: "smart_toy", web: "smart_toy" },
+  send: { ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" },
+  add: { ios: "plus", android: "add", web: "add" },
+  chevron: { ios: "chevron.right", android: "chevron_right", web: "chevron_right" },
+  offline: { ios: "wifi.slash", android: "wifi_off", web: "wifi_off" },
   settings: { ios: "gearshape", android: "settings", web: "settings" },
   machine: { ios: "desktopcomputer", android: "computer", web: "computer" },
   window: { ios: "macwindow", android: "tab", web: "tab" },

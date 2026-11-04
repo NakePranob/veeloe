@@ -64,7 +64,7 @@ test.skipIf(!dsn)("a Machine and a Controller pair through the real Hub, and the
   expect(await proc.exited).toBe(0);
   expect(result.machine.publicKey).toBe(link.machine);
 
-  const trust = JSON.parse(readFileSync(join(home, "trust.json"), "utf8"));
+  const trust = JSON.parse(readFileSync(join(home, "runtime/trust.json"), "utf8"));
   expect(trust).toEqual({ owners: [{ member: result.machine.member, keys: [toBase64url(publicKeyOf(secretKey))] }] });
   expect(JSON.parse(readFileSync(join(home, "config.json"), "utf8"))).toEqual({ hubUrl });
 

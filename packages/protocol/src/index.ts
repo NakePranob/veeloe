@@ -28,3 +28,27 @@ export {
   type PairingResponse,
   type ParsedPairingLink,
 } from "./messages/pairing-link";
+export {
+  AgentCreateBodySchema,
+  AgentIdSchema,
+  AgentListBodySchema,
+  AgentListedBodySchema,
+  type Agent,
+  type AgentCreateBody,
+  type AgentListedBody,
+  type ProviderInfo,
+} from "./messages/agent";
+export {
+  TASK_EVENTS_PAGE,
+  TaskEventBodySchema,
+  TaskEventKind,
+  TaskEventSchema,
+  TaskEventsBodySchema,
+  TaskMessageBodySchema,
+  TaskSyncBodySchema,
+  type TaskEvent,
+  type TaskEventBody,
+  type TaskEventsBody,
+  type TaskMessageBody,
+  type TaskSyncBody,
+} from "./messages/task";

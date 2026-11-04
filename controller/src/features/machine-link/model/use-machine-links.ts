@@ -1,0 +1,59 @@
+import { randomUUID } from "expo-crypto";
+import { useEffect, useSyncExternalStore } from "react";
+import { useMachines } from "../../../entities/machine";
+import { useDatabase } from "../../../shared/db";
+import { keySession, useKeyStatus } from "../../../shared/keystore";
+import { createMachineLinks, type MachineLinks, type MachineStatus } from "./links";
+
+let current: MachineLinks | null = null;
+const changes = new Set<() => void>();
+const announce = () => changes.forEach((listener) => listener());
+
+/** For the app layer: keeps the connections up while the key is open, and drops them when it locks. */
+export function useMachineLinks() {
+  const database = useDatabase();
+  const unlocked = useKeyStatus() === "unlocked";
+  const machines = useMachines();
+
+  useEffect(() => {
+    const secretKey = unlocked ? keySession.secretKey() : null;
+    if (!secretKey) return;
+    const links = createMachineLinks({ database, secretKey, newId: randomUUID });
+    current = links;
+    announce();
+    return () => {
+      links.stop();
+      if (current === links) current = null;
+      announce();
+    };
+  }, [database, unlocked]);
+
+  useEffect(() => {
+    if (machines && current) current.update(machines);
+  }, [machines, unlocked]);
+}
+
+function useCurrent() {
+  return useSyncExternalStore(
+    (listener) => {
+      changes.add(listener);
+      return () => void changes.delete(listener);
+    },
+    () => current,
+  );
+}
+
+/** What pages send with. Null while locked. */
+export function useMachineLink() {
+  return useCurrent();
+}
+
+const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null };
+
+export function useMachineStatus(machine: string): MachineStatus {
+  const links = useCurrent();
+  return useSyncExternalStore(
+    (listener) => links?.subscribe(listener) ?? (() => {}),
+    () => links?.status(machine) ?? UNKNOWN,
+  );
+}

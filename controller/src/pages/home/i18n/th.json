@@ -5,5 +5,8 @@
     "title": "ยังไม่มี Machine",
     "body": "Agent ของคุณจะมาอยู่ที่นี่หลังทำ Pairing ระหว่าง Machine กับแอปนี้"
   },
-  "add": "เพิ่ม Machine"
+  "add": "เพิ่ม Machine",
+  "offline": "ออฟไลน์",
+  "noAgents": "Machine เครื่องนี้ยังไม่มี Agent",
+  "addAgent": "Agent ใหม่"
 }

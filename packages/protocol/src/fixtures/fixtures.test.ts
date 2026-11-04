@@ -3,6 +3,7 @@ import { fromBase64url } from "../crypto/base64url";
 import { verifySignature } from "../crypto/ed25519";
 import { MemorySeenSequences, verify } from "../envelope/verify";
 import { parseFrame } from "../frame";
+import { parseMessage } from "../messages";
 import { handshakeBytes, HubAuthSchema } from "../messages/hub-auth";
 import { pairingProof } from "../messages/pairing-claim";
 import { parsePairingLink } from "../messages/pairing-link";
@@ -60,4 +61,9 @@ test("the pairing vectors agree with the code that reads them", async () => {
   expect(atMachine).toMatchObject({ ok: true, signed: { body: { member, proof } } });
   const atController = verify(JSON.parse(done), new Set([parsed.link.machine]), (route) => "recipients" in route && route.recipients.includes(member), new MemorySeenSequences());
   expect(atController).toMatchObject({ ok: true, signed: { body: { name: "my-mac" } } });
+});
+
+test("every message vector is read as expected", async () => {
+  const { vectors } = await Bun.file(`${root}/vectors/messages.json`).json();
+  for (const v of vectors) expect([v.name, parseMessage({ type: v.type, body: v.body }).kind === "message"]).toEqual([v.name, v.valid]);
 });

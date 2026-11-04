@@ -1,0 +1,53 @@
+import { z } from "zod";
+import { AgentIdSchema } from "./agent";
+
+const agent = AgentIdSchema;
+
+/** Controller → Machine, with the Task's id in the header. `id` makes a resend harmless. */
+export const TaskMessageBodySchema = z.looseObject({
+  agent,
+  id: z.string().min(1).max(64),
+  text: z.string().min(1).max(100_000),
+});
+export type TaskMessageBody = z.infer<typeof TaskMessageBodySchema>;
+
+/**
+ * One event of a Task's log (ADR 0018). `kind` stays open: a newer Runtime adds
+ * kinds, and a Controller skips the ones it does not know (ADR 0023).
+ */
+export const TaskEventSchema = z.looseObject({
+  seq: z.number().int().positive(),
+  kind: z.string().min(1),
+  /** Unix milliseconds on the Machine. */
+  at: z.number().int().nonnegative(),
+  body: z.unknown(),
+});
+export type TaskEvent = z.infer<typeof TaskEventSchema>;
+
+/** Machine → Member: a new event, with the Task's id in the header. */
+export const TaskEventBodySchema = TaskEventSchema.extend({ agent });
+export type TaskEventBody = z.infer<typeof TaskEventBodySchema>;
+
+/** Controller → Machine: the Task's events after `after`. */
+export const TaskSyncBodySchema = z.looseObject({ agent, after: z.number().int().nonnegative() });
+export type TaskSyncBody = z.infer<typeof TaskSyncBodySchema>;
+
+/** Machine → Member: events in order, up to TASK_EVENTS_PAGE at a time. */
+export const TaskEventsBodySchema = z.looseObject({ agent, events: z.array(TaskEventSchema) });
+export type TaskEventsBody = z.infer<typeof TaskEventsBodySchema>;
+
+export const TASK_EVENTS_PAGE = 100;
+
+/** What `body` holds for the kinds v0.1 writes. */
+export const TaskEventKind = {
+  /** `{ member, id, text }` */
+  MemberMessage: "member.message",
+  /** `{ member }` */
+  TurnStarted: "turn.started",
+  /** `{ content }`, exactly as the LLM sent it, thinking blocks included. */
+  LlmMessage: "llm.message",
+  /** `{ content }`: the tool_result blocks that answer the LLM's tool_use. */
+  ToolResult: "tool.result",
+  /** `{ reason: "done" } | { reason: "error", code }` */
+  TurnEnded: "turn.ended",
+} as const;

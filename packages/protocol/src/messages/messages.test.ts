@@ -15,6 +15,6 @@ test("an error with no code, a sentence for a code or a nested parameter is inva
 });
 
 test("a type this build does not know is reported, including names found on every object", () => {
-  expect(parseMessage({ type: "task.message", body: {} })).toEqual({ kind: "unknown", type: "task.message" });
+  expect(parseMessage({ type: "future.message", body: {} })).toEqual({ kind: "unknown", type: "future.message" });
   expect(parseMessage({ type: "constructor", body: {} })).toEqual({ kind: "unknown", type: "constructor" });
 });

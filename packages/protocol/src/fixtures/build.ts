@@ -209,12 +209,44 @@ export function pairingVectors() {
   };
 }
 
+/** Bodies every implementation must read the same way: `valid` is whether parseMessage takes it. */
+export function messageVectors() {
+  const agent = { id: "agent-1", name: "Deployer", provider: "anthropic", model: "claude-sonnet-5-5" };
+  const event = { agent: "agent-1", seq: 3, kind: "llm.message", at: 1_800_000_000_000, body: { content: [{ type: "text", text: "สวัสดี" }] } };
+  const cases: { name: string; type: string; body: unknown; valid: boolean }[] = [
+    { name: "create an Agent", type: "agent.create", body: agent, valid: true },
+    { name: "create with a field this build does not know", type: "agent.create", body: { ...agent, character: "robot" }, valid: true },
+    { name: "create with a blank name", type: "agent.create", body: { ...agent, name: "  " }, valid: false },
+    { name: "create with no model", type: "agent.create", body: { id: "agent-1", name: "Deployer", provider: "anthropic" }, valid: false },
+    { name: "create with an id that is not a plain folder name", type: "agent.create", body: { ...agent, id: "../trust" }, valid: false },
+    { name: "list", type: "agent.list", body: {}, valid: true },
+    {
+      name: "listed, with a Provider that answered and one that did not",
+      type: "agent.listed",
+      body: { agents: [agent], providers: [{ name: "anthropic", models: [{ id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5" }] }, { name: "openrouter", error: "provider.unreachable" }] },
+      valid: true,
+    },
+    { name: "listed with no providers field", type: "agent.listed", body: { agents: [] }, valid: false },
+    { name: "a message in a Task", type: "task.message", body: { agent: "agent-1", id: "msg-1", text: "deploy ให้หน่อย" }, valid: true },
+    { name: "an empty message", type: "task.message", body: { agent: "agent-1", id: "msg-1", text: "" }, valid: false },
+    { name: "an event", type: "task.event", body: event, valid: true },
+    { name: "an event of a kind this build does not know", type: "task.event", body: { ...event, kind: "future.thing" }, valid: true },
+    { name: "an event numbered from zero", type: "task.event", body: { ...event, seq: 0 }, valid: false },
+    { name: "sync from the start", type: "task.sync", body: { agent: "agent-1", after: 0 }, valid: true },
+    { name: "sync from a negative number", type: "task.sync", body: { agent: "agent-1", after: -1 }, valid: false },
+    { name: "a page of events", type: "task.events", body: { agent: "agent-1", events: [{ seq: 1, kind: "member.message", at: 1, body: {} }] }, valid: true },
+    { name: "an error about an envelope", type: "error", body: { code: "agent.busy", ref: "sig-1" }, valid: true },
+  ];
+  return { note: "`valid` is whether a receiver accepts the body of an envelope of `type` that verify already accepted.", vectors: cases };
+}
+
 export const FIXTURES = {
   "schema/envelope-header.schema.json": headerSchema,
   "vectors/envelopes.json": envelopeVectors,
   "vectors/handshakes.json": handshakeVectors,
   "vectors/hub-urls.json": hubUrlVectors,
   "vectors/pairings.json": pairingVectors,
+  "vectors/messages.json": messageVectors,
 };
 
 export const render = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;

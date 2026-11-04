@@ -1,0 +1,18 @@
+{
+  "title": "Agent ใหม่",
+  "asking": "กำลังถาม Machine ว่ามีอะไรบ้าง…",
+  "offline": "Machine เครื่องนี้ออฟไลน์อยู่ ให้รัน veeloe ที่เครื่องนั้นแล้วกลับมาที่นี่",
+  "noProvider": {
+    "heading": "Machine เครื่องนี้ยังไม่มี Provider",
+    "body": "ที่ Machine ให้รันคำสั่งนี้ แล้ววาง key ของ Provider เมื่อมันถาม",
+    "command": "veeloe provider add --name <ชื่อ> --url <base url>"
+  },
+  "name": "ชื่อ",
+  "namePlaceholder": "Deployer",
+  "provider": "Provider",
+  "model": "Model",
+  "modelFilter": "ค้นหา model",
+  "providerProblem": "ดูรายชื่อ model ของ Provider นี้ไม่ได้",
+  "noMatch": "ไม่มี model ที่ตรง",
+  "create": "สร้าง"
+}

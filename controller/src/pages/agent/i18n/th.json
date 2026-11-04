@@ -1,0 +1,6 @@
+{
+  "tasks": "Task",
+  "newTask": "Task ใหม่",
+  "untitled": "ยังไม่มีข้อความ",
+  "on": "อยู่บน {{machine}} · {{model}}"
+}

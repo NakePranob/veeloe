@@ -5,5 +5,7 @@ import { z } from "zod";
 export const ErrorBodySchema = z.looseObject({
   code: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/),
   params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+  /** The `sig` of the envelope this error is about, when it answers one. */
+  ref: z.string().min(1).optional(),
 });
 export type ErrorBody = z.infer<typeof ErrorBodySchema>;

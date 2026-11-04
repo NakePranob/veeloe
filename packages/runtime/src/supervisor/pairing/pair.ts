@@ -13,10 +13,10 @@ import {
   verify,
 } from "@veeloe/protocol";
 import { renderUnicodeCompact } from "uqr";
-import { saveHubUrl } from "./config";
-import { startHubLink } from "./hub-link/hub-link";
-import { loadOrCreateMachineKey } from "./trust/machine-key";
-import { FileSeenSequences, loadTrust, saveTrust } from "./trust/store";
+import { saveHubUrl } from "../config";
+import { startHubLink } from "../hub-link/hub-link";
+import { loadOrCreateMachineKey } from "../trust/machine-key";
+import { FileSeenSequences, loadTrust, saveTrust } from "../trust/store";
 
 export type PairResult = "paired" | "expired" | "already-paired";
 

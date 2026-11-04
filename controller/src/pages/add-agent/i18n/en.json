@@ -1,0 +1,18 @@
+{
+  "title": "New Agent",
+  "asking": "Asking the Machine what it has…",
+  "offline": "This Machine is offline. Start veeloe on it, then come back.",
+  "noProvider": {
+    "heading": "This Machine has no Provider yet",
+    "body": "On the Machine, run this, then paste the Provider's key when it asks:",
+    "command": "veeloe provider add --name <name> --url <base url>"
+  },
+  "name": "Name",
+  "namePlaceholder": "Deployer",
+  "provider": "Provider",
+  "model": "Model",
+  "modelFilter": "Search models",
+  "providerProblem": "Couldn't list this Provider's models",
+  "noMatch": "No model matches",
+  "create": "Create"
+}

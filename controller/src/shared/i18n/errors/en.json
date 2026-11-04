@@ -1,5 +1,9 @@
 {
   "_unknown": "Something went wrong ({{code}})",
+  "agent.busy": "The Agent is still working on the last message. Send this when it's done",
+  "agent.provider_unknown": "That Provider or model isn't on this Machine",
+  "agent.unavailable": "The Agent couldn't take this right now. Try again in a moment",
+  "agent.unknown": "This Machine doesn't have that Agent",
   "hub.machine_offline": "That Machine is offline, so it did not get this",
   "hub.machine_taken": "That Machine already belongs to another Workspace. Run veeloe unpair on it, then pair again",
   "hub.pairing_invalid": "The Hub refused this link because the signatures did not check out or it has expired. Run veeloe pair again",
@@ -9,5 +13,11 @@
   "pairing.link_bad_signature": "This link was changed after the Machine made it, so it can't be used",
   "pairing.link_expired": "This link has expired. Run veeloe pair on the Machine again",
   "pairing.link_malformed": "That isn't a Pairing link. Copy the whole link veeloe pair shows",
-  "pairing.timed_out": "The Machine didn't answer in time. Check veeloe pair is still running, then try again"
+  "pairing.timed_out": "The Machine didn't answer in time. Check veeloe pair is still running, then try again",
+  "provider.failed": "The Provider answered with an error",
+  "provider.missing": "The Agent's Provider was removed from the Machine. Add it again with veeloe provider add",
+  "provider.rejected": "The Provider refused the key on the Machine",
+  "provider.unreachable": "The Machine couldn't reach the Provider",
+  "task.not_found": "This Machine doesn't have that Task",
+  "turn.too_many_rounds": "The Agent stopped after too many steps in one go"
 }

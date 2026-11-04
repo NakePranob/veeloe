@@ -22,6 +22,7 @@
 - [ ] `machine-pairing`: ผูก Machine กับ Controller ด้วย QR รอ `hub-relay`, `controller-device-key` (ADR 0013)
 - [ ] `agent-and-task`: สร้าง Agent, supervisor กับ worker, Task แบบ event log และคุยกับ Provider ผ่าน proxy รอ `machine-pairing` (ADR 0004, 0018, 0020, 0032, 0042)
 - [ ] `sandboxed-commands`: คำสั่งรันใน sandbox บน macOS และ Linux พร้อม Egress รายชื่อเดียวทั้ง Machine รอ `agent-and-task` (ADR 0008)
+- [ ] `workdir-file-tools`: tool อ่านและเขียนไฟล์ใน Workdir (read, write, edit, glob, grep) รอ `sandboxed-commands` (ADR 0008, 0011, 0032)
 - [ ] `approval-and-allowlist`: ขอและตอบ Approval พร้อม Allowlist รอ `sandboxed-commands` (ADR 0030)
 
 ### ส่วนที่เหลือของ v0.1
@@ -30,6 +31,7 @@
 
 - [ ] `stop-and-restart`: Stop และปิด Turn ที่ค้างเมื่อเริ่มใหม่ (ADR 0017, 0033)
 - [ ] `one-writer-queue`: คิวงานและคนเขียนทีละ Turn (ADR 0011)
+- [ ] `provider-keys-in-app`: ใส่ key ของ Provider ในแอปครั้งเดียวแล้วเข้ารหัสแบบ sealed box ให้แต่ละ Machine (ADR 0005, 0042)
 - [ ] `daily-budget`: Budget ต่อวันที่ proxy (ADR 0043)
 - [ ] `memory-and-compaction`: Memory และการย่อ context (ADR 0036, 0041)
 - [ ] `attachments`: ส่งไฟล์เป็นก้อนผ่าน Hub โดยไม่เก็บ (ADR 0050)

@@ -10,4 +10,35 @@ export const MIGRATIONS = [
     member_id TEXT NOT NULL,
     paired_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE agent (
+    id TEXT PRIMARY KEY NOT NULL,
+    machine_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL
+  );
+  CREATE TABLE task (
+    id TEXT PRIMARY KEY NOT NULL,
+    agent_id TEXT NOT NULL,
+    machine_id TEXT NOT NULL,
+    synced_seq INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX task_by_agent ON task (agent_id, updated_at);
+  CREATE TABLE task_event (
+    task_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    PRIMARY KEY (task_id, seq)
+  );
+  CREATE TABLE pending_message (
+    id TEXT PRIMARY KEY NOT NULL,
+    task_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    sig TEXT,
+    error TEXT
+  )`,
 ] as const;

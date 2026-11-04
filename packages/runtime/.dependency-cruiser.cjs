@@ -21,6 +21,13 @@ module.exports = {
       from: { path: "^src/worker/" },
       to: { path: "^src/supervisor/" },
     },
+    {
+      // ADR 0022: a slice is one kind of message; what slices share lives in a module beside them.
+      name: "supervisor-slices-apart",
+      severity: "error",
+      from: { path: "^src/supervisor/(pairing|agents|task-message|task-sync)/" },
+      to: { path: "^src/supervisor/(pairing|agents|task-message|task-sync)/", pathNot: "^src/supervisor/$1/" },
+    },
   ],
   options: {
     doNotFollow: { path: "node_modules" },

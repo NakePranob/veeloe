@@ -26,12 +26,14 @@ export function startHubLink({ hubUrl, secretKey, log = console.log, backoff = c
   const url = `${hubUrl.replace(/\/+$/, "")}/connect`;
   let stopped = false;
   let socket: WebSocket | undefined;
+  let connected = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
 
   function connect() {
     let ready = false;
     const ws = new WebSocket(url);
     socket = ws;
+    connected = false;
 
     ws.onmessage = (event) => {
       const text = String(event.data);
@@ -43,6 +45,7 @@ export function startHubLink({ hubUrl, secretKey, log = console.log, backoff = c
         ws.send(JSON.stringify(answerChallenge(hubUrl, msg.nonce, secretKey)));
       } else if (msg.type === "hub.ready" && !ready) {
         ready = true;
+        connected = true;
         backoff.reset();
         log(`connected to hub ${hubUrl} as machine ${msg.machine}`);
         if (msg.machine) onReady?.(msg.machine);
@@ -50,7 +53,10 @@ export function startHubLink({ hubUrl, secretKey, log = console.log, backoff = c
     };
 
     ws.onclose = (event) => {
-      if (socket === ws) socket = undefined;
+      if (socket === ws) {
+        socket = undefined;
+        connected = false;
+      }
       if (stopped) return;
       const why = closeReasons[event.code] ?? (ready ? "connection lost" : "could not connect");
       const delay = backoff.next();
@@ -61,6 +67,12 @@ export function startHubLink({ hubUrl, secretKey, log = console.log, backoff = c
 
   connect();
   return {
+    /** False while there is no accepted connection: the frame is not kept. */
+    send(frame: unknown): boolean {
+      if (!socket || !connected) return false;
+      socket.send(JSON.stringify(frame));
+      return true;
+    },
     stop() {
       stopped = true;
       clearTimeout(retry);

@@ -65,12 +65,15 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
 
   connect();
   return {
-    /** False when not connected right now: nothing was signed or sent. */
-    send(out: Outgoing): boolean {
-      if (!socket || member === undefined) return false;
-      socket.send(JSON.stringify(signEnvelope(out)));
-      return true;
+    /** The sent envelope's sig, which answers name it by; null when not connected, and nothing was signed or sent. */
+    send(out: Outgoing): string | null {
+      if (!socket || member === undefined) return null;
+      const envelope = signEnvelope(out);
+      socket.send(JSON.stringify(envelope));
+      return envelope.sig;
     },
+    /** The Member the Hub named for this Controller, once connected. */
+    member: () => member,
     stop() {
       stopped = true;
       clearTimeout(retry);

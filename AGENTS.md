@@ -38,7 +38,8 @@ bun run test
 dependency-cruiser on the Runtime (ADR 0022) and `go-scaffold check` on the Hub.
 `test` runs the unit tests of `packages/`, the Controller and its prototype.
 CI runs both, plus `go test -race ./...` in `hub/` and `bun run test:e2e`, which
-sends signed envelopes through a real relay and needs Go. Its Pairing test also
+sends signed envelopes through a real relay, runs the compiled `veeloe` against a
+stand-in Provider, and needs Go. Its Pairing test also
 needs a migrated Postgres in `TEST_DB_DSN`, and skips without one unless
 `REQUIRE_TEST_DB` is set, as it is in CI.
 

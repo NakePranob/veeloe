@@ -1,13 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSigner, MemorySeenSequences, pairingProof, parsePairingLink, publicKeyOf, toBase64url, verify, type Envelope } from "@veeloe/protocol";
-import { loadConfig } from "./config";
-import { fakeHub, type FakeHub } from "./hub-link/fake-hub";
+import { loadConfig } from "../config";
+import { fakeHub, type FakeHub } from "../hub-link/fake-hub";
 import { runPair } from "./pair";
 import { runUnpair } from "./unpair";
-import { loadTrust, saveTrust } from "./trust/store";
+import { loadTrust, saveTrust } from "../trust/store";
 
 // TEST-ONLY KEYS.
 const controllerSeed = new Uint8Array(32).fill(0x44);
@@ -54,7 +54,7 @@ test("a right claim makes the key an Owner, answers done signed by the Machine a
 
   expect(await result).toBe("paired");
   expect(loadTrust(home)).toEqual({ owners: [{ member, keys: [controllerKey] }] });
-  expect(statSync(join(home, "trust.json")).mode & 0o777).toBe(0o600);
+  expect(statSync(join(home, "runtime/trust.json")).mode & 0o777).toBe(0o600);
   expect(loadConfig({ VEELOE_HOME: home }).hubUrl).toBe(hub.url);
 
   await until(() => hub.frames.length === 1);
@@ -139,11 +139,13 @@ test("unpair deletes the trust and the key only after a yes, and a new pair can 
   await result;
 
   expect(await runUnpair({ home, confirm: async () => false, log: () => {} })).toBe(false);
-  expect(existsSync(join(home, "trust.json"))).toBe(true);
+  expect(existsSync(join(home, "runtime/trust.json"))).toBe(true);
   expect(existsSync(join(home, "machine.key"))).toBe(true);
 
+  writeFileSync(join(home, "runtime/agents.json"), "[]");
   expect(await runUnpair({ home, confirm: async () => true, log: () => {} })).toBe(true);
-  for (const file of ["trust.json", "seen.json", "machine.key"]) expect(existsSync(join(home, file))).toBe(false);
+  expect(existsSync(join(home, "runtime/agents.json"))).toBe(false);
+  for (const file of ["runtime/trust.json", "runtime/seen.json", "machine.key"]) expect(existsSync(join(home, file))).toBe(false);
   expect(existsSync(join(home, "config.json"))).toBe(true);
 
   const again = await runPair({ home, hubUrl: hub.url, log: () => {}, ttlSeconds: 0.05 });
