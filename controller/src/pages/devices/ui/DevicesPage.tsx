@@ -19,7 +19,7 @@ export function DevicesPage() {
   const live = devices.filter((d) => d.revoked_at === null);
   const revoked = devices.filter((d) => d.revoked_at !== null);
   return (
-    <Screen title={t("title")} right={{ label: t("linkNew"), onPress: () => router.push("/devices/link") }}>
+    <Screen title={t("title")} right={{ label: t("linkNew"), icon: "add", onPress: () => router.push("/devices/link") }}>
       <Section title={t("mine")} footer={t("footer")}>
         {live.map((device) => (
           <DeviceRow key={device.key} device={device} devices={devices} here={device.key === own} />
