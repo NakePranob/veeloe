@@ -21,7 +21,7 @@
 - [x] `controller-device-key`: กุญแจบนเครื่องที่เปิดใช้ได้หลังยืนยันตัว รอ `protocol-envelope`, `controller-foundation` (ADR 0012)
 - [x] `machine-pairing`: ผูก Machine กับ Controller ด้วย QR รอ `hub-relay`, `controller-device-key` (ADR 0013)
 - [x] `agent-and-task`: สร้าง Agent, supervisor กับ worker, Task แบบ event log และคุยกับ Provider ผ่าน proxy รอ `machine-pairing` (ADR 0004, 0018, 0020, 0032, 0042)
-- [ ] `sandboxed-commands`: คำสั่งรันใน sandbox บน macOS และ Linux พร้อม Egress รายชื่อเดียวทั้ง Machine รอ `agent-and-task` (ADR 0008)
+- [x] `sandboxed-commands`: คำสั่งรันใน sandbox บน macOS และ Linux พร้อม Egress รายชื่อเดียวทั้ง Machine รอ `agent-and-task` (ADR 0008)
 - [ ] `workdir-file-tools`: tool อ่านและเขียนไฟล์ใน Workdir (read, write, edit, glob, grep) รอ `sandboxed-commands` (ADR 0008, 0011, 0032)
 - [ ] `approval-and-allowlist`: ขอและตอบ Approval พร้อม Allowlist รอ `sandboxed-commands` (ADR 0030)
 

@@ -67,19 +67,23 @@ Runtime SHALL มี Provider สำเร็จรูปในตาราง�
 - **THEN** Turn จบด้วย error code `provider.missing`
 
 ### Requirement: worker คุยกับ LLM ผ่าน proxy ของ supervisor เท่านั้น
-supervisor SHALL รับคำขอไป LLM จาก worker ผ่าน proxy ที่ฟังเฉพาะบนเครื่อง ใส่ key ของ Provider ที่ Agent ตัวนั้นใช้ แล้วส่งต่อ worker MUST NOT ได้รับ key ทั้งทางตัวแปร environment, IPC หรือคำตอบของ proxy proxy SHALL รับเฉพาะคำขอที่พกรหัสของ worker ที่ supervisor ออกให้ และ SHALL ใช้ Provider กับ model ของ Agent ที่รหัสนั้นเป็นเจ้าของ ไม่ใช่ค่าที่คำขอระบุ
+supervisor SHALL รับคำขอไป LLM จาก worker ผ่านช่อง IPC ของ worker ตัวนั้นเท่านั้น ใส่ key ของ Provider ที่ Agent ตัวนั้นใช้ แล้วส่งต่อ Agent ที่เป็นเจ้าของคำขอ SHALL มาจากช่อง IPC ที่คำขอเข้ามา ไม่ใช่จากสิ่งที่คำขอระบุ supervisor MUST NOT เปิด port บนเครื่องให้ worker เรียก LLM worker MUST NOT ได้รับ key ทั้งทางตัวแปร environment, IPC หรือคำตอบ supervisor SHALL ใช้ Provider กับ model ของ Agent ตัวนั้น ไม่ใช่ค่าที่คำขอระบุ และ SHALL ส่งต่อเฉพาะ path ที่ใช้คุยกับ LLM (ADR 0008, 0042)
 
 #### Scenario: worker ขอ LLM
-- **WHEN** worker ส่งคำขอพร้อมรหัสของตัวเอง
+- **WHEN** worker ส่งคำขอทาง IPC ของตัวเอง
 - **THEN** Provider ได้คำขอพร้อม key และ worker ได้คำตอบตามที่ Provider ตอบ
 
-#### Scenario: คำขอที่ไม่มีรหัส
-- **WHEN** โปรเซสบนเครื่องส่งคำขอไปที่ proxy โดยไม่มีรหัส หรือใช้รหัสที่ไม่ได้ออกให้
-- **THEN** proxy ตอบปฏิเสธและไม่ติดต่อ Provider
+#### Scenario: โปรเซสอื่นบนเครื่อง
+- **WHEN** โปรเซสบนเครื่องที่ไม่ใช่ worker ลองหาทางเรียก LLM ผ่าน supervisor
+- **THEN** ไม่มี port ให้ต่อ และ supervisor ไม่ติดต่อ Provider
 
 #### Scenario: worker ขอ model อื่น
 - **WHEN** คำขอของ worker ระบุ model ที่ไม่ใช่ของ Agent
 - **THEN** Provider ได้คำขอด้วย model ของ Agent
+
+#### Scenario: worker ขอ path อื่น
+- **WHEN** worker ขอ path ที่ไม่ใช่การส่งข้อความหรือนับ token
+- **THEN** supervisor ปฏิเสธและไม่ติดต่อ Provider
 
 #### Scenario: Provider ล่ม
 - **WHEN** ติดต่อ Provider ไม่ได้ หรือ Provider ตอบ error
