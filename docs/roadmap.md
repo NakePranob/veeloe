@@ -31,7 +31,9 @@
 
 - [ ] `stop-and-restart`: Stop และปิด Turn ที่ค้างเมื่อเริ่มใหม่ (ADR 0017, 0033)
 - [ ] `one-writer-queue`: คิวงานและคนเขียนทีละ Turn (ADR 0011)
-- [ ] `provider-keys-in-app`: ใส่ key ของ Provider ในแอปครั้งเดียวแล้วเข้ารหัสแบบ sealed box ให้แต่ละ Machine (ADR 0005, 0042)
+- [ ] `provider-keys-in-app`: ใส่ key ของ Provider ในแอปครั้งเดียวแล้วเข้ารหัสแบบ sealed box ให้แต่ละ Machine เลือกได้จากรายชื่อ Provider ที่เราตั้งค่าไว้ให้แล้ว (URL, header และค่าเฉพาะของแต่ละเจ้า เช่น `x-opencode-session` ของ OpenCode Go) หรือเพิ่ม Provider เองด้วย URL ที่รับ Anthropic Messages API (ADR 0005, 0042)
+- [ ] `agent-settings`: แก้ Agent หลังสร้างด้วย `agent.update` ที่เซ็นแล้ว ทั้ง Provider, model และหน้าตา Character (ADR 0006, 0042)
+- [ ] `runtime-service`: ติดตั้ง supervisor เป็น service ของระบบ (launchd บน macOS, systemd บน Linux) ให้ Agent ทำงานต่อหลังปิด terminal หรือเปิดเครื่องใหม่
 - [ ] `daily-budget`: Budget ต่อวันที่ proxy (ADR 0043)
 - [ ] `memory-and-compaction`: Memory และการย่อ context (ADR 0036, 0041)
 - [ ] `attachments`: ส่งไฟล์เป็นก้อนผ่าน Hub โดยไม่เก็บ (ADR 0050)
