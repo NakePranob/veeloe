@@ -13,13 +13,13 @@ function tempHome() {
 afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })));
 
 test("a Machine with no file trusts nobody", () => {
-  expect(loadTrust(tempHome())).toEqual({ owners: [] });
+  expect(loadTrust(tempHome())).toEqual({ owners: [], links: [], revoked: [] });
 });
 
 test("owners come back as saved, only the owner can read them, and no temporary file stays", () => {
   const home = tempHome();
   saveTrust(home, { owners: [{ member: "m_1", keys: ["key-1"] }] });
-  expect(loadTrust(home)).toEqual({ owners: [{ member: "m_1", keys: ["key-1"] }] });
+  expect(loadTrust(home)).toEqual({ owners: [{ member: "m_1", keys: ["key-1"] }], links: [], revoked: [] });
   expect(trustedKeys(loadTrust(home))).toEqual(new Set(["key-1"]));
   expect(statSync(join(home, "runtime/trust.json")).mode & 0o777).toBe(0o600);
   expect(readdirSync(join(home, "runtime"))).toEqual(["trust.json"]);

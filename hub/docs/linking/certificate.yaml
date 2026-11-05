@@ -1,0 +1,16 @@
+Certificate:
+  type: object
+  required: [signed, sig]
+  description: >-
+    A key change one Controller signed apart from any envelope. The Hub keeps it
+    exactly as sent and hands it to every Machine and Controller of the
+    Workspace in a `hub.certificates` frame.
+  properties:
+    signed:
+      type: string
+      maxLength: 4096
+      description: >-
+        JSON text `{v: 1, type, workspace, member, key, by, at}`, plus `name` for
+        a `device.link` or `keep` for a `device.revoke`. Keys are Ed25519 public
+        keys, base64url.
+    sig: { type: string, description: "Ed25519 over the UTF-8 of `signed`, by the key in its `by`, base64url" }

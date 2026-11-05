@@ -1,6 +1,9 @@
 import { addMachineI18n } from "../../pages/add-machine";
 import { agentsI18n } from "../../pages/agents";
 import { createKeyI18n } from "../../pages/create-key";
+import { devicesI18n } from "../../pages/devices";
+import { linkDeviceI18n } from "../../pages/link-device";
+import { linkThisDeviceI18n } from "../../pages/link-this-device";
 import { homeI18n } from "../../pages/home";
 import { lockI18n } from "../../pages/lock";
 import { machinesI18n } from "../../pages/machines";
@@ -20,6 +23,9 @@ const slices = {
   "add-machine": addMachineI18n,
   agents: agentsI18n,
   "create-key": createKeyI18n,
+  devices: devicesI18n,
+  "link-device": linkDeviceI18n,
+  "link-this-device": linkThisDeviceI18n,
   home: homeI18n,
   lock: lockI18n,
   machines: machinesI18n,

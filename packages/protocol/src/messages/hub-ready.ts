@@ -14,6 +14,8 @@ export type HubReady = z.infer<typeof HubReadySchema>;
 export const HubCloseCode = {
   /** The answer did not prove a known key. */
   AuthFailed: 4401,
+  /** This key was revoked: it is not coming back, so wipe and start over. */
+  Revoked: 4403,
   /** No answer within the handshake timeout. */
   HandshakeTimeout: 4408,
   /** A newer connection with the same key took over. */

@@ -9,12 +9,15 @@ export type HubLinkOptions = {
   onReady?: (machine: string) => void;
   /** A frame that is not the Hub's own: an envelope, unverified. `send` writes back on the same connection. */
   onEnvelope?: (value: unknown, send: (frame: unknown) => void) => void;
+  /** Certificates the Hub keeps for the Workspace, unverified. They come before any envelope. */
+  onCertificates?: (certificates: unknown[]) => void;
 };
 
 const closeReasons: Record<number, string> = {
   [HubCloseCode.AuthFailed]: "the Hub does not know this Machine's key, or the answer did not check out",
   [HubCloseCode.HandshakeTimeout]: "the handshake took too long",
   [HubCloseCode.Replaced]: "another connection with this Machine's key took over",
+  [HubCloseCode.Revoked]: "the Hub says this key was revoked",
 };
 
 /**
@@ -22,7 +25,7 @@ const closeReasons: Record<number, string> = {
  * Machine key, reports what the Hub says, and reconnects with backoff
  * whenever the connection drops or cannot be opened. Runs until stop().
  */
-export function startHubLink({ hubUrl, secretKey, log = console.log, backoff = createBackoff(), onReady, onEnvelope }: HubLinkOptions) {
+export function startHubLink({ hubUrl, secretKey, log = console.log, backoff = createBackoff(), onReady, onEnvelope, onCertificates }: HubLinkOptions) {
   const url = `${hubUrl.replace(/\/+$/, "")}/connect`;
   let stopped = false;
   let socket: WebSocket | undefined;
@@ -49,6 +52,8 @@ export function startHubLink({ hubUrl, secretKey, log = console.log, backoff = c
         backoff.reset();
         log(`connected to hub ${hubUrl} as machine ${msg.machine}`);
         if (msg.machine) onReady?.(msg.machine);
+      } else if (msg.type === "hub.certificates" && ready) {
+        onCertificates?.(msg.certificates);
       }
     };
 

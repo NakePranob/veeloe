@@ -87,3 +87,12 @@ test("the plural rules agree with the real ones for our languages", () => {
     for (const count of [0, 1, 2, 5, 21, 100]) expect(ours.select(count)).toBe(real.select(count) as "one" | "other");
   }
 });
+
+test("every code the Hub answers with has words in both languages", async () => {
+  const source = await Bun.file(`${import.meta.dir}/../../../../hub/internal/shared/protocol/protocol.go`).text();
+  const codes = [...source.matchAll(/Code\w+\s*=\s*"(hub\.[a-z_]+)"/g)].map((m) => m[1]!);
+  expect(codes).toContain("hub.last_device");
+  for (const code of codes) {
+    expect([code, Object.hasOwn(errorsI18n.th, code), Object.hasOwn(errorsI18n.en, code)]).toEqual([code, true, true]);
+  }
+});

@@ -20,6 +20,10 @@ paths:
     $ref: './health/health-readyz.yaml'
   /pairings:
     $ref: './pairing/pairings.yaml'
+  /links:
+    $ref: './linking/links.yaml'
+  /revocations:
+    $ref: './linking/revocations.yaml'
   # go-scaffold:paths
 
 components:

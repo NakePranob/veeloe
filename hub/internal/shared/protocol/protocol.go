@@ -119,11 +119,21 @@ const (
 	CodeRouteNotAllowed = "hub.route_not_allowed"
 	CodePairingInvalid  = "hub.pairing_invalid"
 	CodeMachineTaken    = "hub.machine_taken"
+	// A device.link whose signer is not a Controller of that Member.
+	CodeLinkInvalid = "hub.link_invalid"
+	// A key that is already a Controller, or was once revoked.
+	CodeKeyTaken = "hub.key_taken"
+	// A device.revoke whose signer or key is not a Controller of that Member.
+	CodeRevocationInvalid = "hub.revocation_invalid"
+	// A revocation that would leave the Member no Controller.
+	CodeLastDevice = "hub.last_device"
 )
 
 // Close codes the Hub ends a connection with.
 const (
-	CloseAuthFailed       = 4401
+	CloseAuthFailed = 4401
+	// This key was revoked: it is not coming back.
+	CloseRevoked          = 4403
 	CloseHandshakeTimeout = 4408
 	CloseReplaced         = 4409
 	// A receiver fell too far behind and its queue overflowed.

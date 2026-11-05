@@ -5,5 +5,6 @@
     "body": "Your Agents will be here once a Machine is paired with this app."
   },
   "add": "Add Machine",
+  "link": "Use with a device I already have",
   "pick": "Pick an Agent on the left to open its Task"
 }

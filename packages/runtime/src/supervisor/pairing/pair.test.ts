@@ -53,7 +53,7 @@ test("a right claim makes the key an Owner, answers done signed by the Machine a
   hub.send(claim(controllerSeed, 1_700_000_000_000, { member, proof: realProof(link) }));
 
   expect(await result).toBe("paired");
-  expect(loadTrust(home)).toEqual({ owners: [{ member, keys: [controllerKey] }] });
+  expect(loadTrust(home)).toEqual({ owners: [{ member, keys: [controllerKey] }], links: [], revoked: [] });
   expect(statSync(join(home, "runtime/trust.json")).mode & 0o777).toBe(0o600);
   expect(loadConfig({ VEELOE_HOME: home }).hubUrl).toBe(hub.url);
 
@@ -79,7 +79,7 @@ test("a Hub swapping in its own key with a proof it saw is refused, and the real
   // Signed by the Hub's key, carrying the proof from the Controller's real envelope.
   hub.send(claim(hubKeySeed, 1, { member, proof: realProof(link) }));
   await until(() => lines.some((l) => l.includes("did not match")));
-  expect(loadTrust(home)).toEqual({ owners: [] });
+  expect(loadTrust(home)).toEqual({ owners: [], links: [], revoked: [] });
   expect(hub.frames).toEqual([]);
 
   hub.send(claim(controllerSeed, 1, { member, proof: realProof(link) }));
@@ -94,7 +94,7 @@ test("a proof made for another Member does not count", async () => {
   await Bun.sleep(20);
   hub.send(claim(controllerSeed, 1, { member: "m_other", proof: realProof(link) }));
   await until(() => lines.some((l) => l.includes("did not match")));
-  expect(loadTrust(home)).toEqual({ owners: [] });
+  expect(loadTrust(home)).toEqual({ owners: [], links: [], revoked: [] });
   hub.send(claim(controllerSeed, 2, { member, proof: realProof(link) }));
   expect(await result).toBe("paired");
 });
@@ -107,7 +107,7 @@ test("other envelopes do nothing while waiting: no work, no trust", async () => 
   hub.send({ ...claim(controllerSeed, 2, { member, proof: realProof(link) }), to: "another-machine" } as Envelope);
   hub.send("not an envelope");
   await Bun.sleep(50);
-  expect(loadTrust(home)).toEqual({ owners: [] });
+  expect(loadTrust(home)).toEqual({ owners: [], links: [], revoked: [] });
   hub.send(claim(controllerSeed, 3, { member, proof: realProof(link) }));
   expect(await result).toBe("paired");
 });
@@ -116,7 +116,7 @@ test("time running out ends the wait and trusts nobody", async () => {
   const { home, lines, result } = setup({ ttlSeconds: 0.05 });
   expect(await result).toBe("expired");
   expect(lines.at(-1)).toContain("expired");
-  expect(loadTrust(home)).toEqual({ owners: [] });
+  expect(loadTrust(home)).toEqual({ owners: [], links: [], revoked: [] });
   expect(existsSync(join(home, "config.json"))).toBe(false);
 });
 
@@ -128,7 +128,7 @@ test("a Machine already paired refuses and keeps its trust", async () => {
   const lines: string[] = [];
   expect(await runPair({ home, hubUrl: "ws://127.0.0.1:1", log: (l) => lines.push(l) })).toBe("already-paired");
   expect(lines[0]).toContain("veeloe unpair");
-  expect(loadTrust(home)).toEqual(trust);
+  expect(loadTrust(home)).toMatchObject(trust);
 });
 
 test("unpair deletes the trust and the key only after a yes, and a new pair can start", async () => {

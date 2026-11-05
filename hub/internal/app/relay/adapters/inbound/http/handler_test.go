@@ -15,10 +15,12 @@ type serviceStub struct{}
 func (serviceStub) Identify(context.Context, []byte) (ports.Identity, bool, error) {
 	return ports.Identity{}, false, nil
 }
-func (serviceStub) Connected(ports.Identity, ports.Session)      {}
-func (serviceStub) Disconnected(ports.Identity, ports.Session)   {}
-func (serviceStub) Online(string, string) bool                   { return false }
-func (serviceStub) Route(ports.Identity, []byte) *protocol.Error { return nil }
+func (serviceStub) Revoked(context.Context, []byte) (bool, error)               { return false, nil }
+func (serviceStub) Connected(ports.Identity, ports.Session)                     {}
+func (serviceStub) Disconnected(ports.Identity, ports.Session)                  {}
+func (serviceStub) Online(string, string) bool                                  { return false }
+func (serviceStub) Route(ports.Identity, ports.Session, []byte) *protocol.Error { return nil }
+func (serviceStub) Certificates(context.Context, string) ([]byte, error)        { return nil, nil }
 
 func TestHandler_RegistersConnect(t *testing.T) {
 	gin.SetMode(gin.TestMode)

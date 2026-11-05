@@ -98,13 +98,14 @@ export function runPair({ home, hubUrl, log = console.log, name = machineName(),
         if (!result.ok) return;
         const parsed = parseMessage(result.signed);
         if (parsed.kind !== "message" || parsed.message.type !== "pairing.claim") return;
-        const { member, proof } = parsed.message.body;
+        const { member, proof, keys = [], workspace } = parsed.message.body;
         if (!checkPairingProof({ secret, machine: machineKey, controller: result.from, member }, proof)) {
           log("ignored a claim whose proof did not match this link");
           return;
         }
 
-        saveTrust(home, { owners: [{ member, keys: [result.from] }] });
+        // The Member's other keys come in the claim, signed by the key the proof vouches for, so a Machine paired from any of their devices trusts them all.
+        saveTrust(home, { owners: [{ member, keys: [...new Set([result.from, ...keys])] }], links: [], revoked: [], ...(workspace ? { workspace } : {}) });
         saveHubUrl(home, hubUrl);
         const seen = new FileSeenSequences(home);
         seen.record(result.from, result.signed.seq);

@@ -7,6 +7,8 @@ import { createSigner } from "../envelope/sign";
 import { answerChallenge, handshakeBytes, normalizeHubUrl } from "../messages/hub-auth";
 import { pairingProof, pairingProofText } from "../messages/pairing-claim";
 import { buildPairingLink, buildPairingRequest, pairingLinkBytes, pairingRequestBytes, parsePairingLink } from "../messages/pairing-link";
+import { revokedWith, signCertificate, verifyCertificate } from "../messages/certificate";
+import { buildLinkingLink, linkingProof, linkingProofText } from "../messages/linking";
 
 // The files every implementation checks itself against (Go included): the
 // header's JSON Schema and the test vectors. Rebuild them with
@@ -19,6 +21,7 @@ const TEST_STRANGER = new Uint8Array(32).fill(0x22);
 const TEST_MACHINE = new Uint8Array(32).fill(0x33);
 const TEST_CONTROLLER = new Uint8Array(32).fill(0x44);
 const TEST_PAIRING_SECRET = new Uint8Array(32).fill(0x55);
+const TEST_NEW_DEVICE = new Uint8Array(32).fill(0x66);
 
 const encoder = new TextEncoder();
 const keyOf = (secret: Uint8Array) => toBase64url(publicKeyOf(secret));
@@ -251,9 +254,66 @@ export function messageVectors() {
     { name: "set the Egress to nothing", type: "egress.set", body: { egress: [] }, valid: true },
     { name: "set the Egress with a URL", type: "egress.set", body: { egress: ["https://pypi.org/simple"] }, valid: false },
     { name: "set the Egress with localhost", type: "egress.set", body: { egress: ["localhost"] }, valid: false },
+    { name: "a claim that names the Member's other keys", type: "pairing.claim", body: { member: "m_1", proof: "p", keys: ["k1", "k2"] }, valid: true },
+    { name: "a claim from before other keys", type: "pairing.claim", body: { member: "m_1", proof: "p" }, valid: true },
+    { name: "list Tasks", type: "task.list", body: {}, valid: true },
+    { name: "listed Tasks", type: "task.listed", body: { tasks: [{ id: "task-1", agent: "agent-1", updated: 1_800_000_000_000 }] }, valid: true },
+    { name: "listed Tasks with an Agent id that is not a folder name", type: "task.listed", body: { tasks: [{ id: "task-1", agent: "../x", updated: 1 }] }, valid: false },
+    { name: "a handoff", type: "device.handoff", body: { data: "{}", proof: "p" }, valid: true },
+    { name: "a handoff with no proof", type: "device.handoff", body: { data: "{}" }, valid: false },
+    { name: "linked", type: "device.linked", body: {}, valid: true },
     { name: "set the Egress with more than 100 domains", type: "egress.set", body: { egress: Array.from({ length: 101 }, (_, i) => `d${i}.example.com`) }, valid: false },
   ];
   return { note: "`valid` is whether a receiver accepts the body of an envelope of `type` that verify already accepted.", vectors: cases };
+}
+
+/**
+ * Certificates every implementation must judge the same way: `valid` is whether
+ * the key in `by` really signed exactly this, before asking whether it is trusted.
+ */
+export function certificateVectors() {
+  const common = { workspace: "w_vector", member: "m_vector", at: 1_800_000_000_000 };
+  const link = signCertificate({ ...common, type: "device.link", key: keyOf(TEST_NEW_DEVICE), name: "Chrome บน Mac" }, TEST_CONTROLLER);
+  const revoke = signCertificate({ ...common, type: "device.revoke", key: keyOf(TEST_CONTROLLER), keep: [keyOf(TEST_NEW_DEVICE)] }, TEST_NEW_DEVICE);
+  const resigned = (signed: string, secret: Uint8Array) => ({ signed, sig: sigOver(signed, secret) });
+  const cases = [
+    { name: "a link", certificate: link },
+    { name: "a revocation that keeps one key", certificate: revoke },
+    { name: "a link with a field this build does not know", certificate: resigned(link.signed.replace('"v":1,', '"v":1,"hint":"newer",'), TEST_CONTROLLER) },
+    { name: "a link to another key, after signing", certificate: { ...link, signed: link.signed.replace(keyOf(TEST_NEW_DEVICE), keyOf(TEST_STRANGER)) } },
+    { name: "a link to another Member, after signing", certificate: { ...link, signed: link.signed.replace("m_vector", "m_other") } },
+    { name: "a link signed by a key other than its by", certificate: { ...link, sig: sigOver(link.signed, TEST_STRANGER) } },
+    { name: "a link with no name", certificate: resigned(link.signed.replace(/"name":"[^"]*",?/, ""), TEST_CONTROLLER) },
+    { name: "a revocation with no keep list", certificate: resigned(revoke.signed.replace(/,?"keep":\[[^\]]*\]/, ""), TEST_NEW_DEVICE) },
+    { name: "a type this build does not know", certificate: resigned(link.signed.replace("device.link", "device.rename"), TEST_CONTROLLER) },
+  ];
+  // A tree: A linked B and C, B linked D. Revoking A and keeping C drops A, B and D.
+  const links = [
+    { key: "B", by: "A" },
+    { key: "C", by: "A" },
+    { key: "D", by: "B" },
+  ];
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds. `sig` is Ed25519 over the UTF-8 of `signed`, by the key in its `by`.",
+    vectors: cases.map((c) => ({ name: c.name, certificate: c.certificate, valid: verifyCertificate(c.certificate) !== null })),
+    fallout: { revoked: "A", links, keep: ["C"], drops: revokedWith("A", links, ["C"]) },
+  };
+}
+
+/** The QR a new device shows, and the proof on the handoff it waits for. */
+export function linkingVectors() {
+  const key = keyOf(TEST_NEW_DEVICE);
+  const secret = toBase64url(TEST_PAIRING_SECRET);
+  const data = JSON.stringify({ workspace: "w_vector", member: "m_vector", machines: [{ id: "machine-1", key: keyOf(TEST_MACHINE), name: "my-mac", hub: "wss://hub.example.com" }], keys: [{ key: keyOf(TEST_CONTROLLER), name: "iPhone" }] });
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds.",
+    link: buildLinkingLink({ hub: "wss://hub.example.com", key, name: "Chrome บน Mac", secret: TEST_PAIRING_SECRET, expires: 2_000_000_000 }),
+    key,
+    secret,
+    data,
+    proofText: linkingProofText(key, data),
+    proof: linkingProof({ secret, key, data }),
+  };
 }
 
 export const FIXTURES = {
@@ -263,6 +323,8 @@ export const FIXTURES = {
   "vectors/hub-urls.json": hubUrlVectors,
   "vectors/pairings.json": pairingVectors,
   "vectors/messages.json": messageVectors,
+  "vectors/certificates.json": certificateVectors,
+  "vectors/linkings.json": linkingVectors,
 };
 
 export const render = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;

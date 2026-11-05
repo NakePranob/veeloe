@@ -1,7 +1,9 @@
 import { randomUUID } from "expo-crypto";
-import { useEffect, useSyncExternalStore } from "react";
+import type { DeviceLink } from "@veeloe/protocol";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useMachines } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";
+import { deviceName } from "../../../shared/device-name";
 import { keySession, useKeyStatus } from "../../../shared/keystore";
 import { createMachineLinks, type MachineLinks, type MachineStatus } from "./links";
 
@@ -9,16 +11,22 @@ let current: MachineLinks | null = null;
 const changes = new Set<() => void>();
 const announce = () => changes.forEach((listener) => listener());
 
-/** For the app layer: keeps the connections up while the key is open, and drops them when it locks. */
-export function useMachineLinks() {
+/**
+ * For the app layer: keeps the connections up while the key is open, and drops them when it locks.
+ * `onRevoked` runs when a Hub says this key was revoked; `onLinked` when another device linked one.
+ */
+export function useMachineLinks({ onRevoked, onLinked }: { onRevoked: () => void; onLinked: (links: DeviceLink[]) => void }) {
   const database = useDatabase();
   const unlocked = useKeyStatus() === "unlocked";
   const machines = useMachines();
+  const handlers = useRef({ onRevoked, onLinked });
+  handlers.current = { onRevoked, onLinked };
 
   useEffect(() => {
     const secretKey = unlocked ? keySession.secretKey() : null;
     if (!secretKey) return;
-    const links = createMachineLinks({ database, secretKey, newId: randomUUID });
+    const links = createMachineLinks({ database, secretKey, newId: randomUUID, deviceName: deviceName(), onRevoked: () => handlers.current.onRevoked() });
+    links.onLinked((news) => handlers.current.onLinked(news));
     current = links;
     announce();
     return () => {

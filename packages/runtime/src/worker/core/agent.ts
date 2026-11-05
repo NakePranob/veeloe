@@ -59,6 +59,10 @@ export function createAgentCore({ name, store, llm, tools, link }: { name: strin
   return {
     /** Synchronous up to the start of a Turn, so two messages can never both find the Agent free. */
     receive(message: Exclude<ToWorker, { kind: "llm.response" }>) {
+      if (message.kind === "list") {
+        link.send({ kind: "tasks", member: message.member, tasks: store.tasksStartedBy(message.member) });
+        return;
+      }
       const starter = store.starterOf(message.task);
       if (starter !== undefined && starter !== message.member) {
         link.send({ kind: "error", member: message.member, ref: message.ref, code: "task.not_found", task: message.task });

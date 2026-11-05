@@ -1,7 +1,8 @@
-import { createBackoff, parseMessage, type AgentCreateBody, type ProviderInfo } from "@veeloe/protocol";
+import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type DeviceLink, type ProviderInfo, type SignedPart } from "@veeloe/protocol";
+import { saveCertificates } from "../../../entities/device";
 import { saveAgents } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
-import { addPendingMessage, failPendingMessage, listTasks, markPendingSent, saveTaskEvents } from "../../../entities/task";
+import { addListedTasks, addPendingMessage, failPendingMessage, listTasks, markPendingSent, saveTaskEvents } from "../../../entities/task";
 import type { Database } from "../../../shared/db";
 import { startHubClient } from "../../../shared/hub-client";
 
@@ -24,8 +25,28 @@ type Client = ReturnType<typeof startHubClient>;
  * event kept. What arrives is written to the database before anything shows it.
  * Only a Machine's own key is believed, and only for that Machine.
  */
-export function createMachineLinks({ database, secretKey, newId, start = startHubClient }: { database: Database; secretKey: Uint8Array; newId: () => string; start?: typeof startHubClient }) {
+export function createMachineLinks({
+  database,
+  secretKey,
+  newId,
+  deviceName = "",
+  onRevoked,
+  start = startHubClient,
+}: {
+  database: Database;
+  secretKey: Uint8Array;
+  newId: () => string;
+  /** This device's own name, for the device list until a certificate names it. */
+  deviceName?: string;
+  /** The Hub closed with 4403: this key was revoked. */
+  onRevoked?: () => void;
+  start?: typeof startHubClient;
+}) {
+  const ownKey = toBase64url(publicKeyOf(secretKey));
   const clients = new Map<string, { client: Client; machines: Machine[] }>();
+  /** Keys of this Member's other devices that a page waits to hear from, such as a new device being linked. */
+  const watchers = new Map<string, (signed: SignedPart) => void>();
+  const linkListeners = new Set<(links: DeviceLink[]) => void>();
   const statuses = new Map<string, MachineStatus>();
   // A new object on every change, so React can tell that something moved.
   let all: Record<string, MachineStatus> = {};
@@ -54,6 +75,8 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
   async function hello(machine: Machine) {
     const tasks = await listTasks(database);
     sendTo(machine, "hello", { type: "agent.list", body: {} });
+    // What this Member started there, for a device that has not seen it all (ADR 0021, 0060).
+    sendTo(machine, "other", { type: "task.list", body: {} });
     for (const task of tasks.filter((t) => t.machine_id === machine.id)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent_id, after: task.synced_seq } });
   }
 
@@ -81,6 +104,8 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
     } else if ((message.type === "task.event" || message.type === "task.events") && signed.task) {
       const events = message.type === "task.event" ? [message.body] : message.body.events;
       await saveTaskEvents(database, { task: signed.task, agent: message.body.agent, machine: machine.id }, events);
+    } else if (message.type === "task.listed") {
+      for (const task of await addListedTasks(database, machine.id, message.body.tasks)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent, after: 0 } });
     } else if (message.type === "error" && message.body.ref) {
       const about = sentTo.get(message.body.ref);
       if (about?.kind === "create") setStatus(machine.id, { createError: message.body.code });
@@ -93,12 +118,25 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
     const client = start({
       hubUrl,
       secretKey,
-      trustedKeys: byKey,
-      onReady: () => machines.forEach((machine) => void hello(machine)),
+      trustedKeys: { has: (key) => byKey.has(key) || watchers.has(key) },
+      onReady: (member) => {
+        // A Hub with no certificate yet sends none, and this device is still the first one.
+        void saveCertificates(database, { member, own: ownKey, ownName: deviceName }, []);
+        machines.forEach((machine) => void hello(machine));
+      },
       onEnvelope: ({ from, signed }) => {
         const machine = byKey.get(from);
         if (machine) void onEnvelope(machine, signed);
+        else watchers.get(from)?.(signed);
       },
+      onCertificates: (certificates) => {
+        const member = client.member();
+        if (!member) return;
+        void saveCertificates(database, { member, own: ownKey, ownName: deviceName }, certificates).then((news) => {
+          if (news.length) for (const listener of [...linkListeners]) listener(news);
+        });
+      },
+      onRevoked: () => onRevoked?.(),
       onHubError: (error) => {
         const about = error.ref ? sentTo.get(error.ref) : undefined;
         if (!about) return;
@@ -164,7 +202,33 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
       await markPendingSent(database, id, sendTo(machine, "other", { type: "task.message", task, body: { agent, id, text } }));
     },
 
+    /**
+     * To this Member's other devices on that Hub (`hub-relay` lets a Controller name only its own Member).
+     * The envelope's sig, or null when that Hub is not connected and nothing went.
+     */
+    sendToSelf(hubUrl: string, type: string, body: unknown) {
+      const client = clients.get(hubUrl)?.client;
+      const member = client?.member();
+      return client && member ? client.send({ type, recipients: [member], body }) : null;
+    },
+
+    /** Reads what `key`, another device of this Member, signs to this one, until the returned function is called. */
+    watch(key: string, handler: (signed: SignedPart) => void) {
+      watchers.set(key, handler);
+      return () => void (watchers.get(key) === handler && watchers.delete(key));
+    },
+
+    /** Hears of a device another of this Member's devices just linked (ADR 0031). */
+    onLinked(listener: (links: DeviceLink[]) => void) {
+      linkListeners.add(listener);
+      return () => void linkListeners.delete(listener);
+    },
+
+    ownKey,
+
     stop() {
+      watchers.clear();
+      linkListeners.clear();
       for (const { timer } of retries.values()) clearTimeout(timer);
       retries.clear();
       for (const { client } of clients.values()) client.stop();

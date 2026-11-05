@@ -55,6 +55,9 @@ const shadows = {
   },
 };
 
+// A QR code is dark on light in either theme, which is what cameras read.
+export const qrInk = { dark: "#000000", light: "#ffffff" };
+
 export function useColors(): Colors {
   return useColorScheme() === "dark" ? dark : light;
 }

@@ -65,11 +65,11 @@ test.skipIf(!dsn)("a Machine and a Controller pair through the real Hub, and the
   expect(result.machine.publicKey).toBe(link.machine);
 
   const trust = JSON.parse(readFileSync(join(home, "runtime/trust.json"), "utf8"));
-  expect(trust).toEqual({ owners: [{ member: result.machine.member, keys: [toBase64url(publicKeyOf(secretKey))] }] });
+  expect(trust).toEqual({ owners: [{ member: result.machine.member, keys: [toBase64url(publicKeyOf(secretKey))] }], workspace: result.machine.workspace, links: [], revoked: [] });
   expect(JSON.parse(readFileSync(join(home, "config.json"), "utf8"))).toEqual({ hubUrl });
 
   // The Hub now accepts the Machine for good: plain `veeloe` reconnects with what pair saved.
-  const supervisor = Bun.spawn([veeloe], { env: { VEELOE_HOME: home }, stdout: "pipe", stderr: "inherit" });
+  const supervisor = Bun.spawn([veeloe], { env: { VEELOE_HOME: home, PATH: process.env.PATH, HOME: process.env.HOME }, stdout: "pipe", stderr: "inherit" });
   running.push(supervisor);
   const reader = supervisor.stdout.getReader();
   let out = "";

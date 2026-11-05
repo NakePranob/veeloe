@@ -47,7 +47,16 @@ func (h *Handler) connect(c *gin.Context) {
 	auth.Lookup = func(ctx context.Context, key []byte) (string, bool, error) {
 		found, ok, err := h.svc.Identify(ctx, key)
 		who = found
-		return found.ID, ok, err
+		if err != nil || ok {
+			return found.ID, ok, err
+		}
+		// 4401 is also what a new device waiting to be linked gets; a revoked
+		// one has to know it is not coming back.
+		revoked, err := h.svc.Revoked(ctx, key)
+		if err == nil && revoked {
+			err = &middleware.HandshakeError{Code: protocol.CloseRevoked, Reason: "key revoked"}
+		}
+		return "", false, err
 	}
 	if _, err := auth.Handshake(ctx, conn); err != nil {
 		var he *middleware.HandshakeError
@@ -69,10 +78,25 @@ func (h *Handler) connect(c *gin.Context) {
 	if err := conn.Write(ctx, websocket.MessageText, ready); err != nil {
 		return
 	}
+	// The certificates go ahead of any envelope, so a Machine learns of a
+	// revocation before it reads anything the revoked key sent (ADR 0031). They
+	// are read after the session is live, so one made in between is published
+	// to it as well, and a duplicate is harmless; the pump starts last, so they
+	// are first in line.
 	s := newSession(conn, h.queueLimit)
-	go s.pump(ctx)
 	h.svc.Connected(who, s)
 	defer h.svc.Disconnected(who, s)
+	certificates, err := h.svc.Certificates(ctx, who.Workspace)
+	if err != nil {
+		// Without them a Machine could take envelopes from a revoked key.
+		slog.Error("certificates", "error", err)
+		_ = conn.Close(websocket.StatusInternalError, "internal error")
+		return
+	}
+	if certificates != nil {
+		s.sendFirst(certificates)
+	}
+	go s.pump(ctx)
 	go h.keepAlive(ctx, conn)
 
 	for {
@@ -80,7 +104,7 @@ func (h *Handler) connect(c *gin.Context) {
 		if err != nil {
 			return
 		}
-		if answer := h.svc.Route(who, frame); answer != nil {
+		if answer := h.svc.Route(who, s, frame); answer != nil {
 			data, _ := json.Marshal(answer)
 			s.Send(data)
 		}

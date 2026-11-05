@@ -34,7 +34,10 @@ export function HomePage() {
               {t("empty.body")}
             </Text>
           </View>
-          <Button label={t("add")} variant="primary" onPress={() => router.navigate("/add-machine")} />
+          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: space.sm }}>
+            <Button label={t("add")} variant="primary" onPress={() => router.navigate("/add-machine")} />
+            <Button label={t("link")} onPress={() => router.navigate("/link")} />
+          </View>
         </View>
       </ScrollView>
     );

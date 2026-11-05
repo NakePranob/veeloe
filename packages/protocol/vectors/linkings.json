@@ -1,0 +1,9 @@
+{
+  "note": "TEST-ONLY KEYS from fixed public seeds.",
+  "link": "veeloe://link?hub=wss%3A%2F%2Fhub.example.com&key=NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y&name=Chrome%20%E0%B8%9A%E0%B8%99%20Mac&secret=VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU&exp=2000000000",
+  "key": "NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y",
+  "secret": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU",
+  "data": "{\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"machines\":[{\"id\":\"machine-1\",\"key\":\"F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\",\"name\":\"my-mac\",\"hub\":\"wss://hub.example.com\"}],\"keys\":[{\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"name\":\"iPhone\"}]}",
+  "proofText": "veeloe-link/1\nNLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\n{\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"machines\":[{\"id\":\"machine-1\",\"key\":\"F8t5-ytBIPKx7GXkGY1uCLKOgT_rAeSkAIObheGAgM4\",\"name\":\"my-mac\",\"hub\":\"wss://hub.example.com\"}],\"keys\":[{\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"name\":\"iPhone\"}]}",
+  "proof": "oKdxZXgroDfQEEJ0wUqL_NBmxiSZWeEcCy7oDREbP5w"
+}

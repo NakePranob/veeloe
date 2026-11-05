@@ -9,6 +9,7 @@ import (
 type fakeSession struct{ replaced bool }
 
 func (f *fakeSession) Replaced()        { f.replaced = true }
+func (f *fakeSession) Revoked()         {}
 func (f *fakeSession) Send([]byte) bool { return true }
 
 // presence is the registry's contract in its simplest form; the real one is
@@ -27,9 +28,11 @@ func (p presence) Remove(who ports.Identity, s ports.Session) {
 }
 func (p presence) Machine(_, id string) ports.Session         { return p[id] }
 func (p presence) Controllers(string, string) []ports.Session { return nil }
+func (p presence) Key(key string) ports.Session               { return p[key] }
+func (p presence) Workspace(string) []ports.Session           { return nil }
 
 func TestService_PresenceFollowsTheLiveSession(t *testing.T) {
-	svc := NewService(nil, presence{})
+	svc := NewService(nil, nil, presence{})
 	who := ports.Identity{Kind: ports.KindMachine, ID: "m-1", Workspace: "w-1", Key: "m-1"}
 	older, newer := &fakeSession{}, &fakeSession{}
 

@@ -177,7 +177,7 @@ func TestRoute_EachKindUsesItsOwnRoute(t *testing.T) {
 	url, _ := startHub(t, time.Second)
 	machine, _ := connectAs(t, url, testMachine)
 	controller, _ := connectAs(t, url, testController)
-	send(t, controller, envelope(testController, `"recipients":["member-1"]`, "sig-1", "b"))
+	send(t, controller, envelope(testController, `"recipients":["member-2"]`, "sig-1", "b"))
 	receiveError(t, controller, protocol.CodeRouteNotAllowed, "sig-1")
 	send(t, machine, envelope(testMachine, `"to":"machine-1"`, "sig-2", "b"))
 	receiveError(t, machine, protocol.CodeRouteNotAllowed, "sig-2")

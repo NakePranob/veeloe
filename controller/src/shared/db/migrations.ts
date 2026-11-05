@@ -45,4 +45,14 @@ export const MIGRATIONS = [
   `ALTER TABLE machine ADD COLUMN egress TEXT NOT NULL DEFAULT '[]'`,
   // The Character the Machine keeps with the Agent, as JSON; null for one made before it had one.
   `ALTER TABLE agent ADD COLUMN character TEXT`,
+  // The Member's Controllers, from the certificates the Hub hands over (`linking-and-revocation`).
+  // linked_by is null for a key with no device.link: the first device.
+  `CREATE TABLE device (
+    key TEXT PRIMARY KEY NOT NULL,
+    member_id TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    linked_by TEXT,
+    linked_at INTEGER,
+    revoked_at INTEGER
+  )`,
 ] as const;

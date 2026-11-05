@@ -22,6 +22,8 @@ export type PairOptions = {
   fetchFn?: typeof fetch;
   /** How often to repeat the claim while the Machine has not answered. */
   retryMs?: number;
+  /** The Member's other keys in use, so the Machine trusts every device of theirs, not only this one. */
+  otherKeys?: string[];
   /** When to give up, in milliseconds on this device's clock. */
   giveUpAt?: number;
 };
@@ -31,7 +33,7 @@ export type PairOptions = {
  * a claim to the Machine until it answers. Only an answer signed by the key in
  * the link counts, whatever the Hub passes along or says about it.
  */
-export async function pairMachine({ link, secretKey, fetchFn = fetch, retryMs = 2000, giveUpAt = (link.expires + PAIRING_CLOCK_SKEW_SECONDS) * 1000 }: PairOptions): Promise<PairResult> {
+export async function pairMachine({ link, secretKey, otherKeys = [], fetchFn = fetch, retryMs = 2000, giveUpAt = (link.expires + PAIRING_CLOCK_SKEW_SECONDS) * 1000 }: PairOptions): Promise<PairResult> {
   let response: Response;
   let payload: unknown;
   try {
@@ -56,7 +58,7 @@ export async function pairMachine({ link, secretKey, fetchFn = fetch, retryMs = 
 
   return new Promise((resolve) => {
     let lastProblem = "pairing.timed_out";
-    const sendClaim = () => client.send({ type: "pairing.claim", to: machine, body: { member, proof } });
+    const sendClaim = () => client.send({ type: "pairing.claim", to: machine, body: { member, proof, workspace, ...(otherKeys.length ? { keys: otherKeys } : {}) } });
     const finish = (result: PairResult) => {
       clearInterval(repeat);
       clearTimeout(timeout);

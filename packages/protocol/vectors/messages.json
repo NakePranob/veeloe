@@ -450,6 +450,85 @@
       "valid": false
     },
     {
+      "name": "a claim that names the Member's other keys",
+      "type": "pairing.claim",
+      "body": {
+        "member": "m_1",
+        "proof": "p",
+        "keys": [
+          "k1",
+          "k2"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a claim from before other keys",
+      "type": "pairing.claim",
+      "body": {
+        "member": "m_1",
+        "proof": "p"
+      },
+      "valid": true
+    },
+    {
+      "name": "list Tasks",
+      "type": "task.list",
+      "body": {},
+      "valid": true
+    },
+    {
+      "name": "listed Tasks",
+      "type": "task.listed",
+      "body": {
+        "tasks": [
+          {
+            "id": "task-1",
+            "agent": "agent-1",
+            "updated": 1800000000000
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "listed Tasks with an Agent id that is not a folder name",
+      "type": "task.listed",
+      "body": {
+        "tasks": [
+          {
+            "id": "task-1",
+            "agent": "../x",
+            "updated": 1
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a handoff",
+      "type": "device.handoff",
+      "body": {
+        "data": "{}",
+        "proof": "p"
+      },
+      "valid": true
+    },
+    {
+      "name": "a handoff with no proof",
+      "type": "device.handoff",
+      "body": {
+        "data": "{}"
+      },
+      "valid": false
+    },
+    {
+      "name": "linked",
+      "type": "device.linked",
+      "body": {},
+      "valid": true
+    },
+    {
       "name": "set the Egress with more than 100 domains",
       "type": "egress.set",
       "body": {

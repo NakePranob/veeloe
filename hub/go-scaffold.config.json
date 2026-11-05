@@ -42,6 +42,12 @@
       "applicationStyle": "service",
       "boundary": "hexagonal",
       "packageLayout": "split"
+    },
+    "linking": {
+      "surface": "none",
+      "applicationStyle": "service",
+      "boundary": "hexagonal",
+      "packageLayout": "split"
     }
   },
   "scaffoldVersion": "0.14.0"

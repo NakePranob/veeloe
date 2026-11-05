@@ -127,6 +127,7 @@ test("cancelling the authentication sends nothing and leaves the app unlocked", 
     isSupported: async () => true,
     hasKey: async () => true,
     create: async () => {},
+    remove: async () => {},
     read: async () => {
       if (reads++ === 0) return secret.slice();
       throw new Error("cancelled");

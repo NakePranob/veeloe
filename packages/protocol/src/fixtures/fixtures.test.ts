@@ -7,6 +7,8 @@ import { parseMessage } from "../messages";
 import { handshakeBytes, HubAuthSchema } from "../messages/hub-auth";
 import { pairingProof } from "../messages/pairing-claim";
 import { parsePairingLink } from "../messages/pairing-link";
+import { revokedWith, verifyCertificate } from "../messages/certificate";
+import { checkLinkingProof, parseLinkingLink } from "../messages/linking";
 import { FIXTURES, isForSelf, render } from "./build";
 
 const root = `${import.meta.dir}/../..`;

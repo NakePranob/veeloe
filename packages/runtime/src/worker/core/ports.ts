@@ -16,6 +16,8 @@ export interface EventStore {
   /** Writes the next event of the Task and returns it with its number. `messageId` makes a resent message a no-op. */
   append(task: string, kind: string, body: unknown, messageId?: string): TaskEvent;
   events(task: string, after?: number): TaskEvent[];
+  /** The Tasks this Member started, with when each last moved. */
+  tasksStartedBy(member: string): { id: string; updated: number }[];
 }
 
 /** `task` is the Task the request is for, which some Providers want as a session. */

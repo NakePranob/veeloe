@@ -6,6 +6,8 @@ export interface Vault {
   hasKey(): Promise<boolean>;
   create(secret: Uint8Array, prompt: string): Promise<void>;
   read(prompt: string): Promise<Uint8Array | null>;
+  /** Deletes the key for good, with no authentication: what a revoked device does. */
+  remove(): Promise<void>;
 }
 
 export const IDLE_LIMIT_MS = 5 * 60 * 1000;
@@ -76,6 +78,14 @@ export function createKeySession({ vault, now, generate }: { vault: Vault; now: 
       if (status !== "unlocked") return;
       if (expired()) lock();
       else lastUsed = now();
+    },
+
+    /** This key was revoked: it goes from the device, and the app starts over at creating one (ADR 0031). */
+    async forget() {
+      secret?.fill(0);
+      secret = null;
+      await vault.remove();
+      set("none");
     },
 
     /** The clock alone, for timers and coming back from the background. */

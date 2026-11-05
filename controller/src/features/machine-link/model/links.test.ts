@@ -1,6 +1,6 @@
 import { Database as Sqlite } from "bun:sqlite";
 import { afterEach, expect, mock, test } from "bun:test";
-import { createBackoff, createSigner, fromBase64url, handshakeBytes, publicKeyOf, toBase64url, verifySignature, type Envelope } from "@veeloe/protocol";
+import { createBackoff, createSigner, fromBase64url, handshakeBytes, publicKeyOf, signCertificate, toBase64url, verifySignature, type Envelope } from "@veeloe/protocol";
 import type { Machine } from "../../../entities/machine";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
@@ -11,6 +11,7 @@ import { startHubClient } from "../../../shared/hub-client";
 mock.module("../../../entities/agent", () => import("../../../entities/agent/model/agents"));
 mock.module("../../../entities/task", () => import("../../../entities/task/model/tasks"));
 mock.module("../../../entities/machine", () => import("../../../entities/machine/model/machines"));
+mock.module("../../../entities/device", () => import("../../../entities/device/model/devices"));
 const { egressOf, saveMachine } = await import("../../../entities/machine/model/machines");
 const { createMachineLinks } = await import("./links");
 
@@ -45,7 +46,7 @@ afterEach(() => cleanup.splice(0).forEach((f) => f()));
 
 /** A Hub that lets the Controller in, records what it sends, and can drop it. */
 function fakeHub() {
-  const hub = { frames: [] as Envelope[], sockets: [] as { send(s: string): void; close(): void }[], connections: 0, url: "" };
+  const hub = { frames: [] as Envelope[], sockets: [] as { send(s: string): void; close(code?: number): void }[], connections: 0, url: "" };
   const server = Bun.serve<{ nonce: string; authed?: boolean }>({
     port: 0,
     hostname: "127.0.0.1",
@@ -67,7 +68,7 @@ function fakeHub() {
   });
   hub.url = `ws://127.0.0.1:${server.port}`;
   cleanup.push(() => server.stop(true));
-  return { ...hub, hub, push: (frame: unknown) => hub.sockets.at(-1)!.send(JSON.stringify(frame)), drop: () => hub.sockets.at(-1)!.close() };
+  return { ...hub, hub, push: (frame: unknown) => hub.sockets.at(-1)!.send(JSON.stringify(frame)), drop: () => hub.sockets.at(-1)!.close(), revoke: () => hub.sockets.at(-1)!.close(4403) };
 }
 
 async function until(cond: () => boolean | Promise<boolean>, ms = 3000) {
@@ -78,7 +79,7 @@ async function until(cond: () => boolean | Promise<boolean>, ms = 3000) {
   }
 }
 
-async function setup() {
+async function setup(extra: { onRevoked?: () => void; deviceName?: string } = {}) {
   const c = connection(new Sqlite(":memory:"));
   await migrate(c, MIGRATIONS);
   const database = createDatabase(c);
@@ -86,19 +87,19 @@ async function setup() {
   const machine: Machine = { id: "machine-1", public_key: toBase64url(publicKeyOf(machineSeed)), name: "mac", hub_url: fake.hub.url, workspace_id: "w", member_id: member, paired_at: 1, egress: "[]" };
   await saveMachine(database, machine);
   let n = 0;
-  const links = createMachineLinks({ database, secretKey: controllerSeed, newId: () => `id-${++n}`, start: (o) => startHubClient({ ...o, backoff: createBackoff({ baseMs: 10, capMs: 20 }) }) });
+  const links = createMachineLinks({ database, secretKey: controllerSeed, newId: () => `id-${++n}`, ...extra, start: (o) => startHubClient({ ...o, backoff: createBackoff({ baseMs: 10, capMs: 20 }) }) });
   cleanup.push(() => links.stop());
   links.update([machine]);
-  await until(() => fake.hub.frames.length > 0);
+  await until(() => fake.hub.frames.length === 2);
   return { database, fake, machine, links };
 }
 
 const signed = (type: string, body: unknown, { seed = machineSeed, seq = 1, task }: { seed?: Uint8Array; seq?: number; task?: string } = {}) => createSigner(seed, () => seq)({ type, recipients: [member], ...(task ? { task } : {}), body });
 const sentTypes = (frames: Envelope[]) => frames.map((f) => JSON.parse(f.signed) as { type: string; task?: string; member?: string; to?: string; body: { after?: number } });
 
-test("on connect it asks the Machine for its Agents, as this Member", async () => {
+test("on connect it asks the Machine for its Agents and this Member's Tasks, as this Member", async () => {
   const { fake } = await setup();
-  expect(sentTypes(fake.hub.frames)).toEqual([expect.objectContaining({ type: "agent.list", to: "machine-1", member })]);
+  expect(sentTypes(fake.hub.frames)).toEqual([expect.objectContaining({ type: "agent.list", to: "machine-1", member }), expect.objectContaining({ type: "task.list", to: "machine-1", member })]);
 });
 
 test("what the Machine signed is kept, and the same thing from another key is not", async () => {
@@ -116,7 +117,7 @@ test("a new Agent goes with the Character the page picked, and the one the Machi
   const { database, fake, machine, links } = await setup();
   const character = { color: "#9DC3E6", shell: "dome", top: "antenna", sides: "ears", decal: "none" };
   expect(links.createAgent(machine, { name: "A", provider: "main", model: "model-a", character })).toBe("id-1");
-  await until(() => fake.hub.frames.length === 2);
+  await until(() => fake.hub.frames.length === 3);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "agent.create", body: { id: "id-1", name: "A", character } });
   fake.push(signed("agent.listed", { agents: [{ id: "id-1", name: "A", provider: "main", model: "model-a", character }, { id: "old", name: "B", provider: "main", model: "model-a" }], providers: [] }));
   await until(async () => (await database.query("SELECT * FROM agent")).length === 2);
@@ -141,7 +142,7 @@ test("after a dropped connection it asks for each Task's events after the last o
 test("a message shows as pending until the log has it, and the Machine's error marks it failed", async () => {
   const { database, fake, machine, links } = await setup();
   await links.sendMessage(machine, { agent: "a1", task: "t1", text: "hello" });
-  await until(() => fake.hub.frames.length === 2);
+  await until(() => fake.hub.frames.length === 3);
   const sent = fake.hub.frames.at(-1)!;
   expect(JSON.parse(sent.signed)).toMatchObject({ type: "task.message", task: "t1", body: { agent: "a1", id: "id-1", text: "hello" } });
   fake.push(signed("error", { code: "agent.busy", ref: sent.sig }, { seq: 5 }));
@@ -169,7 +170,7 @@ test("a Machine that was offline is asked again until it answers", async () => {
 test("the Egress goes as one signed list, and the list kept is the one the Machine signed back", async () => {
   const { database, fake, machine, links } = await setup();
   expect(links.setEgress(machine, ["github.com", "*.npmjs.org"])).toBe(true);
-  await until(() => fake.hub.frames.length === 2);
+  await until(() => fake.hub.frames.length === 3);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "egress.set", to: "machine-1", member, body: { egress: ["github.com", "*.npmjs.org"] } });
 
   fake.push(signed("agent.listed", { agents: [], providers: [], egress: ["evil.example.com"] }, { seed: strangerSeed }));
@@ -179,4 +180,56 @@ test("the Egress goes as one signed list, and the list kept is the one the Machi
   fake.push(signed("agent.listed", { agents: [], providers: [] }, { seq: 2 }));
   await Bun.sleep(50);
   expect(egressOf((await database.query<Machine>("SELECT * FROM machine"))[0]!)).toEqual(["github.com", "*.npmjs.org"]);
+});
+
+const newSeed = new Uint8Array(32).fill(0x55);
+const ipadSeed = new Uint8Array(32).fill(0x56);
+const keyOf = (seed: Uint8Array) => toBase64url(publicKeyOf(seed));
+const devices = (database: Awaited<ReturnType<typeof setup>>["database"]) =>
+  database.query<{ key: string; name: string; linked_by: string | null; revoked_at: number | null }>("SELECT key, name, linked_by, revoked_at FROM device ORDER BY coalesce(linked_at, 0), key");
+
+test("the device list comes from certificates that check out: this one first, who linked whom, what was revoked", async () => {
+  const { database, fake, links } = await setup({ deviceName: "iPhone" });
+  const heard: string[] = [];
+  links.onLinked((news) => heard.push(...news.map((n) => n.name)));
+  const at = Date.now();
+  const link = signCertificate({ type: "device.link", workspace: "w", member, key: keyOf(newSeed), name: "Chrome", at }, controllerSeed);
+  const forged = { ...signCertificate({ type: "device.link", workspace: "w", member, key: keyOf(strangerSeed), name: "Evil", at }, controllerSeed), sig: link.sig };
+  const fromNew = signCertificate({ type: "device.link", workspace: "w", member, key: keyOf(ipadSeed), name: "iPad", at: at + 1 }, newSeed);
+  fake.push({ type: "hub.certificates", certificates: [link, forged, fromNew] });
+  await until(async () => (await devices(database)).length === 3);
+  expect(await devices(database)).toEqual([
+    { key: keyOf(controllerSeed), name: "iPhone", linked_by: null, revoked_at: null },
+    { key: keyOf(newSeed), name: "Chrome", linked_by: keyOf(controllerSeed), revoked_at: null },
+    { key: keyOf(ipadSeed), name: "iPad", linked_by: keyOf(newSeed), revoked_at: null },
+  ]);
+  // Only the link another device made is news; this device's own is not.
+  expect(heard).toEqual(["iPad"]);
+
+  // Revoking the browser takes the iPad it linked, since nothing was kept.
+  fake.push({ type: "hub.certificates", certificates: [signCertificate({ type: "device.revoke", workspace: "w", member, key: keyOf(newSeed), keep: [], at: at + 2 }, controllerSeed)] });
+  await until(async () => (await devices(database)).every((d) => d.key === keyOf(controllerSeed) || d.revoked_at !== null));
+});
+
+test("Tasks the Machine lists are added and synced from the start, without touching one already here", async () => {
+  const { database, fake } = await setup();
+  fake.push(signed("task.event", { agent: "a1", seq: 1, kind: "member.message", at: 1, body: {} }, { seq: 2, task: "known" }));
+  await until(async () => (await database.query("SELECT * FROM task")).length === 1);
+  fake.hub.frames.length = 0;
+  fake.push(signed("task.listed", { tasks: [{ id: "known", agent: "a1", updated: 99 }, { id: "new", agent: "a2", updated: 50 }] }, { seq: 3 }));
+  await until(() => fake.hub.frames.length === 1);
+  expect(sentTypes(fake.hub.frames)).toEqual([expect.objectContaining({ type: "task.sync", task: "new", body: { agent: "a2", after: 0 } })]);
+  expect(await database.query("SELECT id, synced_seq, updated_at FROM task ORDER BY id")).toEqual([
+    { id: "known", synced_seq: 1, updated_at: 1 },
+    { id: "new", synced_seq: 0, updated_at: 50 },
+  ]);
+});
+
+test("a 4403 from the Hub says this key was revoked, and the client stops trying", async () => {
+  let revoked = 0;
+  const { fake } = await setup({ onRevoked: () => revoked++ });
+  fake.revoke();
+  await until(() => revoked === 1);
+  await Bun.sleep(100);
+  expect(fake.hub.connections).toBe(1);
 });

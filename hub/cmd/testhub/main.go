@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"hub/internal/app/relay"
+	"hub/internal/shared/protocol"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +29,15 @@ func (known identities) ByKey(_ context.Context, key []byte) (relay.Identity, bo
 	who, ok := known[base64.RawURLEncoding.EncodeToString(key)]
 	return who, ok, nil
 }
+
+// noCertificates is a Workspace nobody has linked or revoked a device in.
+type noCertificates struct{}
+
+func (noCertificates) ForWorkspace(context.Context, string) ([]protocol.Certificate, error) {
+	return nil, nil
+}
+
+func (noCertificates) Revoked(context.Context, []byte) (bool, error) { return false, nil }
 
 func keyOf(seed byte) string {
 	public := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{seed}, 32)).Public().(ed25519.PublicKey)
@@ -48,7 +58,7 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	url := "ws://" + listener.Addr().String()
-	relay.NewHandler(known, relay.Config{PublicURL: url, HandshakeTimeout: 5 * time.Second, HeartbeatInterval: 5 * time.Second}).Register(r)
+	relay.New(known, noCertificates{}, relay.Config{PublicURL: url, HandshakeTimeout: 5 * time.Second, HeartbeatInterval: 5 * time.Second}).Register(r)
 	fmt.Println(url) // the test reads this line to know where to connect
 	server := &http.Server{Handler: r, ReadHeaderTimeout: 5 * time.Second}
 	if err := server.Serve(listener); err != nil {

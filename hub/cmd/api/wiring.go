@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"hub/internal/app/controller"
+	"hub/internal/app/linking"
 	"hub/internal/app/machine"
 	"hub/internal/app/pairing"
 	"hub/internal/app/relay"
@@ -86,7 +87,7 @@ func run() error {
 	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return fmt.Errorf("trusted proxies: %w", err)
 	}
-	r.Use(gin.Recovery(), middleware.CORS(cfg.CORSAllowedOrigins, "/pairings"), middleware.SecurityHeaders(cfg.IsProd()), middleware.RequestID(), middleware.Logger(logger), middleware.Error(!cfg.IsProd()))
+	r.Use(gin.Recovery(), middleware.CORS(cfg.CORSAllowedOrigins, "/pairings", "/links", "/revocations"), middleware.SecurityHeaders(cfg.IsProd()), middleware.RequestID(), middleware.Logger(logger), middleware.Error(!cfg.IsProd()))
 
 	// liveness = is the process up / readiness = ready for traffic (can it reach the DB)
 	r.GET("/livez", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
@@ -108,15 +109,19 @@ func run() error {
 	// it public.
 
 	api := r.Group("/")
-	relay.NewHandler(composition.RelayIdentities(machine.NewLookupFromDB(db), controller.NewLookupFromDB(db)), relay.Config{
+	// The relay and linking each need the other: the relay hands out linking's
+	// certificates, and linking reaches the relay's connections.
+	hub := relay.New(composition.RelayIdentities(machine.NewLookupFromDB(db), controller.NewLookupFromDB(db)), linking.NewCertificatesFromDB(db), relay.Config{
 		PublicURL:         cfg.HubPublicURL,
 		HandshakeTimeout:  cfg.HandshakeTimeout,
 		HeartbeatInterval: cfg.HeartbeatInterval,
 		MaxQueueBytes:     cfg.HubMaxQueueBytes,
-	}).Register(api)
+	})
+	hub.Register(api)
 	machine.NewHandlerFromDB(db).Register(api)
 	controller.NewHandlerFromDB(db).Register(api)
 	pairing.NewHandlerFromDB(db, cfg.HubPublicURL).Register(api)
+	linking.NewHandlerFromDB(db, hub).Register(api)
 	// go-scaffold:routes
 
 	srv := &http.Server{

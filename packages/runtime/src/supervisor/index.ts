@@ -6,13 +6,15 @@ import { createEgressSlice, loadEgress } from "./egress/egress";
 import { createLlmHandler } from "./proxy/proxy";
 import { SandboxError, startSandbox, type Sandbox } from "./sandbox/sandbox";
 import { createTaskMessageSlice } from "./task-message/task-message";
+import { createTaskListSlice } from "./task-list/task-list";
 import { createTaskSyncSlice } from "./task-sync/task-sync";
 import { createWorkers } from "./workers/workers";
 import { ConfigError, loadConfig, runtimeHome, saveHubUrl } from "./config";
 import { startHubLink } from "./hub-link/hub-link";
 import { runPair } from "./pairing/pair";
 import { KeyFileError, loadOrCreateMachineKey } from "./trust/machine-key";
-import { FileSeenSequences, loadTrust, TrustFileError, trustedKeys } from "./trust/store";
+import { applyCertificates } from "./trust/certificates";
+import { FileSeenSequences, loadTrust, saveTrust, TrustFileError, type Trust } from "./trust/store";
 import { runUnpair } from "./pairing/unpair";
 import { runProviderCommand, type ProviderCommand } from "./providers/cli";
 import { readKey } from "./providers/read-key";
@@ -40,10 +42,12 @@ export type SupervisorOptions = {
  * over its IPC to the supervisor, which holds the keys (ADR 0008, 0020, 0042).
  */
 export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbox, log = console.log, backoff, fetchFn }: SupervisorOptions) {
-  const trust = loadTrust(home);
+  let trust = loadTrust(home);
   if (trust.owners.length === 0) log("this Machine is not paired yet, so it takes no commands. Run: veeloe pair");
-  const keys = trustedKeys(trust);
-  const memberOf = new Map(trust.owners.flatMap((owner) => owner.keys.map((key) => [key, owner.member] as const)));
+  const membersOf = (t: Trust) => new Map(t.owners.flatMap((owner) => owner.keys.map((key) => [key, owner.member] as const)));
+  // Live, because a certificate can add or revoke a key while the Machine is connected.
+  let memberOf = membersOf(trust);
+  const keys = { has: (key: string) => memberOf.has(key) };
   const seen = new FileSeenSequences(home);
   const machineKey = toBase64url(publicKeyOf(secretKey));
   const signEnvelope = createSigner(secretKey, () => seen.next(machineKey));
@@ -75,6 +79,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
     onMessage(agent, message) {
       if (message.kind === "event") outbox.toMember(message.starter, "task.event", { agent, ...message.event }, message.task);
       else if (message.kind === "error") outbox.error({ member: message.member, ref: message.ref, task: message.task }, message.code);
+      else if (message.kind === "tasks") outbox.toMember(message.member, "task.listed", { tasks: message.tasks.map((t) => ({ ...t, agent })) });
       else if (message.kind === "events") {
         for (let i = 0; i === 0 || i < message.events.length; i += TASK_EVENTS_PAGE) outbox.toMember(message.member, "task.events", { agent, events: message.events.slice(i, i + TASK_EVENTS_PAGE) }, message.task);
       }
@@ -86,6 +91,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
   const agents = createAgentsSlice({ registry, workers, providers, egress: egress.current, outbox, fetchFn });
   const taskMessage = createTaskMessageSlice({ registry, workers, outbox });
   const taskSync = createTaskSyncSlice({ registry, workers, outbox });
+  const taskList = createTaskListSlice({ registry, workers });
 
   const hub = startHubLink({
     hubUrl,
@@ -94,6 +100,14 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
     backoff,
     onReady: (id) => {
       machine = id;
+    },
+    // Before any envelope on this connection, so a key linked or revoked while the Machine was off is settled first.
+    onCertificates: (certificates) => {
+      const next = applyCertificates(trust, certificates, log);
+      if (JSON.stringify(next) === JSON.stringify(trust)) return;
+      saveTrust(home, next);
+      trust = next;
+      memberOf = membersOf(next);
     },
     onEnvelope: (value) => {
       const result = verify(value, keys, (route) => "to" in route && route.to === machine, seen);
@@ -112,6 +126,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
       else if (message.type === "task.message" && from.task) taskMessage({ ...from, task: from.task }, message.body);
       else if (message.type === "task.sync" && from.task) taskSync({ ...from, task: from.task }, message.body);
       else if (message.type === "egress.set") void egress.set(from, message.body);
+      else if (message.type === "task.list") taskList(from);
     },
   });
 

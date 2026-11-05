@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { HubCertificatesSchema } from "./messages/certificate";
 import { HubAuthSchema } from "./messages/hub-auth";
 import { HubChallengeSchema } from "./messages/hub-challenge";
 import { HubErrorSchema } from "./messages/hub-error";
@@ -9,6 +10,7 @@ const known = {
   "hub.auth": HubAuthSchema,
   "hub.ready": HubReadySchema,
   "hub.error": HubErrorSchema,
+  "hub.certificates": HubCertificatesSchema,
 };
 
 type KnownType = keyof typeof known;

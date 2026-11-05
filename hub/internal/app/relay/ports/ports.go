@@ -1,7 +1,11 @@
 // Package ports declares what the relay application needs from outside it.
 package ports
 
-import "context"
+import (
+	"context"
+
+	"hub/internal/shared/protocol"
+)
 
 // Kind says which side of the Protocol a connection is.
 type Kind string
@@ -26,10 +30,20 @@ type Identities interface {
 	ByKey(ctx context.Context, publicKey []byte) (who Identity, ok bool, err error)
 }
 
+// Certificates answers the device.link and device.revoke certificates of a
+// Workspace, in the order they were made. The linking module answers it.
+type Certificates interface {
+	ForWorkspace(ctx context.Context, workspace string) ([]protocol.Certificate, error)
+	// Revoked says whether a device.revoke certificate names this key.
+	Revoked(ctx context.Context, publicKey []byte) (bool, error)
+}
+
 // Session is one authenticated connection, as the application sees it.
 type Session interface {
 	// Replaced ends this session because a newer one took over its key.
 	Replaced()
+	// Revoked ends this session because its key was revoked.
+	Revoked()
 	// Send queues a frame and answers false when this session cannot take it,
 	// which ends the session. It never blocks on the peer.
 	Send(frame []byte) bool
@@ -48,4 +62,8 @@ type PresenceRegistry interface {
 	Machine(workspace, id string) Session
 	// Controllers answers the live sessions of the Member in that Workspace.
 	Controllers(workspace, member string) []Session
+	// Key answers the live session of a key (base64url), or nil.
+	Key(key string) Session
+	// Workspace answers every live session in that Workspace.
+	Workspace(workspace string) []Session
 }

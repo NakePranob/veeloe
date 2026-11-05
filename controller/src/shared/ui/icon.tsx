@@ -27,6 +27,8 @@ const SYMBOLS = {
   expand: { ios: "chevron.down", android: "expand_more", web: "expand_more" },
   collapse: { ios: "chevron.up", android: "expand_less", web: "expand_less" },
   network: { ios: "globe", android: "public", web: "public" },
+  device: { ios: "iphone", android: "smartphone", web: "smartphone" },
+  trash: { ios: "trash", android: "delete", web: "delete" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 
 export type IconName = keyof typeof SYMBOLS;

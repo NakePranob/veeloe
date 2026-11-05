@@ -37,3 +37,18 @@ test("events number from 1 without a gap per Task, survive reopening, and a mess
   again.close();
 });
 
+test("a Member's list of Tasks has the ones they started and none of another Member's (ADR 0060)", () => {
+  let now = 10;
+  const store = openEventStore(tempDb(), { now: () => now++ });
+  store.createTask("mine", "m_1");
+  store.createTask("theirs", "m_2");
+  store.createTask("quiet", "m_1");
+  store.append("mine", "member.message", {});
+  store.append("theirs", "member.message", {});
+  expect(store.tasksStartedBy("m_1").sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+    { id: "mine", updated: 13 },
+    { id: "quiet", updated: 12 },
+  ]);
+  store.close();
+});
+

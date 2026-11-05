@@ -38,6 +38,15 @@ export type TaskEventsBody = z.infer<typeof TaskEventsBodySchema>;
 
 export const TASK_EVENTS_PAGE = 100;
 
+/** Controller → Machine: which Tasks this Member may open (ADR 0060), for a device that has none of them yet. */
+export const TaskListBodySchema = z.looseObject({});
+
+/** Machine → Member: one Agent's Tasks at a time. `updated` is Unix milliseconds on the Machine. */
+export const TaskListedBodySchema = z.looseObject({
+  tasks: z.array(z.looseObject({ id: z.string().min(1).max(64), agent, updated: z.number().int().nonnegative() })),
+});
+export type TaskListedBody = z.infer<typeof TaskListedBodySchema>;
+
 /** What `body` holds for the kinds v0.1 writes. */
 export const TaskEventKind = {
   /** `{ member, id, text }` */

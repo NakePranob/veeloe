@@ -44,7 +44,7 @@ export function createWorkers({
   function ended(agent: Agent, entry: Running, why: string) {
     if (running.get(agent.id) !== entry) return;
     running.delete(agent.id);
-    for (const lost of entry.waiting) if (lost.kind !== "llm.response") onMessage(agent.id, { kind: "error", member: lost.member, ref: lost.ref, code: "agent.unavailable", task: lost.task });
+    for (const lost of entry.waiting) if (lost.kind !== "llm.response" && lost.kind !== "list") onMessage(agent.id, { kind: "error", member: lost.member, ref: lost.ref, code: "agent.unavailable", task: lost.task });
     if (stopping) return;
     const b = backoffs.get(agent.id) ?? backoff();
     backoffs.set(agent.id, b);

@@ -64,10 +64,24 @@ func startHub(t *testing.T, heartbeat time.Duration) (string, *application.Servi
 	return startHubWith(t, Config{HeartbeatInterval: heartbeat})
 }
 
+// noCertificates is a Workspace where no device was ever linked or revoked.
+type noCertificates struct{}
+
+func (noCertificates) ForWorkspace(context.Context, string) ([]protocol.Certificate, error) {
+	return nil, nil
+}
+
+func (noCertificates) Revoked(context.Context, []byte) (bool, error) { return false, nil }
+
 func startHubWith(t *testing.T, cfg Config) (string, *application.Service) {
 	t.Helper()
+	return startHubWithCertificates(t, cfg, noCertificates{})
+}
+
+func startHubWithCertificates(t *testing.T, cfg Config, certs ports.Certificates) (string, *application.Service) {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
-	svc := application.NewService(keys{}, memory.NewPresence())
+	svc := application.NewService(keys{}, certs, memory.NewPresence())
 	r := gin.New()
 	cfg.PublicURL, cfg.HandshakeTimeout = hubURL, time.Second
 	httpadapter.NewHandler(svc, cfg).Register(r)

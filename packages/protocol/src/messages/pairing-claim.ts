@@ -10,6 +10,10 @@ import { fromBase64url, toBase64url } from "../crypto/base64url";
 export const PairingClaimBodySchema = z.looseObject({
   member: z.string().min(1),
   proof: z.string().min(1),
+  /** The Member's other keys in use, so a Machine paired from any device trusts them all. A Runtime older than this ignores it. */
+  keys: z.array(z.string().min(1).max(64)).max(100).optional(),
+  /** The Workspace the Hub put the Machine in, so a certificate from another one is refused. */
+  workspace: z.string().min(1).optional(),
 });
 export type PairingClaimBody = z.infer<typeof PairingClaimBodySchema>;
 

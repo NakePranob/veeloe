@@ -6,14 +6,16 @@ import { CreateKeyPage } from "../../pages/create-key";
 import { LockPage } from "../../pages/lock";
 import { OtherTabPage } from "../../pages/other-tab";
 import { StorageUnavailablePage } from "../../pages/storage-unavailable";
+import { listDevices } from "../../entities/device";
 import { useMachineLinks } from "../../features/machine-link";
-import { DatabaseProvider } from "../../shared/db";
+import { DatabaseProvider, useDatabase } from "../../shared/db";
 import { deviceLanguage, initI18n, useT } from "../../shared/i18n";
 import { useKeyActivity, useKeyStatus } from "../../shared/keystore";
-import { Button, Card, SIDEBAR_WIDTH, space, Text, useColors, useSplit } from "../../shared/ui";
+import { Button, Card, inform, SIDEBAR_WIDTH, space, Text, useColors, useSplit } from "../../shared/ui";
 import { AgentInbox } from "../../widgets/agent-inbox";
 import { resources } from "../i18n/resources";
 import "../styles/web-reset";
+import { forgetThisDevice } from "./forget-device";
 import { useAppDatabase } from "./use-app-database";
 
 // Web draws its own header, with our button right against the screen's edge.
@@ -23,8 +25,18 @@ const webHeader = process.env.EXPO_OS === "web" ? { headerRightContainerStyle: {
 initI18n(resources, deviceLanguage());
 
 // Keeps every Hub connected while the key is open. Needs the database, so it sits inside the provider.
+// It also wipes this device when a Hub says its key was revoked, and tells the Owner when another of their devices linked one.
 function MachineLinks() {
-  useMachineLinks();
+  const t = useT("devices");
+  const database = useDatabase();
+  useMachineLinks({
+    onRevoked: () => void forgetThisDevice(database).then(() => inform(t("revoked.title"), t("revoked.body"))),
+    // ponytail: an alert in the app stands in for the push the prototype shows, until there is push (ADR 0044).
+    onLinked: (links) =>
+      void listDevices(database).then((devices) => {
+        for (const link of links) inform(t("linked.title"), t("linked.body", { name: link.name, by: devices.find((d) => d.key === link.by)?.name || t("firstDevice") }));
+      }),
+  });
   return null;
 }
 

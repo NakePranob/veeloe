@@ -40,6 +40,8 @@ export function openEventStore(file: string, clock: Clock = { now: Date.now }): 
     hasMessage: (id) => db.query("SELECT 1 FROM event WHERE message_id = ?").get(id) !== null,
     append: (task, kind, body, messageId) => append(task, kind, body, messageId),
     events: (task, after = 0) => list.all(task, after).map((row) => ({ seq: row.seq, kind: row.kind, at: row.at, body: JSON.parse(row.body) })),
+    tasksStartedBy: (member) =>
+      db.query<{ id: string; updated: number }, [string]>("SELECT t.id, coalesce((SELECT max(at) FROM event WHERE task_id = t.id), t.created_at) AS updated FROM task t WHERE t.starter = ?").all(member),
     close: () => db.close(),
   };
 }

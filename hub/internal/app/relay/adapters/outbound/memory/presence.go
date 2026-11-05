@@ -70,6 +70,35 @@ func (p *Presence) Machine(workspace, id string) ports.Session {
 	return p.machines[place{workspace, id}]
 }
 
+func (p *Presence) Key(key string) ports.Session {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.byKey[key]
+}
+
+// Workspace walks every live session.
+//
+// ponytail: O(all sessions) per call, and it runs once per certificate; index
+// sessions by Workspace if one Hub ever holds enough of them to notice.
+func (p *Presence) Workspace(workspace string) []ports.Session {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var live []ports.Session
+	for at, s := range p.machines {
+		if at.workspace == workspace {
+			live = append(live, s)
+		}
+	}
+	for at, sessions := range p.members {
+		if at.workspace == workspace {
+			for s := range sessions {
+				live = append(live, s)
+			}
+		}
+	}
+	return live
+}
+
 func (p *Presence) Controllers(workspace, member string) []ports.Session {
 	p.mu.Lock()
 	defer p.mu.Unlock()

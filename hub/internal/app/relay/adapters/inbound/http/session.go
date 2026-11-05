@@ -85,9 +85,32 @@ func (s *session) stop() {
 	s.queue, s.queued = nil, 0
 }
 
+// sendFirst puts a frame ahead of everything queued. It runs before the pump
+// starts, so the frame is the first the peer gets after hub.ready.
+func (s *session) sendFirst(frame []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.queue = append([][]byte{frame}, s.queue...)
+	s.queued += len(frame)
+	select {
+	case s.wake <- struct{}{}:
+	default:
+	}
+}
+
 // Replaced closes in the background: Close waits for the peer's answer, and
 // the newer connection must not wait on the older one.
 func (s *session) Replaced() {
 	s.stop()
 	go func() { _ = s.conn.Close(protocol.CloseReplaced, "replaced by a newer connection") }()
+}
+
+// Revoked drops whatever is still queued, which a revoked key must not get,
+// and closes in the background like Replaced.
+func (s *session) Revoked() {
+	s.stop()
+	go func() { _ = s.conn.Close(protocol.CloseRevoked, "key revoked") }()
 }

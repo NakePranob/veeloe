@@ -1,4 +1,4 @@
-import { answerChallenge, createBackoff, createSigner, MemorySeenSequences, parseFrame, verify, type HubError, type Outgoing, type Verified } from "@veeloe/protocol";
+import { answerChallenge, createBackoff, createSigner, HubCloseCode, MemorySeenSequences, parseFrame, verify, type HubError, type Outgoing, type Verified } from "@veeloe/protocol";
 import { clockSequence } from "./sequence";
 
 export type HubClientOptions = {
@@ -11,6 +11,10 @@ export type HubClientOptions = {
   onEnvelope?: (envelope: Extract<Verified, { ok: true }>) => void;
   /** Unsigned, so a hint about delivery and nothing more (ADR 0065). */
   onHubError?: (error: HubError) => void;
+  /** The certificates the Hub keeps for the Workspace, unverified: all of them after connecting, then each new one. */
+  onCertificates?: (certificates: unknown[]) => void;
+  /** The Hub closed with 4403: this key was revoked. The client stops for good. */
+  onRevoked?: () => void;
   backoff?: ReturnType<typeof createBackoff>;
 };
 
@@ -21,7 +25,7 @@ export type HubClientOptions = {
  * ponytail: the last number per sender is in memory. Keep it in SQLite when
  * Task events start arriving and a replay could change what is on screen.
  */
-export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, backoff = createBackoff() }: HubClientOptions) {
+export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, onCertificates, onRevoked, backoff = createBackoff() }: HubClientOptions) {
   const url = `${hubUrl.replace(/\/+$/, "")}/connect`;
   const signEnvelope = createSigner(secretKey, clockSequence());
   const seen = new MemorySeenSequences();
@@ -47,6 +51,8 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
           onReady?.(member);
         } else if (message.type === "hub.error") {
           onHubError?.(message);
+        } else if (message.type === "hub.certificates" && member !== undefined) {
+          onCertificates?.(message.certificates);
         }
       } else if (frame.kind === "unknown" && member !== undefined) {
         const mine = member;
@@ -55,10 +61,15 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (socket !== ws) return;
       socket = undefined;
       member = undefined;
+      if (event.code === HubCloseCode.Revoked && !stopped) {
+        stopped = true;
+        onRevoked?.();
+        return;
+      }
       if (!stopped) retry = setTimeout(connect, backoff.next());
     };
   }

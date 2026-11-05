@@ -12,6 +12,8 @@ export type ToWorker =
   | { kind: "message"; task: string; id: string; member: string; text: string; ref: string }
   /** The Task's events after `after`, for the Member asking. */
   | { kind: "sync"; task: string; after: number; member: string; ref: string }
+  /** Which of this Agent's Tasks the Member may open: the ones they started (ADR 0060). */
+  | { kind: "list"; member: string }
   | ({ kind: "llm.response"; id: string } & LlmResponse);
 
 export type FromWorker =
@@ -19,5 +21,6 @@ export type FromWorker =
   /** A new event, for the Member who started the Task. */
   | { kind: "event"; task: string; starter: string; event: TaskEvent }
   | { kind: "events"; task: string; member: string; events: TaskEvent[] }
+  | { kind: "tasks"; member: string; tasks: { id: string; updated: number }[] }
   | { kind: "error"; member: string; ref: string; code: string; task?: string }
   | ({ kind: "llm.request"; id: string } & LlmRequest);

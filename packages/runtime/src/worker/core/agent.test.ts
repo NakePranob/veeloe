@@ -22,6 +22,7 @@ function memoryStore(): EventStore & { all: Map<string, TaskEvent[]> } {
       return event;
     },
     events: (task, after = 0) => (all.get(task) ?? []).filter((e) => e.seq > after),
+    tasksStartedBy: (member) => [...starters].filter(([, s]) => s === member).map(([id]) => ({ id, updated: all.get(id)?.at(-1)?.at ?? 0 })),
   };
 }
 

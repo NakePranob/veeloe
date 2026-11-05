@@ -5,8 +5,12 @@ import { readJsonFile, writeJsonFile } from "../json-file";
 
 export class TrustFileError extends Error {}
 
-/** The keys this Machine takes commands from (ADR 0031). A list, because a Workspace will have many. */
-export type Trust = { owners: { member: string; keys: string[] }[] };
+/**
+ * The keys this Machine takes commands from (ADR 0031). A list, because a Workspace will have many.
+ * `links` says who vouched for each linked key, so a revocation knows what goes with it, and
+ * `revoked` is never trusted again. A file from before Linking has neither, and reads as empty.
+ */
+export type Trust = { owners: { member: string; keys: string[] }[]; workspace?: string; links?: { key: string; by: string }[]; revoked?: string[] };
 
 function isTrust(value: unknown): value is Trust {
   const owners = (value as Trust | null)?.owners;
@@ -22,9 +26,9 @@ export function loadTrust(home: string): Trust {
   } catch (err) {
     throw new TrustFileError(`cannot read ${file}: ${(err as Error).message}`);
   }
-  if (value === undefined) return { owners: [] };
+  if (value === undefined) return { owners: [], links: [], revoked: [] };
   if (!isTrust(value)) throw new TrustFileError(`cannot read ${file}: it is not a list of owners`);
-  return value;
+  return { ...value, links: value.links ?? [], revoked: value.revoked ?? [] };
 }
 
 export function saveTrust(home: string, trust: Trust) {

@@ -3,8 +3,9 @@ import type { SignedPart } from "../envelope/schema";
 import { AgentCreateBodySchema, AgentListBodySchema, AgentListedBodySchema } from "./agent";
 import { EgressSetBodySchema } from "./egress";
 import { ErrorBodySchema } from "./error";
+import { DeviceHandoffBodySchema, DeviceLinkedBodySchema } from "./linking";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
-import { TaskEventBodySchema, TaskEventsBodySchema, TaskMessageBodySchema, TaskSyncBodySchema } from "./task";
+import { TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskSyncBodySchema } from "./task";
 
 const known = {
   error: ErrorBodySchema,
@@ -18,6 +19,10 @@ const known = {
   "task.sync": TaskSyncBodySchema,
   "task.events": TaskEventsBodySchema,
   "egress.set": EgressSetBodySchema,
+  "task.list": TaskListBodySchema,
+  "task.listed": TaskListedBodySchema,
+  "device.handoff": DeviceHandoffBodySchema,
+  "device.linked": DeviceLinkedBodySchema,
 };
 
 type KnownType = keyof typeof known;

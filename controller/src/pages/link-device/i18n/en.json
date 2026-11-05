@@ -1,0 +1,27 @@
+{
+  "title": "Link new device",
+  "enter": {
+    "heading": "On the new device, open Veeloe and choose Use with a device I already have",
+    "footer": "Scan the QR code it shows, or paste its link here. Linking is only for your own devices.",
+    "scan": "Scan QR code",
+    "stopScan": "Stop scanning",
+    "paste": "Paste the link",
+    "continue": "Continue",
+    "noCamera": "Veeloe can't use the camera here. Paste the link instead."
+  },
+  "name": {
+    "heading": "New device",
+    "label": "Name of the new device",
+    "footer": "This device will vouch for the new device's key, and the new device will be able to command all your Machines. Only approve a device that is in front of you.",
+    "empty": "Name the new device first",
+    "taken": "You already have a device called {{name}}"
+  },
+  "cannot": "Can't link",
+  "approve": "Approve",
+  "cancel": "Cancel",
+  "prompt": "Link {{name}}. This device will vouch for its key",
+  "sending": {
+    "heading": "Sending your Machines to the new device…",
+    "body": "Keep the app open on the new device until this finishes."
+  }
+}

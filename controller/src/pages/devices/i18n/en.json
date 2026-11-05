@@ -1,0 +1,44 @@
+{
+  "title": "My devices",
+  "linkNew": "Link new device",
+  "mine": "Your devices",
+  "footer": "Device names are for this page and the notice sent when a device is linked. Every time one is linked, your other devices hear about it.",
+  "firstDevice": "First device",
+  "linkedBy": "Linked by {{name}} · {{when}}",
+  "thisDevice": "This device",
+  "revokedSection": "Revoked",
+  "revokedDetail": "No longer in use. Link it again to use it",
+  "linkFooter": "Linking is only for your own devices. Other people join the Workspace by Invitation.",
+  "linkQr": "Link with a QR code",
+  "linkQrDetail": "Scan the QR code the new device shows",
+  "oneDevice": "You have one device. If you lose it, or change its biometric settings so its key stops working, no other device can sign for you, and you'll have to pair every Machine again. Link a second device now.",
+  "signed": {
+    "title": "Devices this one vouched for",
+    "detail": "Turn on the ones you still trust. The certificates of the rest stop working, whatever their date, and those devices have to be linked again."
+  },
+  "keep": "Keep {{name}}",
+  "revoke": "Revoke this device's key",
+  "lastDevice": {
+    "title": "Can't revoke this device",
+    "body": "Revoking {{name}} would leave you no device that works, and none left to revoke or link. Link another device first, then revoke this one. If this device really is lost, run veeloe unpair on the Machine and pair it again."
+  },
+  "confirm": {
+    "title": "Revoke the key of {{name}}?",
+    "here": "This is the device in your hand. The app will delete its Machines, Tasks and key, and start over at creating a key.",
+    "body": "It is cut off from the Hub right away, and Machines stop taking commands from it.",
+    "drops": "{{names}}, which it vouched for, will be cut off too.",
+    "kept": "Certificates kept: {{names}}",
+    "action": "Revoke key",
+    "cancel": "Cancel"
+  },
+  "prompt": "Revoke the key of {{name}}",
+  "failed": "Couldn't revoke the key",
+  "revoked": {
+    "title": "This device was revoked",
+    "body": "Its key was revoked, so the app deleted the Machines, Tasks and key on it. To use it again, create a new key and link it from another of your devices."
+  },
+  "linked": {
+    "title": "A new device was linked",
+    "body": "{{name}} was linked from {{by}}. If that wasn't you, revoke it on My devices."
+  }
+}

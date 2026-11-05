@@ -15,6 +15,9 @@ function setup({ supported = true, stored = false } = {}) {
       if (state.read === "refuse") throw new Error("cancelled");
       return state.read === "lost" ? null : new Uint8Array(32).fill(7);
     },
+    remove: async () => {
+      state.hasKey = false;
+    },
   };
   return { state, session: createKeySession({ vault, now: () => state.time, generate: () => new Uint8Array(32).fill(9) }) };
 }
@@ -140,6 +143,16 @@ test("a refused important action does not run and does not lock", async () => {
   expect(await session.withFreshAuthentication("p", () => void (ran = true))).toBe(false);
   expect(ran).toBe(false);
   expect(session.status()).toBe("unlocked");
+});
+
+test("a revoked device forgets its key: none left to read, and back to creating one", async () => {
+  const { session, state } = await unlocked();
+  const key = session.secretKey()!;
+  await session.forget();
+  expect(key.every((b) => b === 0)).toBe(true);
+  expect(state.hasKey).toBe(false);
+  expect(session.status()).toBe("none");
+  expect(session.secretKey()).toBeNull();
 });
 
 test("an important action on an invalidated key does not run and reports lost", async () => {

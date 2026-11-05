@@ -1,10 +1,9 @@
 import { parsePairingLink, type PairingLink } from "@veeloe/protocol";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, ScrollView, TextInput, View } from "react-native";
 import { describeError, useT } from "../../../shared/i18n";
-import { Button, Card, column, Icon, radius, space, Text, useColors } from "../../../shared/ui";
+import { Button, Card, column, Icon, QrScanner, radius, space, Text, useColors } from "../../../shared/ui";
 import { usePairMachine } from "../model/use-pair-machine";
 
 const linkProblem = { malformed: "pairing.link_malformed", "bad-signature": "pairing.link_bad_signature", expired: "pairing.link_expired" } as const;
@@ -19,26 +18,16 @@ export function AddMachinePage() {
   const [text, setText] = useState(opened ?? "");
   const [link, setLink] = useState<PairingLink | null>(start?.ok ? start.link : null);
   const [problem, setProblem] = useState<string | null>(start && !start.ok ? describeError({ code: linkProblem[start.reason] }) : null);
-  const [scanning, setScanning] = useState(false);
   const [pairing, setPairing] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
 
   function accept(value: string) {
     const parsed = parsePairingLink(value, Date.now());
-    setScanning(false);
     if (parsed.ok) {
       setProblem(null);
       setLink(parsed.link);
     } else {
       setProblem(describeError({ code: linkProblem[parsed.reason] }));
     }
-  }
-
-  async function startScanning() {
-    setProblem(null);
-    const granted = permission?.granted || (await requestPermission()).granted;
-    if (granted) setScanning(true);
-    else setProblem(t("enter.noCamera"));
   }
 
   async function confirm() {
@@ -123,14 +112,7 @@ export function AddMachinePage() {
               {t("enter.body")}
             </Text>
           </View>
-          {scanning && (
-            <View style={{ aspectRatio: 1, borderRadius: radius.card, borderCurve: "continuous", overflow: "hidden", backgroundColor: colors.chip }}>
-              <CameraView style={{ flex: 1 }} facing="back" barcodeScannerSettings={{ barcodeTypes: ["qr"] }} onBarcodeScanned={({ data }) => accept(data)} />
-            </View>
-          )}
-          <View style={{ flexDirection: "row" }}>
-            <Button label={t(scanning ? "enter.stopScan" : "enter.scan")} onPress={() => (scanning ? setScanning(false) : void startScanning())} />
-          </View>
+          <QrScanner labels={{ scan: t("enter.scan"), stop: t("enter.stopScan") }} onScan={accept} onNoCamera={() => setProblem(t("enter.noCamera"))} />
           <TextInput
             aria-label={t("enter.paste")}
             placeholder={t("enter.paste")}

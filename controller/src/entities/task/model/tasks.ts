@@ -60,6 +60,24 @@ export function dismissPendingMessage(database: Database, id: string) {
   return database.write([TASK_TOPIC], (transaction) => transaction.run("DELETE FROM pending_message WHERE id = ?", [id]));
 }
 
+/**
+ * Tasks a Machine says this Member started, which this device may not have yet
+ * (a linked device, or a browser whose storage was cleared). A row already here
+ * is left as it is; the new ones come back so their events can be synced from 0.
+ */
+export function addListedTasks(database: Database, machine: string, tasks: { id: string; agent: string; updated: number }[]) {
+  return database.write([TASK_TOPIC], async (transaction) => {
+    const added: { id: string; agent: string }[] = [];
+    for (const task of tasks) {
+      const [known] = await transaction.all("SELECT 1 FROM task WHERE id = ?", [task.id]);
+      if (known) continue;
+      await transaction.run("INSERT INTO task (id, agent_id, machine_id, synced_seq, updated_at) VALUES (?, ?, ?, 0, ?)", [task.id, task.agent, machine, task.updated]);
+      added.push(task);
+    }
+    return added;
+  });
+}
+
 export function listTasks(database: Database) {
   return database.query<TaskRow>("SELECT * FROM task");
 }

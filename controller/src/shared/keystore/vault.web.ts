@@ -42,6 +42,10 @@ export const vault: Vault = {
     await request((store) => store.put({ secret: secret.slice(), credentialId: credential.rawId } satisfies Stored, RECORD), "readwrite");
   },
 
+  async remove() {
+    await request((store) => store.delete(RECORD), "readwrite");
+  },
+
   async read() {
     const stored = await load();
     if (!stored) return null;

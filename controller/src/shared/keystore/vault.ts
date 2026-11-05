@@ -22,6 +22,11 @@ export const vault: Vault = {
     if ((await SecureStore.getItemAsync(SECRET, locked(prompt))) === null) throw new Error("The new key does not open");
   },
 
+  async remove() {
+    await SecureStore.deleteItemAsync(SECRET, SECRET_OPTIONS);
+    await SecureStore.deleteItemAsync(MARKER);
+  },
+
   async read(prompt) {
     const value = await SecureStore.getItemAsync(SECRET, locked(prompt));
     return value === null ? null : fromBase64url(value);

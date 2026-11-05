@@ -1,0 +1,27 @@
+{
+  "title": "Use with a device I already have",
+  "why": {
+    "heading": "Link this device to one you already use",
+    "footer": "Your other device scans the QR code this shows and vouches for this device's key. This device then sees your Machines, Agents and Tasks, and can command them the same way."
+  },
+  "hub": {
+    "label": "Hub",
+    "footer": "The same Hub your other device uses"
+  },
+  "name": {
+    "label": "Name of this device",
+    "footer": "Your other device can change it before approving.",
+    "empty": "Name this device first"
+  },
+  "show": "Show QR code",
+  "again": "Make a new QR code",
+  "cannot": "Can't show the QR code",
+  "qr": {
+    "heading": "On your other device, go to Workspace, then My devices, tap Link new device and scan this",
+    "footer": "Expires {{when}}. It works once.",
+    "label": "QR code to link this device",
+    "link": "Or copy this link and paste it on your other device"
+  },
+  "waiting": "Waiting for your other device to approve…",
+  "secret": "This QR code and link hold a secret. Don't send them to anyone or keep a photo of them."
+}

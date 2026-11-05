@@ -1,0 +1,102 @@
+{
+  "note": "TEST-ONLY KEYS from fixed public seeds. `sig` is Ed25519 over the UTF-8 of `signed`, by the key in its `by`.",
+  "vectors": [
+    {
+      "name": "a link",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"device.link\",\"key\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\",\"name\":\"Chrome บน Mac\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "Oz0hWRSnIvhVYdq2mJ69l4bTF57CT9asvHQbggpT2krQfUP6qTQo_oLOjeNpdOWZF95yTuBeZx1slngoxREzDg"
+      },
+      "valid": true
+    },
+    {
+      "name": "a revocation that keeps one key",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"device.revoke\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"keep\":[\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\"],\"by\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\"}",
+        "sig": "nkQZvwaCPtikePr4Q6a6CwGr7UII4_p8EEzPJD8O7s0iDN0OVZoCaNoD8W8BGcd3p_EF_aVsGanORjhgeagTDw"
+      },
+      "valid": true
+    },
+    {
+      "name": "a link with a field this build does not know",
+      "certificate": {
+        "signed": "{\"v\":1,\"hint\":\"newer\",\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"device.link\",\"key\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\",\"name\":\"Chrome บน Mac\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "30UCqeib6voiXLLse-wNXmkIobTa1BX9vK9FUtHim8keEy5JLXfQcYpYqy1Qn3RDj5YIlPdDGmd9uKyYNRXRDA"
+      },
+      "valid": true
+    },
+    {
+      "name": "a link to another key, after signing",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"device.link\",\"key\":\"oJql9HpnWYAv-VX43C0qFKXJnSO-l_hkEn_5ODRVpPA\",\"name\":\"Chrome บน Mac\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "Oz0hWRSnIvhVYdq2mJ69l4bTF57CT9asvHQbggpT2krQfUP6qTQo_oLOjeNpdOWZF95yTuBeZx1slngoxREzDg"
+      },
+      "valid": false
+    },
+    {
+      "name": "a link to another Member, after signing",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_other\",\"at\":1800000000000,\"type\":\"device.link\",\"key\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\",\"name\":\"Chrome บน Mac\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "Oz0hWRSnIvhVYdq2mJ69l4bTF57CT9asvHQbggpT2krQfUP6qTQo_oLOjeNpdOWZF95yTuBeZx1slngoxREzDg"
+      },
+      "valid": false
+    },
+    {
+      "name": "a link signed by a key other than its by",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"device.link\",\"key\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\",\"name\":\"Chrome บน Mac\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "0KS7vMyffRrVrWMLwTR9pHnyYfWrMiIZXpp5fLw351-T5LF5abVHD40qUgywZDrOsvq8vOKlSadpnsTSvY24BA"
+      },
+      "valid": false
+    },
+    {
+      "name": "a link with no name",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"device.link\",\"key\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "SKHmbjeccVqaEBO1vwSlpqgMecqcJ0hQy6ngki0vFe2owqMZfLTs7AuIFNnbQ5SxJXvkaBzpvKLn8T9NxswlAA"
+      },
+      "valid": false
+    },
+    {
+      "name": "a revocation with no keep list",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"device.revoke\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"by\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\"}",
+        "sig": "y8zSUOITEa4-lP1ICF8L-sUdwU1etUpiADd6kjQ6BWNWB-0x_nwFOhrJ_oiWfJMG-zCcSH4GD17YWvYt5SG5DA"
+      },
+      "valid": false
+    },
+    {
+      "name": "a type this build does not know",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"device.rename\",\"key\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\",\"name\":\"Chrome บน Mac\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "VlJCLWZYBuSdQmWiib4INkpe4235BH4Y8IW6JkAxehwsHmy5pycdpEvIZAAGanzQRy0WiEs2Dnv7Y3dTysufAQ"
+      },
+      "valid": false
+    }
+  ],
+  "fallout": {
+    "revoked": "A",
+    "links": [
+      {
+        "key": "B",
+        "by": "A"
+      },
+      {
+        "key": "C",
+        "by": "A"
+      },
+      {
+        "key": "D",
+        "by": "B"
+      }
+    ],
+    "keep": [
+      "C"
+    ],
+    "drops": [
+      "A",
+      "B",
+      "D"
+    ]
+  }
+}
