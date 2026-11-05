@@ -74,7 +74,7 @@ supervisor SHALL ตรวจลายเซ็น กุญแจที่ไ�
 
 #### Scenario: เริ่ม Runtime ใหม่
 - **WHEN** Owner รัน `veeloe` ใหม่ แล้ว Controller ขอรายชื่อ
-- **THEN** Agent มี `character` เดิมที่ส่งมาตอนสร้าง
+- **THEN** Agent มี `character` ล่าสุดที่เก็บไว้ จากคำสั่งสร้างหรือจาก `agent.update`
 
 #### Scenario: Character ผิดรูป
 - **WHEN** คำสั่งสร้างมี `character` ที่สีไม่ใช่ `#rrggbb` หรือชิ้นส่วนยาวเกินหรือไม่ใช่คำตัวพิมพ์เล็ก

@@ -22,7 +22,7 @@ Controller SHALL แสดง Agent ด้วย Character ซึ่งเป็
 - **THEN** Agent ที่มีอยู่มีสี เปลือก และชิ้นส่วนเดิม
 
 ### Requirement: เลือก Character ตอนสร้าง Agent
-หน้าสร้าง Agent SHALL แสดง Character ที่ Agent ใหม่จะได้ และ SHALL มีปุ่มสุ่ม Character ใหม่ ปุ่มนั้น SHALL สุ่มหน้าตาใหม่โดยไม่เปลี่ยนอะไรอื่น Character ที่สุ่มได้ SHALL ไม่ซ้ำกับ Agent ตัวอื่นที่ Controller รู้จัก Controller SHALL ส่งหน้าตานั้นไปในคำสั่งสร้าง และเมื่อสร้างแล้ว Agent SHALL มี Character ตามที่เห็นในหน้าสร้าง หลังสร้างแล้วแก้หน้าตาไม่ได้ใน change นี้
+หน้าสร้าง Agent SHALL แสดง Character ที่ Agent ใหม่จะได้ และ SHALL มีปุ่มสุ่ม Character ใหม่ ปุ่มนั้น SHALL สุ่มหน้าตาใหม่โดยไม่เปลี่ยนอะไรอื่น Character ที่สุ่มได้ SHALL ไม่ซ้ำกับ Agent ตัวอื่นที่ Controller รู้จัก Controller SHALL ส่งหน้าตานั้นไปในคำสั่งสร้าง และเมื่อสร้างแล้ว Agent SHALL มี Character ตามที่เห็นในหน้าสร้าง การแก้หน้าตาหลังสร้างอยู่ใน `agent-settings`
 
 #### Scenario: สุ่มแล้วสร้าง
 - **WHEN** Owner กดสุ่ม Character ใหม่สองครั้งแล้วกดสร้าง

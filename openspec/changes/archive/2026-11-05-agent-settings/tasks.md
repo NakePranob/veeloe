@@ -17,7 +17,7 @@
 - [x] 3.3 แก้ `AgentPage` ตาม prototype: แถว Character, ช่องชื่อกับปุ่มบันทึก, แถว Provider และ model, Note เมื่อ Machine ออฟไลน์ และคำเตือนเมื่อ Provider หรือ model ไม่อยู่บน Machine แล้ว พร้อม footer ใต้ช่องชื่อในหน้าสร้าง Agent ตรวจกฎคำเตือนด้วย test ของฟังก์ชันที่ตัดสินจาก Agent กับรายชื่อ Provider (หาย, model หาย, Provider ตอบ error, ยังไม่ได้รายชื่อ)
 - [x] 3.4 เพิ่ม `pick`, `still` และ export ตัวเลือกใน `entities/character` แล้วเพิ่ม `pages/agent-character` ตาม `CharacterPage` ของ prototype ที่ส่งชิ้นส่วนที่ไม่รู้จักกลับตามเดิม ตรวจด้วย test เรื่องแก้แค่สีแล้วส่ง `shell` ที่ไม่รู้จักกลับไป
 - [x] 3.5 เขียนคำไทยและอังกฤษของทุกหน้าใหม่ และแก้คำของ `provider.missing` ให้บอกให้เลือก Provider ใหม่ในหน้า Agent ตรวจด้วย `bun run check`
-- [ ] 3.6 ลองทุกหน้าบน iOS Simulator และเว็บ ทั้งสว่างและมืด ทั้งไทยและอังกฤษ พร้อมภาพหน้าจอ
+- [x] 3.6 ลองทุกหน้าบน iOS Simulator และเว็บ ทั้งสว่างและมืด ทั้งไทยและอังกฤษ พร้อมภาพหน้าจอ
 
 ## 4. ปิดงาน
 
