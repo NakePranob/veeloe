@@ -6,7 +6,7 @@ import { readJsonFile, writeJsonFile } from "../json-file";
 export type ProviderAuth = "x-api-key" | "bearer";
 
 /** A Provider set on this Machine (ADR 0042). Only the supervisor reads this file. */
-export type Provider = { name: string; url: string; key: string; auth: ProviderAuth };
+export type Provider = { name: string; url: string; key: string; auth: ProviderAuth; /** The built-in Provider it was added from; none for a custom one. */ preset?: string };
 
 export class ProviderError extends Error {}
 

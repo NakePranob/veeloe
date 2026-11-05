@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { normalizeHubUrl } from "@veeloe/protocol";
 import { writeJsonFile } from "./json-file";
@@ -11,6 +11,9 @@ export type Config = {
 };
 
 export class ConfigError extends Error {}
+
+/** The name this Machine pairs with: its host name. */
+export const machineName = () => hostname().replace(/\.local$/, "");
 
 /** The Runtime's folder is VEELOE_HOME (default ~/.veeloe), created owner-only. */
 export function runtimeHome(env: Record<string, string | undefined> = process.env): string {

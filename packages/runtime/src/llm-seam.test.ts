@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FromWorker } from "./ipc";
 import { FAKE_KEY, fakeProvider, sse } from "./supervisor/providers/fake-provider";
+import { USER_AGENT } from "./supervisor/providers/presets";
 import { createLlmHandler } from "./supervisor/proxy/proxy";
 import { anthropicLlm, ipcFetch } from "./worker/adapters/anthropic-llm";
 import { openEventStore } from "./worker/adapters/sqlite-store";
@@ -24,10 +25,10 @@ function tempDb() {
   return join(dir, "tasks.db");
 }
 
-function overIpc() {
+function overIpc(preset?: string) {
   const provider = fakeProvider();
   cleanup.push(() => provider.server.stop(true));
-  const handle = createLlmHandler({ route: (agent) => (agent === "a1" ? { provider: { name: "p", url: provider.url, key: FAKE_KEY, auth: "x-api-key" }, model: "model-a" } : undefined) });
+  const handle = createLlmHandler({ route: (agent) => (agent === "a1" ? { provider: { name: "p", url: provider.url, key: FAKE_KEY, auth: "x-api-key", preset }, model: "model-a" } : undefined) });
   const link = ipcFetch((message: FromWorker) => {
     if (message.kind !== "llm.request") return;
     const { id, kind: _, ...request } = JSON.parse(JSON.stringify(message)) as typeof message;
@@ -57,9 +58,23 @@ test("a thinking block goes back to the LLM in the next request exactly as it ca
 
 test("the supervisor's and the Provider's failures come back as codes", async () => {
   const { provider, llm } = overIpc();
-  const ask = () => llm.send({ system: "", messages: [{ role: "user", content: [{ type: "text", text: "x" }] }], tools: [] });
+  const ask = () => llm.send({ task: "t", system: "", messages: [{ role: "user", content: [{ type: "text", text: "x" }] }], tools: [] });
   provider.reply = () => Response.json({ type: "error", error: { type: "invalid_request_error", message: "bad" } }, { status: 400 });
   await expect(ask()).rejects.toEqual(new LlmError("provider.failed"));
   provider.server.stop(true);
   await expect(ask()).rejects.toEqual(new LlmError("provider.unreachable"));
 }, 20_000);
+
+test("OpenCode Go gets the Task's id as its session, and every Provider learns the request is from veeloe", async () => {
+  for (const [preset, session] of [["opencode-go", "task-42"], [undefined, undefined]] as const) {
+    const { provider, llm } = overIpc(preset);
+    const core = createAgentCore({ name: "A", store: openEventStore(tempDb()), llm, tools: noTools, link: { send: () => {} } });
+    core.receive({ kind: "message", task: "task-42", id: "1", member: "m", text: "hi", ref: "s1" });
+    await core.idle();
+    const headers = provider.requests.at(-1)!.headers;
+    expect(headers["x-opencode-session"]).toBe(session as never);
+    expect(headers["user-agent"]).toBe(USER_AGENT);
+    expect(headers["x-api-key"]).toBe(FAKE_KEY);
+    expect(Object.keys(headers).filter((h) => h.startsWith("x-veeloe"))).toEqual([]);
+  }
+});

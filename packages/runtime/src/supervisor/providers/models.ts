@@ -1,4 +1,5 @@
-import { authHeaders, type Provider, type ProviderAuth } from "./store";
+import { upstreamHeaders } from "./presets";
+import type { Provider, ProviderAuth } from "./store";
 
 export type Model = { id: string; name?: string };
 
@@ -13,11 +14,11 @@ export type ModelsResult = { ok: true; models: Model[] } | { ok: false; problem:
  *
  * ponytail: the first page only. Follow `has_more` if a Provider lists more than one page.
  */
-export async function listModels(provider: Pick<Provider, "url" | "key" | "auth">, { fetchFn = fetch, timeoutMs = 10_000 } = {}): Promise<ModelsResult> {
+export async function listModels(provider: Pick<Provider, "url" | "key" | "auth" | "preset">, { fetchFn = fetch, timeoutMs = 10_000 } = {}): Promise<ModelsResult> {
   let response: Response;
   try {
     response = await fetchFn(`${provider.url}/v1/models?limit=1000`, {
-      headers: { ...authHeaders(provider), "anthropic-version": "2023-06-01" },
+      headers: { ...upstreamHeaders(provider), "anthropic-version": "2023-06-01" },
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {

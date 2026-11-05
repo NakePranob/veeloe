@@ -8,7 +8,7 @@ import { SandboxError, startSandbox, type Sandbox } from "./sandbox/sandbox";
 import { createTaskMessageSlice } from "./task-message/task-message";
 import { createTaskSyncSlice } from "./task-sync/task-sync";
 import { createWorkers } from "./workers/workers";
-import { ConfigError, loadConfig, runtimeHome } from "./config";
+import { ConfigError, loadConfig, runtimeHome, saveHubUrl } from "./config";
 import { startHubLink } from "./hub-link/hub-link";
 import { runPair } from "./pairing/pair";
 import { KeyFileError, loadOrCreateMachineKey } from "./trust/machine-key";
@@ -17,6 +17,8 @@ import { runUnpair } from "./pairing/unpair";
 import { runProviderCommand, type ProviderCommand } from "./providers/cli";
 import { readKey } from "./providers/read-key";
 import { loadProviders, ProviderError } from "./providers/store";
+import { runStatus, writePidFile } from "./status";
+import { askLine, askOnTerminal, interactive, pickWithArrows } from "./terminal";
 
 export type SupervisorOptions = {
   home: string;
@@ -135,9 +137,51 @@ async function reporting(work: () => unknown | Promise<unknown>) {
   }
 }
 
+/** The terminal's answers, for the commands that ask. */
+const terminalIo = () => ({ interactive: interactive(), ask: askLine, confirm: askOnTerminal, pick: pickWithArrows, readKey });
+
+/** Pairs inline when it must, at a terminal. True when this Machine is paired. */
+async function firstRun(home: string): Promise<boolean> {
+  if (loadTrust(home).owners.length > 0) return true;
+  if (!interactive()) {
+    loadConfig(); // with no Hub URL, that is the first thing to say
+    console.error("veeloe: this Machine is not paired yet. From a terminal, run:\n  veeloe pair       pair it with the Veeloe app\n  veeloe provider add\n  veeloe            start the Runtime");
+    return false;
+  }
+  let hubUrl: string;
+  try {
+    hubUrl = loadConfig().hubUrl;
+  } catch (err) {
+    if (!(err instanceof ConfigError)) throw err;
+    const answer = await askLine("Hub URL (wss://... from the Veeloe app): ");
+    if (!answer) throw new ConfigError("no Hub URL was given. Run veeloe again, or veeloe pair --hub <url>");
+    try {
+      hubUrl = normalizeHubUrl(answer);
+    } catch (e) {
+      throw new ConfigError((e as Error).message);
+    }
+    saveHubUrl(home, hubUrl);
+  }
+  console.log("This Machine is not paired yet. Pair it with the Veeloe app first.\n");
+  if ((await runPair({ home, hubUrl })) !== "paired") return false;
+  if (loadProviders(home).length === 0) {
+    console.log("\nNext, add a Provider: the LLM your Agents use.\n");
+    try {
+      if (!(await runProviderCommand({ action: "add" }, { home, ...terminalIo() }))) console.log("You can add one later with: veeloe provider add");
+    } catch (err) {
+      if (!(err instanceof ProviderError)) throw err;
+      console.log(`${err.message}\nYou can add one later with: veeloe provider add`);
+    }
+  }
+  console.log("");
+  return true;
+}
+
 export function runSupervisor() {
   return reporting(async () => {
+    if (!(await firstRun(runtimeHome()))) process.exit(1);
     const config = loadConfig();
+    if (loadProviders(config.home).length === 0) console.log("no Provider yet, so no Agent can answer. Add one with: veeloe provider add");
     const secretKey = loadOrCreateMachineKey(config.home);
     console.log(`veeloe supervisor, machine key ${toBase64url(publicKeyOf(secretKey))}`);
     // Before any worker: a Machine that cannot sandbox one runs none (ADR 0008).
@@ -145,6 +189,8 @@ export function runSupervisor() {
     // Compiled, the binary is the worker too. From source, Bun runs main.ts again.
     const workerCommand = Bun.main.startsWith("/$bunfs/") ? [process.execPath] : [process.execPath, Bun.main];
     const running = startSupervisor({ home: config.home, hubUrl: config.hubUrl, secretKey, workerCommand, sandbox });
+    writePidFile(config.home);
+    console.log("Running. Stop it with Ctrl-C; see how this Machine is set up with: veeloe status");
     // sandbox-runtime's own SIGINT and SIGTERM handlers only clean up, which would leave this running.
     for (const signal of ["SIGINT", "SIGTERM"] as const) {
       process.on(signal, () => {
@@ -165,6 +211,7 @@ export function runPairCommand(hub: string | undefined) {
       throw new ConfigError((err as Error).message);
     }
     const result = await runPair({ home, hubUrl: normal });
+    if (result === "paired") console.log(loadProviders(home).length ? "Next: start the Runtime with: veeloe" : "Next: add a Provider with veeloe provider add, then start the Runtime with: veeloe");
     process.exit(result === "paired" ? 0 : 1);
   });
 }
@@ -178,7 +225,11 @@ export function runUnpairCommand() {
 
 export function runProviderCommandLine(command: ProviderCommand) {
   return reporting(async () => {
-    const done = await runProviderCommand(command, { home: runtimeHome(), readKey });
+    const done = await runProviderCommand(command, { home: runtimeHome(), ...terminalIo() });
     process.exit(done ? 0 : 1);
   });
+}
+
+export function runStatusCommand() {
+  return reporting(() => runStatus({ home: runtimeHome() }));
 }

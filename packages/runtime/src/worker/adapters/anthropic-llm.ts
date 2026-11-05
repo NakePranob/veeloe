@@ -4,6 +4,8 @@ import { LlmError, type Llm } from "../core/ports";
 
 /** The header the supervisor names its own refusals in. */
 const PROXY_ERROR_HEADER = "x-veeloe-error";
+/** The header the supervisor reads the Task of a request from, and drops. */
+const TASK_HEADER = "x-veeloe-task";
 
 // ponytail: one ceiling for every model. Read it from the Provider's model list when a model needs more or allows less.
 const MAX_TOKENS = 8192;
@@ -42,10 +44,10 @@ export function ipcFetch(send: (message: FromWorker) => void) {
 export function anthropicLlm({ fetch }: { fetch: typeof globalThis.fetch }): Llm {
   const client = new Anthropic({ baseURL: "http://supervisor", apiKey: "held-by-the-supervisor", fetch, maxRetries: 2 });
   return {
-    async send({ system, messages, tools }) {
+    async send({ task, system, messages, tools }) {
       try {
         const message = await client.messages
-          .stream({ model: "agent", max_tokens: MAX_TOKENS, system, messages: messages as Anthropic.MessageParam[], ...(tools.length ? { tools: tools as Anthropic.Tool[] } : {}) })
+          .stream({ model: "agent", max_tokens: MAX_TOKENS, system, messages: messages as Anthropic.MessageParam[], ...(tools.length ? { tools: tools as Anthropic.Tool[] } : {}) }, { headers: { [TASK_HEADER]: task } })
           .finalMessage();
         // Through JSON, so what is kept is what the Provider sent and nothing the SDK hangs on it.
         return { content: JSON.parse(JSON.stringify(message.content)), stopReason: message.stop_reason };

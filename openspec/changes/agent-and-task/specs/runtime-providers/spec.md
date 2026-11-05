@@ -5,26 +5,60 @@
 ## ADDED Requirements
 
 ### Requirement: Owner ตั้ง Provider ที่หน้าเครื่อง
-`veeloe provider add` SHALL รับชื่อ, base URL และ key ของ Provider ที่รองรับรูปแบบ Anthropic Messages โดย key SHALL ถูกอ่านจาก terminal แบบไม่แสดงบนจอหรือจาก stdin และ MUST NOT ถูกรับเป็น argument ของคำสั่ง ก่อนบันทึก Runtime SHALL ถามรายชื่อ model จาก Provider ด้วย key นั้น และ SHALL ไม่บันทึกเมื่อถามไม่สำเร็จ key SHALL ถูกเก็บในไฟล์ของ supervisor ที่เจ้าของอ่านเขียนได้คนเดียว และ MUST NOT ออกจาก Machine
+`veeloe provider add` SHALL รับ Provider สำเร็จรูปด้วย `--preset <id>` หรือ Provider อื่นที่รองรับรูปแบบ Anthropic Messages ด้วย `--name` กับ `--url` และ key ของ Provider โดย key SHALL ถูกอ่านจาก terminal แบบไม่แสดงบนจอหรือจาก stdin และ MUST NOT ถูกรับเป็น argument ของคำสั่ง ก่อนบันทึก Runtime SHALL ถามรายชื่อ model จาก Provider ด้วย key นั้น และ SHALL ไม่บันทึกเมื่อถามไม่สำเร็จ key SHALL ถูกเก็บในไฟล์ของ supervisor ที่เจ้าของอ่านเขียนได้คนเดียว และ MUST NOT ออกจาก Machine
 
 #### Scenario: key ใช้ได้
 - **WHEN** Owner รัน `veeloe provider add` แล้วใส่ URL กับ key ที่ Provider รับ
-- **THEN** Runtime บันทึก Provider และแสดงจำนวน model ที่ใช้ได้
+- **THEN** Runtime บันทึก Provider แสดงจำนวน model ที่ใช้ได้ และบอกขั้นต่อไป
 
 #### Scenario: key ใช้ไม่ได้
 - **WHEN** Provider ตอบว่า key ไม่ถูกต้อง หรือติดต่อ URL ไม่ได้
-- **THEN** Runtime ไม่บันทึกอะไร และบอกเหตุผลใน terminal
+- **THEN** Runtime ไม่บันทึกอะไร และบอกเหตุผลกับวิธีแก้ใน terminal
 
 #### Scenario: ชื่อซ้ำ
 - **WHEN** Owner เพิ่ม Provider ด้วยชื่อที่มีอยู่แล้ว
 - **THEN** Runtime ปฏิเสธ และ Provider เดิมไม่เปลี่ยน
 
+#### Scenario: key เป็น argument
+- **WHEN** Owner ใส่ key ไว้ในคำสั่ง เช่น `--key` หรือเป็นคำท้ายคำสั่ง
+- **THEN** Runtime ปฏิเสธโดยไม่พิมพ์ key นั้นออกมา และบอกให้พิมพ์ตอนถามหรือส่งทาง stdin
+
+### Requirement: Provider สำเร็จรูป
+Runtime SHALL มี Provider สำเร็จรูปในตารางเดียว คือ `anthropic` (`https://api.anthropic.com`, `x-api-key`), `opencode-go` (`https://opencode.ai/inference/go`, `x-api-key`) และ `openrouter` (`https://openrouter.ai/api`, `Bearer`) Provider สำเร็จรูป SHALL ใช้ URL และวิธีส่ง key ตามตารางโดยไม่ลองเดา ส่วน Provider ที่ใส่ URL เอง SHALL ลอง `x-api-key` ก่อนแล้วจึง `Bearer` Provider ที่บันทึก SHALL จำว่ามาจาก Provider สำเร็จรูปตัวไหน ทุกคำขอที่ supervisor ส่งไป Provider SHALL มี `user-agent: veeloe/<version>` และคำขอไป `opencode-go` SHALL มี `x-opencode-session` เป็นรหัสของ Task ที่คำขอนั้นเป็นของ ซึ่งคงที่ตลอด Task worker SHALL บอกรหัส Task มากับคำขอทาง IPC และ supervisor MUST NOT ส่ง header `x-veeloe-*` ของ Runtime เองต่อไปที่ Provider
+
+#### Scenario: OpenRouter
+- **WHEN** Owner เพิ่ม `--preset openrouter` ซึ่งตอบรายชื่อ model ได้โดยไม่ต้องมี key
+- **THEN** Runtime บันทึกแบบ `Bearer` ตามตาราง ไม่ใช่ `x-api-key`
+
+#### Scenario: OpenCode Go
+- **WHEN** Agent ที่ใช้ Provider จาก `opencode-go` ทำ Turn ใน Task หนึ่ง
+- **THEN** ทุกคำขอของ Task นั้นมี `x-opencode-session` เป็นรหัส Task มี `user-agent` เป็น `veeloe/<version>` และไม่มี header `x-veeloe-*`
+
+### Requirement: เพิ่ม Provider แบบถามทีละขั้น
+เมื่อ stdin และ stdout เป็น terminal และคำสั่งไม่ได้บอก Provider มา `veeloe provider add` SHALL ให้เลือกจากรายการเลขของ Provider สำเร็จรูปกับ "Custom (enter a URL)" ถ้าเลือก Provider สำเร็จรูป SHALL ถามแค่ key ถ้าเลือก Custom SHALL ถามชื่อ, URL และ key ตามลำดับ และถามซ้ำเมื่อคำตอบใช้ไม่ได้ เมื่อไม่มี terminal Runtime MUST NOT ถามอะไร และ SHALL จบด้วย exit code ที่ไม่ใช่ 0 พร้อมบอกว่าขาด flag ตัวไหน
+
+#### Scenario: เลือกจากรายการ
+- **WHEN** Owner รัน `veeloe provider add` ที่ terminal เลือก Custom ตอบชื่อผิดรูปแบบหนึ่งครั้ง แล้วตอบชื่อ URL และ key ที่ใช้ได้
+- **THEN** Runtime ถามชื่ออีกครั้ง แล้วตรวจ key กับ Provider และบันทึก
+
+#### Scenario: ไม่มี terminal
+- **WHEN** สคริปต์รัน `veeloe provider add` โดยไม่มี `--name` และไม่มี terminal
+- **THEN** Runtime ไม่ถามอะไร และออกด้วย error ที่บอกว่าขาด `--name`
+
 ### Requirement: Owner ดูและลบ Provider ได้
-`veeloe provider list` SHALL แสดงชื่อและ URL ของทุก Provider และ MUST NOT แสดง key `veeloe provider remove <name>` SHALL ลบ Provider นั้น Agent ที่ใช้ Provider ที่ถูกลบ SHALL จบ Turn ถัดไปด้วย error ที่บอกว่าไม่มี Provider แทนที่จะพัง
+`veeloe provider list` SHALL แสดงชื่อและ URL ของทุก Provider และ MUST NOT แสดง key `veeloe provider remove [<name>]` SHALL ลบ Provider นั้น ถ้าไม่ได้ระบุชื่อและมี terminal SHALL ให้เลือกจากรายการเลข ก่อนลบ Runtime SHALL บอกชื่อ Agent ทุกตัวที่ใช้ Provider นั้นจากรายชื่อ Agent และบอกว่า Agent เหล่านั้นจะหยุดตอบจนกว่าจะได้ Provider ใหม่ แล้วถามยืนยันโดยค่าเริ่มต้นคือไม่ลบ `--yes` SHALL ข้ามการถาม และเมื่อไม่มี terminal Runtime SHALL ไม่ลบถ้าไม่มี `--yes` Agent ที่ใช้ Provider ที่ถูกลบ SHALL จบ Turn ถัดไปด้วย error ที่บอกว่าไม่มี Provider แทนที่จะพัง
 
 #### Scenario: ดูรายชื่อ
 - **WHEN** Owner รัน `veeloe provider list`
 - **THEN** terminal แสดงชื่อกับ URL และไม่มี key ส่วนใดเลย
+
+#### Scenario: ลบแบบเลือก
+- **WHEN** Owner รัน `veeloe provider remove` ที่ terminal เลือก Provider ที่ Agent ใช้อยู่ แล้วกด Enter ตอนถามยืนยัน
+- **THEN** terminal แสดงชื่อ Agent ที่ใช้ Provider นั้น และไม่มีอะไรถูกลบ
+
+#### Scenario: ลบโดยไม่มี terminal
+- **WHEN** สคริปต์รัน `veeloe provider remove main` โดยไม่มี `--yes`
+- **THEN** Runtime ไม่ลบ และบอกให้รันใหม่พร้อม `--yes`
 
 #### Scenario: ลบ Provider ที่ Agent ใช้อยู่
 - **WHEN** Owner ลบ Provider แล้วส่งข้อความหา Agent ที่ใช้ Provider นั้น

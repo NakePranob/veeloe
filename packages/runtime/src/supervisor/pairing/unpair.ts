@@ -1,17 +1,6 @@
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import { createInterface } from "node:readline";
-
-export function askOnTerminal(question: string): Promise<boolean> {
-  const terminal = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    terminal.once("close", () => resolve(false)); // no answer is not a yes
-    terminal.question(`${question} [y/N] `, (answer) => {
-      resolve(answer.trim().toLowerCase() === "y");
-      terminal.close();
-    });
-  });
-}
+import { askOnTerminal } from "../terminal";
 
 /**
  * Starts this Machine over without needing any Controller (ADR 0031). The key

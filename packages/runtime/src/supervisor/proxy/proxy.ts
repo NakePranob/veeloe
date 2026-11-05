@@ -1,6 +1,6 @@
 import type { LlmRequest, LlmResponse } from "../../ipc";
 import type { Provider } from "../providers/store";
-import { authHeaders } from "../providers/store";
+import { upstreamHeaders } from "../providers/presets";
 
 /** What an Agent's requests go to: the Provider and model of that Agent, or why there is none. */
 export type Route = { provider: Provider; model: string } | { error: "provider.missing" };
@@ -9,7 +9,9 @@ export type Route = { provider: Provider; model: string } | { error: "provider.m
 export const PROXY_ERROR_HEADER = "x-veeloe-error";
 
 const ALLOWED = new Set(["/v1/messages", "/v1/messages/count_tokens"]);
-// What a worker sent that must not reach the Provider: the SDK's placeholder key, and what fetch sets itself.
+/** The header a worker names the Task of a request in; the supervisor reads it and never sends it on. */
+export const TASK_HEADER = "x-veeloe-task";
+// What a worker sent that must not reach the Provider: the SDK's placeholder key, what fetch sets itself, and the Runtime's own x-veeloe-* headers.
 const DROPPED = new Set(["host", "x-api-key", "authorization", "content-length", "connection", "accept-encoding"]);
 
 function refuse(status: number, code: string): LlmResponse {
@@ -41,8 +43,13 @@ export function createLlmHandler({ route, fetchFn = fetch }: { route: (agent: st
       return refuse(400, "proxy.bad_request");
     }
     const headers = new Headers();
-    for (const [name, value] of Object.entries(req.headers)) if (!DROPPED.has(name.toLowerCase())) headers.set(name, value);
-    for (const [name, value] of Object.entries(authHeaders(to.provider))) headers.set(name, value);
+    let task: string | undefined;
+    for (const [name, value] of Object.entries(req.headers)) {
+      const lower = name.toLowerCase();
+      if (lower === TASK_HEADER) task = value;
+      if (!DROPPED.has(lower) && !lower.startsWith("x-veeloe-")) headers.set(name, value);
+    }
+    for (const [name, value] of Object.entries(upstreamHeaders(to.provider, task))) headers.set(name, value);
 
     try {
       const upstream = await fetchFn(`${to.provider.url}${pathname}${search}`, { method: "POST", headers, body: JSON.stringify({ ...body, model: to.model }) });

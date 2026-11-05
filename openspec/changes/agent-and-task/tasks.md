@@ -10,6 +10,9 @@
 - [x] 2.3 เพิ่ม proxy ของ LLM ตรวจด้วย test เรื่องไม่มีรหัสหรือรหัสผิด, path ที่ไม่อนุญาต, model ถูกเขียนทับ, SSE ผ่านตามที่ได้ และ Provider ล่ม
 - [x] 2.4 เพิ่มรายชื่อ Agent, Workdir และการเปิด worker ทาง IPC พร้อมเปิดใหม่เมื่อพัง ตรวจด้วย test ว่า worker ตัวหนึ่งพังแล้วตัวอื่นยังตอบ และเริ่ม supervisor ใหม่แล้ว worker ทุกตัวกลับมา
 - [x] 2.5 เพิ่ม slice `agents` (`agent.create`, `agent.list`) และ slice `task-message` กับ `task-sync` ที่ส่งต่อให้ worker และส่ง event กลับถึงคนเริ่ม Task ตรวจด้วย test เรื่องลายเซ็นผิด, กุญแจไม่อยู่ใน trust, `member` ในหัวซองไม่ตรง, Agent ไม่มี, Provider ไม่มี และ Task ของคนอื่น
+- [x] 2.6 เพิ่ม Provider สำเร็จรูป (`anthropic`, `opencode-go`, `openrouter`) ที่ใช้วิธีส่ง key ตามตาราง และ header `user-agent` กับ `x-opencode-session` ที่เป็นรหัส Task ซึ่ง worker ส่งมาทาง IPC ตรวจด้วย test ที่ส่งผ่าน proxy จริงไป Provider ปลอมว่าได้ header ครบและไม่มี `x-veeloe-*` และ OpenRouter ได้ `Bearer` แม้รายชื่อ model เปิดให้ทุกคน
+- [x] 2.7 เพิ่ม `provider add` แบบถามทีละขั้นกับ `--preset` และ `provider remove` แบบเลือก ที่บอก Agent ที่ใช้อยู่และถามยืนยันโดยค่าเริ่มต้นคือไม่ลบ พร้อม `--yes` ตรวจด้วย test ว่าไม่มี terminal แล้วไม่ถามและบอก flag ที่ขาด, ตอบผิดแล้วถามซ้ำ, ตอบไม่ลบแล้ว Provider ยังอยู่ และ key ที่เป็น argument ถูกปฏิเสธโดยไม่พิมพ์ออกมา
+- [x] 2.8 เพิ่ม `veeloe` ครั้งแรกที่พา Pairing กับเพิ่ม Provider, `veeloe status` กับไฟล์ pid และ help ของทุกคำสั่ง ตรวจด้วย test ว่า status ไม่มี key, ไฟล์ pid ค้างถือว่าไม่ทำงาน, ไม่มี terminal แล้วบอกขั้นตอนแทนการรอ และคำสั่งที่ไม่รู้จักชี้ไป `--help`
 
 ## 3. worker
 

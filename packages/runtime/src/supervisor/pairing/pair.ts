@@ -1,4 +1,3 @@
-import { hostname } from "node:os";
 import {
   buildPairingLink,
   checkPairingProof,
@@ -13,7 +12,7 @@ import {
   verify,
 } from "@veeloe/protocol";
 import { renderUnicodeCompact } from "uqr";
-import { saveHubUrl } from "../config";
+import { machineName, saveHubUrl } from "../config";
 import { startHubLink } from "../hub-link/hub-link";
 import { loadOrCreateMachineKey } from "../trust/machine-key";
 import { FileSeenSequences, loadTrust, saveTrust } from "../trust/store";
@@ -48,7 +47,7 @@ function terminalQr(text: string): string {
  * this Machine paired, and `veeloe unpair` recovers. Answer a repeated claim
  * from the supervisor if that turns out to happen in practice.
  */
-export function runPair({ home, hubUrl, log = console.log, name = hostname().replace(/\.local$/, ""), ttlSeconds = PAIRING_TTL_SECONDS }: PairOptions): Promise<PairResult> {
+export function runPair({ home, hubUrl, log = console.log, name = machineName(), ttlSeconds = PAIRING_TTL_SECONDS }: PairOptions): Promise<PairResult> {
   if (loadTrust(home).owners.length > 0) {
     log("this Machine is already paired. To start over, run: veeloe unpair");
     return Promise.resolve("already-paired");
@@ -111,7 +110,7 @@ export function runPair({ home, hubUrl, log = console.log, name = hostname().rep
         seen.record(result.from, result.signed.seq);
         const signEnvelope = createSigner(secretKey, () => seen.next(machineKey));
         send(signEnvelope({ type: "pairing.done", recipients: [member], body: { name } }));
-        log(`paired with hub ${hubUrl}. Start the Runtime with: veeloe`);
+        log(`paired with hub ${hubUrl}.`);
         finish("paired");
       },
     });

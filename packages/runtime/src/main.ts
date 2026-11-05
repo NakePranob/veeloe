@@ -1,30 +1,53 @@
 import { parseArgs } from "node:util";
-import { runPairCommand, runProviderCommandLine, runSupervisor, runUnpairCommand } from "./supervisor";
+import { helpFor, USAGE } from "./help";
+import { runPairCommand, runProviderCommandLine, runStatusCommand, runSupervisor, runUnpairCommand } from "./supervisor";
 import { runWorker } from "./worker";
+
+function fail(message: string): never {
+  console.error(`veeloe: ${message}\n${USAGE}\nrun veeloe --help`);
+  process.exit(2);
+}
+
+const argv = process.argv.slice(2);
+// A key in an argument stays in shell history and in `ps`, so it is refused before anything else reads it.
+if (argv.some((a) => /^--?(key|api-key|token)(=|$)/.test(a))) fail("a Provider key is never an argument. Type it when asked, or pipe it in: veeloe provider add ... < key.txt");
+
+let parsed;
+try {
+  parsed = parseArgs({
+    args: argv,
+    options: { agent: { type: "string" }, hub: { type: "string" }, name: { type: "string" }, url: { type: "string" }, preset: { type: "string" }, yes: { type: "boolean" }, help: { type: "boolean", short: "h" } },
+    allowPositionals: true,
+  });
+} catch (err) {
+  fail((err as Error).message);
+}
+const { positionals: [command, sub, ...rest], values } = parsed;
 
 // One binary, two modes (ADR 0020): `veeloe` is the supervisor, which starts
 // each Agent's worker as `veeloe worker --agent <id>`.
-const { positionals, values } = parseArgs({
-  args: process.argv.slice(2),
-  options: { agent: { type: "string" }, hub: { type: "string" }, name: { type: "string" }, url: { type: "string" } },
-  allowPositionals: true,
-});
-
-if (positionals.length === 0) {
+if (values.help || command === "help") {
+  const topic = command === "help" ? sub : command;
+  const text = helpFor(topic);
+  if (!text) fail(`no command ${topic}`);
+  console.log(text);
+} else if (command === undefined) {
   runSupervisor();
-} else if (positionals[0] === "pair" && positionals.length === 1) {
+} else if (command === "pair" && !sub) {
   runPairCommand(values.hub);
-} else if (positionals[0] === "unpair" && positionals.length === 1) {
+} else if (command === "unpair" && !sub) {
   runUnpairCommand();
-} else if (positionals[0] === "provider" && positionals[1] === "add" && positionals.length === 2) {
-  runProviderCommandLine({ action: "add", name: values.name, url: values.url });
-} else if (positionals[0] === "provider" && positionals[1] === "list" && positionals.length === 2) {
+} else if (command === "status" && !sub) {
+  runStatusCommand();
+} else if (command === "provider" && sub === "add" && rest.length === 0) {
+  runProviderCommandLine({ action: "add", name: values.name, url: values.url, preset: values.preset });
+} else if (command === "provider" && sub === "list" && rest.length === 0) {
   runProviderCommandLine({ action: "list" });
-} else if (positionals[0] === "provider" && positionals[1] === "remove" && positionals.length === 3) {
-  runProviderCommandLine({ action: "remove", name: positionals[2] });
-} else if (positionals[0] === "worker" && positionals.length === 1 && values.agent) {
+} else if (command === "provider" && sub === "remove" && rest.length <= 1) {
+  runProviderCommandLine({ action: "remove", name: rest[0], yes: values.yes });
+} else if (command === "worker" && !sub && values.agent) {
   runWorker(values.agent);
 } else {
-  console.error("usage: veeloe | veeloe pair [--hub <url>] | veeloe unpair | veeloe provider add --name <name> --url <url> | veeloe provider list | veeloe provider remove <name>");
-  process.exit(2);
+  // Never the arguments themselves: a key pasted in the wrong place would be printed.
+  fail(command === "provider" ? "not a provider command (a key is never an argument): see veeloe help provider" : helpFor(command) ? `wrong arguments for ${command}: see veeloe help ${command}` : `unknown command: ${command}`);
 }

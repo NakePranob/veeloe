@@ -31,7 +31,7 @@ export function createAgentCore({ name, store, llm, tools, link }: { name: strin
     for (let round = 0; round < MAX_ROUNDS; round++) {
       let reply;
       try {
-        reply = await llm.send({ system, messages: conversation(store.events(task)), tools: tools.definitions() });
+        reply = await llm.send({ task, system, messages: conversation(store.events(task)), tools: tools.definitions() });
       } catch (err) {
         append(task, starter, TaskEventKind.TurnEnded, { reason: "error", code: err instanceof LlmError ? err.code : "provider.failed" });
         return;

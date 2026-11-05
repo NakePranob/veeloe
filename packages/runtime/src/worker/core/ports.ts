@@ -18,7 +18,8 @@ export interface EventStore {
   events(task: string, after?: number): TaskEvent[];
 }
 
-export type LlmRequest = { system: string; messages: { role: "user" | "assistant"; content: unknown[] }[]; tools: ToolDefinition[] };
+/** `task` is the Task the request is for, which some Providers want as a session. */
+export type LlmRequest = { task: string; system: string; messages: { role: "user" | "assistant"; content: unknown[] }[]; tools: ToolDefinition[] };
 export type LlmReply = { content: unknown[]; stopReason: string | null };
 
 /** Throws LlmError when there is no answer. */
