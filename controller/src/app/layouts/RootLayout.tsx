@@ -90,7 +90,7 @@ export function RootLayout() {
             <View style={{ flex: 1, flexDirection: "row", backgroundColor: colors.background }}>
               {split && <Sidebar selectedTaskId={task} />}
               <View style={{ flex: 1 }}>
-                <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTitleAlign: "center", ...webHeader }}>
+                <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTitleAlign: "center", headerBackButtonDisplayMode: "minimal", ...webHeader }}>
                   <Stack.Screen name="index" options={split ? { headerShown: false } : {}} />
                   {/* In split view the inbox is already beside the Task, so there is nothing to go back to.
                       Web ignores headerBackVisible when a deep link anchors the inbox underneath, hence headerLeft. */}
