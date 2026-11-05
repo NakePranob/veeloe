@@ -3,3 +3,6 @@ dist/
 # temp files `bun build --compile` can leave behind
 *.bun-build
 .DS_Store
+
+# Worktrees that Claude Code agents work in
+.claude/worktrees/
