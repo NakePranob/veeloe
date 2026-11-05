@@ -3,8 +3,8 @@ import { useState } from "react";
 import { View } from "react-native";
 import { addDevice, thisDevice, useCurrentMember, type Device } from "../../../entities/member";
 import { pushNotification } from "../../../entities/notification";
-import { authenticate, Button, Card, Field, inform, Note, Row, Screen, Section, Select, space, Text, ToggleRow, useColors } from "../../../shared/ui";
-import { newKey, shortCode } from "../model/code";
+import { authenticate, Button, Card, Field, inform, Row, Screen, Section, Select, space, useColors } from "../../../shared/ui";
+import { newKey } from "../model/code";
 
 const KINDS: { value: Device["kind"]; label: string }[] = [
   { value: "phone", label: "มือถือ" },
@@ -25,35 +25,21 @@ function KeyStandIn({ keyText }: { keyText: string }) {
   );
 }
 
-// Linking a second Controller of the same Member by QR (ADR 0013, 0031). Both screens show a
-// short code made from the new key; the Member compares them, then this device signs.
+// Linking a second Controller of the same Member by QR (ADR 0013, 0031). The new key goes from the
+// new device's screen into this device's camera, so no Hub stands between them to swap it, and there
+// is no short code to compare: this device names the new one and signs. Only Linking by login compares one.
 export function DeviceLinkPage() {
   const me = useCurrentMember();
   const [name, setName] = useState("iPad ของ " + me.name);
   const [kind, setKind] = useState<Device["kind"]>("tablet");
   // ponytail: the new device's key is made here; a real one is made on that device and read by scanning.
-  const [key, setKey] = useState(() => newKey());
-  const [swapped, setSwapped] = useState(false);
+  const [key] = useState(() => newKey());
   const [scanned, setScanned] = useState(false);
-  const [refused, setRefused] = useState(false);
-  const [attacker] = useState(() => newKey());
-
-  // What this device receives is not what the new device made when the Hub swaps it on the way.
-  const received = swapped ? attacker : key;
-  const mine = shortCode(received);
-  const theirs = shortCode(key);
-
-  function again() {
-    setKey(newKey());
-    setScanned(false);
-    setRefused(false);
-  }
 
   async function approve() {
     const chosen = name.trim();
     if (!chosen) return inform("Link ไม่ได้", "ตั้งชื่อเครื่องใหม่ก่อน");
     if (me.devices.some((device) => !device.revoked && device.name === chosen)) return inform("Link ไม่ได้", `คุณมีเครื่องชื่อ ${chosen} แล้ว`);
-    if (mine !== theirs) return inform("Link ไม่สำเร็จ", "ใบรับรองนี้ผูกกับกุญแจที่เครื่องใหม่ไม่ได้ถืออยู่ ใช้ไม่ได้ ตรวจรหัสสองฝั่งให้ตรงกันก่อนอนุมัติ");
     const signer = thisDevice(me);
     if (!signer) return;
     if (!(await authenticate(`Link เครื่อง ${chosen} เข้ากับ ${me.name} เครื่องนี้จะเซ็นรับรองกุญแจของมัน`))) return;
@@ -70,38 +56,20 @@ export function DeviceLinkPage() {
         <View style={{ alignItems: "flex-start", padding: space.sm }}>
           <Select label="ชนิดเครื่อง" value={kind} options={KINDS} onChange={setKind} />
         </View>
-        <ToggleRow title="จำลอง: Hub สลับกุญแจระหว่างทาง" detail="ลองดูว่ารหัสสองฝั่งจะไม่ตรงกันเมื่อมีคนแทรก (ADR 0006)" value={swapped} onChange={(on) => { setSwapped(on); setRefused(false); }} />
         <Card style={{ alignItems: "center", marginTop: space.sm }}>
           <KeyStandIn keyText={key} />
           <View style={{ alignSelf: "stretch", alignItems: "center", paddingTop: space.sm }}>
-            <Button label="จำลอง: สแกนแล้ว" disabled={scanned} onPress={() => { setScanned(true); setRefused(false); }} />
+            <Button label="จำลอง: สแกนแล้ว" disabled={scanned} onPress={() => setScanned(true)} />
           </View>
         </Card>
       </Section>
 
-      {scanned && !refused && (
-        <Section title="2. เทียบรหัสสั้น" footer="อ่านรหัสบนเครื่องใหม่เทียบกับรหัสบนเครื่องนี้ ถ้ามีตัวไหนต่าง อย่าอนุมัติ มีคนอาจสลับกุญแจระหว่างทาง">
-          <Row title="บนเครื่องนี้" accessory={<Text variant="headline" accessibilityLabel={`รหัสบนเครื่องนี้ ${mine}`}>{mine}</Text>} />
-          <Row title="บนเครื่องใหม่" accessory={<Text variant="headline" accessibilityLabel={`รหัสบนเครื่องใหม่ ${theirs}`}>{theirs}</Text>} />
+      {scanned && (
+        <Section title="2. อนุมัติ" footer="อนุมัติเฉพาะเครื่องที่อยู่ตรงหน้าคุณ เครื่องนี้จะเซ็นรับรองกุญแจของมัน และเครื่องอื่นของคุณได้รับแจ้ง">
           <View style={{ flexDirection: "row", gap: space.sm, padding: space.sm }}>
-            <Button label="รหัสตรงกัน อนุมัติ" variant="primary" onPress={approve} />
-            <Button
-              label="รหัสไม่ตรง"
-              onPress={() => {
-                // Nothing was signed, so the new key stays untrusted; a fresh attempt starts from a new QR.
-                setRefused(true);
-              }}
-            />
+            <Button label="อนุมัติ" variant="primary" onPress={approve} />
           </View>
         </Section>
-      )}
-      {refused && (
-        <>
-          <Note icon="info" iconColor="orange">ปฏิเสธแล้ว ไม่มีการเซ็นรับรองกุญแจนี้ รหัสที่ไม่ตรงแปลว่ากุญแจที่มาถึงไม่ใช่กุญแจของเครื่องใหม่ อาจมีคนสลับระหว่างทาง ถ้าไม่ได้ตั้งใจให้เป็นแบบนี้ ให้เปลี่ยนเครือข่ายแล้วลองใหม่</Note>
-          <View style={{ alignItems: "flex-start", paddingHorizontal: space.sm }}>
-            <Button label="เริ่ม Link ใหม่" onPress={again} />
-          </View>
-        </>
       )}
 
       <Section title="วิธีอื่น">
