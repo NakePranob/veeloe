@@ -25,5 +25,28 @@
     "command": "veeloe provider add --name <name> --url <base url>",
     "models_one": "{{count}} model",
     "models_other": "{{count}} models"
+  },
+  "egress": {
+    "who": "every Agent on {{machine}}",
+    "whoNamed": "every Agent on {{machine}} ({{agents}})",
+    "footer": "These domains are open to {{who}}, not to one Agent alone. Outside this list the sandbox lets no Agent out. Data can still leave to the domains listed, so add only ones you trust (ADR 0008).",
+    "none": {
+      "title": "No domains allowed",
+      "detail": "Agents can't reach the internet at all"
+    },
+    "remove": "Remove",
+    "add": "Add domain",
+    "placeholder": "e.g. pypi.org",
+    "addPrompt": "Add {{domain}} to the Egress of {{who}}",
+    "removePrompt": "Remove {{domain}} from the Egress of {{who}}",
+    "offline": {
+      "title": "Machine offline",
+      "body": "{{machine}} has to be online first, so its Runtime can check the signature on this change."
+    },
+    "invalid": {
+      "title": "Not a valid domain",
+      "body": "Enter a domain name only, such as github.com or *.npmjs.org, without https:// or a path."
+    },
+    "duplicate": "This domain is already listed"
   }
 }

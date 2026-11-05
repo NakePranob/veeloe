@@ -236,6 +236,13 @@ export function messageVectors() {
     { name: "sync from a negative number", type: "task.sync", body: { agent: "agent-1", after: -1 }, valid: false },
     { name: "a page of events", type: "task.events", body: { agent: "agent-1", events: [{ seq: 1, kind: "member.message", at: 1, body: {} }] }, valid: true },
     { name: "an error about an envelope", type: "error", body: { code: "agent.busy", ref: "sig-1" }, valid: true },
+    { name: "listed with the Machine's Egress", type: "agent.listed", body: { agents: [agent], providers: [], egress: ["github.com", "*.npmjs.org"] }, valid: true },
+    { name: "listed with an Egress entry that is not a domain", type: "agent.listed", body: { agents: [], providers: [], egress: ["10.0.0.1"] }, valid: false },
+    { name: "set the Egress", type: "egress.set", body: { egress: ["github.com", "*.npmjs.org"] }, valid: true },
+    { name: "set the Egress to nothing", type: "egress.set", body: { egress: [] }, valid: true },
+    { name: "set the Egress with a URL", type: "egress.set", body: { egress: ["https://pypi.org/simple"] }, valid: false },
+    { name: "set the Egress with localhost", type: "egress.set", body: { egress: ["localhost"] }, valid: false },
+    { name: "set the Egress with more than 100 domains", type: "egress.set", body: { egress: Array.from({ length: 101 }, (_, i) => `d${i}.example.com`) }, valid: false },
   ];
   return { note: "`valid` is whether a receiver accepts the body of an envelope of `type` that verify already accepted.", vectors: cases };
 }

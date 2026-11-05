@@ -20,6 +20,12 @@ const SYMBOLS = {
   key: { ios: "key", android: "key", web: "key" },
   lock: { ios: "lock", android: "lock", web: "lock" },
   warning: { ios: "exclamationmark.triangle", android: "warning", web: "warning" },
+  done: { ios: "checkmark.circle.fill", android: "check_circle", web: "check_circle" },
+  failed: { ios: "xmark.circle.fill", android: "cancel", web: "cancel" },
+  stopped: { ios: "stop.circle", android: "stop_circle", web: "stop_circle" },
+  expand: { ios: "chevron.down", android: "expand_more", web: "expand_more" },
+  collapse: { ios: "chevron.up", android: "expand_less", web: "expand_less" },
+  network: { ios: "globe", android: "public", web: "public" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 
 export type IconName = keyof typeof SYMBOLS;

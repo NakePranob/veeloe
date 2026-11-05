@@ -4,6 +4,7 @@
   "agent.provider_unknown": "That Provider or model isn't on this Machine",
   "agent.unavailable": "The Agent couldn't take this right now. Try again in a moment",
   "agent.unknown": "This Machine doesn't have that Agent",
+  "egress.invalid_domain": "The Machine kept its Egress: one entry isn't a plain domain name",
   "hub.machine_offline": "That Machine is offline, so it did not get this",
   "hub.machine_taken": "That Machine already belongs to another Workspace. Run veeloe unpair on it, then pair again",
   "hub.pairing_invalid": "The Hub refused this link because the signatures did not check out or it has expired. Run veeloe pair again",

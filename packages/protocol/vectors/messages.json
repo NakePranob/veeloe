@@ -219,6 +219,187 @@
         "ref": "sig-1"
       },
       "valid": true
+    },
+    {
+      "name": "listed with the Machine's Egress",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5"
+          }
+        ],
+        "providers": [],
+        "egress": [
+          "github.com",
+          "*.npmjs.org"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with an Egress entry that is not a domain",
+      "type": "agent.listed",
+      "body": {
+        "agents": [],
+        "providers": [],
+        "egress": [
+          "10.0.0.1"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "set the Egress",
+      "type": "egress.set",
+      "body": {
+        "egress": [
+          "github.com",
+          "*.npmjs.org"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "set the Egress to nothing",
+      "type": "egress.set",
+      "body": {
+        "egress": []
+      },
+      "valid": true
+    },
+    {
+      "name": "set the Egress with a URL",
+      "type": "egress.set",
+      "body": {
+        "egress": [
+          "https://pypi.org/simple"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "set the Egress with localhost",
+      "type": "egress.set",
+      "body": {
+        "egress": [
+          "localhost"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "set the Egress with more than 100 domains",
+      "type": "egress.set",
+      "body": {
+        "egress": [
+          "d0.example.com",
+          "d1.example.com",
+          "d2.example.com",
+          "d3.example.com",
+          "d4.example.com",
+          "d5.example.com",
+          "d6.example.com",
+          "d7.example.com",
+          "d8.example.com",
+          "d9.example.com",
+          "d10.example.com",
+          "d11.example.com",
+          "d12.example.com",
+          "d13.example.com",
+          "d14.example.com",
+          "d15.example.com",
+          "d16.example.com",
+          "d17.example.com",
+          "d18.example.com",
+          "d19.example.com",
+          "d20.example.com",
+          "d21.example.com",
+          "d22.example.com",
+          "d23.example.com",
+          "d24.example.com",
+          "d25.example.com",
+          "d26.example.com",
+          "d27.example.com",
+          "d28.example.com",
+          "d29.example.com",
+          "d30.example.com",
+          "d31.example.com",
+          "d32.example.com",
+          "d33.example.com",
+          "d34.example.com",
+          "d35.example.com",
+          "d36.example.com",
+          "d37.example.com",
+          "d38.example.com",
+          "d39.example.com",
+          "d40.example.com",
+          "d41.example.com",
+          "d42.example.com",
+          "d43.example.com",
+          "d44.example.com",
+          "d45.example.com",
+          "d46.example.com",
+          "d47.example.com",
+          "d48.example.com",
+          "d49.example.com",
+          "d50.example.com",
+          "d51.example.com",
+          "d52.example.com",
+          "d53.example.com",
+          "d54.example.com",
+          "d55.example.com",
+          "d56.example.com",
+          "d57.example.com",
+          "d58.example.com",
+          "d59.example.com",
+          "d60.example.com",
+          "d61.example.com",
+          "d62.example.com",
+          "d63.example.com",
+          "d64.example.com",
+          "d65.example.com",
+          "d66.example.com",
+          "d67.example.com",
+          "d68.example.com",
+          "d69.example.com",
+          "d70.example.com",
+          "d71.example.com",
+          "d72.example.com",
+          "d73.example.com",
+          "d74.example.com",
+          "d75.example.com",
+          "d76.example.com",
+          "d77.example.com",
+          "d78.example.com",
+          "d79.example.com",
+          "d80.example.com",
+          "d81.example.com",
+          "d82.example.com",
+          "d83.example.com",
+          "d84.example.com",
+          "d85.example.com",
+          "d86.example.com",
+          "d87.example.com",
+          "d88.example.com",
+          "d89.example.com",
+          "d90.example.com",
+          "d91.example.com",
+          "d92.example.com",
+          "d93.example.com",
+          "d94.example.com",
+          "d95.example.com",
+          "d96.example.com",
+          "d97.example.com",
+          "d98.example.com",
+          "d99.example.com",
+          "d100.example.com"
+        ]
+      },
+      "valid": false
     }
   ]
 }

@@ -5,8 +5,8 @@ import { listModels } from "../providers/models";
 import type { Provider } from "../providers/store";
 import type { Workers } from "../workers/workers";
 
-/** `agent.create` and `agent.list` (ADR 0020, 0042). Both answer with the whole list, never a Provider's URL or key. */
-export function createAgentsSlice({ registry, workers, providers, outbox, fetchFn }: { registry: AgentRegistry; workers: Workers; providers: () => Provider[]; outbox: Outbox; fetchFn?: typeof fetch }) {
+/** `agent.create` and `agent.list` (ADR 0020, 0042). Both answer with the whole list and the Machine's Egress, never a Provider's URL or key. */
+export function createAgentsSlice({ registry, workers, providers, egress, outbox, fetchFn }: { registry: AgentRegistry; workers: Workers; providers: () => Provider[]; egress: () => string[]; outbox: Outbox; fetchFn?: typeof fetch }) {
   async function providerInfo(): Promise<ProviderInfo[]> {
     return Promise.all(
       providers().map(async (p) => {
@@ -17,10 +17,11 @@ export function createAgentsSlice({ registry, workers, providers, outbox, fetchF
   }
 
   async function listed(): Promise<AgentListedBody> {
-    return { agents: registry.all(), providers: await providerInfo() };
+    return { agents: registry.all(), providers: await providerInfo(), egress: egress() };
   }
 
   return {
+    listed,
     async list(from: Inbound) {
       outbox.toMember(from.member, "agent.listed", await listed());
     },

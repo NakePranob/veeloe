@@ -4,8 +4,9 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { Empty, Row, Screen, Section } from "../../../shared/ui";
+import { EgressSection } from "./EgressSection";
 
-// controller-prototype's MachinePage, with what this version has: status, its Agents and its Providers.
+// controller-prototype's MachinePage, with what this version has: status, its Agents, its Providers and its Egress.
 // ponytail: logs, updates, release and unpair from the app come with their own changes.
 export function MachinePage() {
   const t = useT("machines");
@@ -44,6 +45,8 @@ export function MachinePage() {
           return <Row key={provider.name} icon="key" title={provider.name} value={models ? t("provider.models", { count: models.length }) : undefined} detail={error ? describeError({ code: error }) : undefined} />;
         })}
       </Section>
+
+      <EgressSection machine={machine} agentNames={agents.map((agent) => agent.name)} />
     </Screen>
   );
 }

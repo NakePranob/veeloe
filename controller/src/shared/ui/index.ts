@@ -4,6 +4,7 @@ export { Card } from "./card";
 export { Empty, Field, Note, Row, Screen, Section } from "./forms";
 export { HeaderAction } from "./header-action";
 export { Icon, type IconName } from "./icon";
+export { inform } from "./inform";
 export { Label } from "./label";
 export { Text } from "./text";
-export { column, motion, radius, space, type, useColors, type Colors } from "./theme";
+export { column, icon, motion, radius, space, type, useColors, type Colors } from "./theme";

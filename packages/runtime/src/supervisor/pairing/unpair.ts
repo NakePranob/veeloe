@@ -17,7 +17,7 @@ export function askOnTerminal(question: string): Promise<boolean> {
  * Starts this Machine over without needing any Controller (ADR 0031). The key
  * goes too: the Hub would keep it in the old Workspace and answer
  * hub.machine_taken forever. Its old row stays at the Hub until revocation.
- * The Agents are forgotten too, so a new Workspace starts from nothing; their
+ * The Agents and the Egress are forgotten too, so a new Workspace starts from nothing; their
  * folders stay on disk, where no Agent reads them (ADR 0035).
  */
 export async function runUnpair({ home, confirm = askOnTerminal, log = console.log }: { home: string; confirm?: (question: string) => Promise<boolean>; log?: (line: string) => void }): Promise<boolean> {
@@ -26,7 +26,7 @@ export async function runUnpair({ home, confirm = askOnTerminal, log = console.l
     log("nothing was changed");
     return false;
   }
-  for (const file of ["runtime/trust.json", "runtime/seen.json", "runtime/agents.json", "machine.key"]) rmSync(join(home, file), { force: true });
+  for (const file of ["runtime/trust.json", "runtime/seen.json", "runtime/agents.json", "runtime/egress.json", "machine.key"]) rmSync(join(home, file), { force: true });
   log("unpaired. To pair again, run: veeloe pair");
   return true;
 }

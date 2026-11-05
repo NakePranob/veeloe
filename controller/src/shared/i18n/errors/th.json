@@ -4,6 +4,7 @@
   "agent.provider_unknown": "Machine เครื่องนี้ไม่มี Provider หรือ model นั้น",
   "agent.unavailable": "Agent รับข้อความนี้ไม่ได้ตอนนี้ ลองใหม่อีกครู่",
   "agent.unknown": "Machine เครื่องนี้ไม่มี Agent ตัวนั้น",
+  "egress.invalid_domain": "Machine ไม่เปลี่ยน Egress เพราะมีรายการที่ไม่ใช่ชื่อโดเมน",
   "hub.machine_offline": "Machine ออฟไลน์อยู่ จึงไม่ได้รับข้อความนี้",
   "hub.machine_taken": "Machine เครื่องนี้อยู่ใน Workspace อื่นแล้ว ให้รัน veeloe unpair ที่เครื่องนั้นแล้วทำ Pairing ใหม่",
   "hub.pairing_invalid": "Hub ไม่รับลิงก์นี้ เพราะลายเซ็นไม่ถูกต้องหรือลิงก์หมดอายุ ให้รัน veeloe pair อีกครั้ง",

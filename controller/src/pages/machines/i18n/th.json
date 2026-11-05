@@ -25,5 +25,28 @@
     "command": "veeloe provider add --name <ชื่อ> --url <base url>",
     "models_one": "{{count}} model",
     "models_other": "{{count}} model"
+  },
+  "egress": {
+    "who": "Agent ทุกตัวบน {{machine}}",
+    "whoNamed": "Agent ทุกตัวบน {{machine}} ({{agents}})",
+    "footer": "โดเมนเหล่านี้เปิดให้ {{who}} ออกไปได้ ไม่ใช่เฉพาะ Agent ตัวใดตัวหนึ่ง นอกรายการนี้ sandbox ปิดเน็ต ข้อมูลยังส่งออกไปโดเมนในรายการได้ จึงเพิ่มเฉพาะที่ไว้ใจ (ADR 0008)",
+    "none": {
+      "title": "ไม่มีโดเมนที่อนุญาต",
+      "detail": "Agent ออกเน็ตไม่ได้เลย"
+    },
+    "remove": "ลบ",
+    "add": "เพิ่มโดเมน",
+    "placeholder": "เช่น pypi.org",
+    "addPrompt": "เพิ่ม {{domain}} ใน Egress มีผลกับ {{who}}",
+    "removePrompt": "ลบ {{domain}} ออกจาก Egress มีผลกับ {{who}}",
+    "offline": {
+      "title": "Machine ออฟไลน์",
+      "body": "{{machine}} ต้องออนไลน์ก่อน Runtime ตรวจลายเซ็นของคำสั่งนี้"
+    },
+    "invalid": {
+      "title": "โดเมนไม่ถูกต้อง",
+      "body": "ใส่ชื่อโดเมนอย่างเดียว เช่น github.com หรือ *.npmjs.org ไม่ต้องมี https:// หรือ path"
+    },
+    "duplicate": "มีโดเมนนี้แล้ว"
   }
 }

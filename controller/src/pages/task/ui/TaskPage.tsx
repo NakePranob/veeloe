@@ -10,6 +10,7 @@ import { describeError, useT } from "../../../shared/i18n";
 import { Button, Card, column, HeaderAction, Label, radius, space, Text, type, useColors } from "../../../shared/ui";
 import { items } from "../model/items";
 import { AgentText } from "./AgentText";
+import { ToolCalls } from "./ToolCalls";
 
 // The Owner's message, in an accent bubble on the right as in Messages.
 function Bubble({ text, note }: { text: string; note?: React.ReactNode }) {
@@ -102,6 +103,8 @@ export function TaskPage() {
             <Bubble key={item.key} text={item.text} />
           ) : item.kind === "agent" ? (
             <AgentText key={item.key} text={item.text} />
+          ) : item.kind === "tools" ? (
+            <ToolCalls key={item.key} calls={item.calls} />
           ) : (
             <Problem key={item.key} code={item.code} />
           ),

@@ -52,3 +52,4 @@ export {
   type TaskMessageBody,
   type TaskSyncBody,
 } from "./messages/task";
+export { EGRESS_MAX, EgressDomainSchema, EgressSchema, EgressSetBodySchema, type EgressSetBody } from "./messages/egress";

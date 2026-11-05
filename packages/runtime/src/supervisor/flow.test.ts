@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSigner, MemorySeenSequences, parseMessage, publicKeyOf, toBase64url, verify, type KnownMessage } from "@veeloe/protocol";
 import { startSupervisor } from ".";
 import { fakeHub, type FakeHub } from "./hub-link/fake-hub";
+import { runUnpair } from "./pairing/unpair";
 import { FAKE_KEY, fakeProvider, type FakeProvider } from "./providers/fake-provider";
 import { saveProviders } from "./providers/store";
 import { saveTrust } from "./trust/store";
@@ -17,6 +18,10 @@ const strangerSeed = new Uint8Array(32).fill(0x22);
 const key = (seed: Uint8Array) => toBase64url(publicKeyOf(seed));
 const workerCommand = [process.execPath, join(import.meta.dir, "../main.ts")];
 
+// No OS sandbox in these tests: e2e runs the real one. This one only remembers the Egress it was given.
+const egressGiven: string[][] = [];
+const passThrough = { wrap: async (argv: string[]) => argv, setEgress: (domains: string[]) => void egressGiven.push(domains) };
+
 const cleanup: (() => void)[] = [];
 afterEach(() => cleanup.splice(0).forEach((f) => f()));
 
@@ -28,7 +33,7 @@ async function setup(home = mkdtempSync(join(tmpdir(), "veeloe-flow-")), provide
   saveProviders(home, [{ name: "main", url: provider.url, key: FAKE_KEY, auth: "x-api-key" }]);
   const hub: FakeHub = fakeHub();
   const lines: string[] = [];
-  const running = startSupervisor({ home, hubUrl: hub.url, secretKey: machineSeed, workerCommand, log: (l) => lines.push(l) });
+  const running = startSupervisor({ home, hubUrl: hub.url, secretKey: machineSeed, workerCommand, sandbox: passThrough, log: (l) => lines.push(l) });
   cleanup.push(() => {
     running.stop();
     hub.server.stop(true);
@@ -83,7 +88,7 @@ test("the owner gets the list with the Provider's models, and never its URL or k
   const s = await setup();
   s.send("agent.list", {});
   const listed = await s.waitFor("agent.listed");
-  expect(listed.body).toEqual({ agents: [], providers: [{ name: "main", models: [{ id: "model-a", name: "Model A" }, { id: "model-b" }] }] });
+  expect(listed.body).toEqual({ agents: [], providers: [{ name: "main", models: [{ id: "model-a", name: "Model A" }, { id: "model-b" }] }], egress: [] });
   expect(JSON.stringify(listed)).not.toContain(FAKE_KEY);
   expect(JSON.stringify(listed)).not.toContain(s.provider.url);
 });
@@ -164,3 +169,63 @@ test("a restarted supervisor starts every Agent's worker again, and drops an env
   expect((await second.waitFor("task.events")).body.events).toHaveLength(4);
   rmSync(first.home, { recursive: true, force: true });
 }, 20_000);
+
+const egressFile = (home: string) => (existsSync(join(home, "runtime/egress.json")) ? JSON.parse(readFileSync(join(home, "runtime/egress.json"), "utf8")) : undefined);
+
+test("the owner sets the Machine's Egress, which the sandbox gets at once, and the same list sent again changes nothing", async () => {
+  const s = await setup();
+  await createAgent(s, "a1");
+  for (let i = 0; i < 2; i++) {
+    s.send("egress.set", { egress: ["github.com", "*.npmjs.org", "github.com"] });
+    const listed = await s.waitFor("agent.listed", "m_1", (m) => m.body.egress?.includes("github.com") === true);
+    expect(listed.body.egress).toEqual(["github.com", "*.npmjs.org"]);
+    expect(listed.body.agents.map((a) => a.id)).toEqual(["a1"]);
+    s.read().length = 0;
+  }
+  expect(egressFile(s.home)).toEqual(["github.com", "*.npmjs.org"]);
+  expect(egressGiven.at(-1)).toEqual(["github.com", "*.npmjs.org"]);
+
+  s.send("egress.set", { egress: [] });
+  await s.waitFor("agent.listed", "m_1", (m) => m.body.egress?.length === 0);
+  expect(egressGiven.at(-1)).toEqual([]);
+});
+
+test("an Egress with one entry that is not a domain is refused whole, and the old one stays", async () => {
+  const s = await setup();
+  s.send("egress.set", { egress: ["github.com"] });
+  await s.waitFor("agent.listed", "m_1", (m) => m.body.egress?.length === 1);
+  const given = egressGiven.length;
+  for (const bad of ["https://pypi.org/simple", "10.0.0.1", "localhost"]) {
+    s.send("egress.set", { egress: ["pypi.org", bad] });
+    await until(() => s.read().filter((m) => m.type === "error").length > 0);
+    expect(s.read().find((m) => m.type === "error")!.body).toMatchObject({ code: "egress.invalid_domain" });
+    s.read().length = 0;
+  }
+  expect(egressFile(s.home)).toEqual(["github.com"]);
+  expect(egressGiven.length).toBe(given);
+});
+
+test("an Egress signed by a key not in trust, or whose signature does not hold, is dropped without an answer", async () => {
+  const s = await setup();
+  s.send("egress.set", { egress: ["evil.example.com"] }, { seed: strangerSeed });
+  const signed = createSigner(ownerSeed, () => seq++)({ type: "egress.set", to: "machine-1", member: "m_1", body: { egress: ["github.com"] } });
+  s.hub.send({ ...signed, signed: signed.signed.replace("github.com", "evil.example.com") });
+  await until(() => s.lines.includes("dropped an envelope: untrusted-key") && s.lines.includes("dropped an envelope: bad-signature"));
+  await Bun.sleep(100);
+  expect(s.read()).toEqual([]);
+  expect(egressFile(s.home)).toBeUndefined();
+});
+
+test("a Machine paired again after unpair starts with no Egress", async () => {
+  const first = await setup();
+  first.send("egress.set", { egress: ["github.com"] });
+  await first.waitFor("agent.listed", "m_1", (m) => m.body.egress?.length === 1);
+  cleanup.splice(0).forEach((f) => f());
+  expect(await runUnpair({ home: first.home, confirm: async () => true, log: () => {} })).toBe(true);
+
+  const second = await setup(first.home);
+  second.send("agent.list", {});
+  expect((await second.waitFor("agent.listed")).body.egress).toEqual([]);
+  expect(egressGiven.at(-1)).toEqual([]);
+  rmSync(first.home, { recursive: true, force: true });
+});

@@ -52,7 +52,7 @@ function setup({ replies = [] as (LlmReply | Error)[], tools = noTools } = {}) {
   return { core, store, sent, requests, gate };
 }
 
-const message = (text: string, over: Partial<Extract<ToWorker, { kind: "message" }>> = {}): ToWorker => ({ kind: "message", task: "t1", id: `m-${text}`, member: "m_owner", text, ref: `sig-${text}`, ...over });
+const message = (text: string, over: Partial<Extract<ToWorker, { kind: "message" }>> = {}): Extract<ToWorker, { kind: "message" }> => ({ kind: "message", task: "t1", id: `m-${text}`, member: "m_owner", text, ref: `sig-${text}`, ...over });
 const kinds = (events: TaskEvent[] | undefined) => (events ?? []).map((e) => e.kind);
 const text = (t: string) => ({ content: [{ type: "text", text: t }], stopReason: "end_turn" });
 

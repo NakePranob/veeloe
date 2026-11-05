@@ -7,5 +7,15 @@
   "dismiss": "Remove",
   "placeholder": "Message {{name}}",
   "send": "Send",
-  "offline": "The Machine is offline. Send once it's back."
+  "offline": "The Machine is offline. Send once it's back.",
+  "tools": {
+    "running": "Running {{command}}",
+    "passed_one": "Ran {{count}} command · all passed",
+    "passed_other": "Ran {{count}} commands · all passed",
+    "failed_one": "Ran {{count}} command · {{failed}} failed",
+    "failed_other": "Ran {{count}} commands · {{failed}} failed",
+    "someUnfinished_one": "Ran {{count}} command · not finished",
+    "someUnfinished_other": "Ran {{count}} commands · not finished",
+    "unfinished": "Not finished"
+  }
 }

@@ -19,6 +19,12 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
+      - name: Sandbox for the Runtime's workers (ADR 0008)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap socat ripgrep
+          # Ubuntu 24.04 stops unprivileged user namespaces through AppArmor, and bubblewrap needs them.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: bun run typecheck
       - name: Unit tests (Protocol, Controller, Controller prototype)
         run: bun run test
@@ -104,6 +110,12 @@ jobs:
           go-version-file: hub/go.mod
           cache-dependency-path: hub/go.sum
       - run: bun install --frozen-lockfile
+      - name: Sandbox for the Runtime's workers (ADR 0008)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap socat ripgrep
+          # Ubuntu 24.04 stops unprivileged user namespaces through AppArmor, and bubblewrap needs them.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Apply migrations
         working-directory: hub
         run: |

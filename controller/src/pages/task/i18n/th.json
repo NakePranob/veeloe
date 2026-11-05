@@ -7,5 +7,15 @@
   "dismiss": "ลบ",
   "placeholder": "ส่งข้อความถึง {{name}}",
   "send": "ส่ง",
-  "offline": "Machine ออฟไลน์อยู่ ส่งได้เมื่อกลับมา"
+  "offline": "Machine ออฟไลน์อยู่ ส่งได้เมื่อกลับมา",
+  "tools": {
+    "running": "กำลังรัน {{command}}",
+    "passed_one": "รัน {{count}} คำสั่ง · ผ่านทั้งหมด",
+    "passed_other": "รัน {{count}} คำสั่ง · ผ่านทั้งหมด",
+    "failed_one": "รัน {{count}} คำสั่ง · ล้มเหลว {{failed}}",
+    "failed_other": "รัน {{count}} คำสั่ง · ล้มเหลว {{failed}}",
+    "someUnfinished_one": "รัน {{count}} คำสั่ง · ไม่เสร็จ",
+    "someUnfinished_other": "รัน {{count}} คำสั่ง · ไม่เสร็จ",
+    "unfinished": "ไม่เสร็จ"
+  }
 }

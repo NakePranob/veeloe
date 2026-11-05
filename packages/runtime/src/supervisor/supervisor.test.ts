@@ -13,7 +13,7 @@ afterAll(() => rmSync(work, { recursive: true, force: true }));
 
 test("the built binary creates its key and connects to a Hub", async () => {
   const hub = fakeHub();
-  const proc = Bun.spawn([binary], { env: { VEELOE_HOME: join(work, "home"), VEELOE_HUB_URL: hub.url }, stdout: "pipe" });
+  const proc = Bun.spawn([binary], { env: { PATH: process.env.PATH, HOME: process.env.HOME, VEELOE_HOME: join(work, "home"), VEELOE_HUB_URL: hub.url }, stdout: "pipe" });
   try {
     let out = "";
     const reader = proc.stdout.getReader();
@@ -24,8 +24,11 @@ test("the built binary creates its key and connects to a Hub", async () => {
     }
     expect(out).toMatch(/machine key [A-Za-z0-9_-]{43}\n/);
     expect(out).toContain(`connected to hub ${hub.url} as machine machine-1`);
+    // It ends when told to, sandbox and all: sandbox-runtime's own signal handlers would keep it running.
+    proc.kill("SIGTERM");
+    expect(await proc.exited).toBe(0);
   } finally {
-    proc.kill();
+    proc.kill("SIGKILL");
     hub.server.stop(true);
   }
 });

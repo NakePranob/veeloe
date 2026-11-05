@@ -2,7 +2,7 @@ import { Database as Sqlite } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { LIST_MACHINES, MACHINE_TOPIC, saveMachine, type Machine } from "./machines";
+import { egressOf, LIST_MACHINES, MACHINE_TOPIC, saveEgress, saveMachine, type Machine } from "./machines";
 
 // The same statements as expo-sqlite, over Bun's own SQLite.
 function connection(sqlite: Sqlite): Connection {
@@ -25,7 +25,7 @@ function connection(sqlite: Sqlite): Connection {
   } as unknown as Connection;
 }
 
-const machine = (id: string, paired_at: number): Machine => ({ id, public_key: `key-${id}`, name: `mac-${id}`, hub_url: "wss://hub.test", workspace_id: "w", member_id: "m", paired_at });
+const machine = (id: string, paired_at: number): Machine => ({ id, public_key: `key-${id}`, name: `mac-${id}`, hub_url: "wss://hub.test", workspace_id: "w", member_id: "m", paired_at, egress: "[]" });
 
 async function open() {
   const c = connection(new Sqlite(":memory:"));
@@ -48,4 +48,18 @@ test("saving tells whoever watches the list, and a repeat replaces instead of ad
   await saveMachine(database, { ...machine("a", 1), name: "renamed" });
   expect(heard).toBe(2);
   expect((await database.query<Machine>(LIST_MACHINES)).map((m) => m.name)).toEqual(["renamed"]);
+});
+
+test("the Egress a Machine said is written to its row and read back as a list, and pairing again starts it empty", async () => {
+  const database = await open();
+  await saveMachine(database, machine("a", 1));
+  let heard = 0;
+  database.subscribe([MACHINE_TOPIC], () => heard++);
+  await saveEgress(database, "a", ["github.com", "*.npmjs.org"]);
+  const [saved] = await database.query<Machine>(LIST_MACHINES);
+  expect(egressOf(saved!)).toEqual(["github.com", "*.npmjs.org"]);
+  expect(heard).toBe(1);
+  await saveMachine(database, machine("a", 1));
+  expect(egressOf((await database.query<Machine>(LIST_MACHINES))[0]!)).toEqual([]);
+  expect(egressOf({ egress: "not json" })).toEqual([]);
 });

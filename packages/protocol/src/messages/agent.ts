@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EgressSchema } from "./egress";
 
 /** Also a folder name on the Machine (ADR 0032), so nothing that could leave it. */
 export const AgentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
@@ -31,5 +32,7 @@ export type ProviderInfo = z.infer<typeof ProviderSchema>;
 export const AgentListedBodySchema = z.looseObject({
   agents: z.array(AgentSchema),
   providers: z.array(ProviderSchema),
+  /** The Machine's Egress (`sandboxed-commands`). Absent from a Machine older than that. */
+  egress: EgressSchema.optional(),
 });
 export type AgentListedBody = z.infer<typeof AgentListedBodySchema>;

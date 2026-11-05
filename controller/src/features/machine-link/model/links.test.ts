@@ -10,6 +10,8 @@ import { startHubClient } from "../../../shared/hub-client";
 // Their models are plain code, so the test reads those.
 mock.module("../../../entities/agent", () => import("../../../entities/agent/model/agents"));
 mock.module("../../../entities/task", () => import("../../../entities/task/model/tasks"));
+mock.module("../../../entities/machine", () => import("../../../entities/machine/model/machines"));
+const { egressOf, saveMachine } = await import("../../../entities/machine/model/machines");
 const { createMachineLinks } = await import("./links");
 
 // TEST-ONLY KEYS.
@@ -81,7 +83,8 @@ async function setup() {
   await migrate(c, MIGRATIONS);
   const database = createDatabase(c);
   const fake = fakeHub();
-  const machine: Machine = { id: "machine-1", public_key: toBase64url(publicKeyOf(machineSeed)), name: "mac", hub_url: fake.hub.url, workspace_id: "w", member_id: member, paired_at: 1 };
+  const machine: Machine = { id: "machine-1", public_key: toBase64url(publicKeyOf(machineSeed)), name: "mac", hub_url: fake.hub.url, workspace_id: "w", member_id: member, paired_at: 1, egress: "[]" };
+  await saveMachine(database, machine);
   let n = 0;
   const links = createMachineLinks({ database, secretKey: controllerSeed, newId: () => `id-${++n}`, start: (o) => startHubClient({ ...o, backoff: createBackoff({ baseMs: 10, capMs: 20 }) }) });
   cleanup.push(() => links.stop());
@@ -147,3 +150,18 @@ test("a Machine that was offline is asked again until it answers", async () => {
   fake.push(signed("agent.listed", { agents: [], providers: [] }));
   await until(() => links.status("machine-1").online === true);
 }, 10_000);
+
+test("the Egress goes as one signed list, and the list kept is the one the Machine signed back", async () => {
+  const { database, fake, machine, links } = await setup();
+  expect(links.setEgress(machine, ["github.com", "*.npmjs.org"])).toBe(true);
+  await until(() => fake.hub.frames.length === 2);
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "egress.set", to: "machine-1", member, body: { egress: ["github.com", "*.npmjs.org"] } });
+
+  fake.push(signed("agent.listed", { agents: [], providers: [], egress: ["evil.example.com"] }, { seed: strangerSeed }));
+  fake.push(signed("agent.listed", { agents: [], providers: [], egress: ["github.com", "*.npmjs.org"] }));
+  await until(async () => egressOf((await database.query<Machine>("SELECT * FROM machine"))[0]!).length === 2);
+  // A Machine that says nothing of an Egress leaves the one kept as it was.
+  fake.push(signed("agent.listed", { agents: [], providers: [] }, { seq: 2 }));
+  await Bun.sleep(50);
+  expect(egressOf((await database.query<Machine>("SELECT * FROM machine"))[0]!)).toEqual(["github.com", "*.npmjs.org"]);
+});

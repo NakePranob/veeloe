@@ -41,4 +41,6 @@ export const MIGRATIONS = [
     sig TEXT,
     error TEXT
   )`,
+  // The Machine's Egress as it last said, a JSON list of domains (`sandboxed-commands`).
+  `ALTER TABLE machine ADD COLUMN egress TEXT NOT NULL DEFAULT '[]'`,
 ] as const;

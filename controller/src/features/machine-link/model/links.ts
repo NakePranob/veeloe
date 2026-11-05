@@ -1,6 +1,6 @@
 import { createBackoff, parseMessage, type ProviderInfo } from "@veeloe/protocol";
 import { saveAgents } from "../../../entities/agent";
-import type { Machine } from "../../../entities/machine";
+import { saveEgress, type Machine } from "../../../entities/machine";
 import { addPendingMessage, failPendingMessage, listTasks, markPendingSent, saveTaskEvents } from "../../../entities/task";
 import type { Database } from "../../../shared/db";
 import { startHubClient } from "../../../shared/hub-client";
@@ -75,6 +75,8 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
         retries.delete(machine.id);
       }
       await saveAgents(database, machine.id, message.body.agents);
+      // A Machine older than `sandboxed-commands` says nothing of it, which is not the same as an empty Egress.
+      if (message.body.egress) await saveEgress(database, machine.id, message.body.egress);
       setStatus(machine.id, { online: true, providers: message.body.providers });
     } else if ((message.type === "task.event" || message.type === "task.events") && signed.task) {
       const events = message.type === "task.event" ? [message.body] : message.body.events;
@@ -145,6 +147,15 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
       setStatus(machine.id, { createError: null });
       const id = newId();
       return sendTo(machine, "create", { type: "agent.create", body: { id, ...agent } }) ? id : null;
+    },
+
+    /**
+     * The Machine's whole new Egress. The page asks for a fresh authentication
+     * first (ADR 0012); the Machine answers with `agent.listed`, which is what
+     * changes the list shown. False when the Hub is not connected and nothing went.
+     */
+    setEgress(machine: Machine, egress: string[]) {
+      return sendTo(machine, "other", { type: "egress.set", body: { egress } }) !== null;
     },
 
     async sendMessage(machine: Machine, { agent, task, text }: { agent: string; task: string; text: string }) {

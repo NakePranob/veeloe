@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { SignedPart } from "../envelope/schema";
 import { AgentCreateBodySchema, AgentListBodySchema, AgentListedBodySchema } from "./agent";
+import { EgressSetBodySchema } from "./egress";
 import { ErrorBodySchema } from "./error";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
 import { TaskEventBodySchema, TaskEventsBodySchema, TaskMessageBodySchema, TaskSyncBodySchema } from "./task";
@@ -16,6 +17,7 @@ const known = {
   "task.event": TaskEventBodySchema,
   "task.sync": TaskSyncBodySchema,
   "task.events": TaskEventsBodySchema,
+  "egress.set": EgressSetBodySchema,
 };
 
 type KnownType = keyof typeof known;
