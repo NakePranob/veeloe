@@ -1,5 +1,6 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
@@ -40,6 +41,7 @@ function Problem({ code }: { code: string }) {
 // Laid out like Messages: your messages in accent bubbles on the right. The
 // Agent's replies have no bubble, because they run long and carry code.
 export function TaskPage() {
+  const insets = useSafeAreaInsets();
   const t = useT("task");
   const colors = useColors();
   const database = useDatabase();
@@ -69,7 +71,7 @@ export function TaskPage() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+    <KeyboardAvoidingView behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={-insets.bottom} style={{ flex: 1 }}>
       {/* The Agent's name with what it is doing under it, so the state stays in view however far the log scrolls. */}
       <Stack.Screen
         options={{
@@ -150,7 +152,8 @@ export function TaskPage() {
         )}
       </ScrollView>
       <LogFade />
-      <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.lg }]}>
+      {/* Clear of the home indicator, as in controller-prototype's TaskPage (insets.bottom under the Composer). */}
+      <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }]}>
         {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
         <Card raised style={{ gap: space.xs, padding: space.sm }}>
           <TextInput
