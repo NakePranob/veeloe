@@ -29,7 +29,7 @@ export function DevicesPage() {
         </Section>
       )}
       <Section title="Link เครื่องใหม่" footer="Link ใช้ได้กับเครื่องของคุณเองเท่านั้น คนอื่นเข้า Workspace ผ่าน Invitation">
-        <Row icon="add" title="Link ด้วย QR" detail="สแกน QR บนเครื่องใหม่" href="/devices/link" />
+        <Row icon="add" title="Link ด้วย QR" detail="แสดง QR ให้เครื่องใหม่สแกน" href="/devices/link" />
         <Row icon="member" title="Link ด้วย login" href="/devices/link-login" />
       </Section>
       {live.length < 2 && <Note icon="info" iconColor="orange">คุณมีเครื่องเดียว ถ้าเครื่องหาย หรือเปลี่ยนการตั้ง biometric จนกุญแจใช้ไม่ได้ จะไม่มีเครื่องไหนเซ็นคำสั่งแทนได้ ต้องทำ Pairing ใหม่ที่หน้า Machine ทุกเครื่อง Link เครื่องที่สองไว้ก่อน (ADR 0012, 0013)</Note>}

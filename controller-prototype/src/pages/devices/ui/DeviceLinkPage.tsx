@@ -3,7 +3,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { addDevice, thisDevice, useCurrentMember, type Device } from "../../../entities/member";
 import { pushNotification } from "../../../entities/notification";
-import { authenticate, Button, Card, Field, inform, Row, Screen, Section, Select, space, useColors } from "../../../shared/ui";
+import { authenticate, Button, Card, Field, inform, Row, Screen, Section, Select, space, Text, useColors } from "../../../shared/ui";
 import { newKey } from "../model/code";
 
 const KINDS: { value: Device["kind"]; label: string }[] = [
@@ -12,12 +12,12 @@ const KINDS: { value: Device["kind"]; label: string }[] = [
   { value: "web", label: "เว็บ" },
 ];
 
-// A hash of the key as a grid, standing in for the QR the new device shows.
-function KeyStandIn({ keyText }: { keyText: string }) {
+// A hash of the secret as a grid, standing in for the QR this device shows.
+function QrStandIn({ seed }: { seed: string }) {
   const colors = useColors();
-  const cells = Array.from({ length: 49 }, (_, i) => (parseInt(keyText[(i * 7) % keyText.length], 16) + i) % 3 !== 0);
+  const cells = Array.from({ length: 49 }, (_, i) => (parseInt(seed[(i * 7) % seed.length], 16) + i) % 3 !== 0);
   return (
-    <View role="img" aria-label="QR ที่เครื่องใหม่แสดง" style={{ width: 7 * 12 + space.md, flexDirection: "row", flexWrap: "wrap", padding: space.sm, backgroundColor: colors.surface }}>
+    <View role="img" aria-label="QR ให้เครื่องใหม่สแกน" style={{ width: 7 * 12 + space.md, flexDirection: "row", flexWrap: "wrap", padding: space.sm, backgroundColor: colors.surface }}>
       {cells.map((on, i) => (
         <View key={i} style={{ width: 12, height: 12, backgroundColor: on ? colors.label : colors.surface }} />
       ))}
@@ -25,16 +25,19 @@ function KeyStandIn({ keyText }: { keyText: string }) {
   );
 }
 
-// Linking a second Controller of the same Member by QR (ADR 0013, 0031). The new key goes from the
-// new device's screen into this device's camera, so no Hub stands between them to swap it, and there
-// is no short code to compare: this device names the new one and signs. Only Linking by login compares one.
+// Linking a second Controller of the same Member by QR (ADR 0013, 0031). This device shows the QR,
+// carrying its Hub as `veeloe pair`'s does, so the new device never asks for one. The new device sends
+// its key back through the Hub, bound to the QR's secret so the Hub cannot swap it, and this device's
+// owner approves the request before signing. Only Linking by login compares a short code.
 export function DeviceLinkPage() {
   const me = useCurrentMember();
+  // ponytail: the secret is made here; a real link is veeloe://link?hub&to&id&secret&exp.
+  const [secret] = useState(() => newKey());
+  const link = `veeloe://link?hub=wss://hub.veeloe.dev&secret=${secret}`;
+  const [asked, setAsked] = useState(false);
+  // What the new device sends with its key: its own name, which this device may change.
   const [name, setName] = useState("iPad ของ " + me.name);
   const [kind, setKind] = useState<Device["kind"]>("tablet");
-  // ponytail: the new device's key is made here; a real one is made on that device and read by scanning.
-  const [key] = useState(() => newKey());
-  const [scanned, setScanned] = useState(false);
 
   async function approve() {
     const chosen = name.trim();
@@ -51,22 +54,35 @@ export function DeviceLinkPage() {
 
   return (
     <Screen title="Link เครื่องใหม่">
-      <Section title="1. เครื่องใหม่ (จำลอง)" footer="ของจริง: เปิดแอปบนเครื่องใหม่แล้วเลือกเข้าด้วย Link เครื่องใหม่แสดง QR ที่มีกุญแจสาธารณะของมัน และ Link ใช้ได้กับเครื่องของ Member คนเดียวกันเท่านั้น (ADR 0013, 0031)">
-        <Field label="ชื่อเครื่องใหม่" value={name} onChangeText={setName} />
-        <View style={{ alignItems: "flex-start", padding: space.sm }}>
-          <Select label="ชนิดเครื่อง" value={kind} options={KINDS} onChange={setKind} />
-        </View>
-        <Card style={{ alignItems: "center", marginTop: space.sm }}>
-          <KeyStandIn keyText={key} />
-          <View style={{ alignSelf: "stretch", alignItems: "center", paddingTop: space.sm }}>
-            <Button label="จำลอง: สแกนแล้ว" disabled={scanned} onPress={() => setScanned(true)} />
-          </View>
+      <Section
+        title="1. ให้เครื่องใหม่สแกน"
+        footer="บนเครื่องใหม่ เปิดแอปแล้วเลือก ใช้กับเครื่องที่มีอยู่แล้ว แล้วสแกน QR นี้ หรือเปิดหรือวางลิงก์บนเครื่องที่ไม่มีกล้อง ลิงก์มี Hub ของเครื่องนี้ เครื่องใหม่จึงไม่ต้องกรอก Hub หมดอายุใน 10 นาที ใช้ได้ครั้งเดียว และ Link ใช้ได้กับเครื่องของ Member คนเดียวกันเท่านั้น (ADR 0013, 0031)"
+      >
+        <Card style={{ alignItems: "center" }}>
+          <QrStandIn seed={secret} />
         </Card>
+        <View style={{ padding: space.sm, gap: space.xs }}>
+          <Text variant="footnote" tone="secondary">
+            หรือแชร์ลิงก์นี้ไปที่เครื่องใหม่
+          </Text>
+          <Text selectable mono variant="footnote">
+            {link}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", gap: space.sm, padding: space.sm }}>
+          <Button label="แชร์ลิงก์" onPress={() => inform("แชร์ลิงก์", "ของจริงเปิด share sheet ของระบบ")} />
+          <Button label="จำลอง: เครื่องใหม่ขอ Link" disabled={asked} onPress={() => setAsked(true)} />
+        </View>
       </Section>
 
-      {scanned && (
-        <Section title="2. อนุมัติ" footer="อนุมัติเฉพาะเครื่องที่อยู่ตรงหน้าคุณ เครื่องนี้จะเซ็นรับรองกุญแจของมัน และเครื่องอื่นของคุณได้รับแจ้ง">
+      {asked && (
+        <Section title="2. มีเครื่องขอ Link" footer="อนุมัติเฉพาะเมื่อเป็นเครื่องที่อยู่ตรงหน้าคุณ เครื่องนี้จะเซ็นรับรองกุญแจของมัน และเครื่องอื่นของคุณได้รับแจ้ง ถ้าไม่รู้จักชื่อนี้ ให้ยกเลิก">
+          <Field label="ชื่อเครื่องใหม่" value={name} onChangeText={setName} />
+          <View style={{ alignItems: "flex-start", padding: space.sm }}>
+            <Select label="ชนิดเครื่อง" value={kind} options={KINDS} onChange={setKind} />
+          </View>
           <View style={{ flexDirection: "row", gap: space.sm, padding: space.sm }}>
+            <Button label="ยกเลิก" onPress={() => router.back()} />
             <Button label="อนุมัติ" variant="primary" onPress={approve} />
           </View>
         </Section>
