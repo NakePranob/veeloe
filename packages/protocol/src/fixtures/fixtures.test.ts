@@ -8,7 +8,7 @@ import { handshakeBytes, HubAuthSchema } from "../messages/hub-auth";
 import { pairingProof } from "../messages/pairing-claim";
 import { parsePairingLink } from "../messages/pairing-link";
 import { revokedWith, verifyCertificate } from "../messages/certificate";
-import { checkLinkingProof, parseLinkingLink } from "../messages/linking";
+import { checkLinkingProof, checkLinkRequestProof, LinkRequestSchema, parseLinkingLink } from "../messages/linking";
 import { FIXTURES, isForSelf, render } from "./build";
 
 const root = `${import.meta.dir}/../..`;
@@ -63,6 +63,16 @@ test("the pairing vectors agree with the code that reads them", async () => {
   expect(atMachine).toMatchObject({ ok: true, signed: { body: { member, proof } } });
   const atController = verify(JSON.parse(done), new Set([parsed.link.machine]), (route) => "recipients" in route && route.recipients.includes(member), new MemorySeenSequences());
   expect(atController).toMatchObject({ ok: true, signed: { body: { name: "my-mac" } } });
+});
+
+test("the linking vectors agree with the code that reads them", async () => {
+  const { link, to, id, secret, request, key, data, proof } = await Bun.file(`${root}/vectors/linkings.json`).json();
+  const parsed = parseLinkingLink(link, 0);
+  if (!parsed.ok) throw new Error(parsed.reason);
+  expect(parsed.link).toMatchObject({ hub: "wss://hub.example.com", to, id, secret });
+  expect(checkLinkRequestProof({ secret, id, key: request.key, name: request.name }, request.proof)).toBe(true);
+  expect(LinkRequestSchema.safeParse(request).success).toBe(true);
+  expect(checkLinkingProof({ secret, key, data }, proof)).toBe(true);
 });
 
 test("every message vector is read as expected", async () => {

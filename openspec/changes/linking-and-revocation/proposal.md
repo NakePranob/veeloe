@@ -6,7 +6,8 @@ ADR 0031 วาง Linking ด้วย QR และการถอนกุญ�
 
 ## What Changes
 
-- เครื่องใหม่สร้างกุญแจของตัวเองแล้วแสดง QR ที่มีกุญแจสาธารณะ รหัสลับ และ Hub ส่วนเครื่องเดิมสแกน ยืนยันตัวใหม่ แล้วเซ็นใบรับรองของ Linking (ADR 0013, 0031)
+- เครื่องเดิมแสดง QR ที่มี Hub ของตัวเอง กุญแจของตัวเอง id และรหัสลับ แบบเดียวกับ QR ของ `veeloe pair` ส่วนเครื่องใหม่สร้างกุญแจแล้วสแกน เปิด หรือวางลิงก์ เครื่องใหม่จึงไม่ต้องถาม Hub และใช้ได้กับ Hub ที่รันเอง (ADR 0013, 0031)
+- เครื่องใหม่ส่งกุญแจกับชื่อของตัวเองกลับไปที่เครื่องเดิมผ่าน `POST /link-requests` พร้อม HMAC ของรหัสลับ เครื่องเดิมตรวจ HMAC แล้วเจ้าของอนุมัติ ยืนยันตัวใหม่ แล้วเซ็นใบรับรองของ Linking
 - เครื่องเดิมส่งรายชื่อ Machine ให้เครื่องใหม่ผ่าน Hub โดยผูกกับรหัสลับใน QR Hub จึงสลับ Machine หรือกุญแจระหว่างทางไม่ได้
 - Hub ลงทะเบียนกุญแจใหม่จากใบรับรองที่เซ็นโดยกุญแจของ Member คนเดียวกัน เก็บใบรับรองเป็น metadata และส่งให้ Machine ตอนต่อเข้ามา (ADR 0005, 0031)
 - Machine เชื่อกุญแจใหม่จากลายเซ็นต่อกันมาจากกุญแจที่เชื่ออยู่แล้ว ไม่ใช่เพราะ Hub บอก
@@ -19,7 +20,7 @@ ADR 0031 วาง Linking ด้วย QR และการถอนกุญ�
 ## Capabilities
 
 ### New Capabilities
-- `device-linking`: Member เพิ่ม Controller เครื่องใหม่ของตัวเองด้วย QR อย่างไร โดยที่ Hub สลับกุญแจหรือ Machine ไม่ได้ และเครื่องใหม่ได้ Machine, Agent และ Task เดิมมาอย่างไร
+- `device-linking`: Member เพิ่ม Controller เครื่องใหม่ของตัวเองด้วย QR บนเครื่องเดิมอย่างไร โดยที่ Hub สลับกุญแจหรือ Machine ไม่ได้ และเครื่องใหม่ได้ Machine, Agent และ Task เดิมมาอย่างไร
 - `key-revocation`: Member ถอนกุญแจของเครื่องหนึ่งอย่างไร และ Hub กับ Runtime หยุดเชื่อกุญแจนั้นอย่างไร แม้ Machine ปิดอยู่ตอนถอน
 
 ### Modified Capabilities
@@ -27,10 +28,10 @@ ADR 0031 วาง Linking ด้วย QR และการถอนกุญ�
 
 ## Impact
 
-- **Protocol:** ลิงก์ `veeloe://link`, ใบรับรอง `device.link` กับ `device.revoke`, frame `hub.certificates`, ข้อความ `device.handoff`, `device.linked`, `task.list` และ `task.listed` พร้อม vector ทั้งหมดเป็นแบบ additive (ADR 0023)
-- **Hub:** ตาราง `controller_svc.certificates`, `POST /links`, `POST /revocations`, ส่งใบรับรองหลัง `hub.ready` และตัดสายของกุญแจที่ถูกถอน
+- **Protocol:** ลิงก์ `veeloe://link`, คำขอ Link กับ frame `hub.link_request`, ใบรับรอง `device.link` กับ `device.revoke`, frame `hub.certificates`, ข้อความ `device.handoff`, `device.linked`, `task.list` และ `task.listed` พร้อม vector ทั้งหมดเป็นแบบ additive (ADR 0023)
+- **Hub:** ตาราง `controller_svc.certificates`, `POST /link-requests` ที่ส่งคำขอต่อโดยไม่เก็บ, `POST /links`, `POST /revocations`, ส่งใบรับรองหลัง `hub.ready` และตัดสายของกุญแจที่ถูกถอน
 - **Runtime:** `trust.json` เพิ่ม `links` กับ `revoked` และ `pairing.claim` รับกุญแจอื่นของ Member
-- **Controller:** หน้าเครื่องใหม่ที่แสดง QR, หน้าสแกนบนเครื่องเดิม, หน้า เครื่องของฉัน, ตาราง `device` และตัวสแกน QR ที่ใช้ร่วมกับ `add-machine`
+- **Controller:** หน้าเครื่องเดิมที่แสดง QR และรออนุมัติ, หน้าเครื่องใหม่ที่สแกนหรือวางลิงก์โดยไม่มีช่อง Hub, หน้า เครื่องของฉัน, ตาราง `device` และตัวสแกน QR ที่ใช้ร่วมกับ `add-machine`
 - **Dependency ใหม่:** `expo-device` สำหรับชื่อเครื่องเริ่มต้น และ `uqr` ใน Controller สำหรับวาด QR
 - **ลำดับ archive:** ต้อง archive `machine-pairing`, `controller-device-key` และ `agent-and-task` ก่อน เพราะ spec ของ change นี้อ้าง `pairing.claim`, กุญแจของ Controller และ `task.sync` จากสาม change นั้น
 - **ยังไม่รวม:** Linking ด้วย login ทาง email, Invitation, Owner หลายคน และการลบ Member อยู่ใน v0.3 (ADR 0013, 0048) การหยุด Schedule, Idle Work, Watch, Channel และ Connector ตอนถอนกุญแจรอ change ที่สร้างของพวกนั้น การเปลี่ยนชื่อเครื่องหลัง Link และ push แจ้งเตือนตอนมีการ Link ยังไม่ทำ

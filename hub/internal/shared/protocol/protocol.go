@@ -127,6 +127,10 @@ const (
 	CodeRevocationInvalid = "hub.revocation_invalid"
 	// A revocation that would leave the Member no Controller.
 	CodeLastDevice = "hub.last_device"
+	// A link request that is not shaped like one.
+	CodeLinkRequestInvalid = "hub.link_request_invalid"
+	// The device a link request is for is not connected as a Controller.
+	CodeDeviceOffline = "hub.device_offline"
 )
 
 // Close codes the Hub ends a connection with.

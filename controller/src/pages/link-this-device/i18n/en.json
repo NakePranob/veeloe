@@ -1,27 +1,27 @@
 {
   "title": "Use with a device I already have",
-  "why": {
-    "heading": "Link this device to one you already use",
-    "footer": "Your other device scans the QR code this shows and vouches for this device's key. This device then sees your Machines, Agents and Tasks, and can command them the same way."
-  },
-  "hub": {
-    "label": "Hub",
-    "footer": "The same Hub your other device uses"
+  "enter": {
+    "heading": "On a device you already use, go to Workspace, then My devices, and tap Link new device",
+    "footer": "Scan the QR code it shows, or open or paste its link here. The link says which Hub to use. This device then sees your Machines, Agents and Tasks, and can command them the same way.",
+    "scan": "Scan QR code",
+    "stopScan": "Stop scanning",
+    "paste": "Paste the link",
+    "continue": "Continue",
+    "noCamera": "Veeloe can't use the camera here. Paste the link instead."
   },
   "name": {
+    "heading": "This device",
     "label": "Name of this device",
-    "footer": "Your other device can change it before approving.",
+    "footer": "Your other device shows this name when it asks you to approve, and can change it.",
     "empty": "Name this device first"
   },
-  "show": "Show QR code",
-  "again": "Make a new QR code",
-  "cannot": "Can't show the QR code",
-  "qr": {
-    "heading": "On your other device, go to Workspace, then My devices, tap Link new device and scan this",
-    "footer": "Expires {{when}}. It works once.",
-    "label": "QR code to link this device",
-    "link": "Or copy this link and paste it on your other device"
-  },
-  "waiting": "Waiting for your other device to approve…",
-  "secret": "This QR code and link hold a secret. Don't send them to anyone or keep a photo of them."
+  "hub": "Hub",
+  "send": "Ask to link",
+  "back": "Back",
+  "cannot": "Can't link",
+  "waiting": {
+    "heading": "Approve on your other device",
+    "body": "It asks you to approve {{name}}. Keep this open until it's done.",
+    "footer": "The request expires {{when}}."
+  }
 }

@@ -32,4 +32,7 @@ type Notifier interface {
 	Publish(workspace string, frame []byte)
 	// Revoke closes the live sessions of these keys (base64url) as revoked.
 	Revoke(keys []string)
+	// ToController sends frame to the live session of key (base64url) when
+	// key is a Controller's, and answers whether it went.
+	ToController(ctx context.Context, key string, frame []byte) bool
 }

@@ -10,7 +10,7 @@
   "revokedDetail": "No longer in use. Link it again to use it",
   "linkFooter": "Linking is only for your own devices. Other people join the Workspace by Invitation.",
   "linkQr": "Link with a QR code",
-  "linkQrDetail": "Scan the QR code the new device shows",
+  "linkQrDetail": "Show a QR code for the new device to scan",
   "oneDevice": "You have one device. If you lose it, or change its biometric settings so its key stops working, no other device can sign for you, and you'll have to pair every Machine again. Link a second device now.",
   "signed": {
     "title": "Devices this one vouched for",

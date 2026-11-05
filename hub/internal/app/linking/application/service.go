@@ -14,6 +14,7 @@ import (
 type ServicePort interface {
 	Link(ctx context.Context, c protocol.Certificate) error
 	Revoke(ctx context.Context, c protocol.Certificate) error
+	Request(ctx context.Context, r protocol.LinkRequest) error
 	// go-scaffold:service-interface
 }
 
@@ -59,6 +60,25 @@ func (s *Service) Revoke(ctx context.Context, c protocol.Certificate) error {
 	}
 	s.notify.Revoke(dropped)
 	s.notify.Publish(cert.Workspace.String(), protocol.CertificatesFrame([]protocol.Certificate{c}))
+	return nil
+}
+
+// Request hands a new device's link request to the device showing the QR it
+// read (ADR 0013). Nothing is kept: the request is good only while that device
+// is connected and waiting, and only that device, holding the secret, can tell
+// a real one from one the Hub made up. Registering the key still takes a
+// device.link that device signs after its owner approves.
+//
+// ponytail: not rate-limited. Anyone who knows a Controller's public key can
+// send it requests it discards; a per-IP limiter goes here if that is ever used
+// to flood one.
+func (s *Service) Request(ctx context.Context, r protocol.LinkRequest) error {
+	if !r.Valid() {
+		return domain.ErrLinkRequestInvalid
+	}
+	if !s.notify.ToController(ctx, r.To, protocol.LinkRequestFrame(r)) {
+		return domain.ErrDeviceOffline
+	}
 	return nil
 }
 

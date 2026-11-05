@@ -24,6 +24,8 @@ paths:
     $ref: './linking/links.yaml'
   /revocations:
     $ref: './linking/revocations.yaml'
+  /link-requests:
+    $ref: './linking/link-requests.yaml'
   # go-scaffold:paths
 
 components:

@@ -1,4 +1,4 @@
-import { answerChallenge, createBackoff, createSigner, HubCloseCode, MemorySeenSequences, parseFrame, verify, type HubError, type Outgoing, type Verified } from "@veeloe/protocol";
+import { answerChallenge, createBackoff, createSigner, HubCloseCode, MemorySeenSequences, parseFrame, verify, type HubError, type HubLinkRequest, type Outgoing, type Verified } from "@veeloe/protocol";
 import { clockSequence } from "./sequence";
 
 export type HubClientOptions = {
@@ -13,6 +13,8 @@ export type HubClientOptions = {
   onHubError?: (error: HubError) => void;
   /** The certificates the Hub keeps for the Workspace, unverified: all of them after connecting, then each new one. */
   onCertificates?: (certificates: unknown[]) => void;
+  /** A new device read this device's Linking QR. Unsigned, and possibly made up by the Hub: only its proof makes it worth reading. */
+  onLinkRequest?: (request: HubLinkRequest) => void;
   /** The Hub closed with 4403: this key was revoked. The client stops for good. */
   onRevoked?: () => void;
   backoff?: ReturnType<typeof createBackoff>;
@@ -25,7 +27,7 @@ export type HubClientOptions = {
  * ponytail: the last number per sender is in memory. Keep it in SQLite when
  * Task events start arriving and a replay could change what is on screen.
  */
-export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, onCertificates, onRevoked, backoff = createBackoff() }: HubClientOptions) {
+export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, onCertificates, onLinkRequest, onRevoked, backoff = createBackoff() }: HubClientOptions) {
   const url = `${hubUrl.replace(/\/+$/, "")}/connect`;
   const signEnvelope = createSigner(secretKey, clockSequence());
   const seen = new MemorySeenSequences();
@@ -53,6 +55,8 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
           onHubError?.(message);
         } else if (message.type === "hub.certificates" && member !== undefined) {
           onCertificates?.(message.certificates);
+        } else if (message.type === "hub.link_request" && member !== undefined) {
+          onLinkRequest?.(message);
         }
       } else if (frame.kind === "unknown" && member !== undefined) {
         const mine = member;

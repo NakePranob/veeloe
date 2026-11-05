@@ -1,18 +1,23 @@
 {
   "title": "Link new device",
-  "enter": {
-    "heading": "On the new device, open Veeloe and choose Use with a device I already have",
-    "footer": "Scan the QR code it shows, or paste its link here. Linking is only for your own devices.",
-    "scan": "Scan QR code",
-    "stopScan": "Stop scanning",
-    "paste": "Paste the link",
-    "continue": "Continue",
-    "noCamera": "Veeloe can't use the camera here. Paste the link instead."
+  "noHub": "Pair a Machine first. The new device links through the Hub your Machines are on.",
+  "show": {
+    "heading": "On the new device, open Veeloe, choose Use with a device I already have, and scan this",
+    "footer": "Expires {{when}}. It works once. Linking is only for your own devices.",
+    "label": "QR code to link a new device",
+    "link": "No camera on the new device? Open or paste this link there",
+    "share": "Share link",
+    "waiting": "Waiting for the new device…",
+    "secret": "This QR code and link hold a secret. Only give them to your own new device, and don't keep a photo of them."
+  },
+  "expired": "This QR code expired before a new device used it.",
+  "again": "Make a new QR code",
+  "ask": {
+    "heading": "A device asks to be linked",
+    "label": "Name of the new device",
+    "footer": "Approve only if this is the device in front of you. This device will vouch for its key, and it will be able to command all your Machines. If you don't recognize the name, cancel."
   },
   "name": {
-    "heading": "New device",
-    "label": "Name of the new device",
-    "footer": "This device will vouch for the new device's key, and the new device will be able to command all your Machines. Only approve a device that is in front of you.",
     "empty": "Name the new device first",
     "taken": "You already have a device called {{name}}"
   },

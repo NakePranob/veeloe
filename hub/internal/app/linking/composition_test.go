@@ -2,6 +2,7 @@ package linking
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
@@ -60,7 +61,8 @@ type notes struct {
 func (n *notes) Publish(workspace string, frame []byte) {
 	n.published = append(n.published, workspace+" "+string(frame))
 }
-func (n *notes) Revoke(keys []string) { n.revoked = append(n.revoked, keys) }
+func (n *notes) Revoke(keys []string)                              { n.revoked = append(n.revoked, keys) }
+func (n *notes) ToController(context.Context, string, []byte) bool { return false }
 
 type hub struct {
 	t     *testing.T

@@ -87,7 +87,7 @@ func run() error {
 	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return fmt.Errorf("trusted proxies: %w", err)
 	}
-	r.Use(gin.Recovery(), middleware.CORS(cfg.CORSAllowedOrigins, "/pairings", "/links", "/revocations"), middleware.SecurityHeaders(cfg.IsProd()), middleware.RequestID(), middleware.Logger(logger), middleware.Error(!cfg.IsProd()))
+	r.Use(gin.Recovery(), middleware.CORS(cfg.CORSAllowedOrigins, "/pairings", "/links", "/revocations", "/link-requests"), middleware.SecurityHeaders(cfg.IsProd()), middleware.RequestID(), middleware.Logger(logger), middleware.Error(!cfg.IsProd()))
 
 	// liveness = is the process up / readiness = ready for traffic (can it reach the DB)
 	r.GET("/livez", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })

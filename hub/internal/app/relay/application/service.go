@@ -89,6 +89,21 @@ func (s *Service) Revoke(keys []string) {
 	}
 }
 
+// ToController sends frame to the live session of key, a Controller's, and
+// answers whether it went. A Machine's key, or one nobody holds, gets nothing.
+func (s *Service) ToController(ctx context.Context, key string, frame []byte) bool {
+	raw, ok := protocol.DecodeKey(key)
+	if !ok {
+		return false
+	}
+	who, ok, err := s.identities.ByKey(ctx, raw)
+	if err != nil || !ok || who.Kind != ports.KindController {
+		return false
+	}
+	sess := s.presence.Key(key)
+	return sess != nil && sess.Send(frame)
+}
+
 // Route forwards one frame from who, exactly as it arrived, and answers what to
 // tell the sender, if anything. It reads the header only (ADR 0005, 0019).
 // Every lookup stays inside who's Workspace, and an unknown Machine answers as

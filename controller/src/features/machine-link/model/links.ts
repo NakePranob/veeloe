@@ -1,4 +1,4 @@
-import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type DeviceLink, type ProviderInfo, type SignedPart } from "@veeloe/protocol";
+import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
@@ -47,6 +47,7 @@ export function createMachineLinks({
   /** Keys of this Member's other devices that a page waits to hear from, such as a new device being linked. */
   const watchers = new Map<string, (signed: SignedPart) => void>();
   const linkListeners = new Set<(links: DeviceLink[]) => void>();
+  const requestListeners = new Set<(hubUrl: string, request: HubLinkRequest) => void>();
   const statuses = new Map<string, MachineStatus>();
   // A new object on every change, so React can tell that something moved.
   let all: Record<string, MachineStatus> = {};
@@ -136,6 +137,9 @@ export function createMachineLinks({
           if (news.length) for (const listener of [...linkListeners]) listener(news);
         });
       },
+      onLinkRequest: (request) => {
+        for (const listener of [...requestListeners]) listener(hubUrl, request);
+      },
       onRevoked: () => onRevoked?.(),
       onHubError: (error) => {
         const about = error.ref ? sentTo.get(error.ref) : undefined;
@@ -224,11 +228,18 @@ export function createMachineLinks({
       return () => void linkListeners.delete(listener);
     },
 
+    /** Hears the link requests a Hub hands this device, unchecked: the page showing the QR checks them against its secret. */
+    onLinkRequest(listener: (hubUrl: string, request: HubLinkRequest) => void) {
+      requestListeners.add(listener);
+      return () => void requestListeners.delete(listener);
+    },
+
     ownKey,
 
     stop() {
       watchers.clear();
       linkListeners.clear();
+      requestListeners.clear();
       for (const { timer } of retries.values()) clearTimeout(timer);
       retries.clear();
       for (const { client } of clients.values()) client.stop();

@@ -2,10 +2,10 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { generateSecretKey, parseLinkingLink, parseMessage, parsePairingLink, publicKeyOf, signCertificate, toBase64url, type KnownMessage, type SignedPart } from "@veeloe/protocol";
+import { generateSecretKey, parseMessage, parsePairingLink, publicKeyOf, signCertificate, toBase64url, type HubLinkRequest, type KnownMessage, type SignedPart } from "@veeloe/protocol";
 import { pairMachine } from "../controller/src/pages/add-machine/model/pair";
-import { approveLink, handOff, handoffData } from "../controller/src/pages/link-device/model/link";
-import { waitForHandoff } from "../controller/src/pages/link-this-device/model/wait";
+import { approveLink, handOff, handoffData, openLink } from "../controller/src/pages/link-device/model/link";
+import { readLink, sendLinkRequest, waitForHandoff } from "../controller/src/pages/link-this-device/model/wait";
 import { postCertificate, startHubClient } from "../controller/src/shared/hub-client";
 import { FAKE_KEY, fakeProvider } from "../packages/runtime/src/supervisor/providers/fake-provider";
 
@@ -83,6 +83,7 @@ async function until(cond: () => boolean, what: string, ms = 15_000) {
 function controller(secretKey: Uint8Array, machineKey: string) {
   const inbox: (KnownMessage & { task?: string })[] = [];
   const state = { ready: false, revoked: false };
+  const requests: HubLinkRequest[] = [];
   // Other devices of this Member it waits to hear from, as the app's links do.
   const watchers = new Map<string, (signed: SignedPart) => void>();
   const client = startHubClient({
@@ -91,6 +92,7 @@ function controller(secretKey: Uint8Array, machineKey: string) {
     trustedKeys: { has: (key) => key === machineKey || watchers.has(key) },
     onReady: () => (state.ready = true),
     onRevoked: () => (state.revoked = true),
+    onLinkRequest: (request) => void requests.push(request),
     onEnvelope: ({ from, signed }) => {
       if (from !== machineKey) return watchers.get(from)?.(signed);
       const parsed = parseMessage(signed);
@@ -102,7 +104,7 @@ function controller(secretKey: Uint8Array, machineKey: string) {
     watchers.set(key, handler);
     return () => void watchers.delete(key);
   };
-  return { client, inbox, state, watch };
+  return { client, inbox, state, watch, requests };
 }
 
 test.skipIf(!dsn)("a linked browser commands the Machine its phone paired, sees the phone's Tasks, and is shut out once revoked", async () => {
@@ -135,16 +137,38 @@ test.skipIf(!dsn)("a linked browser commands the Machine its phone paired, sees 
   await stopMachine(machine);
   const browser = generateSecretKey();
   const browserKey = toBase64url(publicKeyOf(browser));
-  const waiting = waitForHandoff({ hub: hubUrl, name: "Chrome", secretKey: browser });
-  const link = parseLinkingLink(waiting.text, Date.now());
-  if (!link.ok) throw new Error(link.reason);
-  const approved = await approveLink(async (use) => (await use(phone), true), { link: link.link, name: "Chrome", machine: machineRow });
-  expect(approved).toEqual({ ok: true });
   const phoneKey = toBase64url(publicKeyOf(phone));
+  // The phone shows the QR, with its Hub in it; the browser reads it and never asks for a Hub.
+  const offer = openLink({ hub: hubUrl, ownKey: phoneKey });
+  const read = readLink(offer.text);
+  if (!read.ok) throw new Error(read.code);
+  expect(read.link.hub).toBe(hubUrl);
+  const waiting = waitForHandoff({ link: read.link, secretKey: browser });
+  expect(await sendLinkRequest({ link: read.link, name: "Chrome", secretKey: browser })).toEqual({ ok: true });
+  await until(() => onPhone.requests.length === 1, "the phone to get the request");
+  const ask = offer.take(onPhone.requests[0]!);
+  expect(ask).toEqual({ key: browserKey, name: "Chrome" });
+
+  // Someone else with the link gets a request to the phone, which reads it as nothing: it works once.
+  expect(await sendLinkRequest({ link: read.link, name: "Chrome", secretKey: generateSecretKey() })).toEqual({ ok: true });
+  await until(() => onPhone.requests.length === 2, "the second request");
+  expect(offer.take(onPhone.requests[1]!)).toBeNull();
+  // A request for a device that is not connected goes nowhere.
+  expect(await sendLinkRequest({ link: { ...read.link, to: toBase64url(publicKeyOf(generateSecretKey())) }, name: "Chrome", secretKey: browser })).toEqual({ ok: false, code: "hub.device_offline" });
+
+  // Until the owner approves, the Hub still does not know the browser's key.
+  const early = controller(browser, machineKey);
+  await Bun.sleep(600);
+  expect(early.state.ready).toBe(false);
+  early.client.stop();
+
+  const approved = await approveLink(async (use) => (await use(phone), true), { link: offer.link, ask: ask!, name: "Chrome", machine: machineRow });
+  expect(approved).toEqual({ ok: true });
   const devices = [{ key: phoneKey, member_id: member, name: "iPhone", linked_by: null, linked_at: null, revoked_at: null }];
   const linked = handOff({
-    link: link.link,
-    data: handoffData(link.link, [machineRow], devices),
+    link: offer.link,
+    key: ask!.key,
+    data: handoffData(hubUrl, [machineRow], devices),
     retryMs: 300,
     send: (type, body) => onPhone.client.send({ type, recipients: [member], body }),
     watch: onPhone.watch,

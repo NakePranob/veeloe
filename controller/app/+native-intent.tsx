@@ -1,5 +1,6 @@
 // A QR read by the phone's own camera opens veeloe://pair?... or veeloe://link?..., which is the link itself rather than a screen.
-const SCREEN = { pair: "/add-machine", link: "/devices/link" } as const;
+// Both are read by the device joining: Pairing's by the Controller, Linking's by the new device.
+const SCREEN = { pair: "/add-machine", link: "/link" } as const;
 
 export function redirectSystemPath({ path }: { path: string }) {
   const match = /^(?:veeloe:)?\/*(pair|link)\?(.*)$/s.exec(path);

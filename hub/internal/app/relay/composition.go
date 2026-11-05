@@ -1,6 +1,8 @@
 package relay
 
 import (
+	"context"
+
 	httpadapter "hub/internal/app/relay/adapters/inbound/http"
 	"hub/internal/app/relay/adapters/outbound/memory"
 	"hub/internal/app/relay/application"
@@ -41,6 +43,11 @@ func (r *Relay) Register(rg gin.IRouter) { r.handler.Register(rg) }
 
 // Publish sends frame to every live session in the Workspace.
 func (r *Relay) Publish(workspace string, frame []byte) { r.svc.Publish(workspace, frame) }
+
+// ToController sends frame to the live session of a Controller's key (base64url).
+func (r *Relay) ToController(ctx context.Context, key string, frame []byte) bool {
+	return r.svc.ToController(ctx, key, frame)
+}
 
 // Revoke closes the live sessions of these keys (base64url) with 4403.
 func (r *Relay) Revoke(keys []string) { r.svc.Revoke(keys) }

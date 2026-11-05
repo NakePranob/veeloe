@@ -1,11 +1,19 @@
 import { afterEach, expect, test } from "bun:test";
-import { createSigner, fromBase64url, handshakeBytes, linkingProof, parseLinkingLink, publicKeyOf, toBase64url, verifySignature, type Envelope } from "@veeloe/protocol";
-import { hubFrom, waitForHandoff } from "./wait";
+import { buildLinkingLink, checkLinkRequestProof, createSigner, fromBase64url, handshakeBytes, linkingProof, publicKeyOf, toBase64url, verifySignature, type Envelope, type LinkingLink } from "@veeloe/protocol";
+import { readLink, sendLinkRequest, waitForHandoff } from "./wait";
 
 // TEST-ONLY KEYS.
 const newSeed = new Uint8Array(32).fill(0x66);
 const oldSeed = new Uint8Array(32).fill(0x44);
 const member = "m_1";
+const secret = new Uint8Array(32).fill(0x55);
+const linkOn = (hub: string, expires = Math.floor(Date.now() / 1000) + 600): LinkingLink => ({
+  hub,
+  to: toBase64url(publicKeyOf(oldSeed)),
+  id: toBase64url(new Uint8Array(16).fill(0x11)),
+  secret: toBase64url(secret),
+  expires,
+});
 
 const stops: (() => void)[] = [];
 afterEach(() => stops.splice(0).forEach((f) => f()));
@@ -49,47 +57,54 @@ async function until(cond: () => boolean, ms = 5000) {
 const data = JSON.stringify({ workspace: "w_1", member, machines: [{ id: "machine-1", key: "mk", name: "mac", hub: "ws://x" }], keys: [{ key: toBase64url(publicKeyOf(oldSeed)), name: "iPhone" }] });
 let seq = 1;
 const handoff = (body: unknown, type = "device.handoff") => createSigner(oldSeed, () => seq++)({ type, recipients: [member], body });
+const key = toBase64url(publicKeyOf(newSeed));
 
 async function started() {
   const { hub, push } = fakeHub();
-  const wait = waitForHandoff({ hub: hub.url, name: "Chrome", secretKey: newSeed.slice() });
+  const link = linkOn(hub.url);
+  const wait = waitForHandoff({ link, secretKey: newSeed.slice() });
   stops.push(wait.stop);
-  const parsed = parseLinkingLink(wait.text, Date.now());
-  if (!parsed.ok) throw new Error(parsed.reason);
   await until(() => hub.refused > 0);
   // The old device registers the key at the Hub.
   hub.accept = true;
   await until(() => hub.sockets.length === 1);
-  return { hub, push, wait, link: parsed.link };
+  return { hub, push, wait, link };
 }
 
-test("the QR holds the Hub, this key, the name and a fresh secret; a Hub address that is not one is caught first", () => {
-  expect(hubFrom(" WSS://Hub.Example.com/ ")).toBe("wss://hub.example.com");
-  expect(hubFrom("https://hub.example.com")).toBeNull();
-  const one = waitForHandoff({ hub: "ws://127.0.0.1:1", name: "Chrome", secretKey: newSeed.slice() });
-  const two = waitForHandoff({ hub: "ws://127.0.0.1:1", name: "Chrome", secretKey: newSeed.slice() });
-  stops.push(one.stop, two.stop);
-  const a = parseLinkingLink(one.text, Date.now());
-  const b = parseLinkingLink(two.text, Date.now());
-  if (!a.ok || !b.ok) throw new Error("link");
-  expect(a.link).toMatchObject({ key: toBase64url(publicKeyOf(newSeed)), name: "Chrome", hub: "ws://127.0.0.1:1" });
-  expect(a.link.secret).not.toBe(b.link.secret);
+test("a link read here names its Hub; one malformed or expired is refused before anything goes anywhere", () => {
+  const text = buildLinkingLink({ ...linkOn("WSS://Hub.Example.com/"), secret });
+  expect(readLink(` ${text} `)).toMatchObject({ ok: true, link: { hub: "wss://hub.example.com" } });
+  expect(readLink("veeloe://pair?x")).toEqual({ ok: false, code: "linking.link_malformed" });
+  expect(readLink(buildLinkingLink({ ...linkOn("wss://hub.example.com", 1000), secret }))).toEqual({ ok: false, code: "linking.link_expired" });
+});
+
+test("the request goes to the link's Hub for the showing device, with this key and name under the secret's proof", async () => {
+  const sent: { url: string; body: { to: string; id: string; key: string; name: string; proof: string } }[] = [];
+  const fetchFn = (async (url: string, init: RequestInit) => (sent.push({ url, body: JSON.parse(String(init.body)) }), Response.json({}))) as unknown as typeof fetch;
+  const link = linkOn("wss://hub.example.com");
+  expect(await sendLinkRequest({ link, name: " Chrome ", secretKey: newSeed, fetchFn })).toEqual({ ok: true });
+  expect(sent[0]!.url).toBe("https://hub.example.com/link-requests");
+  const body = sent[0]!.body;
+  expect(body).toMatchObject({ to: link.to, id: link.id, key, name: "Chrome" });
+  expect(checkLinkRequestProof({ secret: link.secret, id: link.id, key, name: "Chrome" }, body.proof)).toBe(true);
+  const offline = (async () => Response.json({ error: { code: "hub.device_offline" } }, { status: 404 })) as unknown as typeof fetch;
+  expect(await sendLinkRequest({ link, name: "Chrome", secretKey: newSeed, fetchFn: offline })).toEqual({ ok: false, code: "hub.device_offline" });
 });
 
 test("a handoff with the right proof is taken, and the new key answers linked to its own Member", async () => {
   const { hub, push, wait, link } = await started();
-  push(handoff({ data, proof: linkingProof({ secret: link.secret, key: link.key, data }) }));
+  push(handoff({ data, proof: linkingProof({ secret: link.secret, key, data }) }));
   expect(await wait.done).toMatchObject({ ok: true, data: { workspace: "w_1", member, machines: [{ id: "machine-1" }] } });
   await until(() => hub.frames.length === 1);
-  expect(hub.frames[0]).toMatchObject({ type: "device.linked", recipients: [member], from: link.key });
+  expect(hub.frames[0]).toMatchObject({ type: "device.linked", recipients: [member], from: key });
 });
 
 test("a handoff whose proof does not match, or another kind of envelope, is ignored, and the wait goes on to its end", async () => {
   const { push, wait, link } = await started();
   const swapped = data.replace("machine-1", "machine-evil");
-  push(handoff({ data: swapped, proof: linkingProof({ secret: link.secret, key: link.key, data }) }));
-  push(handoff({ data, proof: linkingProof({ secret: toBase64url(new Uint8Array(32).fill(1)), key: link.key, data }) }));
-  push(handoff({ data, proof: linkingProof({ secret: link.secret, key: link.key, data }) }, "task.event"));
+  push(handoff({ data: swapped, proof: linkingProof({ secret: link.secret, key, data }) }));
+  push(handoff({ data, proof: linkingProof({ secret: toBase64url(new Uint8Array(32).fill(1)), key, data }) }));
+  push(handoff({ data, proof: linkingProof({ secret: link.secret, key, data }) }, "task.event"));
   const early = await Promise.race([wait.done, Bun.sleep(150).then(() => "still waiting")]);
   expect(early).toBe("still waiting");
   wait.stop();
@@ -97,6 +112,7 @@ test("a handoff whose proof does not match, or another kind of envelope, is igno
 });
 
 test("with no handoff the wait ends when the link does", async () => {
-  const wait = waitForHandoff({ hub: "ws://127.0.0.1:1", name: "Chrome", secretKey: newSeed.slice(), ttlSeconds: 0.05 });
+  const link = linkOn("ws://127.0.0.1:1", Math.floor(Date.now() / 1000));
+  const wait = waitForHandoff({ link, secretKey: newSeed.slice(), now: () => link.expires * 1000 - 50 });
   expect(await wait.done).toEqual({ ok: false, code: "linking.expired" });
 });

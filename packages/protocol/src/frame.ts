@@ -4,6 +4,7 @@ import { HubAuthSchema } from "./messages/hub-auth";
 import { HubChallengeSchema } from "./messages/hub-challenge";
 import { HubErrorSchema } from "./messages/hub-error";
 import { HubReadySchema } from "./messages/hub-ready";
+import { HubLinkRequestSchema } from "./messages/linking";
 
 const known = {
   "hub.challenge": HubChallengeSchema,
@@ -11,6 +12,7 @@ const known = {
   "hub.ready": HubReadySchema,
   "hub.error": HubErrorSchema,
   "hub.certificates": HubCertificatesSchema,
+  "hub.link_request": HubLinkRequestSchema,
 };
 
 type KnownType = keyof typeof known;

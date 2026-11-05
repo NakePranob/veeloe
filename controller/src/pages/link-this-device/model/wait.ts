@@ -1,31 +1,36 @@
-import { buildLinkingLink, checkLinkingProof, createBackoff, HandoffDataSchema, LINKING_TTL_SECONDS, normalizeHubUrl, parseMessage, publicKeyOf, toBase64url, type HandoffData } from "@veeloe/protocol";
-import { startHubClient } from "../../../shared/hub-client";
+import { checkLinkingProof, createBackoff, HandoffDataSchema, linkRequestProof, parseLinkingLink, parseMessage, publicKeyOf, toBase64url, type HandoffData, type LinkingLink } from "@veeloe/protocol";
+import { postLinkRequest, startHubClient, type HubAnswer } from "../../../shared/hub-client";
 
 export type WaitResult = { ok: true; data: HandoffData } | { ok: false; code: "linking.expired" };
 
-/** The Hub as typed, in normal form, or null when it is not a Hub URL. */
-export function hubFrom(text: string): string | null {
-  try {
-    return normalizeHubUrl(text.trim());
-  } catch {
-    return null;
-  }
+const linkProblem = { malformed: "linking.link_malformed", expired: "linking.link_expired" } as const;
+
+/** A link scanned, opened or pasted on this device. It names the Hub, so this device never asks for one. */
+export function readLink(text: string, now = Date.now()): { ok: true; link: LinkingLink } | { ok: false; code: string } {
+  const parsed = parseLinkingLink(text, now);
+  return parsed.ok ? parsed : { ok: false, code: linkProblem[parsed.reason] };
 }
 
 /**
- * The new device's half of Linking (ADR 0013, 0031): a link with a fresh secret
- * to show as a QR, then a wait at the Hub until the Hub knows this key and the
- * old device's handoff arrives. Only a handoff whose proof matches the secret and
- * this key counts, from whatever key: the Hub cannot change it or make one up.
- * The secret lives only in this call and the link.
+ * Asks the device showing the QR to link this key, by way of the link's Hub. The proof,
+ * an HMAC under the QR's secret, is what keeps the Hub from swapping in a key of its own:
+ * the other device drops a request it does not match. Nothing is linked yet; the owner
+ * approves there.
  */
-export function waitForHandoff({ hub, name, secretKey, ttlSeconds = LINKING_TTL_SECONDS, now = Date.now }: { hub: string; name: string; secretKey: Uint8Array; ttlSeconds?: number; now?: () => number }) {
+export function sendLinkRequest({ link, name, secretKey, fetchFn }: { link: LinkingLink; name: string; secretKey: Uint8Array; fetchFn?: typeof fetch }): Promise<HubAnswer> {
   const key = toBase64url(publicKeyOf(secretKey));
-  const secretBytes = crypto.getRandomValues(new Uint8Array(32));
-  const secret = toBase64url(secretBytes);
-  const expires = Math.floor(now() / 1000 + ttlSeconds);
-  const text = buildLinkingLink({ hub, key, name, secret: secretBytes, expires });
-  secretBytes.fill(0);
+  const chosen = name.trim();
+  return postLinkRequest(link.hub, { to: link.to, id: link.id, key, name: chosen, proof: linkRequestProof({ secret: link.secret, id: link.id, key, name: chosen }) }, fetchFn);
+}
+
+/**
+ * The wait after the request (ADR 0013, 0031): at the link's Hub until it knows this key,
+ * then for the other device's handoff. Only a handoff whose proof matches the secret and
+ * this key counts, from whatever key: the Hub cannot change it or make one up. It ends
+ * when the link does.
+ */
+export function waitForHandoff({ link, secretKey, now = Date.now }: { link: LinkingLink; secretKey: Uint8Array; now?: () => number }) {
+  const key = toBase64url(publicKeyOf(secretKey));
   // ponytail: a copy of the key for the wait, because the session's own is zeroed if the app locks
   // while the owner walks to the other device. It is zeroed when the wait ends.
   const signingKey = secretKey.slice();
@@ -39,11 +44,11 @@ export function waitForHandoff({ hub, name, secretKey, ttlSeconds = LINKING_TTL_
       resolve(result);
     };
     stop = () => finish({ ok: false, code: "linking.expired" });
-    const timer = setTimeout(stop, ttlSeconds * 1000);
+    const timer = setTimeout(stop, Math.max(0, link.expires * 1000 - now()));
     const client = startHubClient({
-      hubUrl: hub,
+      hubUrl: link.hub,
       secretKey: signingKey,
-      // The Hub refuses this key until the old device registers it, so ask often.
+      // The Hub refuses this key until the other device registers it, so ask often.
       backoff: createBackoff({ capMs: 3000 }),
       // Nobody is trusted yet; the proof is the check.
       trustedKeys: { has: () => true },
@@ -51,7 +56,7 @@ export function waitForHandoff({ hub, name, secretKey, ttlSeconds = LINKING_TTL_
         const parsed = parseMessage(signed);
         if (parsed.kind !== "message" || parsed.message.type !== "device.handoff") return;
         const { data, proof } = parsed.message.body;
-        if (!checkLinkingProof({ secret, key, data }, proof)) return;
+        if (!checkLinkingProof({ secret: link.secret, key, data }, proof)) return;
         let handoff: HandoffData;
         try {
           const value = HandoffDataSchema.safeParse(JSON.parse(data));
@@ -65,5 +70,5 @@ export function waitForHandoff({ hub, name, secretKey, ttlSeconds = LINKING_TTL_
       },
     });
   });
-  return { text, expires, done, stop: () => stop() };
+  return { done, stop: () => stop() };
 }

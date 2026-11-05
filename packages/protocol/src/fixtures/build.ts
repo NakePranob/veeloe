@@ -8,7 +8,7 @@ import { answerChallenge, handshakeBytes, normalizeHubUrl } from "../messages/hu
 import { pairingProof, pairingProofText } from "../messages/pairing-claim";
 import { buildPairingLink, buildPairingRequest, pairingLinkBytes, pairingRequestBytes, parsePairingLink } from "../messages/pairing-link";
 import { revokedWith, signCertificate, verifyCertificate } from "../messages/certificate";
-import { buildLinkingLink, linkingProof, linkingProofText } from "../messages/linking";
+import { buildLinkingLink, linkingProof, linkingProofText, linkRequestProof, linkRequestProofText } from "../messages/linking";
 
 // The files every implementation checks itself against (Go included): the
 // header's JSON Schema and the test vectors. Rebuild them with
@@ -300,16 +300,23 @@ export function certificateVectors() {
   };
 }
 
-/** The QR a new device shows, and the proof on the handoff it waits for. */
+/** The QR the device already in the Workspace shows, the new device's request back, and the proof on the handoff it waits for. */
 export function linkingVectors() {
   const key = keyOf(TEST_NEW_DEVICE);
+  const to = keyOf(TEST_CONTROLLER);
+  const id = toBase64url(new Uint8Array(16).fill(0x11));
+  const name = "Chrome บน Mac";
   const secret = toBase64url(TEST_PAIRING_SECRET);
-  const data = JSON.stringify({ workspace: "w_vector", member: "m_vector", machines: [{ id: "machine-1", key: keyOf(TEST_MACHINE), name: "my-mac", hub: "wss://hub.example.com" }], keys: [{ key: keyOf(TEST_CONTROLLER), name: "iPhone" }] });
+  const data = JSON.stringify({ workspace: "w_vector", member: "m_vector", machines: [{ id: "machine-1", key: keyOf(TEST_MACHINE), name: "my-mac", hub: "wss://hub.example.com" }], keys: [{ key: to, name: "iPhone" }] });
   return {
     note: "TEST-ONLY KEYS from fixed public seeds.",
-    link: buildLinkingLink({ hub: "wss://hub.example.com", key, name: "Chrome บน Mac", secret: TEST_PAIRING_SECRET, expires: 2_000_000_000 }),
-    key,
+    link: buildLinkingLink({ hub: "wss://hub.example.com", to, id, secret: TEST_PAIRING_SECRET, expires: 2_000_000_000 }),
+    to,
+    id,
     secret,
+    request: { to, id, key, name, proof: linkRequestProof({ secret, id, key, name }) },
+    requestProofText: linkRequestProofText(id, key, name),
+    key,
     data,
     proofText: linkingProofText(key, data),
     proof: linkingProof({ secret, key, data }),

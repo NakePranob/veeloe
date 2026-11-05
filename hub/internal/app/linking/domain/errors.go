@@ -13,4 +13,9 @@ var (
 	ErrRevocationInvalid = errors.New("revocation certificate is not valid")
 	// ErrLastDevice is a revocation that would leave the Member no Controller.
 	ErrLastDevice = errors.New("revocation would leave no device")
+	// ErrLinkRequestInvalid is a link request not shaped like one.
+	ErrLinkRequestInvalid = errors.New("link request is not valid")
+	// ErrDeviceOffline is a link request for a key with no live Controller
+	// connection: nobody is showing that QR any more.
+	ErrDeviceOffline = errors.New("device is not connected")
 )
