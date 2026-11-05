@@ -116,6 +116,22 @@ test("an Agent is made once with its Workdir, and a Provider or model the Machin
   expect(existsSync(join(s.home, "agents/a1/workdir"))).toBe(true);
 });
 
+test("an Agent keeps the Character it was made with across a restart, and a repeat create does not change it", async () => {
+  const character = { color: "#9DC3E6", shell: "dome", top: "antenna", sides: "ears", decal: "none" };
+  const s = await setup();
+  s.send("agent.create", { id: "a1", name: "A", provider: "main", model: "model-a", character });
+  await s.waitFor("agent.listed", "m_1", (m) => m.body.agents.some((a) => a.id === "a1"));
+  s.send("agent.create", { id: "a1", name: "A", provider: "main", model: "model-a", character: { ...character, color: "#000000" } });
+  await until(() => s.read().filter((m) => m.type === "agent.listed").length === 2);
+  s.running.stop();
+  s.hub.server.stop(true);
+
+  const again = await setup(s.home);
+  again.send("agent.list", {});
+  const listed = await again.waitFor("agent.listed");
+  expect(listed.body.agents.map((a) => a.character)).toEqual([character]);
+});
+
 test("a message gets the Agent's answer as signed events, and sync gives them back to the starter only", async () => {
   const s = await setup();
   await createAgent(s, "a1");

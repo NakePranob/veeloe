@@ -1,10 +1,11 @@
 import { Link, router } from "expo-router";
 import { Pressable, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
+import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
-import { AgentAvatar, Card, Empty, Icon, radius, Screen, space, Text, useColors } from "../../../shared/ui";
+import { Card, Empty, Icon, radius, Screen, space, Text, useColors } from "../../../shared/ui";
 
 // The Agents on every paired Machine (controller-prototype's AgentsPage). v0.1 has only the Owner, who has Manage on all of them.
 export function AgentsPage() {
@@ -24,7 +25,7 @@ export function AgentsPage() {
               <Pressable role="link">
                 {({ pressed }) => (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.sm, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: pressed ? colors.chip : "transparent" }}>
-                    <AgentAvatar backdrop={pressed ? "chip" : "fill"} />
+                    <Character look={lookOfJson(agent.character)} mood={moodOf([], statuses[agent.machine_id]?.online ?? null)} size={44} />
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text variant="headline">{agent.name}</Text>
                       <Text variant="footnote" tone="secondary" numberOfLines={1}>

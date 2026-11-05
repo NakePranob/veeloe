@@ -1,4 +1,4 @@
-import { createBackoff, parseMessage, type ProviderInfo } from "@veeloe/protocol";
+import { createBackoff, parseMessage, type AgentCreateBody, type ProviderInfo } from "@veeloe/protocol";
 import { saveAgents } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
 import { addPendingMessage, failPendingMessage, listTasks, markPendingSent, saveTaskEvents } from "../../../entities/task";
@@ -142,8 +142,8 @@ export function createMachineLinks({ database, secretKey, newId, start = startHu
       return () => void listeners.delete(listener);
     },
 
-    /** The new Agent's id, or null when the Machine's Hub is not connected and nothing went. */
-    createAgent(machine: Machine, agent: { name: string; provider: string; model: string }) {
+    /** The new Agent's id, or null when the Machine's Hub is not connected and nothing went. The Machine keeps `character` with it. */
+    createAgent(machine: Machine, agent: Omit<AgentCreateBody, "id">) {
       setStatus(machine.id, { createError: null });
       const id = newId();
       return sendTo(machine, "create", { type: "agent.create", body: { id, ...agent } }) ? id : null;

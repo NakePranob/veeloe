@@ -1,12 +1,13 @@
 import { randomUUID } from "expo-crypto";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
+import { Character, lookOfJson, shuffleLook } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
-import { Field, Icon, Note, Row, Screen, Section, useColors } from "../../../shared/ui";
+import { Button, Field, Icon, Note, Row, Screen, Section, space, useColors } from "../../../shared/ui";
 
 // ponytail: a gateway can list hundreds of models, so only the first matches show; add paging if people miss theirs.
 const SHOWN = 30;
@@ -19,8 +20,8 @@ const errorOf = (p: unknown): string | null => {
   return typeof error === "string" ? error : null;
 };
 
-// controller-prototype's NewAgentPage, with what this version sends: a name, a Machine, a Provider and a model.
-// ponytail: no Character, description, instructions or Allowlist yet; each comes with the change that uses it.
+// controller-prototype's NewAgentPage, with what this version sends: a Character, a name, a Machine, a Provider and a model.
+// ponytail: no description, instructions or Allowlist yet; each comes with the change that uses it.
 // The prototype picks Provider and model from a menu (@expo/ui); this app has no @expo/ui yet, so they are ticked rows like the language.
 export function NewAgentPage() {
   const t = useT("agents");
@@ -35,6 +36,9 @@ export function NewAgentPage() {
   const [model, setModel] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState<string | null>(null);
+  // The Machine keeps this look with the Agent (ADR 0006). Shuffling picks a new look, never a new id.
+  const others = () => (agents ?? []).map((a) => lookOfJson(a.character));
+  const [look, setLook] = useState(() => shuffleLook(others()));
 
   const ready_machine = machines.find((m) => statuses[m.id]?.online && statuses[m.id]?.providers?.length) ?? machines[0];
   const machine = machines.find((m) => m.id === machineId) ?? ready_machine;
@@ -56,12 +60,16 @@ export function NewAgentPage() {
 
   function create() {
     if (!ready || !link || !machine || !chosen || !model) return;
-    setCreating(link.createAgent(machine, { name: name.trim(), provider: chosen.name, model }));
+    setCreating(link.createAgent(machine, { name: name.trim(), provider: chosen.name, model, character: look }));
   }
 
   const tick = <Icon name="check" size="md" color="label" weight="semibold" />;
   return (
     <Screen title={t("new")} right={{ label: t("createShort"), onPress: create, disabled: !ready }}>
+      <View style={{ alignItems: "center", gap: space.sm }}>
+        <Character look={look} mood="idle" size={96} />
+        <Button label={t("shuffle")} onPress={() => setLook(shuffleLook(others()))} />
+      </View>
       <Section>
         <Field label={t("name")} value={name} onChangeText={setName} placeholder={t("namePlaceholder")} />
       </Section>

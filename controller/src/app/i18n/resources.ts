@@ -9,12 +9,14 @@ import { storageUnavailableI18n } from "../../pages/storage-unavailable";
 import { taskI18n } from "../../pages/task";
 import { workspaceI18n } from "../../pages/workspace";
 import { taskStatusI18n } from "../../entities/task";
+import { agentInboxI18n } from "../../widgets/agent-inbox";
 import { errorsI18n, type Language } from "../../shared/i18n";
 
 // One namespace per slice. Only this layer may see them all, since shared cannot import up.
 const slices = {
   errors: errorsI18n,
   "task-status": taskStatusI18n,
+  "agent-inbox": agentInboxI18n,
   "add-machine": addMachineI18n,
   agents: agentsI18n,
   "create-key": createKeyI18n,

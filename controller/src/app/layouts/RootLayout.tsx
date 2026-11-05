@@ -1,15 +1,17 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useGlobalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CreateKeyPage } from "../../pages/create-key";
 import { LockPage } from "../../pages/lock";
 import { OtherTabPage } from "../../pages/other-tab";
 import { StorageUnavailablePage } from "../../pages/storage-unavailable";
 import { useMachineLinks } from "../../features/machine-link";
 import { DatabaseProvider } from "../../shared/db";
-import { deviceLanguage, initI18n } from "../../shared/i18n";
+import { deviceLanguage, initI18n, useT } from "../../shared/i18n";
 import { useKeyActivity, useKeyStatus } from "../../shared/keystore";
-import { space, useColors } from "../../shared/ui";
+import { Button, Card, SIDEBAR_WIDTH, space, Text, useColors, useSplit } from "../../shared/ui";
+import { AgentInbox } from "../../widgets/agent-inbox";
 import { resources } from "../i18n/resources";
 import "../styles/web-reset";
 import { useAppDatabase } from "./use-app-database";
@@ -26,8 +28,38 @@ function MachineLinks() {
   return null;
 }
 
+// The inbox beside the open Task on an iPad or a wide window, as in Mail: a card
+// floating on the grey screen, no divider line.
+// ponytail: a plain title, not a second navigation stack; the sidebar never navigates on its own.
+function Sidebar({ selectedTaskId }: { selectedTaskId?: string }) {
+  const t = useT("agent-inbox");
+  const insets = useSafeAreaInsets();
+  return (
+    <Card
+      style={{
+        width: SIDEBAR_WIDTH,
+        marginTop: insets.top + space.md,
+        marginBottom: insets.bottom + space.md,
+        marginLeft: insets.left + space.md,
+        padding: 0,
+        gap: 0,
+        // Clips the list to the card's corners as it scrolls.
+        overflow: "hidden",
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.xs }}>
+        <Text variant="largeTitle">{t("title")}</Text>
+        <Button label="Workspace" icon="settings" onPress={() => router.navigate("/workspace")} />
+      </View>
+      <AgentInbox selectedTaskId={selectedTaskId} split />
+    </Card>
+  );
+}
+
 export function RootLayout() {
   const colors = useColors();
+  const split = useSplit();
+  const { task } = useGlobalSearchParams<{ task?: string }>();
   const keyStatus = useKeyStatus();
   const trackActivity = useKeyActivity();
   const { state, useHere, retry } = useAppDatabase();
@@ -42,7 +74,18 @@ export function RootLayout() {
           <MachineLinks />
           {/* The Stack stays mounted but hidden while locked, so unlocking returns to the same page. */}
           <View onTouchStartCapture={trackActivity} style={{ flex: 1, display: keyStatus === "unlocked" ? "flex" : "none" }}>
-            <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTitleAlign: "center", ...webHeader }} />
+            {/* The Stack keeps its place in the tree either way, so resizing never resets navigation. */}
+            <View style={{ flex: 1, flexDirection: "row", backgroundColor: colors.background }}>
+              {split && <Sidebar selectedTaskId={task} />}
+              <View style={{ flex: 1 }}>
+                <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTitleAlign: "center", ...webHeader }}>
+                  <Stack.Screen name="index" options={split ? { headerShown: false } : {}} />
+                  {/* In split view the inbox is already beside the Task, so there is nothing to go back to.
+                      Web ignores headerBackVisible when a deep link anchors the inbox underneath, hence headerLeft. */}
+                  <Stack.Screen name="tasks/[task]" options={split ? { headerBackVisible: false, headerLeft: () => null } : {}} />
+                </Stack>
+              </View>
+            </View>
           </View>
           {keyStatus === "locked" && <LockPage />}
           {(keyStatus === "none" || keyStatus === "lost") && <CreateKeyPage lost={keyStatus === "lost"} />}

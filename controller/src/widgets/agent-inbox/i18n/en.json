@@ -1,0 +1,9 @@
+{
+  "title": "Veeloe",
+  "start": "Start talking with {{name}}",
+  "noAgents": {
+    "title": "No Agent yet",
+    "body": "Create the first Agent on a paired Machine",
+    "action": "Create Agent"
+  }
+}

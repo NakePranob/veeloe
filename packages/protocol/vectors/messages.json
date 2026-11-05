@@ -20,9 +20,115 @@
         "name": "Deployer",
         "provider": "anthropic",
         "model": "claude-sonnet-5-5",
-        "character": "robot"
+        "mascot": "robot"
       },
       "valid": true
+    },
+    {
+      "name": "create with a Character",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "dome",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "none"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "create with a Character part this build does not know",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "orb",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "none",
+          "glow": true
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "create with a Character colour that is not #rrggbb",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "red",
+          "shell": "dome",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "none"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "create with a Character part too long",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "dome",
+          "top": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sides": "ears",
+          "decal": "none"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "create with a Character part that is not a lowercase word",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "dome",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "<b>"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "create with a Character missing a slot",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "dome"
+        }
+      },
+      "valid": false
     },
     {
       "name": "create with a blank name",
@@ -91,6 +197,58 @@
         ]
       },
       "valid": true
+    },
+    {
+      "name": "listed, with an Agent that has a Character and one made before Characters",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "character": {
+              "color": "#9DC3E6",
+              "shell": "dome",
+              "top": "antenna",
+              "sides": "ears",
+              "decal": "none"
+            }
+          },
+          {
+            "id": "agent-2",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5"
+          }
+        ],
+        "providers": []
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with a Character colour that is not #rrggbb",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "character": {
+              "color": "#12345",
+              "shell": "dome",
+              "top": "antenna",
+              "sides": "ears",
+              "decal": "none"
+            }
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
     },
     {
       "name": "listed with no providers field",

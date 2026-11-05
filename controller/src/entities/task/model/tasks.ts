@@ -70,13 +70,20 @@ export async function latestTaskOf(database: Database, agentId: string) {
   return row?.id ?? null;
 }
 
-/** A Task as lists show it: when it last moved, whether a Turn is running, and its latest words. */
-export type TaskSummary = TaskRow & { working: number; events: number; last_kind: string | null; last_body: string | null };
+/** Kinds this build knows; a newer Runtime's kind is skipped when working out what a Task is doing. */
+const KNOWN: readonly string[] = Object.values(TaskEventKind);
+const KNOWN_SQL = KNOWN.map((kind) => `'${kind}'`).join(", ");
+
+/** The latest event of a kind this build knows: what a Task is doing, and how its Character carries itself. */
+export type Latest = { latest_kind: string | null; latest_body: string | null };
+
+/** A Task as lists show it: when it last moved, what it is doing, and its latest words. */
+export type TaskSummary = TaskRow & Latest & { events: number; last_kind: string | null; last_body: string | null };
 
 export const LIST_TASK_SUMMARIES = `SELECT t.*,
-  coalesce((SELECT max(seq) FROM task_event WHERE task_id = t.id AND kind = 'turn.started'), 0) >
-    coalesce((SELECT max(seq) FROM task_event WHERE task_id = t.id AND kind = 'turn.ended'), 0) AS working,
   (SELECT count(*) FROM task_event WHERE task_id = t.id) AS events,
+  (SELECT kind FROM task_event WHERE task_id = t.id AND kind IN (${KNOWN_SQL}) ORDER BY seq DESC LIMIT 1) AS latest_kind,
+  (SELECT body FROM task_event WHERE task_id = t.id AND kind IN (${KNOWN_SQL}) ORDER BY seq DESC LIMIT 1) AS latest_body,
   (SELECT kind FROM task_event WHERE task_id = t.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1) AS last_kind,
   (SELECT body FROM task_event WHERE task_id = t.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1) AS last_body
   FROM task t ORDER BY t.updated_at DESC`;
@@ -94,11 +101,26 @@ export function previewOf(summary: Pick<TaskSummary, "last_kind" | "last_body">)
   }
 }
 
-/** What a Task is doing, in the prototype's words for it. */
-export type TaskStatus = "working" | "done" | "offline" | "new";
+/** The same as a summary's, from a Task's events in order, for the screen that already has them all. */
+export function latestOf(events: readonly Pick<TaskEventRow, "kind" | "body">[]): Latest {
+  for (let i = events.length - 1; i >= 0; i--) if (KNOWN.includes(events[i]!.kind)) return { latest_kind: events[i]!.kind, latest_body: events[i]!.body };
+  return { latest_kind: null, latest_body: null };
+}
 
-export function statusOf(summary: Pick<TaskSummary, "working" | "events"> | undefined, online: boolean | null): TaskStatus {
+/** The latest event as the Character's moodOf takes it. */
+export const latestEvents = ({ latest_kind, latest_body }: Latest) => (latest_kind ? [{ kind: latest_kind, body: latest_body }] : []);
+
+/** What a Task is doing, in the prototype's words for it. `failed`: its latest Turn ended in an error. */
+export type TaskStatus = "working" | "failed" | "done" | "offline" | "new";
+
+/** Offline first; then from the latest known event: none is not started, and anything before turn.ended is a Turn still running. */
+export function statusOf(latest: Latest | undefined, online: boolean | null): TaskStatus {
   if (online === false) return "offline";
-  if (!summary || summary.events === 0) return "new";
-  return summary.working ? "working" : "done";
+  if (!latest?.latest_kind) return "new";
+  if (latest.latest_kind !== TaskEventKind.TurnEnded) return "working";
+  try {
+    return (JSON.parse(latest.latest_body ?? "null") as { reason?: unknown } | null)?.reason === "done" ? "done" : "failed";
+  } catch {
+    return "failed";
+  }
 }

@@ -11,6 +11,7 @@ const SYMBOLS = {
   add: { ios: "plus", android: "add", web: "add" },
   disclosure: { ios: "chevron.right", android: "chevron_right", web: "chevron_right" },
   thread: { ios: "rectangle.stack", android: "layers", web: "layers" },
+  inbox: { ios: "tray", android: "inbox", web: "inbox" },
   time: { ios: "clock", android: "schedule", web: "schedule" },
   info: { ios: "info.circle", android: "info", web: "info" },
   offline: { ios: "wifi.slash", android: "wifi_off", web: "wifi_off" },

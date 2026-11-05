@@ -17,5 +17,9 @@
     "someUnfinished_one": "Ran {{count}} command · not finished",
     "someUnfinished_other": "Ran {{count}} commands · not finished",
     "unfinished": "Not finished"
-  }
+  },
+  "busy": "You can send once this Turn ends",
+  "openAgent": "Open {{name}}",
+  "started": "{{machine}} · {{when}}",
+  "notStarted": "{{machine}} · Not started"
 }

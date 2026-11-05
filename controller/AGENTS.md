@@ -27,6 +27,7 @@ Native modules are in this build, so it does not run in Expo Go. `ios/` and `and
 - Routes live in `app/`: every file is a screen and re-exports a page from `src/pages/`. `app.json` pins the router root to `./app`, so Expo never takes `src/app/` for routes.
 - Everything else is Feature-Sliced Design under `src/` (ADR 0022), checked by Steiger. Steiger does not see `export … from`, so never re-export from a higher layer or a sibling slice.
 - All data goes through the database on the device (ADR 0021): screens read with `useLiveQuery` and write with `database.write(topics, batch)`. Never fetch into a screen. A new migration is a new line at the end of `src/shared/db/migrations.ts`.
+- A test that needs an entity's model mocks the entity's public API with `mock.module`, since that API also pulls in React Native. Give it a plain factory over a static import (`() => tasks`), not `() => import(...)`: two test files mocking the same module with async factories hang `bun test` when they run together.
 
 ## Words
 

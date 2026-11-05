@@ -43,4 +43,6 @@ export const MIGRATIONS = [
   )`,
   // The Machine's Egress as it last said, a JSON list of domains (`sandboxed-commands`).
   `ALTER TABLE machine ADD COLUMN egress TEXT NOT NULL DEFAULT '[]'`,
+  // The Character the Machine keeps with the Agent, as JSON; null for one made before it had one.
+  `ALTER TABLE agent ADD COLUMN character TEXT`,
 ] as const;

@@ -212,10 +212,17 @@ export function pairingVectors() {
 /** Bodies every implementation must read the same way: `valid` is whether parseMessage takes it. */
 export function messageVectors() {
   const agent = { id: "agent-1", name: "Deployer", provider: "anthropic", model: "claude-sonnet-5-5" };
+  const character = { color: "#9DC3E6", shell: "dome", top: "antenna", sides: "ears", decal: "none" };
   const event = { agent: "agent-1", seq: 3, kind: "llm.message", at: 1_800_000_000_000, body: { content: [{ type: "text", text: "สวัสดี" }] } };
   const cases: { name: string; type: string; body: unknown; valid: boolean }[] = [
     { name: "create an Agent", type: "agent.create", body: agent, valid: true },
-    { name: "create with a field this build does not know", type: "agent.create", body: { ...agent, character: "robot" }, valid: true },
+    { name: "create with a field this build does not know", type: "agent.create", body: { ...agent, mascot: "robot" }, valid: true },
+    { name: "create with a Character", type: "agent.create", body: { ...agent, character }, valid: true },
+    { name: "create with a Character part this build does not know", type: "agent.create", body: { ...agent, character: { ...character, shell: "orb", glow: true } }, valid: true },
+    { name: "create with a Character colour that is not #rrggbb", type: "agent.create", body: { ...agent, character: { ...character, color: "red" } }, valid: false },
+    { name: "create with a Character part too long", type: "agent.create", body: { ...agent, character: { ...character, top: "a".repeat(33) } }, valid: false },
+    { name: "create with a Character part that is not a lowercase word", type: "agent.create", body: { ...agent, character: { ...character, decal: "<b>" } }, valid: false },
+    { name: "create with a Character missing a slot", type: "agent.create", body: { ...agent, character: { color: "#9DC3E6", shell: "dome" } }, valid: false },
     { name: "create with a blank name", type: "agent.create", body: { ...agent, name: "  " }, valid: false },
     { name: "create with no model", type: "agent.create", body: { id: "agent-1", name: "Deployer", provider: "anthropic" }, valid: false },
     { name: "create with an id that is not a plain folder name", type: "agent.create", body: { ...agent, id: "../trust" }, valid: false },
@@ -226,6 +233,8 @@ export function messageVectors() {
       body: { agents: [agent], providers: [{ name: "anthropic", models: [{ id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5" }] }, { name: "openrouter", error: "provider.unreachable" }] },
       valid: true,
     },
+    { name: "listed, with an Agent that has a Character and one made before Characters", type: "agent.listed", body: { agents: [{ ...agent, character }, { ...agent, id: "agent-2" }], providers: [] }, valid: true },
+    { name: "listed with a Character colour that is not #rrggbb", type: "agent.listed", body: { agents: [{ ...agent, character: { ...character, color: "#12345" } }], providers: [] }, valid: false },
     { name: "listed with no providers field", type: "agent.listed", body: { agents: [] }, valid: false },
     { name: "a message in a Task", type: "task.message", body: { agent: "agent-1", id: "msg-1", text: "deploy ให้หน่อย" }, valid: true },
     { name: "an empty message", type: "task.message", body: { agent: "agent-1", id: "msg-1", text: "" }, valid: false },

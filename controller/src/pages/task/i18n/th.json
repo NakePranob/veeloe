@@ -17,5 +17,9 @@
     "someUnfinished_one": "รัน {{count}} คำสั่ง · ไม่เสร็จ",
     "someUnfinished_other": "รัน {{count}} คำสั่ง · ไม่เสร็จ",
     "unfinished": "ไม่เสร็จ"
-  }
+  },
+  "busy": "ส่งได้เมื่อ Turn นี้จบ",
+  "openAgent": "เปิดหน้า {{name}}",
+  "started": "{{machine}} · {{when}}",
+  "notStarted": "{{machine}} · ยังไม่ได้เริ่ม"
 }

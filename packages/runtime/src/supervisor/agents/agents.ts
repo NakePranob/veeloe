@@ -33,7 +33,8 @@ export function createAgentsSlice({ registry, workers, providers, egress, outbox
         const models = await listModels(provider, { fetchFn });
         if (!models.ok) return outbox.error(from, models.problem);
         if (!models.models.some((m) => m.id === body.model)) return outbox.error(from, "agent.provider_unknown");
-        const agent = { id: body.id, name: body.name, provider: body.provider, model: body.model };
+        // The look is kept as sent, so it never changes with a Controller's version (ADR 0006).
+        const agent = { id: body.id, name: body.name, provider: body.provider, model: body.model, ...(body.character && { character: body.character }) };
         registry.add(agent);
         workers.start(agent);
       }

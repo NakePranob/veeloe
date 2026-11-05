@@ -5,10 +5,5 @@
     "body": "Agent ของคุณจะมาอยู่ที่นี่หลังทำ Pairing ระหว่าง Machine กับแอปนี้"
   },
   "add": "เพิ่ม Machine",
-  "start": "เริ่มคุยกับ {{name}}",
-  "noAgents": {
-    "title": "ยังไม่มี Agent",
-    "body": "สร้าง Agent ตัวแรกบน Machine ที่ผูกไว้",
-    "action": "สร้าง Agent"
-  }
+  "pick": "เลือก Agent ทางซ้ายเพื่อเปิด Task"
 }

@@ -2,12 +2,13 @@ import { randomUUID } from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
+import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { previewOf, statusOf, useTaskSummaries } from "../../../entities/task";
 import { useMachineStatus } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { AgentAvatar, Empty, Row, Screen, Section, space, Text } from "../../../shared/ui";
+import { Empty, Row, Screen, Section, space, Text } from "../../../shared/ui";
 
 // controller-prototype's AgentPage: the Agent's Tasks first, then its settings.
 // ponytail: only what this version has. Name, instructions, Budget, Approval, Allowlist and the rest come with their changes.
@@ -33,7 +34,7 @@ export function AgentPage() {
   return (
     <Screen title={agent.name}>
       <View style={{ alignItems: "center", gap: space.xs }}>
-        <AgentAvatar size={96} />
+        <Character look={lookOfJson(agent.character)} mood={moodOf([], online)} size={96} />
         <Text variant="footnote" tone="secondary">
           {machine?.name}
           {online === null ? "" : ` · ${t(online ? "online" : "offline")}`}

@@ -1,0 +1,9 @@
+{
+  "title": "Veeloe",
+  "start": "เริ่มคุยกับ {{name}}",
+  "noAgents": {
+    "title": "ยังไม่มี Agent",
+    "body": "สร้าง Agent ตัวแรกบน Machine ที่ผูกไว้",
+    "action": "สร้าง Agent"
+  }
+}

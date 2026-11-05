@@ -112,6 +112,21 @@ test("what the Machine signed is kept, and the same thing from another key is no
   expect(links.status("machine-1")).toMatchObject({ online: true, providers: [{ name: "main" }] });
 });
 
+test("a new Agent goes with the Character the page picked, and the one the Machine keeps lands in the agent table", async () => {
+  const { database, fake, machine, links } = await setup();
+  const character = { color: "#9DC3E6", shell: "dome", top: "antenna", sides: "ears", decal: "none" };
+  expect(links.createAgent(machine, { name: "A", provider: "main", model: "model-a", character })).toBe("id-1");
+  await until(() => fake.hub.frames.length === 2);
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "agent.create", body: { id: "id-1", name: "A", character } });
+  fake.push(signed("agent.listed", { agents: [{ id: "id-1", name: "A", provider: "main", model: "model-a", character }, { id: "old", name: "B", provider: "main", model: "model-a" }], providers: [] }));
+  await until(async () => (await database.query("SELECT * FROM agent")).length === 2);
+  const rows = await database.query<{ id: string; character: string | null }>("SELECT id, character FROM agent ORDER BY id");
+  expect(rows.map((r) => [r.id, r.character && JSON.parse(r.character)])).toEqual([
+    ["id-1", character],
+    ["old", null],
+  ]);
+});
+
 test("after a dropped connection it asks for each Task's events after the last one kept", async () => {
   const { database, fake } = await setup();
   fake.push(signed("task.event", { agent: "a1", seq: 1, kind: "member.message", at: 1, body: {} }, { seq: 2, task: "t1" }));

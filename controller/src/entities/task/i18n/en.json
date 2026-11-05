@@ -1,5 +1,6 @@
 {
   "working": "Working",
+  "failed": "Turn failed",
   "done": "Done",
   "offline": "Offline",
   "new": "Not started"

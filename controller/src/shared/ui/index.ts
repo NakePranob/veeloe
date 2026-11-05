@@ -1,4 +1,3 @@
-export { AgentAvatar } from "./agent-avatar";
 export { Button } from "./button";
 export { Card } from "./card";
 export { Empty, Field, Note, Row, Screen, Section } from "./forms";
@@ -7,4 +6,4 @@ export { Icon, type IconName } from "./icon";
 export { inform } from "./inform";
 export { Label } from "./label";
 export { Text } from "./text";
-export { column, icon, motion, radius, space, type, useColors, type Colors } from "./theme";
+export { column, icon, motion, radius, SIDEBAR_WIDTH, space, type, useColors, useSplit, type Colors } from "./theme";

@@ -5,10 +5,5 @@
     "body": "Your Agents will be here once a Machine is paired with this app."
   },
   "add": "Add Machine",
-  "start": "Start talking with {{name}}",
-  "noAgents": {
-    "title": "No Agent yet",
-    "body": "Create the first Agent on a paired Machine",
-    "action": "Create Agent"
-  }
+  "pick": "Pick an Agent on the left to open its Task"
 }

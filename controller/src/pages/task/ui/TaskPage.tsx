@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
-import { dismissPendingMessage, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
+import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useT } from "../../../shared/i18n";
@@ -11,6 +11,8 @@ import { Button, Card, column, HeaderAction, Label, radius, space, Text, type, u
 import { items } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ToolCalls } from "./ToolCalls";
+import { FADE, LogFade } from "./LogFade";
+import { LogHead } from "./LogHead";
 
 // The Owner's message, in an accent bubble on the right as in Messages.
 function Bubble({ text, note }: { text: string; note?: React.ReactNode }) {
@@ -55,9 +57,13 @@ export function TaskPage() {
   if (!agent || !machine || !events || !pending) return <Stack.Screen options={{ title: t("title") }} />;
   const { items: shown, working } = items(events);
   const message = text.trim();
+  const latest = latestOf(events);
+  const taskStatus = statusOf(latest, status.online);
+  // A Turn is running: the Machine would refuse a second message (agent.busy), so it waits here, kept in the field.
+  const busy = statusOf(latest, true) === "working";
 
   function send() {
-    if (!message || !link || !machine || !agent) return;
+    if (!message || !link || !machine || !agent || busy) return;
     setText("");
     void link.sendMessage(machine, { agent: agent.id, task, text: message });
   }
@@ -73,7 +79,8 @@ export function TaskPage() {
               <Text variant="headline" numberOfLines={1}>
                 {agent.name}
               </Text>
-              {(events.length > 0 || status.online === false) && <TaskStatusLabel status={status.online === false ? "offline" : working ? "working" : "done"} variant="caption" />}
+              {/* A Task nobody has written in is not "done" yet. */}
+              {taskStatus !== "new" && <TaskStatusLabel status={taskStatus} variant="caption" />}
             </View>
           ),
         }}
@@ -91,8 +98,10 @@ export function TaskPage() {
         onContentSizeChange={(_, height) => {
           if (height > viewport.current) scroll.current?.scrollToEnd({ animated: false });
         }}
-        contentContainerStyle={[column, { padding: space.lg, gap: space.lg }]}
+        // The end of the log rests clear of the fade.
+        contentContainerStyle={[column, { padding: space.lg, paddingBottom: FADE, gap: space.lg }]}
       >
+        <LogHead agent={agent} machine={machine.name} events={events} online={status.online} />
         {shown.length === 0 && pending.length === 0 && (
           <Text variant="subheadline" tone="secondary" style={{ textAlign: "center", marginTop: space.xl }}>
             {t("empty", { name: agent.name })}
@@ -140,12 +149,13 @@ export function TaskPage() {
           </View>
         )}
       </ScrollView>
+      <LogFade />
       <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.lg }]}>
         {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
         <Card raised style={{ gap: space.xs, padding: space.sm }}>
           <TextInput
             aria-label={t("placeholder", { name: agent.name })}
-            placeholder={status.online === false ? t("offline") : t("placeholder", { name: agent.name })}
+            placeholder={status.online === false ? t("offline") : busy ? t("busy") : t("placeholder", { name: agent.name })}
             placeholderTextColor={colors.tertiaryLabel}
             value={text}
             onChangeText={setText}
@@ -153,7 +163,7 @@ export function TaskPage() {
             style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
           />
           <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-            <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link} onPress={send} />
+            <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link || busy} onPress={send} />
           </View>
         </Card>
       </View>
