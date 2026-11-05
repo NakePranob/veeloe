@@ -23,10 +23,10 @@
   "asking": "Asking the Machine which Providers it has",
   "provider": {
     "heading": "Provider and model",
-    "footer": "The models come from the Providers set on this Machine (ADR 0042).",
+    "footer": "The models come from the Providers set on this Machine. Someone with Manage can change them later, from the next Task on (ADR 0042).",
     "none": "This Machine has no Provider yet",
     "command": "veeloe provider add --name <name> --url <base url>",
-    "agentFooter": "If a Provider goes down, every Agent on the Machine that uses it stops with it (ADR 0042)."
+    "nextTask": "A change takes effect from the next Task. A Task already going keeps its model to the end, since changing it midway restarts the prompt cache and loses its thinking. If a Provider goes down, every Agent on the Machine that uses it stops with it (ADR 0042)."
   },
   "modelFilter": "Search models",
   "noMatch": "No model matches",
@@ -35,5 +35,17 @@
     "new": "New Task",
     "footer": "Only the Tasks you started are here (ADR 0060).",
     "untitled": "No message yet"
+  },
+  "save": "Save",
+  "saving": "Saving on the Machine",
+  "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",
+  "characterLater": "You can change the Character later on the Agent's page.",
+  "character": {
+    "detail": "How it looks and moves in the Inbox"
+  },
+  "problem": {
+    "provider": "Provider {{provider}} is no longer on the Machine, so this Agent can't answer. Pick a new Provider below.",
+    "model": "Provider {{provider}} no longer lists model {{model}}. Pick a new model below.",
+    "choose": "Pick a new Provider"
   }
 }

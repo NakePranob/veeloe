@@ -7,7 +7,7 @@ import { startSupervisor } from ".";
 import { fakeHub, type FakeHub } from "./hub-link/fake-hub";
 import { runUnpair } from "./pairing/unpair";
 import { FAKE_KEY, fakeProvider, type FakeProvider } from "./providers/fake-provider";
-import { saveProviders } from "./providers/store";
+import { loadProviders, saveProviders } from "./providers/store";
 import { saveTrust } from "./trust/store";
 
 // The supervisor with its real workers, a stand-in Hub and a stand-in Provider. TEST-ONLY KEYS.
@@ -15,6 +15,7 @@ const machineSeed = new Uint8Array(32).fill(0x33);
 const ownerSeed = new Uint8Array(32).fill(0x44);
 const secondOwnerSeed = new Uint8Array(32).fill(0x45);
 const strangerSeed = new Uint8Array(32).fill(0x22);
+const revokedSeed = new Uint8Array(32).fill(0x23);
 const key = (seed: Uint8Array) => toBase64url(publicKeyOf(seed));
 const workerCommand = [process.execPath, join(import.meta.dir, "../main.ts")];
 
@@ -29,7 +30,7 @@ let seq = 1;
 type Setup = Awaited<ReturnType<typeof setup>>;
 
 async function setup(home = mkdtempSync(join(tmpdir(), "veeloe-flow-")), provider: FakeProvider = fakeProvider()) {
-  saveTrust(home, { owners: [{ member: "m_1", keys: [key(ownerSeed)] }, { member: "m_2", keys: [key(secondOwnerSeed)] }] });
+  saveTrust(home, { owners: [{ member: "m_1", keys: [key(ownerSeed)] }, { member: "m_2", keys: [key(secondOwnerSeed)] }], revoked: [key(revokedSeed)] });
   saveProviders(home, [{ name: "main", url: provider.url, key: FAKE_KEY, auth: "x-api-key" }]);
   const hub: FakeHub = fakeHub();
   const lines: string[] = [];
@@ -40,18 +41,19 @@ async function setup(home = mkdtempSync(join(tmpdir(), "veeloe-flow-")), provide
   });
   await until(() => lines.some((l) => l.includes("connected to hub")));
 
-  const seen = new MemorySeenSequences();
+  // One per Member, as each of them is its own Controller.
+  const seen: Record<string, MemorySeenSequences> = { m_1: new MemorySeenSequences(), m_2: new MemorySeenSequences() };
   /** Signed frames the Machine sent to `member`, read and verified like a Controller would. */
   const received = (member = "m_1") =>
     hub.frames.flatMap((frame) => {
-      const result = verify(frame, new Set([key(machineSeed)]), (route) => "recipients" in route && route.recipients.includes(member), seen);
+      const result = verify(frame, new Set([key(machineSeed)]), (route) => "recipients" in route && route.recipients.includes(member), seen[member]!);
       if (!result.ok) return [];
       const parsed = parseMessage(result.signed);
       return parsed.kind === "message" ? [{ ...parsed.message, task: result.signed.task }] : [];
     });
   const inbox: Record<string, (KnownMessage & { task?: string })[]> = { m_1: [], m_2: [] };
   const read = (member = "m_1") => {
-    inbox[member]!.push(...received(member));
+    for (const m of Object.keys(inbox)) inbox[m]!.push(...received(m));
     hub.frames.length = 0;
     return inbox[member]!;
   };
@@ -79,9 +81,13 @@ async function createAgent(s: Setup, id: string) {
 }
 
 async function talk(s: Setup, agent: string, task: string, text: string) {
+  // This message's own Turn, not an earlier one of the same Task.
+  const isEnd = (m: KnownMessage & { task?: string }) => m.type === "task.event" && m.body.kind === "turn.ended" && m.task === task;
+  const before = s.read().filter(isEnd).length;
   s.send("task.message", { agent, id: `${task}-${text}`, text }, { task });
-  const ended = await s.waitFor("task.event", "m_1", (m) => m.body.kind === "turn.ended" && (m as { task?: string }).task === task);
-  expect(ended.body.body).toEqual({ reason: "done" });
+  await until(() => s.read().filter(isEnd).length > before, 8000);
+  const ended = s.read().filter(isEnd).at(-1)!;
+  expect(ended.body).toMatchObject({ body: { reason: "done" } });
 }
 
 test("the owner gets the list with the Provider's models, and never its URL or key", async () => {
@@ -245,3 +251,51 @@ test("a Machine paired again after unpair starts with no Egress", async () => {
   expect(egressGiven.at(-1)).toEqual([]);
   rmSync(first.home, { recursive: true, force: true });
 });
+
+test("a change to an Agent reaches every Member in trust, and one from a key not in trust or revoked changes nothing", async () => {
+  const s = await setup();
+  await createAgent(s, "a1");
+  s.send("agent.update", { id: "a1", name: "Stolen" }, { seed: strangerSeed });
+  s.send("agent.update", { id: "a1", name: "Stolen" }, { seed: revokedSeed });
+  await until(() => s.lines.filter((l) => l === "dropped an envelope: untrusted-key").length === 2);
+  s.send("agent.update", { id: "a1", name: "Deployer" });
+  for (const member of ["m_1", "m_2"]) {
+    const listed = await s.waitFor("agent.listed", member, (m) => m.body.agents.some((a) => a.name !== "a1"));
+    expect(listed.body.agents.map((a) => a.name)).toEqual(["Deployer"]);
+  }
+  expect(s.read("m_1").some((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.name === "Stolen"))).toBe(false);
+});
+
+test("a Task keeps its model after the Agent's changes, across a restart; a new Task gets the new one; a removed Provider moves the Task on", async () => {
+  const first = await setup();
+  await createAgent(first, "a1");
+  const models = () => first.provider.requests.filter((r) => r.path === "/v1/messages").map((r) => (r.body as { model: string }).model);
+  await talk(first, "a1", "t1", "one");
+  first.send("agent.update", { id: "a1", model: "model-b" });
+  await first.waitFor("agent.listed", "m_1", (m) => m.body.agents[0]?.model === "model-b");
+  await talk(first, "a1", "t1", "two");
+  await talk(first, "a1", "t2", "three");
+  expect(models()).toEqual(["model-a", "model-a", "model-b"]);
+  cleanup.splice(0).forEach((f) => f());
+
+  const second = await setup(first.home, first.provider);
+  await until(() => !!second.running.workers.pid("a1"));
+  await talk(second, "a1", "t1", "four");
+  expect(models().at(-1)).toBe("model-a");
+
+  // `veeloe provider remove main`, then the Owner picks another one.
+  const other = fakeProvider();
+  cleanup.push(() => other.server.stop(true));
+  saveProviders(second.home, [{ name: "other", url: other.url, key: FAKE_KEY, auth: "x-api-key" }]);
+  second.read().length = 0;
+  second.send("task.message", { agent: "a1", id: "t1-five", text: "five" }, { task: "t1" });
+  const missing = await second.waitFor("task.event", "m_1", (m) => m.body.kind === "turn.ended" && (m as { task?: string }).task === "t1");
+  expect(missing.body.body).toMatchObject({ reason: "error", code: "provider.missing" });
+  second.read().length = 0;
+  second.send("agent.update", { id: "a1", provider: "other", model: "model-b" });
+  await second.waitFor("agent.listed", "m_1", (m) => m.body.agents[0]?.provider === "other");
+  await talk(second, "a1", "t1", "six");
+  expect(other.requests.filter((r) => r.path === "/v1/messages").map((r) => (r.body as { model: string }).model)).toEqual(["model-b"]);
+  expect(loadProviders(second.home).map((p) => p.name)).toEqual(["other"]);
+  rmSync(first.home, { recursive: true, force: true });
+}, 30_000);

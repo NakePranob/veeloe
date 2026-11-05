@@ -39,19 +39,21 @@ export function createWorkers({
 }) {
   const running = new Map<string, Running>();
   const backoffs = new Map<string, ReturnType<typeof createBackoff>>();
+  // The latest of each Agent, so a worker started again gets the name it has now.
+  const latest = new Map<string, Agent>();
   let stopping = false;
 
   function ended(agent: Agent, entry: Running, why: string) {
     if (running.get(agent.id) !== entry) return;
     running.delete(agent.id);
-    for (const lost of entry.waiting) if (lost.kind !== "llm.response" && lost.kind !== "list") onMessage(agent.id, { kind: "error", member: lost.member, ref: lost.ref, code: "agent.unavailable", task: lost.task });
+    for (const lost of entry.waiting) if (lost.kind === "message" || lost.kind === "sync") onMessage(agent.id, { kind: "error", member: lost.member, ref: lost.ref, code: "agent.unavailable", task: lost.task });
     if (stopping) return;
     const b = backoffs.get(agent.id) ?? backoff();
     backoffs.set(agent.id, b);
     if (Date.now() - entry.startedAt > HEALTHY_MS) b.reset();
     const delay = b.next();
     log(`worker of agent ${agent.id} ended (${why}); starting it again in ${delay} ms`);
-    setTimeout(() => !stopping && !running.has(agent.id) && start(agent), delay);
+    setTimeout(() => !stopping && !running.has(agent.id) && start(latest.get(agent.id) ?? agent), delay);
   }
 
   async function spawn(agent: Agent, entry: Running) {
@@ -83,20 +85,28 @@ export function createWorkers({
   }
 
   function start(agent: Agent) {
+    latest.set(agent.id, agent);
     const entry: Running = { ready: false, waiting: [], startedAt: Date.now() };
     running.set(agent.id, entry);
     spawn(agent, entry).catch((err: Error) => ended(agent, entry, `could not sandbox it: ${err.message}`));
   }
 
+  /** False when the Agent has no worker right now, so the caller can say so. */
+  function send(agent: string, message: ToWorker): boolean {
+    const entry = running.get(agent);
+    if (!entry) return false;
+    if (entry.ready) entry.process!.send(message);
+    else entry.waiting.push(message);
+    return true;
+  }
+
   return {
     start,
-    /** False when the Agent has no worker right now, so the caller can say so. */
-    send(agent: string, message: ToWorker): boolean {
-      const entry = running.get(agent);
-      if (!entry) return false;
-      if (entry.ready) entry.process!.send(message);
-      else entry.waiting.push(message);
-      return true;
+    send,
+    /** A new name reaches the worker without stopping it, and a worker started later gets it too. */
+    rename(agent: Agent) {
+      latest.set(agent.id, agent);
+      send(agent.id, { kind: "agent", name: agent.name });
     },
     pid: (agent: string) => running.get(agent)?.process?.pid,
     stop() {

@@ -44,6 +44,9 @@ export function lookOfJson(json: string | null) {
   }
 }
 
+// Editing works on a draft: picking changes the draft only, and Done hands the whole of it over.
+export const pick = (draft: Look, slot: keyof Look, value: string): Look => lookOf({ ...draft, [slot]: value });
+
 export const sameLook = (a: Look, b: Look) =>
   a.color.toLowerCase() === b.color.toLowerCase() && a.shell === b.shell && a.top === b.top && a.sides === b.sides && a.decal === b.decal;
 

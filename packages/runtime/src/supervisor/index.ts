@@ -4,6 +4,7 @@ import { createAgentsSlice } from "./agents/agents";
 import type { Inbound, Outbox } from "./outbox";
 import { createEgressSlice, loadEgress } from "./egress/egress";
 import { createLlmHandler } from "./proxy/proxy";
+import { createTaskRoutes } from "./proxy/task-routes";
 import { SandboxError, startSandbox, type Sandbox } from "./sandbox/sandbox";
 import { createTaskMessageSlice } from "./task-message/task-message";
 import { createTaskListSlice } from "./task-list/task-list";
@@ -55,13 +56,12 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
 
   const registry = createAgentRegistry(home);
   const providers = () => loadProviders(home);
+  const taskRoutes = createTaskRoutes(home);
   const llm = createLlmHandler({
     fetchFn,
-    route(id) {
+    route(id, task) {
       const agent = registry.get(id);
-      if (!agent) return undefined;
-      const provider = providers().find((p) => p.name === agent.provider);
-      return provider ? { provider, model: agent.model } : { error: "provider.missing" };
+      return agent && taskRoutes(agent, task, providers());
     },
   });
 
@@ -88,7 +88,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
   for (const agent of registry.all()) workers.start(agent);
 
   const egress = createEgressSlice({ home, apply: sandbox.setEgress, outbox, listed: () => agents.listed() });
-  const agents = createAgentsSlice({ registry, workers, providers, egress: egress.current, outbox, fetchFn });
+  const agents = createAgentsSlice({ registry, workers, providers, egress: egress.current, outbox, fetchFn, members: () => trust.owners.map((o) => o.member) });
   const taskMessage = createTaskMessageSlice({ registry, workers, outbox });
   const taskSync = createTaskSyncSlice({ registry, workers, outbox });
   const taskList = createTaskListSlice({ registry, workers });
@@ -123,6 +123,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
       const { message } = parsed;
       if (message.type === "agent.list") void agents.list(from);
       else if (message.type === "agent.create") void agents.create(from, message.body);
+      else if (message.type === "agent.update") void agents.update(from, message.body);
       else if (message.type === "task.message" && from.task) taskMessage({ ...from, task: from.task }, message.body);
       else if (message.type === "task.sync" && from.task) taskSync({ ...from, task: from.task }, message.body);
       else if (message.type === "egress.set") void egress.set(from, message.body);

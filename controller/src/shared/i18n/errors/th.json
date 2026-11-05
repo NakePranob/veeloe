@@ -25,7 +25,7 @@
   "pairing.link_malformed": "นี่ไม่ใช่ลิงก์ Pairing ให้คัดลอกลิงก์ทั้งหมดที่ veeloe pair แสดง",
   "pairing.timed_out": "Machine ไม่ตอบในเวลาที่กำหนด ตรวจว่า veeloe pair ยังทำงานอยู่ แล้วลองใหม่",
   "provider.failed": "Provider ตอบกลับมาเป็น error",
-  "provider.missing": "Provider ของ Agent ถูกลบออกจาก Machine แล้ว ให้เพิ่มใหม่ด้วย veeloe provider add",
+  "provider.missing": "Provider ของ Agent ถูกลบออกจาก Machine แล้ว เลือก Provider ใหม่ได้ที่หน้าของ Agent",
   "provider.rejected": "Provider ไม่รับ key ที่ตั้งไว้บน Machine",
   "provider.unreachable": "Machine ติดต่อ Provider ไม่ได้",
   "task.not_found": "Machine เครื่องนี้ไม่มี Task นั้น",

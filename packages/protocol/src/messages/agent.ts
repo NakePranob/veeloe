@@ -23,6 +23,16 @@ export const AgentCreateBodySchema = z.looseObject({
 });
 export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
 
+/**
+ * Controller → Machine: change only the fields sent, all or none (`agent-settings`). A model
+ * belongs to its Provider, so a new Provider comes with its model.
+ */
+export const AgentUpdateBodySchema = z
+  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional() })
+  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined, "nothing to change")
+  .refine((b) => b.provider === undefined || b.model !== undefined, "a provider needs its model");
+export type AgentUpdateBody = z.infer<typeof AgentUpdateBodySchema>;
+
 /** Controller → Machine: what is on this Machine. */
 export const AgentListBodySchema = z.looseObject({});
 

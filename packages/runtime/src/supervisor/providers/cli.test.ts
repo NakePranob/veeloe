@@ -117,7 +117,7 @@ test("remove names the Agents that use the Provider, and a no keeps it", async (
   const questions: string[] = [];
   const io = { home, readKey: never, log: (l: string) => lines.push(l), interactive: true, ask: async () => "1", confirm: async (q: string) => (questions.push(q), false) };
   expect(await runProviderCommand({ action: "remove" }, io)).toBe(false);
-  expect(lines.join("\n")).toContain("Agents using main: Deployer. They stop answering");
+  expect(lines.join("\n")).toContain("Agents using main: Deployer. They stop answering until you pick another Provider for them on the Agent's page in the Veeloe app.");
   expect(lines.join("\n")).not.toContain("Other");
   expect(questions).toEqual(["Remove main?"]);
   expect(loadProviders(home)).toHaveLength(1);

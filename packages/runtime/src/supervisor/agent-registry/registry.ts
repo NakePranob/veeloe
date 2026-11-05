@@ -16,6 +16,11 @@ export function createAgentRegistry(home: string) {
       agents = [...agents, agent];
       writeJsonFile(file, agents);
     },
+    /** The Agent with this id, changed, in one write of the whole file. */
+    replace(agent: Agent) {
+      agents = agents.map((a) => (a.id === agent.id ? agent : a));
+      writeJsonFile(file, agents);
+    },
   };
 }
 export type AgentRegistry = ReturnType<typeof createAgentRegistry>;

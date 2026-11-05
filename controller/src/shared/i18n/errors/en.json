@@ -25,7 +25,7 @@
   "pairing.link_malformed": "That isn't a Pairing link. Copy the whole link veeloe pair shows",
   "pairing.timed_out": "The Machine didn't answer in time. Check veeloe pair is still running, then try again",
   "provider.failed": "The Provider answered with an error",
-  "provider.missing": "The Agent's Provider was removed from the Machine. Add it again with veeloe provider add",
+  "provider.missing": "The Agent's Provider was removed from the Machine. Pick a new one on the Agent's page",
   "provider.rejected": "The Provider refused the key on the Machine",
   "provider.unreachable": "The Machine couldn't reach the Provider",
   "task.not_found": "This Machine doesn't have that Task",

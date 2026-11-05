@@ -21,16 +21,17 @@ function refuse(status: number, code: string): LlmResponse {
 /**
  * Every request to an LLM goes through here (ADR 0042). It comes over the IPC
  * of one worker, so the Agent is the one whose worker that is, never what the
- * request says. This puts the Provider's key in and the Agent's model, and
+ * request says. This puts the Provider's key in and the model the Task is pinned to, and
  * answers once the Provider has sent everything, a stream included: the worker
  * only keeps the finished message. Nothing listens on a port.
  *
  * ponytail: the whole answer in one IPC message. Send `llm.chunk`s when the Controller shows a reply as it is typed.
  * ponytail: tokens are not counted yet. `daily-budget` reads `usage` here, the one place requests leave (ADR 0043).
  */
-export function createLlmHandler({ route, fetchFn = fetch }: { route: (agent: string) => Route | undefined; fetchFn?: typeof fetch }) {
+export function createLlmHandler({ route, fetchFn = fetch }: { route: (agent: string, task: string | undefined) => Route | undefined; fetchFn?: typeof fetch }) {
   return async function handleLlm(agent: string, req: LlmRequest): Promise<LlmResponse> {
-    const to = route(agent);
+    const task = Object.entries(req.headers).find(([name]) => name.toLowerCase() === TASK_HEADER)?.[1];
+    const to = route(agent, task);
     if (!to) return refuse(401, "proxy.unknown_worker");
     const { pathname, search } = new URL(req.path, "http://supervisor");
     if (req.method !== "POST" || !ALLOWED.has(pathname)) return refuse(404, "proxy.not_allowed");
@@ -43,10 +44,8 @@ export function createLlmHandler({ route, fetchFn = fetch }: { route: (agent: st
       return refuse(400, "proxy.bad_request");
     }
     const headers = new Headers();
-    let task: string | undefined;
     for (const [name, value] of Object.entries(req.headers)) {
       const lower = name.toLowerCase();
-      if (lower === TASK_HEADER) task = value;
       if (!DROPPED.has(lower) && !lower.startsWith("x-veeloe-")) headers.set(name, value);
     }
     for (const [name, value] of Object.entries(upstreamHeaders(to.provider, task))) headers.set(name, value);

@@ -1,0 +1,44 @@
+{
+  "title": "Character",
+  "titleOf": "{{name}}'s Character",
+  "cancel": "Cancel",
+  "done": "Done",
+  "close": "Close",
+  "missing": "Agent not found",
+  "backToInbox": "Back to Inbox",
+  "moods": {
+    "idle": "Idle",
+    "thinking": "Thinking",
+    "working": "Working",
+    "done": "Done",
+    "offline": "Offline"
+  },
+  "color": "Colour",
+  "colorOption": "Colour {{name}}",
+  "colors": {
+    "peach": "Peach",
+    "sky": "Sky",
+    "sage": "Sage",
+    "lilac": "Lilac",
+    "rose": "Rose",
+    "butter": "Butter",
+    "mint": "Mint",
+    "sand": "Sand"
+  },
+  "option": "{{slot}} {{name}}",
+  "slots": {
+    "shell": "Shell",
+    "top": "Top",
+    "sides": "Sides",
+    "decal": "Decal"
+  },
+  "parts": {
+    "shell": { "box": "Box", "capsule": "Capsule", "dome": "Dome", "chamfer": "Chamfer" },
+    "top": { "none": "None", "antenna": "Antenna", "twin": "Twin", "fin": "Fin", "beacon": "Beacon" },
+    "sides": { "none": "None", "ears": "Bolts", "pods": "Pods", "fins": "Wings" },
+    "decal": { "none": "None", "brow": "Brow", "lights": "Lights", "grille": "Grille" }
+  },
+  "shuffle": "Shuffle parts",
+  "saving": "Saving on the Machine",
+  "offline": "The Machine has to be online to save the Character"
+}

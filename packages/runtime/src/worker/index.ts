@@ -28,6 +28,7 @@ export function runWorker(agentId: string) {
   process.on("message", (message) => {
     const m = message as ToWorker;
     if (m.kind === "llm.response") llm.receive(m);
+    else if (m.kind === "agent") core.rename(m.name);
     else core.receive(m);
   });
   process.on("disconnect", () => process.exit(0));

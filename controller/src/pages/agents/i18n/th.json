@@ -23,10 +23,10 @@
   "asking": "กำลังถาม Machine ว่ามี Provider อะไร",
   "provider": {
     "heading": "Provider และ model",
-    "footer": "รายชื่อ model มาจาก Provider ที่ตั้งบน Machine นี้ (ADR 0042)",
+    "footer": "รายชื่อ model มาจาก Provider ที่ตั้งบน Machine นี้ คนที่มี Manage เปลี่ยนทีหลังได้ และมีผลตั้งแต่ Task ถัดไป (ADR 0042)",
     "none": "Machine นี้ยังไม่มี Provider",
     "command": "veeloe provider add --name <ชื่อ> --url <base url>",
-    "agentFooter": "ถ้า Provider ล่ม Agent ทุกตัวบนเครื่องที่ใช้ตัวนั้นหยุดพร้อมกัน (ADR 0042)"
+    "nextTask": "เปลี่ยนแล้วมีผลตั้งแต่ Task ถัดไป Task ที่กำลังทำอยู่ใช้ model เดิมจนจบ เพราะเปลี่ยนกลาง Task ทำให้ prompt cache เริ่มใหม่ และ thinking ใช้ต่อไม่ได้ ถ้า Provider ล่ม Agent ทุกตัวบนเครื่องที่ใช้ตัวนั้นหยุดพร้อมกัน (ADR 0042)"
   },
   "modelFilter": "ค้นหา model",
   "noMatch": "ไม่มี model ที่ตรง",
@@ -35,5 +35,17 @@
     "new": "Task ใหม่",
     "footer": "แสดงเฉพาะ Task ที่คุณเริ่ม (ADR 0060)",
     "untitled": "ยังไม่มีข้อความ"
+  },
+  "save": "บันทึก",
+  "saving": "กำลังบันทึกบน Machine",
+  "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",
+  "characterLater": "Character แก้ทีหลังได้ที่หน้าของ Agent",
+  "character": {
+    "detail": "หน้าตาและท่าทางที่แสดงใน Inbox"
+  },
+  "problem": {
+    "provider": "Provider {{provider}} ไม่อยู่บน Machine แล้ว Agent นี้จึงตอบไม่ได้ เลือก Provider ใหม่ด้านล่าง",
+    "model": "Provider {{provider}} ไม่มี model {{model}} ในรายชื่อแล้ว เลือก model ใหม่ด้านล่าง",
+    "choose": "เลือก Provider ใหม่"
   }
 }

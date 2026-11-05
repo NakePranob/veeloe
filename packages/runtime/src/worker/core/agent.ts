@@ -17,8 +17,7 @@ export type AgentCore = ReturnType<typeof createAgentCore>;
  */
 export function createAgentCore({ name, store, llm, tools, link }: { name: string; store: EventStore; llm: Llm; tools: ToolRunner; link: SupervisorLink }) {
   let running: Promise<void> | undefined;
-
-  const system = `You are ${name}, an Agent that runs on its owner's own machine through Veeloe. Answer in the language the person writes in.`;
+  let current = name;
 
   function append(task: string, starter: string, kind: string, body: unknown, messageId?: string) {
     const event = store.append(task, kind, body, messageId);
@@ -26,6 +25,8 @@ export function createAgentCore({ name, store, llm, tools, link }: { name: strin
   }
 
   async function runTurn(task: string, starter: string, member: string) {
+    // Once per Turn: a rename reaches the next Turn, never one halfway through (`agent-settings`).
+    const system = `You are ${current}, an Agent that runs on its owner's own machine through Veeloe. Answer in the language the person writes in.`;
     append(task, starter, TaskEventKind.TurnStarted, { member });
     const available = new Set(tools.definitions().map((t) => t.name));
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -58,7 +59,7 @@ export function createAgentCore({ name, store, llm, tools, link }: { name: strin
 
   return {
     /** Synchronous up to the start of a Turn, so two messages can never both find the Agent free. */
-    receive(message: Exclude<ToWorker, { kind: "llm.response" }>) {
+    receive(message: Exclude<ToWorker, { kind: "llm.response" | "agent" }>) {
       if (message.kind === "list") {
         link.send({ kind: "tasks", member: message.member, tasks: store.tasksStartedBy(message.member) });
         return;
@@ -84,6 +85,9 @@ export function createAgentCore({ name, store, llm, tools, link }: { name: strin
       running = runTurn(message.task, owner, message.member).finally(() => {
         running = undefined;
       });
+    },
+    rename(name: string) {
+      current = name;
     },
     /** Resolves when the Turn running now, if any, has ended. */
     idle: () => running ?? Promise.resolve(),

@@ -169,6 +169,114 @@
       "valid": true
     },
     {
+      "name": "update the name",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "name": "Builder"
+      },
+      "valid": true
+    },
+    {
+      "name": "update the Provider with its model",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "provider": "openrouter",
+        "model": "gpt-5"
+      },
+      "valid": true
+    },
+    {
+      "name": "update only the model",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "model": "claude-opus-5-5"
+      },
+      "valid": true
+    },
+    {
+      "name": "update the Character, keeping a part this build does not know",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "orb",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "none"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "update with a field this build does not know",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "name": "Builder",
+        "budget": 5
+      },
+      "valid": true
+    },
+    {
+      "name": "update with nothing to change",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1"
+      },
+      "valid": false
+    },
+    {
+      "name": "update with only a field this build does not know",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 5
+      },
+      "valid": false
+    },
+    {
+      "name": "update the Provider without a model",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "provider": "openrouter"
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a blank name",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "name": " "
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a Character missing a slot",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "character": {
+          "color": "#9DC3E6"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "update with an id that is not a plain folder name",
+      "type": "agent.update",
+      "body": {
+        "id": "../trust",
+        "name": "Builder"
+      },
+      "valid": false
+    },
+    {
       "name": "listed, with a Provider that answered and one that did not",
       "type": "agent.listed",
       "body": {

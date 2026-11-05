@@ -10,6 +10,8 @@ interface Props {
   // What the Agent is doing, as moodOf works it out. It moves the head, never the look.
   mood: Mood;
   size?: number;
+  // Holds the pose without moving, as for the small heads on the Character editor's option cards.
+  still?: boolean;
 }
 
 // A screen and its LEDs look the same in light and dark, like the hardware they draw.
@@ -132,9 +134,9 @@ function DecalPart({ decal, visor: [vx, vy, vw, vh], c }: { decal: Decal; visor:
 // A floating robot head drawn 2.5D: a lit front over a darker wall, a screen set into it. Turning slides
 // the screen toward the turn and the wall and side parts against it. Who it is never changes with the
 // Mood; offline is the one exception, greyed out because the Agent can't be reached.
-export function Character({ look, mood, size = 44 }: Props) {
+export function Character({ look, mood, size = 44, still }: Props) {
   const colors = useColors();
-  const reduce = useReduceMotion();
+  const reduce = useReduceMotion() || !!still;
   const id = useId().replace(/[^\w-]/g, "");
   const s = SHELLS[look.shell];
   const [vx, vy, vw, vh, vr] = s.visor;

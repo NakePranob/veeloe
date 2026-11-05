@@ -102,6 +102,19 @@ test("a message during a Turn is refused as busy and leaves the log alone", asyn
   expect(store.all.get("t1")!.some((e) => (e.body as { text?: string }).text === "second")).toBe(false);
 });
 
+test("a new name reaches the next Turn, and the Turn running keeps the old one to its end", async () => {
+  const { core, requests, gate } = setup({ replies: [{ content: [{ type: "tool_use", id: "u1", name: "echo", input: {} }], stopReason: "tool_use" }], tools: echoTool });
+  let open!: () => void;
+  gate.wait = new Promise((resolve) => (open = resolve));
+  core.receive(message("first"));
+  core.rename("Builder");
+  open();
+  await core.idle();
+  core.receive(message("second", { task: "t2" }));
+  await core.idle();
+  expect(requests.map((r) => r.system.split(",")[0])).toEqual(["You are Deployer", "You are Deployer", "You are Builder"]);
+});
+
 test("a tool the LLM asks for runs, and its result goes into the next request", async () => {
   const use = { type: "tool_use", id: "tu1", name: "echo", input: { a: 1 } };
   const { core, store, requests } = setup({ tools: echoTool, replies: [{ content: [use], stopReason: "tool_use" }, text("done")] });

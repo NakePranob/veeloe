@@ -97,7 +97,7 @@ export async function runProviderCommand(command: ProviderCommand, { home, readK
       .all()
       .filter((a) => a.provider === name)
       .map((a) => a.name);
-    log(users.length ? `Agents using ${name}: ${users.join(", ")}. They stop answering until they are given another Provider.` : `no Agent uses ${name}.`);
+    log(users.length ? `Agents using ${name}: ${users.join(", ")}. They stop answering until you pick another Provider for them on the Agent's page in the Veeloe app.` : `no Agent uses ${name}.`);
     if (!command.yes) {
       if (!interactive) throw new ProviderError(`not removed: there is no terminal to confirm on. Run it again with --yes: veeloe provider remove ${name} --yes`);
       if (!(await confirm(`Remove ${name}?`))) {

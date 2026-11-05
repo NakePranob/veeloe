@@ -1,4 +1,4 @@
-import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol";
+import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type AgentUpdateBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
@@ -13,11 +13,15 @@ export type MachineStatus = {
   providers: ProviderInfo[] | null;
   /** The code the last `agent.create` came back with, if it failed. */
   createError: string | null;
+  /** The code the last `agent.update` came back with, if it failed. */
+  updateError: string | null;
 };
 
-const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null };
+const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null };
 
 type Client = ReturnType<typeof startHubClient>;
+/** What an envelope was, so the error about it lands in the right place. */
+type Kind = "create" | "update" | "hello" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -53,7 +57,7 @@ export function createMachineLinks({
   let all: Record<string, MachineStatus> = {};
   const listeners = new Set<() => void>();
   /** Which Machine an envelope went to, by its sig, so an answer about it finds its way back. */
-  const sentTo = new Map<string, { machine: string; kind: "create" | "hello" | "other" }>();
+  const sentTo = new Map<string, { machine: string; kind: Kind }>();
   // The Hub does not say when a Machine comes back, so one that was offline is asked again, later each time.
   const retries = new Map<string, { timer: ReturnType<typeof setTimeout>; backoff: ReturnType<typeof createBackoff> }>();
 
@@ -63,7 +67,7 @@ export function createMachineLinks({
     for (const listener of [...listeners]) listener();
   }
 
-  function sendTo(machine: Machine, kind: "create" | "hello" | "other", out: { type: string; task?: string; body: unknown }) {
+  function sendTo(machine: Machine, kind: Kind, out: { type: string; task?: string; body: unknown }) {
     const entry = clients.get(machine.hub_url);
     const member = entry?.client.member();
     if (!entry || !member) return null;
@@ -110,6 +114,7 @@ export function createMachineLinks({
     } else if (message.type === "error" && message.body.ref) {
       const about = sentTo.get(message.body.ref);
       if (about?.kind === "create") setStatus(machine.id, { createError: message.body.code });
+      else if (about?.kind === "update") setStatus(machine.id, { updateError: message.body.code });
       else await failPendingMessage(database, message.body.ref, message.body.code);
     }
   }
@@ -151,6 +156,7 @@ export function createMachineLinks({
         }
         if (about.kind === "hello") return;
         if (about.kind === "create") setStatus(about.machine, { createError: error.code });
+        else if (about.kind === "update") setStatus(about.machine, { updateError: error.code });
         else void failPendingMessage(database, error.ref!, error.code);
       },
     });
@@ -189,6 +195,15 @@ export function createMachineLinks({
       setStatus(machine.id, { createError: null });
       const id = newId();
       return sendTo(machine, "create", { type: "agent.create", body: { id, ...agent } }) ? id : null;
+    },
+
+    /**
+     * Only the fields that change (`agent-settings`). Nothing shows as changed until the Machine's
+     * `agent.listed` says so (ADR 0006). The sig, or null when the Hub is not connected and nothing went.
+     */
+    updateAgent(machine: Machine, body: AgentUpdateBody) {
+      setStatus(machine.id, { updateError: null });
+      return sendTo(machine, "update", { type: "agent.update", body });
     },
 
     /**

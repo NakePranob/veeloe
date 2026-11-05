@@ -33,9 +33,11 @@ export {
   AgentIdSchema,
   AgentListBodySchema,
   AgentListedBodySchema,
+  AgentUpdateBodySchema,
   type Agent,
   type AgentCreateBody,
   type AgentListedBody,
+  type AgentUpdateBody,
   type ProviderInfo,
 } from "./messages/agent";
 export {

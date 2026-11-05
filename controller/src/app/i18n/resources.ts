@@ -1,4 +1,5 @@
 import { addMachineI18n } from "../../pages/add-machine";
+import { agentCharacterI18n } from "../../pages/agent-character";
 import { agentsI18n } from "../../pages/agents";
 import { createKeyI18n } from "../../pages/create-key";
 import { devicesI18n } from "../../pages/devices";
@@ -21,6 +22,7 @@ const slices = {
   "task-status": taskStatusI18n,
   "agent-inbox": agentInboxI18n,
   "add-machine": addMachineI18n,
+  "agent-character": agentCharacterI18n,
   agents: agentsI18n,
   "create-key": createKeyI18n,
   devices: devicesI18n,

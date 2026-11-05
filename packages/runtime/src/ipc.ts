@@ -14,6 +14,8 @@ export type ToWorker =
   | { kind: "sync"; task: string; after: number; member: string; ref: string }
   /** Which of this Agent's Tasks the Member may open: the ones they started (ADR 0060). */
   | { kind: "list"; member: string }
+  /** The Agent was renamed: the next Turn of every Task uses this name (`agent-settings`). */
+  | { kind: "agent"; name: string }
   | ({ kind: "llm.response"; id: string } & LlmResponse);
 
 export type FromWorker =

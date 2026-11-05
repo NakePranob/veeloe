@@ -128,6 +128,30 @@ test("a new Agent goes with the Character the page picked, and the one the Machi
   ]);
 });
 
+test("a change to an Agent goes signed with only its fields, and the Machine's error about that envelope is kept as its updateError", async () => {
+  const { fake, machine, links } = await setup();
+  const sig = links.updateAgent(machine, { id: "a1", model: "model-b" });
+  await until(() => fake.hub.frames.length === 3);
+  const sent = fake.hub.frames.at(-1)!;
+  expect(sent.sig).toBe(sig!);
+  expect(JSON.parse(sent.signed)).toMatchObject({ type: "agent.update", to: "machine-1", member, body: { id: "a1", model: "model-b" } });
+  // An error about another envelope is not this one's.
+  fake.push(signed("error", { code: "agent.busy", ref: "someone-else" }, { seq: 4 }));
+  fake.push(signed("error", { code: "agent.provider_unknown", ref: sent.sig }, { seq: 5 }));
+  await until(() => links.status("machine-1").updateError === "agent.provider_unknown");
+  expect(links.status("machine-1").createError).toBeNull();
+
+  links.updateAgent(machine, { id: "a1", name: "B" });
+  expect(links.status("machine-1").updateError).toBeNull();
+  await until(() => fake.hub.frames.length === 4);
+  fake.push({ type: "hub.error", code: "hub.machine_offline", ref: fake.hub.frames.at(-1)!.sig });
+  await until(() => links.status("machine-1").updateError === "hub.machine_offline");
+  expect(links.status("machine-1").online).toBe(false);
+
+  links.stop();
+  expect(links.updateAgent(machine, { id: "a1", name: "C" })).toBeNull();
+});
+
 test("after a dropped connection it asks for each Task's events after the last one kept", async () => {
   const { database, fake } = await setup();
   fake.push(signed("task.event", { agent: "a1", seq: 1, kind: "member.message", at: 1, body: {} }, { seq: 2, task: "t1" }));

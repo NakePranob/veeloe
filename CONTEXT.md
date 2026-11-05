@@ -189,5 +189,5 @@ _Avoid_: Helper, child agent, worker
 ### LLM
 
 **Provider**:
-ปลายทาง LLM ที่ Runtime เรียกใช้ กำหนดด้วย URL กับ key ของลูกค้า เช่น Anthropic, OpenRouter หรือ OpenCode Zen Owner ตั้ง Provider ไว้ที่ Machine และเครื่องหนึ่งมีได้หลายตัว supervisor ถือ key และเป็นทางผ่านของทุกคำขอไป LLM Agent จึงไม่เห็น key Agent แต่ละตัวใช้ Provider ตัวเดียวกับ model เดียวจากเครื่องนั้น ซึ่งคนที่มี Manage เป็นคนเลือก ถ้าเปลี่ยน จะมีผลตั้งแต่ Task ถัดไป
+ปลายทาง LLM ที่ Runtime เรียกใช้ กำหนดด้วย URL กับ key ของลูกค้า เช่น Anthropic, OpenRouter หรือ OpenCode Zen Owner ตั้ง Provider ไว้ที่ Machine และเครื่องหนึ่งมีได้หลายตัว supervisor ถือ key และเป็นทางผ่านของทุกคำขอไป LLM Agent จึงไม่เห็น key Agent แต่ละตัวใช้ Provider ตัวเดียวกับ model เดียวจากเครื่องนั้น ซึ่งคนที่มี Manage เป็นคนเลือก ถ้าเปลี่ยน จะมีผลตั้งแต่ Task ถัดไป ยกเว้น Task ที่ Provider ซึ่งมันใช้อยู่ถูกลบออกจาก Machine แล้ว ซึ่งย้ายไปใช้ Provider กับ model ปัจจุบันของ Agent เพราะ Provider เดิมตอบไม่ได้อยู่แล้ว
 _Avoid_: Vendor, backend, model

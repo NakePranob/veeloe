@@ -21,6 +21,10 @@ import { useAppDatabase } from "./use-app-database";
 // Web draws its own header, with our button right against the screen's edge.
 const webHeader = process.env.EXPO_OS === "web" ? { headerRightContainerStyle: { paddingRight: space.lg } } : {};
 
+// The Character editor slides up over the Agent's page, as in the prototype. Android's sheet draws
+// no header, so Cancel and Done would be lost: there it is a modal. On web the stack shows one screen, so it is a page.
+const sheet = process.env.EXPO_OS === "android" ? ({ presentation: "modal", animation: "slide_from_bottom" } as const) : ({ presentation: "formSheet" } as const);
+
 // Before anything draws. The saved language replaces it once the database opens.
 initI18n(resources, deviceLanguage());
 
@@ -95,6 +99,7 @@ export function RootLayout() {
                   {/* In split view the inbox is already beside the Task, so there is nothing to go back to.
                       Web ignores headerBackVisible when a deep link anchors the inbox underneath, hence headerLeft. */}
                   <Stack.Screen name="tasks/[task]" options={split ? { headerBackVisible: false, headerLeft: () => null } : {}} />
+                  <Stack.Screen name="agents/[agent]/character" options={sheet} />
                 </Stack>
               </View>
             </View>

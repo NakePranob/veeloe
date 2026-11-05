@@ -8,21 +8,11 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { Button, Field, Icon, Note, Row, Screen, Section, space, useColors } from "../../../shared/ui";
-
-// ponytail: a gateway can list hundreds of models, so only the first matches show; add paging if people miss theirs.
-const SHOWN = 30;
-
-type Model = { id: string; name?: string };
-// The schemas are loose (ADR 0023), so `in` alone does not narrow them.
-const modelsOf = (p: unknown): Model[] => (Array.isArray((p as { models?: unknown } | undefined)?.models) ? (p as { models: Model[] }).models : []);
-const errorOf = (p: unknown): string | null => {
-  const error = (p as { error?: unknown } | undefined)?.error;
-  return typeof error === "string" ? error : null;
-};
+import { modelsOf } from "../model/providers";
+import { ProviderModelSections } from "./ProviderModelSections";
 
 // controller-prototype's NewAgentPage, with what this version sends: a Character, a name, a Machine, a Provider and a model.
 // ponytail: no description, instructions or Allowlist yet; each comes with the change that uses it.
-// The prototype picks Provider and model from a menu (@expo/ui); this app has no @expo/ui yet, so they are ticked rows like the language.
 export function NewAgentPage() {
   const t = useT("agents");
   const colors = useColors();
@@ -34,7 +24,6 @@ export function NewAgentPage() {
   const [machineId, setMachineId] = useState<string | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   const [model, setModel] = useState<string | null>(null);
-  const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState<string | null>(null);
   // The Machine keeps this look with the Agent (ADR 0006). Shuffling picks a new look, never a new id.
   const others = () => (agents ?? []).map((a) => lookOfJson(a.character));
@@ -45,10 +34,7 @@ export function NewAgentPage() {
   const status = machine ? statuses[machine.id] : undefined;
   const providers = status?.providers ?? [];
   const chosen = providers.find((p) => p.name === (provider ?? providers[0]?.name));
-  const models = modelsOf(chosen);
-  const query = filter.trim().toLowerCase();
-  const matching = models.filter((m) => !query || m.id.toLowerCase().includes(query) || m.name?.toLowerCase().includes(query)).slice(0, SHOWN);
-  const ready = !!machine && !!name.trim() && !!chosen && !!model && models.some((m) => m.id === model) && !creating && !!link;
+  const ready = !!machine && !!name.trim() && !!chosen && !!model && modelsOf(chosen).some((m) => m.id === model) && !creating && !!link;
 
   // Done when the Machine lists the new Agent; its first Task opens in place of this page, as in the prototype.
   useEffect(() => {
@@ -70,7 +56,7 @@ export function NewAgentPage() {
         <Character look={look} mood="idle" size={96} />
         <Button label={t("shuffle")} onPress={() => setLook(shuffleLook(others()))} />
       </View>
-      <Section>
+      <Section footer={t("characterLater")}>
         <Field label={t("name")} value={name} onChangeText={setName} placeholder={t("namePlaceholder")} />
       </Section>
 
@@ -92,39 +78,19 @@ export function NewAgentPage() {
         ))}
       </Section>
 
-      <Section title={t("provider.heading")} footer={t("provider.footer")}>
-        {status?.online === false ? (
-          <Row icon="machine" title={t("machine.offline")} />
-        ) : !status?.providers ? (
-          <Row title={t("asking")} accessory={<ActivityIndicator color={colors.secondaryLabel} />} />
-        ) : providers.length === 0 ? (
-          <Row icon="key" title={t("provider.none")} detail={t("provider.command")} />
-        ) : (
-          providers.map((p) => (
-            <Row
-              key={p.name}
-              icon="key"
-              title={p.name}
-              detail={errorOf(p) ? describeError({ code: errorOf(p)! }) : undefined}
-              onPress={() => {
-                setProvider(p.name);
-                setModel(null);
-              }}
-              accessory={p.name === chosen?.name ? tick : undefined}
-            />
-          ))
-        )}
-      </Section>
-
-      {models.length > 0 && (
-        <Section title="model">
-          {models.length > 8 && <Field label={t("modelFilter")} value={filter} onChangeText={setFilter} mono />}
-          {matching.map((m) => (
-            <Row key={m.id} title={m.name ?? m.id} detail={m.name ? m.id : undefined} onPress={() => setModel(m.id)} accessory={m.id === model ? tick : undefined} />
-          ))}
-          {matching.length === 0 && <Row title={t("noMatch")} />}
-        </Section>
-      )}
+      <ProviderModelSections
+        // A new filter for each Machine, as its models are another list.
+        key={machine?.id}
+        status={status}
+        provider={chosen?.name}
+        model={model}
+        footer={t("provider.footer")}
+        onProvider={(name) => {
+          setProvider(name);
+          setModel(null);
+        }}
+        onModel={setModel}
+      />
 
       {creating && <Row title={t("creating")} accessory={<ActivityIndicator color={colors.secondaryLabel} />} />}
       {status?.createError && (

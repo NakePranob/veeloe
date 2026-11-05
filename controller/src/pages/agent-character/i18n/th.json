@@ -1,0 +1,44 @@
+{
+  "title": "Character",
+  "titleOf": "Character ของ {{name}}",
+  "cancel": "ยกเลิก",
+  "done": "เสร็จ",
+  "close": "ปิด",
+  "missing": "ไม่พบ Agent นี้",
+  "backToInbox": "กลับไป Inbox",
+  "moods": {
+    "idle": "ว่าง",
+    "thinking": "คิด",
+    "working": "ทำงาน",
+    "done": "เสร็จ",
+    "offline": "ออฟไลน์"
+  },
+  "color": "สี",
+  "colorOption": "สี {{name}}",
+  "colors": {
+    "peach": "พีช",
+    "sky": "ฟ้า",
+    "sage": "เสจ",
+    "lilac": "ไลแลค",
+    "rose": "โรส",
+    "butter": "เนย",
+    "mint": "มินต์",
+    "sand": "ทราย"
+  },
+  "option": "{{slot}} {{name}}",
+  "slots": {
+    "shell": "เปลือก",
+    "top": "ด้านบน",
+    "sides": "ด้านข้าง",
+    "decal": "ลายบนเปลือก"
+  },
+  "parts": {
+    "shell": { "box": "กล่อง", "capsule": "แคปซูล", "dome": "โดม", "chamfer": "เหลี่ยม" },
+    "top": { "none": "ไม่มี", "antenna": "เสาเดี่ยว", "twin": "เสาคู่", "fin": "ครีบ", "beacon": "ไฟสัญญาณ" },
+    "sides": { "none": "ไม่มี", "ears": "น็อตหู", "pods": "หูฟัง", "fins": "ปีก" },
+    "decal": { "none": "ไม่มี", "brow": "แถบคิ้ว", "lights": "ไฟสามดวง", "grille": "ช่องลำโพง" }
+  },
+  "shuffle": "สุ่มชิ้นส่วน",
+  "saving": "กำลังบันทึกบน Machine",
+  "offline": "Machine ต้องออนไลน์ก่อน จึงจะบันทึก Character ได้"
+}

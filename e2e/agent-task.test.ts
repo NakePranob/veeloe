@@ -111,3 +111,45 @@ test("an Agent is made, answers twice in one Task with the whole conversation, a
   expect(page.type === "task.events" && page.body.events.map((e) => e.kind)).toEqual(["member.message", "turn.started", "llm.message", "turn.ended"]);
   late.client.stop();
 }, 60_000);
+
+test("after agent.update a Task keeps its model and a new one gets the new one, and an Agent whose Provider was removed answers again on another", async () => {
+  const owner = controller();
+  await owner.ready;
+  const ends = (task: string) => owner.inbox.filter((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended");
+  async function talk(task: string, text: string) {
+    const before = ends(task).length;
+    owner.send("task.message", { agent: "agent-set", id: `${task}-${text}`, text }, task);
+    await owner.waitFor(() => ends(task).length > before);
+    return ends(task).at(-1)!.body as { body: unknown };
+  }
+  const modelsAt = (p: typeof provider) => p.requests.filter((r) => r.path === "/v1/messages").map((r) => (r.body as { model: string }).model);
+
+  owner.send("agent.create", { id: "agent-set", name: "Setter", provider: "main", model: "model-a" });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-set"));
+  const before = modelsAt(provider).length;
+  await talk("task-old", "one");
+  owner.send("agent.update", { id: "agent-set", model: "model-b" });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-set" && a.model === "model-b"));
+  await talk("task-old", "two");
+  await talk("task-new", "three");
+  expect(modelsAt(provider).slice(before)).toEqual(["model-a", "model-a", "model-b"]);
+
+  // At the Machine: the Provider goes, and another comes.
+  const other = fakeProvider();
+  try {
+    const remove = Bun.spawn([veeloe, "provider", "remove", "main", "--yes"], { env: { VEELOE_HOME: home }, stdout: "pipe" });
+    expect(await remove.exited).toBe(0);
+    expect(await new Response(remove.stdout).text()).toContain("on the Agent's page in the Veeloe app");
+    const add = Bun.spawn([veeloe, "provider", "add", "--name", "second", "--url", other.url], { env: { VEELOE_HOME: home }, stdin: new Blob([FAKE_KEY]), stdout: "pipe" });
+    expect(await add.exited).toBe(0);
+
+    expect(await talk("task-old", "four")).toMatchObject({ body: { reason: "error", code: "provider.missing" } });
+    owner.send("agent.update", { id: "agent-set", provider: "second", model: "model-a" });
+    await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-set" && a.provider === "second"));
+    expect(await talk("task-old", "five")).toMatchObject({ body: { reason: "done" } });
+    expect(modelsAt(other)).toEqual(["model-a"]);
+  } finally {
+    other.server.stop(true);
+    owner.client.stop();
+  }
+}, 90_000);

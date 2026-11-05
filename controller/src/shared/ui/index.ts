@@ -7,4 +7,4 @@ export { confirm, inform } from "./inform";
 export { Label } from "./label";
 export { QrCode, QrScanner } from "./qr";
 export { Text } from "./text";
-export { column, icon, motion, radius, SIDEBAR_WIDTH, space, type, useColors, useSplit, type Colors } from "./theme";
+export { column, icon, motion, radius, SIDEBAR_WIDTH, space, type, useColors, useShadows, useSplit, type Colors } from "./theme";
