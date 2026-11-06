@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseMessage, publicKeyOf, toBase64url, type KnownMessage } from "@veeloe/protocol";
@@ -31,6 +31,20 @@ function askBash(id: string, command: string) {
     { type: "message_start", message: start },
     { type: "content_block_start", index: 0, content_block: { type: "tool_use", id, name: "bash", input: {} } },
     { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify({ command }) } },
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 1 } },
+    { type: "message_stop" },
+  ];
+  return new Response(events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
+}
+
+/** The SSE of one message that asks for `name` with `input`. */
+function askTool(id: string, name: string, input: unknown) {
+  const start = { ...message([], "tool_use"), content: [] };
+  const events = [
+    { type: "message_start", message: start },
+    { type: "content_block_start", index: 0, content_block: { type: "tool_use", id, name, input: {} } },
+    { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify(input) } },
     { type: "content_block_stop", index: 0 },
     { type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 1 } },
     { type: "message_stop" },
@@ -194,4 +208,59 @@ test("a domain the owner adds to the Egress opens at once for every Agent, and c
   c.send("egress.set", { egress: [] });
   await c.waitFor((m) => m.type === "agent.listed" && m.body.egress?.length === 0);
   expect((await run("curl -sS -m 10 -o /dev/null https://example.com")).failed).toBe(true);
+}, 120_000);
+
+/** The SSE of one finished answer that just says `text`. */
+function say(text: string) {
+  const events = [
+    { type: "message_start", message: { ...message([]), content: [] } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+    { type: "message_stop" },
+  ];
+  return new Response(events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
+}
+
+/** An answer that asks for one tool on the first request, then says it is done. */
+function toolReply(name: string, input: unknown) {
+  let asked = false;
+  return (body: { model?: string; messages?: unknown[]; stream?: boolean }) => {
+    const last = (body.messages ?? []).at(-1) as { content: { type: string; text?: string }[] } | undefined;
+    if (!asked && last?.content.some((block) => block.type === "text")) {
+      asked = true;
+      return askTool(`toolu_${++uses}`, name, input);
+    }
+    return say("done");
+  };
+}
+
+async function runFileTool() {
+  const task = `task-${++n}`;
+  c.send("task.message", { agent: "agent-a", id: `m-${n}`, text: "go" }, task);
+  const ended = await c.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended");
+  expect(ended.type === "task.event" && ended.body.body).toEqual({ reason: "done" });
+  const result = await c.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "tool.result");
+  const [first] = (result.type === "task.event" ? (result.body.body as { content: { content: string; is_error?: boolean }[] }).content : []) as { content: string; is_error?: boolean }[];
+  return { output: first!.content, failed: first!.is_error === true };
+}
+
+test("file tools refuse a path outside the Workdir inside the real sandbox", async () => {
+  const workdir = join(home, "agents/agent-a/workdir");
+  if (!existsSync(join(workdir, "key-link"))) symlinkSync(join(user, ".ssh/id_ed25519"), join(workdir, "key-link"));
+  const original = provider.reply;
+
+  provider.reply = toolReply("read", { path: "key-link" });
+  const read = await runFileTool();
+  expect(read.failed).toBe(true);
+  expect(read.output).not.toContain("SSH-SECRET");
+
+  provider.reply = toolReply("write", { path: "../agent-b/workdir/x", content: "x" });
+  const write = await runFileTool();
+  expect(write.failed).toBe(true);
+  expect(existsSync(join(home, "agents/agent-b/workdir/x"))).toBe(false);
+
+  rmSync(join(workdir, "key-link"), { force: true });
+  provider.reply = original;
 }, 120_000);

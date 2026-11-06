@@ -2,7 +2,9 @@ import { join } from "node:path";
 import type { FromWorker, ToWorker } from "../ipc";
 import { anthropicLlm, ipcFetch } from "./adapters/anthropic-llm";
 import { bashTool } from "./adapters/bash";
+import { fileTools } from "./adapters/files";
 import { openEventStore } from "./adapters/sqlite-store";
+import { combineTools } from "./adapters/tools";
 import { createAgentCore } from "./core/agent";
 
 /**
@@ -23,7 +25,8 @@ export function runWorker(agentId: string) {
 
   const send = (message: FromWorker) => process.send!(message);
   const llm = ipcFetch(send);
-  const tools = bashTool({ workdir: join(dir, "workdir"), env: process.env });
+  const workdir = join(dir, "workdir");
+  const tools = combineTools([bashTool({ workdir, env: process.env }), fileTools({ workdir })]);
   const core = createAgentCore({ name, store: openEventStore(join(dir, "tasks.db")), llm: anthropicLlm({ fetch: llm.fetch }), tools, link: { send } });
   process.on("message", (message) => {
     const m = message as ToWorker;

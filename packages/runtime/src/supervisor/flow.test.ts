@@ -302,11 +302,11 @@ test("a Task keeps its model after the Agent's changes, across a restart; a new 
   rmSync(first.home, { recursive: true, force: true });
 }, 30_000);
 
-/** An SSE answer that asks for a tool this Machine lacks, so the Turn goes back to the LLM. */
-function toolUseSse() {
+/** An SSE answer that asks for a tool, so the Turn goes back to the LLM after the tool runs. */
+function toolUseSse(name = "no_such_tool", input: unknown = {}, id = "tu1") {
   const start = JSON.stringify({ type: "message_start", message: { id: "msg_b", type: "message", role: "assistant", model: "model-a", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } } });
-  const block = JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tu1", name: "no_such_tool", input: {} } });
-  const delta = JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } });
+  const block = JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id, name, input: {} } });
+  const delta = JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify(input) } });
   const stop = JSON.stringify({ type: "content_block_stop", index: 0 });
   const end = JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 3 } });
   const lines = [start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`);
@@ -402,3 +402,22 @@ test("usage.list answers with the Machine's own days and the Tasks that used the
   const week = await s.waitFor("usage.listed", "m_1", (m) => m.body.request === "req-2");
   expect(week.body).toMatchObject({ from: shiftDay(today, -6), to: today });
 }, 40_000);
+
+test("an Agent writes and reads a file through its tools in one Turn, and both results are in the log", async () => {
+  const s = await setup();
+  await createAgent(s, "a1");
+  let calls = 0;
+  s.provider.reply = () => (++calls === 1 ? toolUseSse("write", { path: "hello.txt", content: "hi" }) : calls === 2 ? toolUseSse("read", { path: "hello.txt" }, "tu2") : sse([{ type: "text", text: "done" }]));
+
+  s.send("task.message", { agent: "a1", id: "m1", text: "write it" }, { task: "t1" });
+  const ended = await s.waitFor("task.event", "m_1", (m) => m.body.kind === "turn.ended");
+  expect(ended.body.body).toEqual({ reason: "done" });
+  expect(readFileSync(join(s.home, "agents/a1/workdir/hello.txt"), "utf8")).toBe("hi");
+
+  const results = s
+    .read("m_1")
+    .filter((m) => m.type === "task.event" && m.body.kind === "tool.result")
+    .flatMap((m) => (m.body as { body: { content: { content: string }[] } }).body.content.map((block) => block.content));
+  expect(results.join("\n")).toContain("Wrote 2 bytes to hello.txt");
+  expect(results.join("\n")).toContain("1\thi");
+}, 30_000);
