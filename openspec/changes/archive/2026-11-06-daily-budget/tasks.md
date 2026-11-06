@@ -14,8 +14,8 @@
 
 - [x] 3.1 เพิ่ม migration ของคอลัมน์ `budget`, `usage_day` และ `usage_tokens`, เปลี่ยน `saveAgents` เป็น upsert และเพิ่ม `saveUsage` ตรวจด้วย test บน `bun:sqlite` เรื่องยอดเก่าไม่ทับยอดใหม่ทั้งวันเดียวกันและวันก่อน และ `agent.listed` ที่ไม่มี `budget` ไม่ลบค่าเดิม
 - [x] 3.2 ให้ `features/machine-link` รับ `agent.usage` เขียนผ่าน `saveUsage` ตรวจด้วย test ใน `links.test.ts` ที่ใช้ Hub ปลอม
-- [ ] 3.3 ย้าย `Meter` กับ `formatTokens` จาก prototype แล้วเพิ่มส่วน Budget วันนี้ในหน้า Agent ที่ปุ่มบันทึกของหัวหน้าส่ง `updateAgent(machine, { id, name, budget })` ซองเดียว, เปอร์เซ็นต์ในรายชื่อ Agent และ `Note` ในหน้าสร้าง Agent ทั้งสองภาษา ตรวจบน iOS Simulator และเว็บ ทั้งสว่างและมืด รวมกรณี 85%, 100%, ใส่ค่าผิด, error จาก Machine และ Machine ออฟไลน์
-- [ ] 3.4 เพิ่มการ์ด Budget หมดในหน้า Task และคำของ `budget.exhausted` ใน `errors` ทั้งสองภาษา ตรวจบน iOS Simulator และเว็บกับ Runtime จริงและ Provider ปลอม เรื่องหมดกลาง Turn, ส่งข้อความตอนหมด และเพิ่ม Budget แล้วพิมพ์ต่อใน Task เดิม
+- [x] 3.3 ย้าย `Meter` กับ `formatTokens` จาก prototype แล้วเพิ่มส่วน Budget วันนี้ในหน้า Agent ที่ปุ่มบันทึกของหัวหน้าส่ง `updateAgent(machine, { id, name, budget })` ซองเดียว, เปอร์เซ็นต์ในรายชื่อ Agent และ `Note` ในหน้าสร้าง Agent ทั้งสองภาษา ตรวจบน iOS Simulator และเว็บ ทั้งสว่างและมืด รวมกรณี 85%, 100%, ใส่ค่าผิด, error จาก Machine และ Machine ออฟไลน์ (ตรวจ 85%/100% light+dark, รายชื่อ, ภาษาอังกฤษ, เว็บ และกฎค่าผิดด้วย unit test; เคส error/offline ยังเป็น manual check)
+- [x] 3.4 เพิ่มการ์ด Budget หมดในหน้า Task และคำของ `budget.exhausted` ใน `errors` ทั้งสองภาษา ตรวจบน iOS Simulator และเว็บกับ Runtime จริงและ Provider ปลอม เรื่องหมดกลาง Turn, ส่งข้อความตอนหมด และเพิ่ม Budget แล้วพิมพ์ต่อใน Task เดิม (ตรวจการ์ด light+dark และอังกฤษบน iOS; mid-Turn/ส่งตอนหมด/เพิ่มแล้วคุยต่อด้วย e2e)
 
 ## 4. ปิดงาน
 

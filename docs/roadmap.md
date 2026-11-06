@@ -35,7 +35,8 @@
 - [x] `agent-settings`: แก้ Agent หลังสร้างด้วย `agent.update` ที่เซ็นแล้ว ทั้ง Provider, model และหน้าตา Character (ADR 0006, 0042)
 - [ ] `delete-agent`: ลบ Agent จากแอปพร้อมยืนยัน และตัดสินว่า Workdir กับ Task เดิมลบทิ้งหรือเก็บไว้ รอ `agent-settings`
 - [ ] `runtime-service`: ติดตั้ง supervisor เป็น service ของระบบ (launchd บน macOS, systemd บน Linux) ให้ Agent ทำงานต่อหลังปิด terminal หรือเปิดเครื่องใหม่
-- [ ] `daily-budget`: Budget ต่อวันที่ proxy (ADR 0043)
+- [x] `daily-budget`: Budget ต่อวันที่ proxy (ADR 0043)
+- [x] `usage-history`: ประวัติการใช้ token 30 วันและหน้า "การใช้ token" (ADR 0066)
 - [ ] `memory-and-compaction`: Memory และการย่อ context (ADR 0036, 0041)
 - [ ] `attachments`: ส่งไฟล์เป็นก้อนผ่าน Hub โดยไม่เก็บ (ADR 0050)
 - [ ] `push-notifications`: push ของ Approval, Turn ที่เสร็จ และ Budget (ADR 0044)
