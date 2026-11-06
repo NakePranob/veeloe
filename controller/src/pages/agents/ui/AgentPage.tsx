@@ -11,6 +11,7 @@ import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, useNow, when } from "../../../shared/lib";
 import { Empty, Field, Icon, Meter, Note, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
 import { providerProblem } from "../model/providers";
+import { budgetOf } from "../model/budget";
 
 // controller-prototype's AgentPage: the Agent's Tasks first, then its settings.
 // ponytail: only what this version has. Description, instructions, Budget, Approval, Allowlist and the rest come with their changes.
@@ -36,8 +37,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
   // A name or Budget not being edited follows the Machine's (ADR 0006).
   const [budgetText, setBudgetText] = useState(agent.budget !== null ? String(agent.budget / 1_000_000) : "");
   // The field takes millions; what goes to the Machine is a whole number of tokens above zero.
-  const budgetTokens = Math.round(Number(budgetText.trim().replace(",", ".")) * 1_000_000);
-  const budgetValid = budgetText.trim() !== "" && Number.isFinite(budgetTokens) && budgetTokens > 0;
+  const { tokens: budgetTokens, valid: budgetValid } = budgetOf(budgetText);
   const budgetChanged = agent.budget === null ? budgetValid : budgetTokens !== agent.budget;
   const share = agent.budget ? Math.min(1, (agent.usage_tokens ?? 0) / agent.budget) : 0;
   // One save for the name and the Budget: the header's button. An unchanged Budget is left out, and an invalid one disables it.
