@@ -1,6 +1,7 @@
 import { createBackoff, createSigner, normalizeHubUrl, parseMessage, publicKeyOf, TASK_EVENTS_PAGE, toBase64url, verify } from "@veeloe/protocol";
 import { createAgentRegistry } from "./agent-registry/registry";
 import { createAgentsSlice } from "./agents/agents";
+import { budgetDay, createBudgets } from "./budget/budget";
 import type { Inbound, Outbox } from "./outbox";
 import { createEgressSlice, loadEgress } from "./egress/egress";
 import { createLlmHandler } from "./proxy/proxy";
@@ -9,6 +10,8 @@ import { SandboxError, startSandbox, type Sandbox } from "./sandbox/sandbox";
 import { createTaskMessageSlice } from "./task-message/task-message";
 import { createTaskListSlice } from "./task-list/task-list";
 import { createTaskSyncSlice } from "./task-sync/task-sync";
+import { createUsageStore, UsageError } from "./usage/store";
+import { createUsageSlice } from "./usage/usage";
 import { createWorkers } from "./workers/workers";
 import { ConfigError, loadConfig, runtimeHome, saveHubUrl } from "./config";
 import { startHubLink } from "./hub-link/hub-link";
@@ -55,10 +58,28 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
   let machine: string | undefined;
 
   const registry = createAgentRegistry(home);
+  // The tally Budget is enforced against and the history are one store (ADR 0066); the old file comes in once.
+  const usageStore = createUsageStore({ home, log });
+  usageStore.importLegacy();
+  usageStore.prune(budgetDay(Date.now()));
+  const budgets = createBudgets({ store: usageStore });
   const providers = () => loadProviders(home);
   const taskRoutes = createTaskRoutes(home);
+  const membersInTrust = () => trust.owners.map((owner) => owner.member);
   const llm = createLlmHandler({
     fetchFn,
+    log,
+    allow: (id) => {
+      const agent = registry.get(id);
+      return !agent || !budgets.exhausted(agent);
+    },
+    // Every answer that reported tokens reaches every Member, which is who sets a Budget in v0.1 (ADR 0034, 0043).
+    onUsage: (id, task, tokens) => {
+      const agent = registry.get(id);
+      if (!agent) return;
+      const tally = budgets.add(agent, task ?? "", tokens);
+      for (const member of membersInTrust()) outbox.toMember(member, "agent.usage", { agent: id, day: tally.day, tokens: tally.tokens, budget: budgets.limitOf(agent) });
+    },
     route(id, task) {
       const agent = registry.get(id);
       return agent && taskRoutes(agent, task, providers());
@@ -88,10 +109,19 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
   for (const agent of registry.all()) workers.start(agent);
 
   const egress = createEgressSlice({ home, apply: sandbox.setEgress, outbox, listed: () => agents.listed() });
-  const agents = createAgentsSlice({ registry, workers, providers, egress: egress.current, outbox, fetchFn, members: () => trust.owners.map((o) => o.member) });
-  const taskMessage = createTaskMessageSlice({ registry, workers, outbox });
+  const agents = createAgentsSlice({ registry, workers, providers, egress: egress.current, outbox, fetchFn, members: membersInTrust, budgets });
+  const taskMessage = createTaskMessageSlice({
+    registry,
+    workers,
+    outbox,
+    exhausted: (id) => {
+      const agent = registry.get(id);
+      return !!agent && budgets.exhausted(agent);
+    },
+  });
   const taskSync = createTaskSyncSlice({ registry, workers, outbox });
   const taskList = createTaskListSlice({ registry, workers });
+  const usage = createUsageSlice({ registry, store: usageStore, outbox, members: membersInTrust });
 
   const hub = startHubLink({
     hubUrl,
@@ -128,6 +158,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
       else if (message.type === "task.sync" && from.task) taskSync({ ...from, task: from.task }, message.body);
       else if (message.type === "egress.set") void egress.set(from, message.body);
       else if (message.type === "task.list") taskList(from);
+      else if (message.type === "usage.list") usage(from, message.body);
     },
   });
 
@@ -136,6 +167,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
     stop() {
       hub.stop();
       workers.stop();
+      usageStore.close();
     },
   };
 }
@@ -145,7 +177,7 @@ async function reporting(work: () => unknown | Promise<unknown>) {
   try {
     await work();
   } catch (err) {
-    if (err instanceof ConfigError || err instanceof KeyFileError || err instanceof TrustFileError || err instanceof ProviderError || err instanceof SandboxError) {
+    if (err instanceof ConfigError || err instanceof KeyFileError || err instanceof TrustFileError || err instanceof ProviderError || err instanceof SandboxError || err instanceof UsageError) {
       console.error(`veeloe: ${err.message}`);
       process.exit(1);
     }

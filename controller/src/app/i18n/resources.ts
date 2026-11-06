@@ -11,6 +11,7 @@ import { machinesI18n } from "../../pages/machines";
 import { otherTabI18n } from "../../pages/other-tab";
 import { storageUnavailableI18n } from "../../pages/storage-unavailable";
 import { taskI18n } from "../../pages/task";
+import { usageI18n } from "../../pages/usage";
 import { workspaceI18n } from "../../pages/workspace";
 import { taskStatusI18n } from "../../entities/task";
 import { agentInboxI18n } from "../../widgets/agent-inbox";
@@ -34,6 +35,7 @@ const slices = {
   "other-tab": otherTabI18n,
   "storage-unavailable": storageUnavailableI18n,
   task: taskI18n,
+  usage: usageI18n,
   workspace: workspaceI18n,
 };
 

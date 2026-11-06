@@ -25,10 +25,13 @@ function tempDb() {
   return join(dir, "tasks.db");
 }
 
-function overIpc(preset?: string) {
+function overIpc(preset?: string, extra: { allow?: (agent: string) => boolean } = {}) {
   const provider = fakeProvider();
   cleanup.push(() => provider.server.stop(true));
-  const handle = createLlmHandler({ route: (agent) => (agent === "a1" ? { provider: { name: "p", url: provider.url, key: FAKE_KEY, auth: "x-api-key", preset }, model: "model-a" } : undefined) });
+  const handle = createLlmHandler({
+    route: (agent) => (agent === "a1" ? { provider: { name: "p", url: provider.url, key: FAKE_KEY, auth: "x-api-key", preset }, model: "model-a" } : undefined),
+    ...extra,
+  });
   const link = ipcFetch((message: FromWorker) => {
     if (message.kind !== "llm.request") return;
     const { id, kind: _, ...request } = JSON.parse(JSON.stringify(message)) as typeof message;
@@ -77,4 +80,19 @@ test("OpenCode Go gets the Task's id as its session, and every Provider learns t
     expect(headers["x-api-key"]).toBe(FAKE_KEY);
     expect(Object.keys(headers).filter((h) => h.startsWith("x-veeloe"))).toEqual([]);
   }
+});
+
+test("a spent Budget reaches the SDK as one refusal with its own code, and the Provider is never asked", async () => {
+  let asked = 0;
+  const { provider, llm } = overIpc(undefined, {
+    allow: () => {
+      asked++;
+      return false;
+    },
+  });
+  const ask = () => llm.send({ task: "t", system: "", messages: [{ role: "user", content: [{ type: "text", text: "x" }] }], tools: [] });
+  await expect(ask()).rejects.toEqual(new LlmError("budget.exhausted"));
+  expect(provider.requests).toEqual([]);
+  // One request over IPC, so the SDK did not try again after the refusal.
+  expect(asked).toBe(1);
 });

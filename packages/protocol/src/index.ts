@@ -34,10 +34,12 @@ export {
   AgentListBodySchema,
   AgentListedBodySchema,
   AgentUpdateBodySchema,
+  AgentUsageBodySchema,
   type Agent,
   type AgentCreateBody,
   type AgentListedBody,
   type AgentUpdateBody,
+  type AgentUsageBody,
   type ProviderInfo,
 } from "./messages/agent";
 export {
@@ -58,6 +60,15 @@ export {
   type TaskSyncBody,
 } from "./messages/task";
 export { EGRESS_MAX, EgressDomainSchema, EgressSchema, EgressSetBodySchema, type EgressSetBody } from "./messages/egress";
+export {
+  UsageAgentSchema,
+  UsageDaySchema,
+  UsageGetBodySchema,
+  UsageListedBodySchema,
+  type UsageAgent,
+  type UsageGetBody,
+  type UsageListedBody,
+} from "./messages/usage";
 export {
   CertificateSchema,
   DeviceLinkSchema,

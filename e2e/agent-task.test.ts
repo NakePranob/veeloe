@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseMessage, publicKeyOf, toBase64url, type KnownMessage } from "@veeloe/protocol";
 import { startHubClient } from "../controller/src/shared/hub-client";
-import { FAKE_KEY, fakeProvider } from "../packages/runtime/src/supervisor/providers/fake-provider";
+import { FAKE_KEY, fakeProvider, sse } from "../packages/runtime/src/supervisor/providers/fake-provider";
 
 // The compiled `veeloe`, its workers and its proxy, through the real relay, with
 // the Controller's own client and a stand-in Provider. TEST-ONLY KEYS, the seeds cmd/testhub knows.
@@ -152,4 +152,80 @@ test("after agent.update a Task keeps its model and a new one gets the new one, 
     other.server.stop(true);
     owner.client.stop();
   }
+}, 90_000);
+
+/** An SSE answer that asks for a tool the Machine lacks, so the Turn goes back to the LLM again. */
+function toolUseSse() {
+  const start = JSON.stringify({ type: "message_start", message: { id: "msg_b", type: "message", role: "assistant", model: "model-a", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } } });
+  const block = JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tu1", name: "no_such_tool", input: {} } });
+  const delta = JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } });
+  const stop = JSON.stringify({ type: "content_block_stop", index: 0 });
+  const end = JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 3 } });
+  return new Response([start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
+}
+
+test("a Budget set from the app stops a Turn at its next request, refuses a new message, and lets both go once it is raised", async () => {
+  const owner = controller();
+  await owner.ready;
+  owner.send("agent.create", { id: "agent-budget", name: "Budgeted", provider: "main", model: "model-a" });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-budget"));
+  // The stand-in answers report four tokens each: one input and three output.
+  owner.send("agent.update", { id: "agent-budget", budget: 4 });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-budget" && a.budget === 4));
+
+  provider.reply = () => toolUseSse();
+  const before = provider.requests.filter((r) => r.path === "/v1/messages").length;
+  owner.send("task.message", { agent: "agent-budget", id: "b1", text: "go" }, "task-budget");
+  const ended = await owner.waitFor((m) => m.type === "task.event" && m.task === "task-budget" && m.body.kind === "turn.ended");
+  expect(ended.body.body).toMatchObject({ reason: "error", code: "budget.exhausted" });
+  const endedSeq = (ended.body as { seq: number }).seq;
+  // The second request of that Turn never reached the Provider.
+  expect(provider.requests.filter((r) => r.path === "/v1/messages")).toHaveLength(before + 1);
+
+  // A new message at the spent Budget is refused, with the same code.
+  owner.send("task.message", { agent: "agent-budget", id: "b2", text: "again" }, "task-budget");
+  const refused = await owner.waitFor((m) => m.type === "error" && m.body.code === "budget.exhausted");
+  expect(refused.body).toMatchObject({ code: "budget.exhausted" });
+
+  // Raising the Budget past today's tokens lets the same Task go on.
+  provider.reply = () => sse([{ type: "text", text: "hello" }]);
+  owner.send("agent.update", { id: "agent-budget", budget: 20_000_000 });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-budget" && a.budget === 20_000_000));
+  owner.send("task.message", { agent: "agent-budget", id: "b3", text: "back" }, "task-budget");
+  const done = await owner.waitFor((m) => m.type === "task.event" && m.task === "task-budget" && m.body.kind === "turn.ended" && (m.body as { seq: number }).seq > endedSeq);
+  expect(done.body.body).toEqual({ reason: "done" });
+  owner.client.stop();
+}, 90_000);
+
+test("usage.list answers with the Machine's own days, the Tasks behind the tokens, and the request it came from", async () => {
+  const owner = controller();
+  await owner.ready;
+  owner.send("agent.create", { id: "agent-usage", name: "Measured", provider: "main", model: "model-a" });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-usage"));
+
+  provider.reply = () => sse([{ type: "text", text: "hello" }]);
+  const ended = (task: string) => owner.inbox.filter((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended").length;
+  for (const [task, text] of [["task-usage-1", "one"], ["task-usage-2", "two"]] as const) {
+    const before = ended(task);
+    owner.send("task.message", { agent: "agent-usage", id: `${task}-m`, text }, task);
+    await owner.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended");
+    expect(ended(task)).toBe(before + 1);
+  }
+
+  owner.send("usage.list", { request: "usage-e2e", days: 1 });
+  const answer = await owner.waitFor((m) => m.type === "usage.listed" && m.body.request === "usage-e2e");
+  const today = (answer.body as { from: string }).from;
+  expect(answer.body).toMatchObject({
+    request: "usage-e2e",
+    from: today,
+    to: today,
+    agents: [{ agent: "agent-usage", days: [{ day: today, tokens: 8 }], tasks: [{ task: "task-usage-1", tokens: 4 }, { task: "task-usage-2", tokens: 4 }], sources: [{ source: "task", tokens: 8 }] }],
+  });
+
+  owner.send("usage.list", { request: "usage-week", days: 7 });
+  const week = await owner.waitFor((m) => m.type === "usage.listed" && m.body.request === "usage-week");
+  const weekBody = week.body as { from: string; to: string };
+  expect(weekBody.to).toBe(today);
+  expect(weekBody.from < today).toBe(true);
+  owner.client.stop();
 }, 90_000);

@@ -6,8 +6,8 @@ export type FakeProvider = {
   server: Server<undefined>;
   /** Every request it got, headers lower-cased. */
   requests: { method: string; path: string; headers: Record<string, string>; body: unknown }[];
-  /** What `POST /v1/messages` answers; the default says hello. */
-  reply: (body: { model?: string; messages?: unknown[]; stream?: boolean }) => Response;
+  /** What `POST /v1/messages` answers; the default says hello. A Promise lets a test act before the answer lands. */
+  reply: (body: { model?: string; messages?: unknown[]; stream?: boolean }) => Response | Promise<Response>;
 };
 
 export const FAKE_KEY = "test-provider-key";

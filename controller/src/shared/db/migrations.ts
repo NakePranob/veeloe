@@ -55,4 +55,17 @@ export const MIGRATIONS = [
     linked_at INTEGER,
     revoked_at INTEGER
   )`,
+  // The Agent's daily token Budget and today's tally, as the Machine last said (`daily-budget`, ADR 0043).
+  // Null until a Machine that knows of them answers.
+  `ALTER TABLE agent ADD COLUMN budget INTEGER;
+  ALTER TABLE agent ADD COLUMN usage_day TEXT;
+  ALTER TABLE agent ADD COLUMN usage_tokens INTEGER`,
+  // Daily token totals the Machine answered with (`usage-history`, ADR 0066), and when it last answered.
+  `CREATE TABLE usage_day (
+    agent_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    tokens INTEGER NOT NULL,
+    PRIMARY KEY (agent_id, day)
+  );
+  ALTER TABLE machine ADD COLUMN usage_fetched_at INTEGER`,
 ] as const;

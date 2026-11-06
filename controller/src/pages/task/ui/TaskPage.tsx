@@ -1,7 +1,7 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from "react-native";
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
 import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
@@ -38,6 +38,22 @@ function Problem({ code }: { code: string }) {
   );
 }
 
+// The one failure with a way out: the Turn stopped because today's token Budget ran out (`daily-budget`).
+function BudgetCard({ machine, agent }: { machine: string; agent: string }) {
+  const t = useT("task");
+  return (
+    <Card>
+      <Label icon="info" iconColor="orange">
+        {t("budget.out")}
+      </Label>
+      <Text>{t("budget.body", { machine })}</Text>
+      <View style={{ flexDirection: "row" }}>
+        <Button label={t("budget.add")} variant="primary" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent } })} />
+      </View>
+    </Card>
+  );
+}
+
 // Laid out like Messages: your messages in accent bubbles on the right. The
 // Agent's replies have no bubble, because they run long and carry code.
 export function TaskPage() {
@@ -66,6 +82,7 @@ export function TaskPage() {
 
   function send() {
     if (!message || !link || !machine || !agent || busy) return;
+    Keyboard.dismiss();
     setText("");
     void link.sendMessage(machine, { agent: agent.id, task, text: message });
   }
@@ -116,6 +133,8 @@ export function TaskPage() {
             <AgentText key={item.key} text={item.text} />
           ) : item.kind === "tools" ? (
             <ToolCalls key={item.key} calls={item.calls} />
+          ) : item.code === "budget.exhausted" ? (
+            <BudgetCard key={item.key} machine={machine.name} agent={agent.id} />
           ) : (
             <Problem key={item.key} code={item.code} />
           ),

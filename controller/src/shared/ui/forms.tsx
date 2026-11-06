@@ -19,6 +19,8 @@ export function Screen({ title, right, children }: ScreenProps) {
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
+      // Room for the keyboard on iOS, so a field near the end of a screen can scroll above it.
+      automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
       contentContainerStyle={[column, { padding: space.lg, gap: space.lg, paddingBottom: space.xl * 2 }]}

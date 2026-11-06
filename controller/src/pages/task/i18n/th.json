@@ -19,6 +19,11 @@
     "unfinished": "ไม่เสร็จ"
   },
   "busy": "ส่งได้เมื่อ Turn นี้จบ",
+  "budget": {
+    "out": "Budget ของวันนี้หมดแล้ว",
+    "body": "งานใหม่จะเริ่มตอน 04:00 ตามเวลาของ {{machine}} หรือเมื่อเพิ่ม Budget ไฟล์ที่แก้ไว้ยังอยู่",
+    "add": "เพิ่ม Budget"
+  },
   "openAgent": "เปิดหน้า {{name}}",
   "started": "{{machine}} · {{when}}",
   "notStarted": "{{machine}} · ยังไม่ได้เริ่ม"

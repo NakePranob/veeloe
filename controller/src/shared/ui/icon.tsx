@@ -28,6 +28,7 @@ const SYMBOLS = {
   collapse: { ios: "chevron.up", android: "expand_less", web: "expand_less" },
   network: { ios: "globe", android: "public", web: "public" },
   device: { ios: "iphone", android: "smartphone", web: "smartphone" },
+  usage: { ios: "chart.bar", android: "bar_chart", web: "bar_chart" },
   trash: { ios: "trash", android: "delete", web: "delete" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 

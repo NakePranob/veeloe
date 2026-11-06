@@ -82,7 +82,7 @@ migration ใหม่เพิ่มคอลัมน์ `budget`, `usage_day`
 
 ### หน้าจอของ Controller ตาม prototype
 
-- **หน้า Agent** (`pages/agents/ui/AgentPage.tsx` ซึ่งมีส่วนชื่อ, Character และ Provider กับ model แล้ว) เพิ่มส่วน "Budget วันนี้" ตาม `controller-prototype/src/pages/agents/ui/AgentPage.tsx`: `Meter`, ตัวเลข "2.4M จาก 10M token (24%)" กับไอคอน `info` สีส้มที่ 80% และแดงพร้อม "หมดแล้ว" ที่ 100%, `Field` "Budget ต่อวัน (ล้าน token)" แบบ `decimal-pad` และปุ่ม "ตั้ง Budget" ที่กดไม่ได้เมื่อค่าไม่เปลี่ยน ไม่ใช่ตัวเลขที่มากกว่า 0 หรือ Machine ออฟไลน์ วางต่อจากส่วน Provider ตามลำดับของ prototype คำท้ายส่วนใช้ข้อความของ prototype
+- **หน้า Agent** (`pages/agents/ui/AgentPage.tsx` ซึ่งมีส่วนชื่อ, Character และ Provider กับ model แล้ว) เพิ่มส่วน "Budget วันนี้" ตาม `controller-prototype/src/pages/agents/ui/AgentPage.tsx`: `Meter`, ตัวเลข "2.4M จาก 10M token (24%)" กับไอคอน `info` สีส้มที่ 80% และแดงพร้อม "หมดแล้ว" ที่ 100%, และ `Field` "Budget ต่อวัน (ล้าน token)" แบบ `decimal-pad` ปุ่มบันทึกที่หัวหน้าของหน้าส่ง `id`, `name` และ `budget` ในซองเดียวเมื่อ Budget เปลี่ยน (ส่งเฉพาะ `id` กับ `name` เมื่อ Budget ไม่เปลี่ยน) และกดไม่ได้เมื่อทั้งชื่อและ Budget ไม่เปลี่ยน ค่า Budget ไม่ถูกต้อง หรือ Machine ออฟไลน์ วางต่อจากส่วน Provider ตามลำดับของ prototype คำท้ายส่วนใช้ข้อความของ prototype
 - **`Meter`** ย้ายจาก `controller-prototype/src/shared/ui/meter.tsx` และ **`formatTokens`** จาก `controller-prototype/src/shared/lib/tokens.ts` มาไว้ใน `shared/` ของ Controller ตามที่เป็น
 - **รายชื่อ Agent** ตาม `controller-prototype/src/pages/agents/ui/AgentsPage.tsx`: ต่อท้ายบรรทัด Machine ด้วย "· Budget วันนี้ N%"
 - **หน้าสร้าง Agent** ตาม `controller-prototype/src/pages/agents/ui/NewAgentPage.tsx`: `Note` ว่า Budget เริ่มที่ 10M token ต่อวันและตั้งทีหลังได้ที่หน้า Agent
@@ -100,4 +100,4 @@ migration ใหม่เพิ่มคอลัมน์ `budget`, `usage_day`
 - [`usage.json` ถูกเขียนทุกคำตอบ] → ไฟล์เล็กและ rename ทีเดียว ถ้าโปรเซสตายระหว่างคำตอบกับการเขียน เสียการนับหนึ่งคำตอบ
 - [โน้ตบุ๊กที่ย้ายเขตเวลาหรือนาฬิกาถอย] → วันสั้นหรือยาวกว่าปกติ ตาม Consequences ของ ADR 0043
 - [`agent.usage` หนึ่งซองต่อคำตอบของ LLM ถึงทุก Member] → หนึ่ง Turn มีไม่เกิน 50 รอบ (`MAX_ROUNDS`) และซองเล็ก ถ้าถี่เกินค่อยส่งเฉพาะตอน Turn จบ
-- [`agent.update` ที่มี `budget` กับ `model` ในซองเดียวแล้ว model ไม่ผ่าน ทำให้ Budget ไม่เปลี่ยนด้วย] → ตรงกับกฎ all-or-none ของ `agent-settings` และหน้า Agent ส่ง Budget แยกซองอยู่แล้ว
+- [`agent.update` ที่มี `budget` กับ `model` ในซองเดียวแล้ว model ไม่ผ่าน ทำให้ Budget ไม่เปลี่ยนด้วย] → ตรงกับกฎ all-or-none ของ `agent-settings` และหน้า Agent ส่ง Budget มากับชื่อโดยไม่ส่ง model มาด้วย

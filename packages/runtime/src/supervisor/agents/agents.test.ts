@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Agent } from "@veeloe/protocol";
 import { createAgentRegistry } from "../agent-registry/registry";
+import { budgetDay, createBudgets } from "../budget/budget";
+import { createUsageStore } from "../usage/store";
 import { FAKE_KEY, fakeProvider } from "../providers/fake-provider";
 import type { Provider } from "../providers/store";
 import { createAgentsSlice } from "./agents";
@@ -19,6 +21,12 @@ function setup() {
   cleanup.push(() => fake.server.stop(true));
   const home = mkdtempSync(join(tmpdir(), "veeloe-agents-"));
   const registry = createAgentRegistry(home);
+  const store = createUsageStore({ home });
+  cleanup.push(() => {
+    store.close();
+    rmSync(home, { recursive: true, force: true });
+  });
+  const budgets = createBudgets({ store });
   const agent: Agent = { id: "a1", name: "A", provider: "main", model: "model-a", character };
   registry.add(agent);
   let providers: Provider[] = [
@@ -35,9 +43,10 @@ function setup() {
     egress: () => [],
     outbox: { toMember: (member, type, body) => void sent.push({ member, type, body }), error: (to, code) => void sent.push({ member: to.member, type: "error", body: { code } }) },
     members: () => ["m_1", "m_2"],
+    budgets,
   });
   const errors = () => sent.filter((s) => s.type === "error").map((s) => (s.body as { code: string }).code);
-  return { home, registry, slice, sent, renamed, errors, agent, setProviders: (p: Provider[]) => (providers = p) };
+  return { home, registry, budgets, slice, sent, renamed, errors, agent, setProviders: (p: Provider[]) => (providers = p) };
 }
 
 test("a new name changes only the name, reaches the worker, and every Member in trust hears of it", async () => {
@@ -94,4 +103,39 @@ test("a Character is kept as sent, a part this build does not know included, and
   const look = { ...character, color: "#000000", shell: "orb", glow: true };
   await s.slice.update(from, { id: "a1", character: look, model: "model-b" });
   expect(createAgentRegistry(s.home).get("a1")).toEqual({ ...s.agent, model: "model-b", character: look });
+});
+
+test("a listed Agent carries its Budget and today's usage, and one made before the change gets the default", async () => {
+  const s = setup();
+  const listed = await s.slice.listed();
+  expect(listed.agents[0]).toMatchObject({ id: "a1", budget: 10_000_000, usage: { day: budgetDay(Date.now()), tokens: 0 } });
+});
+
+test("a Budget alone changes without asking the Provider, even one that is down", async () => {
+  const s = setup();
+  s.setProviders([{ name: "main", url: "http://127.0.0.1:1", key: FAKE_KEY, auth: "x-api-key" }]);
+  await s.slice.update(from, { id: "a1", budget: 5_000_000 });
+  expect(s.errors()).toEqual([]);
+  expect(s.registry.get("a1")).toMatchObject({ name: "A", provider: "main", model: "model-a", budget: 5_000_000 });
+  expect(s.renamed).toEqual([]);
+  expect(s.sent.filter((m) => m.type === "agent.listed")).toHaveLength(2);
+});
+
+test("a Budget sent with a model that fails changes nothing, and a Member without Manage cannot set one", async () => {
+  const s = setup();
+  await s.slice.update(from, { id: "a1", budget: 7_000_000, model: "no-such-model" });
+  expect(s.errors()).toEqual(["agent.provider_unknown"]);
+  expect(s.registry.get("a1")).toEqual(s.agent);
+  await s.slice.update({ member: "m_stranger", ref: "sig-2" }, { id: "a1", budget: 7_000_000 });
+  expect(s.errors()).toEqual(["agent.provider_unknown", "agent.unknown"]);
+  expect(s.registry.get("a1")).toEqual(s.agent);
+});
+
+test("a Budget raised past today's tokens no longer counts the Agent as exhausted", async () => {
+  const s = setup();
+  s.budgets.add(s.agent, "", 10_000_000);
+  expect(s.budgets.exhausted(s.registry.get("a1")!)).toBe(true);
+
+  await s.slice.update(from, { id: "a1", budget: 20_000_000 });
+  expect(s.budgets.exhausted(s.registry.get("a1")!)).toBe(false);
 });

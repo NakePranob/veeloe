@@ -2,6 +2,8 @@
   "onMachines": "On your Machines",
   "people": "People",
   "devices": "My devices",
+  "usage": "Token usage",
+  "usageDetail": "Daily totals, by Machine and Agent",
   "oneDevice": "You have one device. If you lose it, you will have to pair every Machine again. Link a second one now on My devices.",
   "language": {
     "heading": "Language",

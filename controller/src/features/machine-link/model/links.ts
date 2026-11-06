@@ -1,8 +1,9 @@
 import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type AgentUpdateBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol";
 import { saveCertificates } from "../../../entities/device";
-import { saveAgents } from "../../../entities/agent";
+import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
 import { addListedTasks, addPendingMessage, failPendingMessage, listTasks, markPendingSent, saveTaskEvents } from "../../../entities/task";
+import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
 import { startHubClient } from "../../../shared/hub-client";
 
@@ -19,9 +20,27 @@ export type MachineStatus = {
 
 const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null };
 
+/** One page's usage request for one Machine: what it asked for, and how it went. */
+export type UsageStatus = {
+  request: string | null;
+  days: number | null;
+  loading: boolean;
+  /** A code from the Hub or the Machine, such as `hub.machine_offline` or `usage.invalid_range`. */
+  error: string | null;
+  /** The range the Machine chose, which its own clock defines; null before its first answer. */
+  from: string | null;
+  to: string | null;
+  /** The biggest Tasks of that answer, for the page's list; only held in memory. */
+  tasks: { agent: string; task: string; tokens: number }[];
+  /** The answer's total for its range, so the "other" row comes from the same answer as the Tasks. */
+  total: number;
+};
+
+const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, error: null, from: null, to: null, tasks: [], total: 0 };
+
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "hello" | "other";
+type Kind = "create" | "update" | "hello" | "usage" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -56,8 +75,12 @@ export function createMachineLinks({
   // A new object on every change, so React can tell that something moved.
   let all: Record<string, MachineStatus> = {};
   const listeners = new Set<() => void>();
+  const usageStatuses = new Map<string, UsageStatus>();
+  // A new object on every change, so React can tell that something moved.
+  let allUsage: Record<string, UsageStatus> = {};
+  const usageListeners = new Set<() => void>();
   /** Which Machine an envelope went to, by its sig, so an answer about it finds its way back. */
-  const sentTo = new Map<string, { machine: string; kind: Kind }>();
+  const sentTo = new Map<string, { machine: string; kind: Kind; request?: string }>();
   // The Hub does not say when a Machine comes back, so one that was offline is asked again, later each time.
   const retries = new Map<string, { timer: ReturnType<typeof setTimeout>; backoff: ReturnType<typeof createBackoff> }>();
 
@@ -67,12 +90,18 @@ export function createMachineLinks({
     for (const listener of [...listeners]) listener();
   }
 
-  function sendTo(machine: Machine, kind: Kind, out: { type: string; task?: string; body: unknown }) {
+  function setUsage(machine: string, change: Partial<UsageStatus>) {
+    usageStatuses.set(machine, { ...(usageStatuses.get(machine) ?? UNKNOWN_USAGE), ...change });
+    allUsage = Object.fromEntries(usageStatuses);
+    for (const listener of [...usageListeners]) listener();
+  }
+
+  function sendTo(machine: Machine, kind: Kind, out: { type: string; task?: string; body: unknown }, request?: string) {
     const entry = clients.get(machine.hub_url);
     const member = entry?.client.member();
     if (!entry || !member) return null;
     const sig = entry.client.send({ ...out, to: machine.id, member });
-    if (sig) sentTo.set(sig, { machine: machine.id, kind });
+    if (sig) sentTo.set(sig, { machine: machine.id, kind, ...(request ? { request } : {}) });
     return sig;
   }
 
@@ -106,6 +135,23 @@ export function createMachineLinks({
       // A Machine older than `sandboxed-commands` says nothing of it, which is not the same as an empty Egress.
       if (message.body.egress) await saveEgress(database, machine.id, message.body.egress);
       setStatus(machine.id, { online: true, providers: message.body.providers });
+    } else if (message.type === "agent.usage") {
+      // The tally of an answer already given, kept before anything shows it; older news never wins (`daily-budget`).
+      await saveUsage(database, message.body);
+    } else if (message.type === "usage.listed") {
+      const current = usageStatuses.get(machine.id);
+      // An answer to an older window is dropped whole: its days would otherwise show up in the current one.
+      if (!current || current.request !== message.body.request) return;
+      await saveUsageHistory(database, machine.id, message.body);
+      await saveUsageFetchedAt(database, machine.id, Date.now());
+      setUsage(machine.id, {
+        loading: false,
+        error: null,
+        from: message.body.from,
+        to: message.body.to,
+        total: message.body.agents.reduce((sum, agent) => sum + agent.days.reduce((all, day) => all + day.tokens, 0), 0),
+        tasks: message.body.agents.flatMap((agent) => agent.tasks.map((task) => ({ agent: agent.agent, ...task }))),
+      });
     } else if ((message.type === "task.event" || message.type === "task.events") && signed.task) {
       const events = message.type === "task.event" ? [message.body] : message.body.events;
       await saveTaskEvents(database, { task: signed.task, agent: message.body.agent, machine: machine.id }, events);
@@ -115,7 +161,10 @@ export function createMachineLinks({
       const about = sentTo.get(message.body.ref);
       if (about?.kind === "create") setStatus(machine.id, { createError: message.body.code });
       else if (about?.kind === "update") setStatus(machine.id, { updateError: message.body.code });
-      else await failPendingMessage(database, message.body.ref, message.body.code);
+      else if (about?.kind === "usage") {
+        const current = usageStatuses.get(about.machine);
+        if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: message.body.code });
+      } else await failPendingMessage(database, message.body.ref, message.body.code);
     }
   }
 
@@ -155,6 +204,11 @@ export function createMachineLinks({
           if (about.kind === "hello" && machine) helloLater(machine);
         }
         if (about.kind === "hello") return;
+        if (about.kind === "usage") {
+          const current = usageStatuses.get(about.machine);
+          if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: error.code });
+          return;
+        }
         if (about.kind === "create") setStatus(about.machine, { createError: error.code });
         else if (about.kind === "update") setStatus(about.machine, { updateError: error.code });
         else void failPendingMessage(database, error.ref!, error.code);
@@ -188,6 +242,30 @@ export function createMachineLinks({
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => void listeners.delete(listener);
+    },
+
+    /**
+     * Asks a Machine for how the last `days` Budget days went. The answer is cached
+     * before the page hears of it, and the request id keeps a slow answer from an
+     * older window out of the page. Null when the Hub is not connected and nothing went.
+     */
+    requestUsage(machine: Machine, days: number) {
+      const current = usageStatuses.get(machine.id);
+      if (current?.loading && current.days === days) return current.request;
+      const request = newId();
+      setUsage(machine.id, { request, days, loading: true, error: null });
+      if (!sendTo(machine, "usage", { type: "usage.list", body: { request, days } }, request)) {
+        setUsage(machine.id, { request, days, loading: false, error: "hub.machine_offline" });
+        return null;
+      }
+      return request;
+    },
+
+    usage: (machine: string) => usageStatuses.get(machine) ?? UNKNOWN_USAGE,
+    usageStatuses: () => allUsage,
+    subscribeUsage(listener: () => void) {
+      usageListeners.add(listener);
+      return () => void usageListeners.delete(listener);
     },
 
     /** The new Agent's id, or null when the Machine's Hub is not connected and nothing went. The Machine keeps `character` with it. */

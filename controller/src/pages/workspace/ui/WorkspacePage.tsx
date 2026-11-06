@@ -22,6 +22,9 @@ export function WorkspacePage() {
         <Row icon="machine" title="Machine" value={machines ? String(machines.length) : undefined} href="/machines" />
         <Row icon="agent" title="Agent" value={agents ? String(agents.length) : undefined} href="/agents" />
       </Section>
+      <Section>
+        <Row icon="usage" title={t("usage")} detail={t("usageDetail")} href="/usage" />
+      </Section>
       <Section title={t("people")}>
         <Row icon="device" title={t("devices")} value={live?.length ? String(live.length) : undefined} href="/devices" />
       </Section>

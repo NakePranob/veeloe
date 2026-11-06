@@ -92,6 +92,8 @@ export function NewAgentPage() {
         onModel={setModel}
       />
 
+      <Note>{t("budget.default")}</Note>
+
       {creating && <Row title={t("creating")} accessory={<ActivityIndicator color={colors.secondaryLabel} />} />}
       {status?.createError && (
         <Note icon="warning" iconColor="orange">

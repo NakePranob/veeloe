@@ -4,11 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSigner, MemorySeenSequences, parseMessage, publicKeyOf, toBase64url, verify, type KnownMessage } from "@veeloe/protocol";
 import { startSupervisor } from ".";
+import { budgetDay } from "./budget/budget";
 import { fakeHub, type FakeHub } from "./hub-link/fake-hub";
 import { runUnpair } from "./pairing/unpair";
-import { FAKE_KEY, fakeProvider, type FakeProvider } from "./providers/fake-provider";
+import { FAKE_KEY, fakeProvider, sse, type FakeProvider } from "./providers/fake-provider";
 import { loadProviders, saveProviders } from "./providers/store";
 import { saveTrust } from "./trust/store";
+import { shiftDay } from "./usage/day";
 
 // The supervisor with its real workers, a stand-in Hub and a stand-in Provider. TEST-ONLY KEYS.
 const machineSeed = new Uint8Array(32).fill(0x33);
@@ -299,3 +301,104 @@ test("a Task keeps its model after the Agent's changes, across a restart; a new 
   expect(loadProviders(second.home).map((p) => p.name)).toEqual(["other"]);
   rmSync(first.home, { recursive: true, force: true });
 }, 30_000);
+
+/** An SSE answer that asks for a tool this Machine lacks, so the Turn goes back to the LLM. */
+function toolUseSse() {
+  const start = JSON.stringify({ type: "message_start", message: { id: "msg_b", type: "message", role: "assistant", model: "model-a", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } } });
+  const block = JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tu1", name: "no_such_tool", input: {} } });
+  const delta = JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } });
+  const stop = JSON.stringify({ type: "content_block_stop", index: 0 });
+  const end = JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 3 } });
+  const lines = [start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`);
+  return new Response(lines.join(""), { headers: { "content-type": "text/event-stream" } });
+}
+
+test("a Turn whose Budget runs out after the second answer ends with budget.exhausted, and that answer is in the log whole", async () => {
+  const s = await setup();
+  await createAgent(s, "a1");
+  // Each stand-in answer reports four tokens: one input and three output.
+  s.send("agent.update", { id: "a1", budget: 8 });
+  await s.waitFor("agent.listed", "m_1", (m) => m.body.agents[0]?.budget === 8);
+  s.provider.reply = () => toolUseSse();
+
+  s.send("task.message", { agent: "a1", id: "m1", text: "go" }, { task: "t1" });
+  const ended = await s.waitFor("task.event", "m_1", (m) => m.body.kind === "turn.ended");
+  expect(ended.body.body).toEqual({ reason: "error", code: "budget.exhausted" });
+  // The third request was refused before the Provider saw it.
+  expect(s.provider.requests.filter((r) => r.path === "/v1/messages")).toHaveLength(2);
+
+  const events = s.read("m_1").filter((m) => m.type === "task.event");
+  expect(events.map((m) => m.body.kind)).toEqual(["member.message", "turn.started", "llm.message", "tool.result", "llm.message", "tool.result", "turn.ended"]);
+  const answers = events.filter((m) => m.body.kind === "llm.message").map((m) => (m.body as { body: { content: { type: string }[] } }).body.content);
+  expect(answers[1]!.map((block) => block.type)).toEqual(["tool_use"]);
+  // Every Member hears the tally after each counted answer.
+  const tallies = s.read("m_1").filter((m) => m.type === "agent.usage").map((m) => m.body.tokens);
+  expect(tallies).toEqual([4, 8]);
+
+  // A new message is refused with the same code, and reaches no worker; the other Agent still answers.
+  await createAgent(s, "a2");
+  s.provider.reply = () => sse([{ type: "text", text: "hello" }]);
+  s.read("m_1").length = 0;
+  s.send("task.message", { agent: "a1", id: "m2", text: "again" }, { task: "t1" });
+  expect((await s.waitFor("error")).body).toMatchObject({ code: "budget.exhausted", ref: expect.any(String) });
+  expect(s.read("m_1").some((m) => m.type === "task.event")).toBe(false);
+
+  // Raising the Budget past today's tokens lets the same Task go on.
+  s.provider.reply = () => sse([{ type: "text", text: "hello" }]);
+  s.send("agent.update", { id: "a1", budget: 20_000_000 });
+  await s.waitFor("agent.listed", "m_1", (m) => m.body.agents.some((a) => a.id === "a1" && a.budget === 20_000_000));
+  s.read("m_1").length = 0;
+  s.send("task.message", { agent: "a1", id: "m3", text: "back" }, { task: "t1" });
+  const resumed = await s.waitFor("task.event", "m_1", (m) => m.body.kind === "turn.ended" && (m as { task?: string }).task === "t1");
+  expect(resumed.body.body).toEqual({ reason: "done" });
+
+  await talk(s, "a2", "t2", "still here?");
+}, 40_000);
+
+test("a Budget lowered below today's tokens mid-Turn ends that Turn after the answer already in flight", async () => {
+  const s = await setup();
+  await createAgent(s, "a1");
+  s.send("agent.update", { id: "a1", budget: 1_000_000 });
+  await s.waitFor("agent.listed", "m_1", (m) => m.body.agents.some((a) => a.id === "a1" && a.budget === 1_000_000));
+
+  let calls = 0;
+  s.provider.reply = async () => {
+    calls++;
+    if (calls === 1) return toolUseSse();
+    // The second request was let through before the Budget fell; this answer is the one in flight.
+    s.send("agent.update", { id: "a1", budget: 1 });
+    await until(() => s.read("m_1").some((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "a1" && a.budget === 1)));
+    return toolUseSse();
+  };
+
+  s.send("task.message", { agent: "a1", id: "m1", text: "go" }, { task: "t1" });
+  const ended = await s.waitFor("task.event", "m_1", (m) => m.body.kind === "turn.ended");
+  expect(ended.body.body).toEqual({ reason: "error", code: "budget.exhausted" });
+  expect(calls).toBe(2);
+}, 30_000);
+
+test("usage.list answers with the Machine's own days and the Tasks that used the tokens, to the asker alone", async () => {
+  const s = await setup();
+  await createAgent(s, "a1");
+  await createAgent(s, "a2");
+  s.provider.reply = () => sse([{ type: "text", text: "hello" }]);
+  await talk(s, "a1", "t1", "one");
+  await talk(s, "a1", "t2", "two");
+
+  s.read("m_1").length = 0;
+  s.send("usage.list", { request: "req-1", days: 1 });
+  const answer = await s.waitFor("usage.listed");
+  const today = budgetDay(Date.now());
+  expect(answer.body).toEqual({
+    request: "req-1",
+    from: today,
+    to: today,
+    agents: [{ agent: "a1", days: [{ day: today, tokens: 8 }], tasks: [{ task: "t1", tokens: 4 }, { task: "t2", tokens: 4 }], sources: [{ source: "task", tokens: 8 }] }],
+  });
+  // The other Member in trust hears nothing of it, and an Agent with no usage is not a row of zeroes.
+  expect(s.read("m_2").some((m) => m.type === "usage.listed")).toBe(false);
+
+  s.send("usage.list", { request: "req-2", days: 7 });
+  const week = await s.waitFor("usage.listed", "m_1", (m) => m.body.request === "req-2");
+  expect(week.body).toMatchObject({ from: shiftDay(today, -6), to: today });
+}, 40_000);

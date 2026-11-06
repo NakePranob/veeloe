@@ -5,7 +5,7 @@ import { useMachines } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";
 import { deviceName } from "../../../shared/device-name";
 import { keySession, useKeyStatus } from "../../../shared/keystore";
-import { createMachineLinks, type MachineLinks, type MachineStatus } from "./links";
+import { createMachineLinks, type MachineLinks, type MachineStatus, type UsageStatus } from "./links";
 
 let current: MachineLinks | null = null;
 const changes = new Set<() => void>();
@@ -74,5 +74,27 @@ export function useMachineStatuses(): Record<string, MachineStatus> {
   return useSyncExternalStore(
     (listener) => links?.subscribe(listener) ?? (() => {}),
     () => links?.statuses() ?? NONE,
+  );
+}
+
+const NO_USAGE: UsageStatus = { request: null, days: null, loading: false, error: null, from: null, to: null, tasks: [], total: 0 };
+
+/** One Machine's usage request: loading, or the code it failed with. */
+export function useUsageStatus(machine: string): UsageStatus {
+  const links = useCurrent();
+  return useSyncExternalStore(
+    (listener) => links?.subscribeUsage(listener) ?? (() => {}),
+    () => links?.usage(machine) ?? NO_USAGE,
+  );
+}
+
+const NO_USAGES: Record<string, UsageStatus> = {};
+
+/** Every Machine's usage request at once, for the page's list of Tasks. */
+export function useUsageStatuses(): Record<string, UsageStatus> {
+  const links = useCurrent();
+  return useSyncExternalStore(
+    (listener) => links?.subscribeUsage(listener) ?? (() => {}),
+    () => links?.usageStatuses() ?? NO_USAGES,
   );
 }

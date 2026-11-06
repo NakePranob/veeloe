@@ -12,6 +12,7 @@ mock.module("../../../entities/agent", () => import("../../../entities/agent/mod
 mock.module("../../../entities/task", () => import("../../../entities/task/model/tasks"));
 mock.module("../../../entities/machine", () => import("../../../entities/machine/model/machines"));
 mock.module("../../../entities/device", () => import("../../../entities/device/model/devices"));
+mock.module("../../../entities/usage", () => import("../../../entities/usage/model/usage"));
 const { egressOf, saveMachine } = await import("../../../entities/machine/model/machines");
 const { createMachineLinks } = await import("./links");
 
@@ -256,4 +257,69 @@ test("a 4403 from the Hub says this key was revoked, and the client stops trying
   await until(() => revoked === 1);
   await Bun.sleep(100);
   expect(fake.hub.connections).toBe(1);
+});
+
+test("agent.usage keeps today's tally, and a later listed answer that is older does not take it back", async () => {
+  const { database, fake } = await setup();
+  const agents = [{ id: "a1", name: "A", provider: "main", model: "model-a" }];
+  fake.push(signed("agent.listed", { agents, providers: [] }));
+  await until(async () => (await database.query("SELECT * FROM agent")).length === 1);
+
+  fake.push(signed("agent.usage", { agent: "a1", day: "2026-11-06", tokens: 3_000_000, budget: 10_000_000 }, { seq: 2 }));
+  await until(async () => (await database.query<{ usage_tokens: number }>("SELECT usage_tokens FROM agent"))[0]?.usage_tokens === 3_000_000);
+
+  // `agent.listed` arriving after the newer `agent.usage`, with the same day but fewer tokens.
+  fake.push(signed("agent.listed", { agents: [{ ...agents[0], budget: 10_000_000, usage: { day: "2026-11-06", tokens: 2_000_000 } }], providers: [] }, { seq: 3 }));
+  await Bun.sleep(50);
+  expect(await database.query("SELECT usage_day, usage_tokens FROM agent")).toEqual([{ usage_day: "2026-11-06", usage_tokens: 3_000_000 }]);
+});
+
+test("a usage request goes signed with its request id and days, and the Machine's answer is cached before the page hears of it", async () => {
+  const { database, fake, machine, links } = await setup();
+  const request = links.requestUsage(machine, 7);
+  expect(request).not.toBeNull();
+  expect(links.usage("machine-1")).toMatchObject({ request, days: 7, loading: true, error: null });
+  await until(() => fake.hub.frames.length === 3);
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "usage.list", to: "machine-1", member, body: { request, days: 7 } });
+
+  fake.push(signed("usage.listed", { request, from: "2026-10-31", to: "2026-11-06", agents: [{ agent: "a1", days: [{ day: "2026-11-06", tokens: 100 }], tasks: [{ task: "t1", tokens: 100 }], sources: [{ source: "task", tokens: 100 }] }] }));
+  await until(async () => (await database.query("SELECT * FROM usage_day")).length === 1);
+  await until(() => links.usage("machine-1").loading === false);
+  expect(await database.query("SELECT agent_id, day, tokens FROM usage_day")).toEqual([{ agent_id: "a1", day: "2026-11-06", tokens: 100 }]);
+  expect((await database.query<{ usage_fetched_at: number }>("SELECT usage_fetched_at FROM machine"))[0]!.usage_fetched_at).toBeGreaterThan(0);
+});
+
+test("an answer to an older request is dropped whole and does not clear the page's loading state", async () => {
+  const { database, fake, machine, links } = await setup();
+  const request = links.requestUsage(machine, 7)!;
+  await until(() => fake.hub.frames.length === 3);
+  fake.push(signed("usage.listed", { request: "an-older-one", from: "2026-10-31", to: "2026-11-05", agents: [{ agent: "a1", days: [{ day: "2026-11-05", tokens: 10 }], tasks: [], sources: [] }] }, { seq: 1 }));
+  await Bun.sleep(100);
+  expect(await database.query("SELECT * FROM usage_day")).toEqual([]);
+  expect(links.usage("machine-1").loading).toBe(true);
+
+  fake.push(signed("usage.listed", { request, from: "2026-10-31", to: "2026-11-06", agents: [{ agent: "a1", days: [{ day: "2026-11-06", tokens: 20 }], tasks: [], sources: [] }] }, { seq: 2 }));
+  await until(async () => (await database.query("SELECT * FROM usage_day")).length === 1);
+  await until(() => links.usage("machine-1").loading === false);
+  expect(links.usage("machine-1").error).toBeNull();
+});
+
+test("a Machine's error about a usage request fails that request only, and does not mark a chat message as failed", async () => {
+  const { database, fake, machine, links } = await setup();
+  links.requestUsage(machine, 7);
+  await until(() => fake.hub.frames.length === 3);
+  fake.push(signed("error", { code: "usage.invalid_range", ref: fake.hub.frames.at(-1)!.sig }));
+  await until(() => links.usage("machine-1").error === "usage.invalid_range");
+  expect(links.usage("machine-1").loading).toBe(false);
+  expect(await database.query("SELECT * FROM pending_message")).toEqual([]);
+});
+
+test("a Hub that says the Machine is offline fails this request only, and does not mark a message as failed", async () => {
+  const { database, fake, machine, links } = await setup();
+  links.requestUsage(machine, 7);
+  await until(() => fake.hub.frames.length === 3);
+  fake.push({ type: "hub.error", code: "hub.machine_offline", ref: fake.hub.frames.at(-1)!.sig });
+  await until(() => links.usage("machine-1").error === "hub.machine_offline");
+  expect(links.usage("machine-1").loading).toBe(false);
+  expect(await database.query("SELECT * FROM pending_message")).toEqual([]);
 });

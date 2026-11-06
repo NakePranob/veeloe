@@ -34,6 +34,7 @@ export function AgentsPage() {
                       <Text variant="footnote" tone="secondary">
                         {machines.find((m) => m.id === agent.machine_id)?.name}
                         {statuses[agent.machine_id]?.online === false ? ` · ${t("offline")}` : ""}
+                        {agent.budget ? ` · ${t("budget.list", { percent: Math.round(((agent.usage_tokens ?? 0) / agent.budget) * 100) })}` : ""}
                       </Text>
                     </View>
                     <Icon name="disclosure" size="xs" color="tertiaryLabel" weight="semibold" />

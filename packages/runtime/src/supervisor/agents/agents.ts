@@ -1,15 +1,11 @@
 import type { Agent, AgentCreateBody, AgentListedBody, AgentUpdateBody, ProviderInfo } from "@veeloe/protocol";
+import { canManage } from "../access";
 import type { AgentRegistry } from "../agent-registry/registry";
+import type { Budgets } from "../budget/budget";
 import type { Inbound, Outbox } from "../outbox";
 import { listModels } from "../providers/models";
 import type { Provider } from "../providers/store";
 import type { Workers } from "../workers/workers";
-
-/**
- * Who may change an Agent: Manage (ADR 0059). In v0.1 the only Members in trust
- * are Owners, who Manage every Agent. v0.3 reads Grants here.
- */
-export const canManage = (member: string, _agent: Agent, members: string[]) => members.includes(member);
 
 /** `agent.create`, `agent.update` and `agent.list` (ADR 0020, 0042). Each answers with the whole list and the Machine's Egress, never a Provider's URL or key. */
 export function createAgentsSlice({
@@ -19,6 +15,7 @@ export function createAgentsSlice({
   egress,
   outbox,
   members,
+  budgets,
   fetchFn,
 }: {
   registry: AgentRegistry;
@@ -28,6 +25,8 @@ export function createAgentsSlice({
   outbox: Outbox;
   /** Every Member in trust, who all hear of a change. */
   members: () => string[];
+  /** Today's tokens and the Budget for each Agent (`daily-budget`, ADR 0043). */
+  budgets: Pick<Budgets, "listedOf">;
   fetchFn?: typeof fetch;
 }) {
   async function providerInfo(): Promise<ProviderInfo[]> {
@@ -40,7 +39,8 @@ export function createAgentsSlice({
   }
 
   async function listed(): Promise<AgentListedBody> {
-    return { agents: registry.all(), providers: await providerInfo(), egress: egress() };
+    // The Budget is filled in here, so an Agent made before `daily-budget` shows its default (ADR 0023).
+    return { agents: registry.all().map((agent) => ({ ...agent, ...budgets.listedOf(agent) })), providers: await providerInfo(), egress: egress() };
   }
 
   return {
@@ -83,6 +83,7 @@ export function createAgentsSlice({
         ...(body.name !== undefined && { name: body.name }),
         ...(body.model !== undefined && { provider: body.provider ?? agent.provider, model: body.model }),
         ...(body.character && { character: body.character }),
+        ...(body.budget !== undefined && { budget: body.budget }),
       };
       registry.replace(next);
       if (next.name !== now.name) workers.rename(next);

@@ -51,7 +51,13 @@ export function AddMachinePage() {
   );
 
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ gap: space.lg, padding: space.xl, ...column }}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      contentInsetAdjustmentBehavior="automatic"
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="interactive"
+      contentContainerStyle={{ gap: space.lg, padding: space.xl, ...column }}
+    >
       <Stack.Screen options={{ title: t("title") }} />
       {pairing ? (
         <View style={{ alignItems: "center", gap: space.sm, paddingVertical: space.xl }}>

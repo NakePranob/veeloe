@@ -4,6 +4,7 @@
   "agent.provider_unknown": "Machine เครื่องนี้ไม่มี Provider หรือ model นั้น",
   "agent.unavailable": "Agent รับข้อความนี้ไม่ได้ตอนนี้ ลองใหม่อีกครู่",
   "agent.unknown": "Machine เครื่องนี้ไม่มี Agent ตัวนั้น",
+  "budget.exhausted": "Budget ของวันนี้หมดแล้ว เพิ่มได้ที่หน้าของ Agent",
   "egress.invalid_domain": "Machine ไม่เปลี่ยน Egress เพราะมีรายการที่ไม่ใช่ชื่อโดเมน",
   "hub.device_offline": "เครื่องเดิมไม่ได้แสดง QR นี้แล้ว ให้เปิด Link เครื่องใหม่บนเครื่องนั้นอีกครั้ง",
   "hub.key_taken": "Hub ไม่รับกุญแจของเครื่องใหม่ เพราะเป็นของคนอื่นหรือเคยถูกถอนแล้ว",
@@ -29,5 +30,6 @@
   "provider.rejected": "Provider ไม่รับ key ที่ตั้งไว้บน Machine",
   "provider.unreachable": "Machine ติดต่อ Provider ไม่ได้",
   "task.not_found": "Machine เครื่องนี้ไม่มี Task นั้น",
-  "turn.too_many_rounds": "Agent หยุดเพราะทำต่อกันหลายขั้นเกินไปในรอบเดียว"
+  "turn.too_many_rounds": "Agent หยุดเพราะทำต่อกันหลายขั้นเกินไปในรอบเดียว",
+  "usage.invalid_range": "ช่วงวันที่ที่ขอไม่ถูกต้อง ต้องอยู่ระหว่าง 1 ถึง 90 วัน"
 }

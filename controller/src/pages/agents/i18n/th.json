@@ -31,6 +31,16 @@
   "modelFilter": "ค้นหา model",
   "noMatch": "ไม่มี model ที่ตรง",
   "creating": "กำลังสร้างบน Machine",
+  "budget": {
+    "heading": "Budget วันนี้",
+    "footer": "นับทุก token ที่ Provider รายงาน วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine พอหมด Turn ที่ทำอยู่จบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนขึ้นวันใหม่หรือมีคนเพิ่ม ควรตั้ง spend limit ที่ Provider ไว้อีกชั้นด้วย (ADR 0043)",
+    "label": "Budget วันนี้",
+    "used": "{{used}} จาก {{budget}} token ({{percent}}%)",
+    "spent": " · หมดแล้ว",
+    "field": "Budget ต่อวัน (ล้าน token)",
+    "default": "Budget เริ่มต้นที่ 10M token ต่อวัน ตั้งทีหลังได้ที่หน้าของ Agent (ADR 0043)",
+    "list": "Budget วันนี้ {{percent}}%"
+  },
   "tasks": {
     "new": "Task ใหม่",
     "footer": "แสดงเฉพาะ Task ที่คุณเริ่ม (ADR 0060)",

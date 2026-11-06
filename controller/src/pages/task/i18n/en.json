@@ -19,6 +19,11 @@
     "unfinished": "Not finished"
   },
   "busy": "You can send once this Turn ends",
+  "budget": {
+    "out": "Today's Budget is used up",
+    "body": "New work starts at 04:00 in {{machine}}'s time, or when you add Budget. Files it changed are still there.",
+    "add": "Add Budget"
+  },
   "openAgent": "Open {{name}}",
   "started": "{{machine}} · {{when}}",
   "notStarted": "{{machine}} · Not started"

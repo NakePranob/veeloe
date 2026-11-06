@@ -2,6 +2,8 @@
   "onMachines": "บนเครื่อง",
   "people": "คน",
   "devices": "เครื่องของฉัน",
+  "usage": "การใช้ token",
+  "usageDetail": "ยอดต่อวัน ตามเครื่องและ Agent",
   "oneDevice": "คุณมีเครื่องเดียว ถ้าเครื่องนี้หาย ต้องทำ Pairing ใหม่ที่ Machine ทุกเครื่อง Link เครื่องที่สองไว้ก่อนในหน้า เครื่องของฉัน",
   "language": {
     "heading": "ภาษา",

@@ -31,6 +31,16 @@
   "modelFilter": "Search models",
   "noMatch": "No model matches",
   "creating": "Creating on the Machine",
+  "budget": {
+    "heading": "Today's Budget",
+    "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget. Set a spend limit at the Provider as well (ADR 0043).",
+    "label": "Today's Budget",
+    "used": "{{used}} of {{budget}} tokens ({{percent}}%)",
+    "spent": " · used up",
+    "field": "Budget per day (million tokens)",
+    "default": "The Budget starts at 10M tokens a day. You can change it later on the Agent's page (ADR 0043).",
+    "list": "Today's Budget {{percent}}%"
+  },
   "tasks": {
     "new": "New Task",
     "footer": "Only the Tasks you started are here (ADR 0060).",

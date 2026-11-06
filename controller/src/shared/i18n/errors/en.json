@@ -4,6 +4,7 @@
   "agent.provider_unknown": "That Provider or model isn't on this Machine",
   "agent.unavailable": "The Agent couldn't take this right now. Try again in a moment",
   "agent.unknown": "This Machine doesn't have that Agent",
+  "budget.exhausted": "Today's Budget is used up. You can add Budget on the Agent's page",
   "egress.invalid_domain": "The Machine kept its Egress: one entry isn't a plain domain name",
   "hub.device_offline": "Your other device isn't showing this QR code any more. Open Link new device on it again",
   "hub.key_taken": "The Hub refused the new device's key: it belongs to someone else, or was revoked before",
@@ -29,5 +30,6 @@
   "provider.rejected": "The Provider refused the key on the Machine",
   "provider.unreachable": "The Machine couldn't reach the Provider",
   "task.not_found": "This Machine doesn't have that Task",
-  "turn.too_many_rounds": "The Agent stopped after too many steps in one go"
+  "turn.too_many_rounds": "The Agent stopped after too many steps in one go",
+  "usage.invalid_range": "That usage range isn't valid. It must be between 1 and 90 days"
 }

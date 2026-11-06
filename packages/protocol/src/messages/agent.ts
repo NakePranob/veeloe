@@ -13,6 +13,13 @@ const name = z.string().trim().min(1).max(80);
 const part = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/);
 const CharacterSchema = z.looseObject({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/), shell: part, top: part, sides: part, decal: part });
 
+/** Tokens per day: a whole number, never zero, up to a trillion (`daily-budget`, ADR 0043). */
+const budget = z.number().int().min(1).max(1_000_000_000_000);
+
+/** The day of a Budget in the Machine's own time (ADR 0043). */
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const usage = z.looseObject({ day, tokens: z.number().int().min(0) });
+
 /** Controller → Machine: make an Agent. Sent again with the same id, it changes nothing. */
 export const AgentCreateBodySchema = z.looseObject({
   id,
@@ -28,16 +35,30 @@ export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
  * belongs to its Provider, so a new Provider comes with its model.
  */
 export const AgentUpdateBodySchema = z
-  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional() })
-  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined, "nothing to change")
+  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional() })
+  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined, "nothing to change")
   .refine((b) => b.provider === undefined || b.model !== undefined, "a provider needs its model");
 export type AgentUpdateBody = z.infer<typeof AgentUpdateBodySchema>;
 
 /** Controller → Machine: what is on this Machine. */
 export const AgentListBodySchema = z.looseObject({});
 
-const AgentSchema = z.looseObject({ id, name, provider: z.string().min(1), model: z.string().min(1), character: CharacterSchema.optional() });
+const AgentSchema = z.looseObject({
+  id,
+  name,
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  character: CharacterSchema.optional(),
+  /** The Budget the Machine keeps, defaulted when it never said one (`daily-budget`). */
+  budget: budget.optional(),
+  /** Today's tokens, as of this answer. Absent from a Machine older than `daily-budget`. */
+  usage: usage.optional(),
+});
 export type Agent = z.infer<typeof AgentSchema>;
+
+/** Machine → Member: how today's tokens stand for one Agent, after every answer that was counted. */
+export const AgentUsageBodySchema = z.looseObject({ agent: id, day, tokens: z.number().int().min(0), budget });
+export type AgentUsageBody = z.infer<typeof AgentUsageBodySchema>;
 
 /** A Provider by name, never its URL or key: the models it offers, or why it could not say. */
 const ProviderSchema = z.union([

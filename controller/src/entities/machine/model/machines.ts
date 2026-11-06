@@ -13,6 +13,8 @@ export type Machine = {
   paired_at: number;
   /** The Machine's Egress as it last said, a JSON list of domains. */
   egress: string;
+  /** When it last answered a usage request, for "ข้อมูลเมื่อ" (`usage-history`); null before the first. */
+  usage_fetched_at?: number | null;
 };
 
 /** The domains in a Machine's Egress, as a list. */

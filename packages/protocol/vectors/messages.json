@@ -217,9 +217,45 @@
       "body": {
         "id": "agent-1",
         "name": "Builder",
-        "budget": 5
+        "mascot": "robot"
       },
       "valid": true
+    },
+    {
+      "name": "update only the Budget",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 5000000
+      },
+      "valid": true
+    },
+    {
+      "name": "update with a Budget of zero",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 0
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a fractional Budget",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 1.5
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a Budget above the ceiling",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 1000000000001
+      },
+      "valid": false
     },
     {
       "name": "update with nothing to change",
@@ -234,7 +270,7 @@
       "type": "agent.update",
       "body": {
         "id": "agent-1",
-        "budget": 5
+        "mascot": "robot"
       },
       "valid": false
     },
@@ -336,6 +372,47 @@
       "valid": true
     },
     {
+      "name": "listed, with a Budget and today's usage",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "budget": 10000000,
+            "usage": {
+              "day": "2026-11-06",
+              "tokens": 17000
+            }
+          }
+        ],
+        "providers": []
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with a usage day that is not a date",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "usage": {
+              "day": "6 November",
+              "tokens": 1
+            }
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
+    },
+    {
       "name": "listed with a Character colour that is not #rrggbb",
       "type": "agent.listed",
       "body": {
@@ -363,6 +440,28 @@
       "type": "agent.listed",
       "body": {
         "agents": []
+      },
+      "valid": false
+    },
+    {
+      "name": "how today's tokens stand",
+      "type": "agent.usage",
+      "body": {
+        "agent": "agent-1",
+        "day": "2026-11-06",
+        "tokens": 1700,
+        "budget": 10000000
+      },
+      "valid": true
+    },
+    {
+      "name": "a tally with a negative number of tokens",
+      "type": "agent.usage",
+      "body": {
+        "agent": "agent-1",
+        "day": "2026-11-06",
+        "tokens": -1,
+        "budget": 10000000
       },
       "valid": false
     },
@@ -635,6 +734,245 @@
       "type": "device.linked",
       "body": {},
       "valid": true
+    },
+    {
+      "name": "ask for 7 days of usage",
+      "type": "usage.list",
+      "body": {
+        "request": "req-1",
+        "days": 7
+      },
+      "valid": true
+    },
+    {
+      "name": "ask for usage of one Agent",
+      "type": "usage.list",
+      "body": {
+        "request": "req-2",
+        "days": 30,
+        "agent": "agent-1"
+      },
+      "valid": true
+    },
+    {
+      "name": "ask for usage with no request id",
+      "type": "usage.list",
+      "body": {
+        "days": 7
+      },
+      "valid": false
+    },
+    {
+      "name": "ask for usage with a fractional number of days",
+      "type": "usage.list",
+      "body": {
+        "request": "req-3",
+        "days": 7.5
+      },
+      "valid": false
+    },
+    {
+      "name": "usage for two Agents in a range",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-10-31",
+        "to": "2026-11-06",
+        "agents": [
+          {
+            "agent": "agent-1",
+            "days": [
+              {
+                "day": "2026-11-05",
+                "tokens": 1700
+              },
+              {
+                "day": "2026-11-06",
+                "tokens": 400
+              }
+            ],
+            "tasks": [
+              {
+                "task": "task-1",
+                "tokens": 1100
+              }
+            ],
+            "sources": [
+              {
+                "source": "task",
+                "tokens": 2100
+              }
+            ]
+          },
+          {
+            "agent": "agent-2",
+            "days": [],
+            "tasks": [],
+            "sources": []
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "usage with a day that is not a date",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-10-31",
+        "to": "2026-11-06",
+        "agents": [
+          {
+            "agent": "agent-1",
+            "days": [
+              {
+                "day": "6 November",
+                "tokens": 1
+              }
+            ],
+            "tasks": [],
+            "sources": []
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "usage with a range that ends before it starts",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-11-06",
+        "to": "2026-10-31",
+        "agents": []
+      },
+      "valid": false
+    },
+    {
+      "name": "usage with a negative number of tokens",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-10-31",
+        "to": "2026-11-06",
+        "agents": [
+          {
+            "agent": "agent-1",
+            "days": [
+              {
+                "day": "2026-11-06",
+                "tokens": -1
+              }
+            ],
+            "tasks": [],
+            "sources": []
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "usage with more than 20 Tasks",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-11-06",
+        "to": "2026-11-06",
+        "agents": [
+          {
+            "agent": "agent-1",
+            "days": [],
+            "tasks": [
+              {
+                "task": "task-0",
+                "tokens": 1
+              },
+              {
+                "task": "task-1",
+                "tokens": 1
+              },
+              {
+                "task": "task-2",
+                "tokens": 1
+              },
+              {
+                "task": "task-3",
+                "tokens": 1
+              },
+              {
+                "task": "task-4",
+                "tokens": 1
+              },
+              {
+                "task": "task-5",
+                "tokens": 1
+              },
+              {
+                "task": "task-6",
+                "tokens": 1
+              },
+              {
+                "task": "task-7",
+                "tokens": 1
+              },
+              {
+                "task": "task-8",
+                "tokens": 1
+              },
+              {
+                "task": "task-9",
+                "tokens": 1
+              },
+              {
+                "task": "task-10",
+                "tokens": 1
+              },
+              {
+                "task": "task-11",
+                "tokens": 1
+              },
+              {
+                "task": "task-12",
+                "tokens": 1
+              },
+              {
+                "task": "task-13",
+                "tokens": 1
+              },
+              {
+                "task": "task-14",
+                "tokens": 1
+              },
+              {
+                "task": "task-15",
+                "tokens": 1
+              },
+              {
+                "task": "task-16",
+                "tokens": 1
+              },
+              {
+                "task": "task-17",
+                "tokens": 1
+              },
+              {
+                "task": "task-18",
+                "tokens": 1
+              },
+              {
+                "task": "task-19",
+                "tokens": 1
+              },
+              {
+                "task": "task-20",
+                "tokens": 1
+              }
+            ],
+            "sources": []
+          }
+        ]
+      },
+      "valid": false
     },
     {
       "name": "set the Egress with more than 100 domains",

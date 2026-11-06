@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, Keyboard } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
@@ -36,6 +36,7 @@ function Picker({ agent }: { agent: AgentRow }) {
 
   function save() {
     if (!link || !machine || !model) return;
+    Keyboard.dismiss();
     // A model belongs to its Provider, so a new Provider goes with its model; a model alone is checked against the current one.
     const body = provider !== agent.provider ? { id: agent.id, provider, model } : { id: agent.id, model };
     setTried(true);
