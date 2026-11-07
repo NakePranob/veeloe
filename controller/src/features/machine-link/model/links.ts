@@ -5,7 +5,7 @@ import { saveEgress, type Machine } from "../../../entities/machine";
 import { addListedTasks, addPendingMessage, failPendingMessage, listTasks, markPendingSent, saveTaskEvents } from "../../../entities/task";
 import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
-import { startHubClient } from "../../../shared/hub-client";
+import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
 
 /** What this Controller knows of a Machine right now, beside what is in the database. */
 export type MachineStatus = {
@@ -16,9 +16,11 @@ export type MachineStatus = {
   createError: string | null;
   /** The code the last `agent.update` came back with, if it failed. */
   updateError: string | null;
+  /** The code the last `task.stop` came back with, if it failed (`stop-and-restart`). */
+  stopError: string | null;
 };
 
-const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null };
+const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, stopError: null };
 
 /** One page's usage request for one Machine: what it asked for, and how it went. */
 export type UsageStatus = {
@@ -40,7 +42,7 @@ const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, 
 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "hello" | "usage" | "other";
+type Kind = "create" | "update" | "stop" | "hello" | "usage" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -161,6 +163,7 @@ export function createMachineLinks({
       const about = sentTo.get(message.body.ref);
       if (about?.kind === "create") setStatus(machine.id, { createError: message.body.code });
       else if (about?.kind === "update") setStatus(machine.id, { updateError: message.body.code });
+      else if (about?.kind === "stop") setStatus(machine.id, { stopError: message.body.code });
       else if (about?.kind === "usage") {
         const current = usageStatuses.get(about.machine);
         if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: message.body.code });
@@ -168,11 +171,16 @@ export function createMachineLinks({
     }
   }
 
+  // The last envelope number from each sender lives in the database, not this process (`protocol-envelope`).
+  const { seen, ready: seenReady } = createSeenSequences(database);
+
   function connect(hubUrl: string, machines: Machine[]) {
     const byKey = new Map(machines.map((m) => [m.public_key, m]));
     const client = start({
       hubUrl,
       secretKey,
+      seen,
+      seenReady,
       trustedKeys: { has: (key) => byKey.has(key) || watchers.has(key) },
       onReady: (member) => {
         // A Hub with no certificate yet sends none, and this device is still the first one.
@@ -211,6 +219,7 @@ export function createMachineLinks({
         }
         if (about.kind === "create") setStatus(about.machine, { createError: error.code });
         else if (about.kind === "update") setStatus(about.machine, { updateError: error.code });
+        else if (about.kind === "stop") setStatus(about.machine, { stopError: error.code });
         else void failPendingMessage(database, error.ref!, error.code);
       },
     });
@@ -294,6 +303,16 @@ export function createMachineLinks({
     },
 
     /**
+     * Stops the Turn running in this Task (ADR 0017). Nothing shows as stopped until
+     * the Machine's `turn.stopped` event lands. `id` makes a resend stop nothing twice.
+     * The sig, or null when the Hub is not connected and nothing went.
+     */
+    stopTurn(machine: Machine, { agent, task, id }: { agent: string; task: string; id: string }) {
+      setStatus(machine.id, { stopError: null });
+      return sendTo(machine, "stop", { type: "task.stop", task, body: { agent, id } });
+    },
+
+    /**
      * The answer to one waiting Approval. Nothing shows as answered until the
      * Machine's `approval.answered` event says so (ADR 0006). The sig, or null
      * when the Hub is not connected and nothing went.
@@ -303,6 +322,8 @@ export function createMachineLinks({
     },
 
     async sendMessage(machine: Machine, { agent, task, text }: { agent: string; task: string; text: string }) {
+      // A new message means the Member moved on from whatever a Stop said (ADR 0017).
+      setStatus(machine.id, { stopError: null });
       const id = newId();
       await addPendingMessage(database, { id, task, agent, machine: machine.id, text });
       await markPendingSent(database, id, sendTo(machine, "other", { type: "task.message", task, body: { agent, id, text } }));

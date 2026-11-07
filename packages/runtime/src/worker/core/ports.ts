@@ -18,15 +18,17 @@ export interface EventStore {
   events(task: string, after?: number): TaskEvent[];
   /** The Tasks this Member started, with when each last moved. */
   tasksStartedBy(member: string): { id: string; updated: number }[];
+  /** The Tasks whose last Turn boundary is a start: a Turn was running when their worker ended (ADR 0033). */
+  openTurns(): string[];
 }
 
 /** `task` is the Task the request is for, which some Providers want as a session. */
 export type LlmRequest = { task: string; system: string; messages: { role: "user" | "assistant"; content: unknown[] }[]; tools: ToolDefinition[] };
 export type LlmReply = { content: unknown[]; stopReason: string | null };
 
-/** Throws LlmError when there is no answer. */
+/** Throws LlmError when there is no answer. `signal` ends the wait when the Turn is stopped. */
 export interface Llm {
-  send(request: LlmRequest): Promise<LlmReply>;
+  send(request: LlmRequest, signal?: AbortSignal): Promise<LlmReply>;
 }
 
 export class LlmError extends Error {
@@ -39,8 +41,8 @@ export type ToolDefinition = { name: string; description: string; input_schema: 
 
 export interface ToolRunner {
   definitions(): ToolDefinition[];
-  /** Runs one tool. A thrown error becomes an error result the LLM reads. */
-  run(name: string, input: unknown): Promise<string>;
+  /** Runs one tool. A thrown error becomes an error result the LLM reads. `signal` kills what it started. */
+  run(name: string, input: unknown, signal?: AbortSignal): Promise<string>;
 }
 
 export interface SupervisorLink {

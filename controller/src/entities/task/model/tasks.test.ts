@@ -95,3 +95,12 @@ test("an error naming the envelope marks only that message as failed", async () 
   const rows = await database.query<PendingRow>("SELECT id, error FROM pending_message ORDER BY id");
   expect(rows).toEqual([{ id: "m1", error: null }, { id: "m2", error: "agent.busy" }] as never);
 });
+
+test("a Turn a Stop ended is finished, and one a restart cut off says so", () => {
+  const ended = (reason: string) => [{ kind: "turn.ended", body: JSON.stringify({ reason }) }];
+  expect(statusOf({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason: "stopped" }) }, true)).toBe("done");
+  expect(statusOf({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason: "interrupted" }) }, true)).toBe("interrupted");
+  expect(ended("stopped")).toHaveLength(1);
+  // The event of a restart on its own says it too, before the Turn's end lands.
+  expect(statusOf({ latest_kind: "turn.interrupted", latest_body: JSON.stringify({ reason: "restart" }) }, true)).toBe("interrupted");
+});

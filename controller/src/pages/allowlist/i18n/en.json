@@ -46,5 +46,9 @@
     "asks": "Asks for an Approval",
     "asksAlways": "Asks every time: the parts cannot be told apart reliably ($( ), backtick or eval)"
   },
-  "cancel": "Cancel"
+  "cancel": "Cancel",
+  "authenticate": {
+    "add": "Add {{entry}} to the Allowlist of {{name}}",
+    "remove": "Remove {{entry}} from the Allowlist of {{name}}"
+  }
 }

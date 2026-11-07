@@ -11,13 +11,16 @@ export type ApprovalDecision = z.infer<typeof ApprovalDecisionSchema>;
  * `request` คือรหัสคำขอจาก event `approval.requested`
  * `message` ใช้กับการบอกให้ทำอย่างอื่น (`redirect`)
  * `allowAlways` คือคำนำหน้าที่จะเพิ่มเข้า Allowlist ไปพร้อมกัน ต้องมี Manage (`agent-settings`)
+ * รับได้ทั้งคำนำหน้าเดียวและหลายคำนำหน้า เพราะคำสั่งหนึ่งมีได้หลายท่อนที่ยังไม่อยู่ในรายการ
+ * และการ์ดเสนอให้เซ็นทีละท่อน (ADR 0023: ของเดิมที่ส่งมาเป็น string เดียวยังใช้ได้)
  */
+export const AllowAlwaysSchema = z.union([AllowlistEntrySchema, z.array(AllowlistEntrySchema).min(1).max(20)]);
 export const ApprovalAnswerBodySchema = z.looseObject({
   agent: AgentIdSchema,
   request: z.string().min(1).max(64),
   decision: ApprovalDecisionSchema,
   message: z.string().min(1).max(10_000).optional(),
-  allowAlways: AllowlistEntrySchema.optional(),
+  allowAlways: AllowAlwaysSchema.optional(),
 });
 export type ApprovalAnswerBody = z.infer<typeof ApprovalAnswerBodySchema>;
 

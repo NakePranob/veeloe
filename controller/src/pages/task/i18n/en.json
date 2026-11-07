@@ -50,5 +50,24 @@
   },
   "openAgent": "Open {{name}}",
   "started": "{{machine}} · {{when}}",
-  "notStarted": "{{machine}} · Not started"
+  "notStarted": "{{machine}} · Not started",
+  "stopped": "{{member}} stopped this Turn · {{when}}",
+  "interrupted": {
+    "title": "{{machine}} started again mid-Turn",
+    "body": "The files it changed are still there, and {{name}} won't carry on by itself, because it could run the same command twice",
+    "continue": "Carry on",
+    "continueMessage": "Carry on"
+  },
+  "stop": {
+    "title": "Stop this Turn?",
+    "message": "Stopping:\n• {{agent}}\n\nFiles it already changed stay, and you can carry on talking",
+    "action": "Stop",
+    "cancel": "Cancel",
+    "button": "Stop",
+    "stopping": "Stopping…"
+  },
+  "authenticate": {
+    "approve": "Approve this command for {{name}}",
+    "always": "Add {{entries}} to the Allowlist and approve"
+  }
 }

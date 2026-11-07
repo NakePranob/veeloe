@@ -71,6 +71,36 @@ export function AgentText({ text }: { text: string }) {
                 <Pieces inline={block.inline} />
               </Text>
             );
+          case "quote":
+            // No divider lines in this app: a quiet fill and a step in from the margin mark it.
+            return (
+              <View key={i} style={{ paddingHorizontal: space.md, paddingVertical: space.sm, marginLeft: space.xs, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: colors.fill }}>
+                <Text selectable tone="secondary">
+                  <Pieces inline={block.inline} />
+                </Text>
+              </View>
+            );
+          case "table":
+            return (
+              <View key={i} style={{ gap: space.xs }}>
+                <View style={{ flexDirection: "row", gap: space.md }}>
+                  {block.header.map((cell, c) => (
+                    <Text key={c} variant="footnote" strong style={{ flex: 1 }}>
+                      <Pieces inline={cell} />
+                    </Text>
+                  ))}
+                </View>
+                {block.rows.map((row, r) => (
+                  <View key={r} style={{ flexDirection: "row", gap: space.md }}>
+                    {row.map((cell, c) => (
+                      <Text key={c} variant="footnote" tone="secondary" selectable style={{ flex: 1 }}>
+                        <Pieces inline={cell} />
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            );
         }
       })}
     </View>

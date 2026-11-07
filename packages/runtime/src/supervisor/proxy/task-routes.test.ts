@@ -39,3 +39,25 @@ test("a request with no Task, or a Task id like __proto__, pins nothing it shoul
   expect(model(createTaskRoutes(home)({ ...agent, model: "model-b" }, "__proto__", both))).toBe("main/model-a");
   expect(model(createTaskRoutes(home)({ ...agent, model: "model-b" }, "t9", both))).toBe("main/model-b");
 });
+
+test("a line outlives a restart, can be forgotten, and is dropped when its Agent is gone", () => {
+  const home = mkdtempSync(join(tmpdir(), "veeloe-routes-"));
+  const providers = [p("main"), p("old")];
+  const later = { ...agent, model: "model-b" };
+
+  const first = createTaskRoutes(home);
+  first(agent, "t1", providers);
+  // Pinned to the model it started on, after a restart too.
+  const again = createTaskRoutes(home);
+  expect(again(later, "t1", providers)).toMatchObject({ model: "model-a" });
+
+  // Forgotten, a Task starts on the Agent's model again.
+  again.forget(agent.id, "t1");
+  expect(createTaskRoutes(home)(later, "t1", providers)).toMatchObject({ model: "model-b" });
+
+  // An Agent this Machine no longer has leaves nothing behind.
+  const third = createTaskRoutes(home);
+  third(agent, "t2", providers);
+  third.prune(["other"]);
+  expect(createTaskRoutes(home)(later, "t2", providers)).toMatchObject({ model: "model-b" });
+});

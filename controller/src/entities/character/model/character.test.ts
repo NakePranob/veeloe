@@ -34,7 +34,10 @@ test("no Character is the one default look, and a slot this build does not know 
 
 const e = (kind: string, body: unknown = {}) => ({ kind, body: JSON.stringify(body) });
 
-test("the five Moods come from the latest event and whether the Machine is online", () => {
+test("the six Moods come from the latest event and whether the Machine is online", () => {
+  // An Approval the Agent is waiting on raises the hand until someone answers.
+  expect(moodOf([e("turn.started"), e("approval.requested", { request: "ap_1" })], true)).toBe("waiting");
+  expect(moodOf([e("approval.requested", { request: "ap_1" }), e("approval.answered", { decision: "approve" })], true)).toBe("thinking");
   expect(moodOf([], true)).toBe("idle");
   expect(moodOf([e("member.message"), e("turn.started")], true)).toBe("thinking");
   expect(moodOf([e("turn.started"), e("llm.message", { content: [{ type: "text", text: "hi" }] })], true)).toBe("thinking");

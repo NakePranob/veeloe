@@ -13,7 +13,10 @@ type Pin = { provider: string; model: string };
  * A Task whose pinned Provider is gone moves to the Agent's current one, since
  * the old one cannot answer anyway (`agent-settings`).
  *
- * ponytail: one line per Task forever. Drop a Task's line once deleting a Task or an Agent exists.
+ * One line per Task, kept until something says the Task is gone: `forget` is
+ * what `delete-agent` will call. A line for an Agent this Machine no longer has
+ * is dropped at startup by `prune`, so an unpaired and re-paired Machine does
+ * not carry the old Workspace's ids forever.
  */
 export function createTaskRoutes(home: string) {
   const file = join(supervisorDir(home), "task-routes.json");
@@ -24,7 +27,7 @@ export function createTaskRoutes(home: string) {
   );
   const save = () => writeJsonFile(file, Object.fromEntries([...pins].map(([agent, tasks]) => [agent, Object.fromEntries(tasks)])));
 
-  return function route(agent: Agent, task: string | undefined, providers: Provider[]): Route {
+  function route(agent: Agent, task: string | undefined, providers: Provider[]): Route {
     const pinned = task === undefined ? undefined : pins.get(agent.id)?.get(task);
     const kept = pinned && providers.find((p) => p.name === pinned.provider);
     if (pinned && kept) return { provider: kept, model: pinned.model };
@@ -35,5 +38,27 @@ export function createTaskRoutes(home: string) {
       save();
     }
     return { provider, model: agent.model };
+  }
+
+  /** Drops one Task's line, for the Task that is being deleted. */
+  route.forget = (agentId: string, task: string) => {
+    const tasks = pins.get(agentId);
+    if (!tasks?.delete(task)) return;
+    if (tasks.size === 0) pins.delete(agentId);
+    save();
   };
+
+  /** Drops the lines of Agents this Machine does not have, so nothing outlives its Agent. */
+  route.prune = (agentIds: readonly string[]) => {
+    const known = new Set(agentIds);
+    let dropped = false;
+    for (const agentId of [...pins.keys()]) {
+      if (known.has(agentId)) continue;
+      pins.delete(agentId);
+      dropped = true;
+    }
+    if (dropped) save();
+  };
+
+  return route;
 }

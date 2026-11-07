@@ -5,6 +5,7 @@ import { allowed, allowlistOf, commandParts, covers, READ_ONLY_COMMANDS, useAgen
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
+import { keySession } from "../../../shared/keystore";
 import { Button, confirm, Empty, Field, Icon, inform, Note, Row, Screen, Section, Text, space } from "../../../shared/ui";
 
 // controller-prototype's AllowlistPage: what this Agent may run without asking,
@@ -23,10 +24,10 @@ export function AllowlistPage() {
     );
   }
   // Keyed by the Agent so a draft entry never carries over to another one.
-  return <AllowlistView key={agent.id} agentId={agent.id} machineId={machine.id} stored={allowlistOf(agent)} />;
+  return <AllowlistView key={agent.id} agentId={agent.id} agentName={agent.name} machineId={machine.id} stored={allowlistOf(agent)} />;
 }
 
-function AllowlistView({ agentId, machineId, stored }: { agentId: string; machineId: string; stored: string[] | null }) {
+function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: string; agentName: string; machineId: string; stored: string[] | null }) {
   const t = useT("allowlist");
   const link = useMachineLink();
   const machine = useMachines()?.find((m) => m.id === machineId);
@@ -42,10 +43,13 @@ function AllowlistView({ agentId, machineId, stored }: { agentId: string; machin
   const after = draft ? allowed(sample, [...allowlist, draft]) : before;
   const validDraft = !!draft && commandParts(draft).length === 1 && allowed(draft, [draft]);
 
-  function save(next: string[]) {
-    if (offline || !link || !machine) return;
+  /** Every change is signed after a fresh authentication (ADR 0012); false when nothing went. */
+  async function save(next: string[], prompt: string) {
+    if (offline || !link || !machine) return false;
     Keyboard.dismiss();
-    link.updateAgent(machine, { id: agentId, allowlist: next });
+    let sent = false;
+    await keySession.withFreshAuthentication(prompt, () => void (sent = !!link.updateAgent(machine, { id: agentId, allowlist: next })));
+    return sent;
   }
 
   async function add() {
@@ -54,8 +58,7 @@ function AllowlistView({ agentId, machineId, stored }: { agentId: string; machin
     // A single word covers every command that starts with it, which is wider than most people mean.
     const bare = draft.split(/\s+/).length === 1 && !READ_ONLY_COMMANDS.includes(draft as (typeof READ_ONLY_COMMANDS)[number]);
     if (bare && !(await confirm({ title: t("wide.title", { entry: draft }), message: t("wide.message", { entry: draft }), action: t("wide.action"), cancel: t("cancel") }))) return;
-    save([...allowlist, draft]);
-    setEntry("");
+    if (await save([...allowlist, draft], t("authenticate.add", { entry: draft, name: agentName }))) setEntry("");
   }
 
   return (
@@ -71,7 +74,14 @@ function AllowlistView({ agentId, machineId, stored }: { agentId: string; machin
       <Section title={t("runs.heading")} footer={t("runs.footer")}>
         {allowlist.length === 0 && <Row title={t("runs.empty")} detail={t("runs.emptyDetail")} />}
         {allowlist.map((item) => (
-          <Row key={item} title={item} mono icon="shield" accessory={<Button label={t("remove")} disabled={offline} onPress={() => save(allowlist.filter((other) => other !== item))} />} />
+          <Row key={item} title={item} mono icon="shield" accessory={<Button
+            label={t("remove")}
+            disabled={offline}
+            onPress={() => void save(
+              allowlist.filter((other) => other !== item),
+              t("authenticate.remove", { entry: item, name: agentName }),
+            )}
+          />} />
         ))}
       </Section>
 

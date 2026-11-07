@@ -16,11 +16,21 @@ export function writePidFile(home: string) {
   });
 }
 
+/** Whether that pid is actually a `veeloe` supervisor, not the OS handing the number to something else. */
+function looksLikeSupervisor(pid: number): boolean {
+  if (process.platform !== "darwin" && process.platform !== "linux") return true;
+  const result = Bun.spawnSync(["ps", "-p", String(pid), "-o", "command="], { stdout: "pipe", stderr: "ignore" });
+  // Without `ps` there is nothing better than the signal check below.
+  if (!result.success) return true;
+  const command = result.stdout.toString();
+  // The compiled binary is `veeloe`; run from source it is Bun running `main.ts`.
+  return /(^|[\/\s])veeloe(\s|$)/.test(command) || /main\.ts(\s|$)/.test(command);
+}
+
 /**
  * The pid of the supervisor running for `home`, if one is. A file left by one
- * that was killed names a process that is gone, which reads as not running.
- *
- * ponytail: a pid the OS has since given to another process reads as running. Hold a lock on the file if that ever misleads.
+ * that was killed names a process that is gone, which reads as not running, and
+ * a number the OS has since given to another program is not taken for it either.
  */
 export function supervisorPid(home: string): number | undefined {
   let pid: number;
@@ -32,10 +42,10 @@ export function supervisorPid(home: string): number | undefined {
   if (!Number.isInteger(pid) || pid <= 0) return undefined;
   try {
     process.kill(pid, 0);
-    return pid;
   } catch (err) {
     return (err as NodeJS.ErrnoException).code === "EPERM" ? pid : undefined;
   }
+  return looksLikeSupervisor(pid) ? pid : undefined;
 }
 
 /** `veeloe status`: what is set up on this Machine and what to do next. Never a key. */

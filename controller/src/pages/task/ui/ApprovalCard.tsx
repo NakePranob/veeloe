@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { covers, missingParts } from "../../../entities/agent";
 import { useT } from "../../../shared/i18n";
+import { keySession } from "../../../shared/keystore";
 import { fromNow } from "../../../shared/lib";
 import { Button, Card, Field, Icon, Label, radius, space, Text, useColors, type IconName } from "../../../shared/ui";
 import type { Approval, ApprovalStatus } from "../model/items";
@@ -41,17 +42,25 @@ export function ApprovalCard({ approval, agentName, allowlist, canAnswer, canMan
   const [sent, setSent] = useState(false);
   const by = approval.answeredBy ? t("approval.by", { member: approval.answeredBy.member }) : "";
 
-  function respond(decision: "approve" | "deny", allowAlways?: string[]) {
+  // Answering takes a fresh unlock, so a phone left open cannot approve (ADR 0012).
+  async function respond(decision: "approve" | "deny", allowAlways?: string[]) {
     if (sent) return;
-    const sig = onAnswer({ decision, ...(allowAlways && { allowAlways }) });
+    if (decision === "approve") {
+      const prompt = allowAlways?.length ? t("authenticate.always", { entries: allowAlways.join(", ") }) : t("authenticate.approve", { name: agentName });
+      let sig: string | null = null;
+      await keySession.withFreshAuthentication(prompt, () => void (sig = onAnswer({ decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) })));
+      if (sig) setSent(true);
+      return;
+    }
+    const sig = onAnswer({ decision });
     if (sig) setSent(true);
   }
 
-  function allowAlways() {
+  async function allowAlways() {
     if (!entries) return;
     const cleaned = entries.map((item) => item.entry.trim()).filter(Boolean);
     if (cleaned.length === 0) return;
-    respond("approve", cleaned);
+    await respond("approve", cleaned);
   }
 
   const outcome = open ? null : OUTCOME[approval.status as Exclude<ApprovalStatus, "open">];
@@ -100,13 +109,14 @@ export function ApprovalCard({ approval, agentName, allowlist, canAnswer, canMan
           {/* One ink pill for the answer the card asks for; quiet chips beside it. "Tell it what to do
               instead" is Codex's "Tell Codex what to do": a no that steers instead of ending the conversation. */}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginTop: space.xs }}>
-            <Button label={t("approval.approve")} variant="primary" disabled={!online} onPress={() => respond("approve")} />
-            <Button label={t("approval.deny")} disabled={!online} onPress={() => respond("deny")} />
+            <Button label={t("approval.approve")} variant="primary" disabled={!online} onPress={() => void respond("approve")} />
+            <Button label={t("approval.deny")} disabled={!online} onPress={() => void respond("deny")} />
             {canManage && (
               <Button
                 label={t("approval.always")}
                 disabled={!online}
-                onPress={() => setEntries(missingParts(approval.command, allowlist).map((part) => ({ entry: part, part })))}
+                // The Protocol takes at most 20, so the card offers at most that many.
+                onPress={() => setEntries(missingParts(approval.command, allowlist).slice(0, 20).map((part) => ({ entry: part, part })))}
               />
             )}
             <Button label={t("approval.steer")} disabled={!online} onPress={onSteer} />
@@ -126,7 +136,7 @@ export function ApprovalCard({ approval, agentName, allowlist, canAnswer, canMan
             />
           ))}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
-            <Button label={t("approval.signAndApprove")} variant="primary" disabled={!online} onPress={allowAlways} />
+            <Button label={t("approval.signAndApprove")} variant="primary" disabled={!online} onPress={() => void allowAlways()} />
             <Button label={t("approval.cancel")} onPress={() => setEntries(null)} />
           </View>
         </>

@@ -277,3 +277,34 @@ test("an Approval answered from the Controller runs the real command, and a deni
   expect(results[0]!.content).toContain("denied");
   owner.client.stop();
 }, 90_000);
+
+test("a Stop from the Controller ends the Turn and kills the command it was running", async () => {
+  const owner = controller();
+  await owner.ready;
+  owner.send("agent.create", { id: "agent-stop", name: "Stopper", provider: "main", model: "model-a", allowlist: ["sleep 300", "touch"] });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-stop"));
+
+  // If the command outlived the Stop, this file would appear: it is written only after the sleep.
+  const survivor = join(home, "agents", "agent-stop", "workdir", "survived-stop");
+  let calls = 0;
+  provider.reply = () => (++calls === 1 ? bashUseSse("sleep 300 && touch survived-stop") : sse([{ type: "text", text: "stopped" }]));
+  owner.send("task.message", { agent: "agent-stop", id: "stop-1", text: "run it" }, "task-stop");
+  await owner.waitFor((m) => m.type === "task.event" && m.task === "task-stop" && (m.body as { kind: string }).kind === "llm.message");
+  await Bun.sleep(400);
+  expect(await Bun.file(survivor).exists()).toBe(false);
+
+  owner.send("task.stop", { agent: "agent-stop", id: "stop-cmd-1" }, "task-stop");
+  const ended = await owner.waitFor((m) => m.type === "task.event" && m.task === "task-stop" && (m.body as { kind: string }).kind === "turn.ended");
+  expect((ended.body as { body: unknown }).body).toEqual({ reason: "stopped" });
+  const kinds = owner.inbox.filter((m) => m.type === "task.event" && m.task === "task-stop").map((m) => (m.body as { kind: string }).kind);
+  expect(kinds.slice(-2)).toEqual(["turn.stopped", "turn.ended"]);
+  // The command was cut off, so it reports no result and never writes its file.
+  expect(kinds).not.toContain("tool.result");
+  expect(await Bun.file(survivor).exists()).toBe(false);
+
+  // The same Task talks again right away.
+  owner.send("task.message", { agent: "agent-stop", id: "stop-2", text: "carry on" }, "task-stop");
+  const next = await owner.waitFor((m) => m.type === "task.event" && m.task === "task-stop" && (m.body as { kind: string }).kind === "turn.ended" && (m.body as { seq: number }).seq > (ended.body as { seq: number }).seq);
+  expect((next.body as { body: unknown }).body).toEqual({ reason: "done" });
+  owner.client.stop();
+}, 90_000);

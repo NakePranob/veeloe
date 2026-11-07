@@ -12,6 +12,16 @@ export const TaskMessageBodySchema = z.looseObject({
 export type TaskMessageBody = z.infer<typeof TaskMessageBodySchema>;
 
 /**
+ * Controller → Machine, with the Task's id in the header: stop the Turn running
+ * now (`stop-and-restart`, ADR 0017). `id` makes a resend stop nothing twice.
+ */
+export const TaskStopBodySchema = z.looseObject({
+  agent,
+  id: z.string().min(1).max(64),
+});
+export type TaskStopBody = z.infer<typeof TaskStopBodySchema>;
+
+/**
  * One event of a Task's log (ADR 0018). `kind` stays open: a newer Runtime adds
  * kinds, and a Controller skips the ones it does not know (ADR 0023).
  */
@@ -57,8 +67,12 @@ export const TaskEventKind = {
   LlmMessage: "llm.message",
   /** `{ content }`: the tool_result blocks that answer the LLM's tool_use. */
   ToolResult: "tool.result",
-  /** `{ reason: "done" } | { reason: "error", code }` */
+  /** `{ reason: "done" } | { reason: "error", code } | { reason: "stopped" } | { reason: "interrupted" }` */
   TurnEnded: "turn.ended",
+  /** `{ member }`: who stopped the Turn that was running (`stop-and-restart`). */
+  TurnStopped: "turn.stopped",
+  /** `{ reason: "restart" }`: the worker started again with this Turn still open (ADR 0033). */
+  TurnInterrupted: "turn.interrupted",
   /** `{ request, command, parts, expiresAt }`: the worker asks for an Approval and waits. */
   ApprovalRequested: "approval.requested",
   /** `{ request, member, decision, message? }`: who answered and how. */

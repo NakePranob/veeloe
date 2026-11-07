@@ -9,6 +9,7 @@ import { createLlmHandler } from "./proxy/proxy";
 import { createTaskRoutes } from "./proxy/task-routes";
 import { SandboxError, startSandbox, type Sandbox } from "./sandbox/sandbox";
 import { createTaskMessageSlice } from "./task-message/task-message";
+import { createTaskStopSlice } from "./task-stop/task-stop";
 import { createTaskListSlice } from "./task-list/task-list";
 import { createTaskSyncSlice } from "./task-sync/task-sync";
 import { createUsageStore, UsageError } from "./usage/store";
@@ -66,6 +67,8 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
   const budgets = createBudgets({ store: usageStore });
   const providers = () => loadProviders(home);
   const taskRoutes = createTaskRoutes(home);
+  // Lines left by Agents this Machine no longer has (an unpair then a new Pairing) go.
+  taskRoutes.prune(registry.all().map((agent) => agent.id));
   const membersInTrust = () => trust.owners.map((owner) => owner.member);
   const llm = createLlmHandler({
     fetchFn,
@@ -132,6 +135,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
       return !!agent && budgets.exhausted(agent);
     },
   });
+  const taskStop = createTaskStopSlice({ registry, workers, outbox, members: membersInTrust });
   const taskSync = createTaskSyncSlice({ registry, workers, outbox });
   const taskList = createTaskListSlice({ registry, workers });
   const usage = createUsageSlice({ registry, store: usageStore, outbox, members: membersInTrust });
@@ -169,6 +173,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
       else if (message.type === "agent.update") void agents.update(from, message.body);
       else if (message.type === "approval.answer") approvals.answer(from, message.body);
       else if (message.type === "task.message" && from.task) taskMessage({ ...from, task: from.task }, message.body);
+      else if (message.type === "task.stop" && from.task) taskStop({ ...from, task: from.task }, message.body);
       else if (message.type === "task.sync" && from.task) taskSync({ ...from, task: from.task }, message.body);
       else if (message.type === "egress.set") void egress.set(from, message.body);
       else if (message.type === "task.list") taskList(from);

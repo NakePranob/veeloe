@@ -50,5 +50,24 @@
   },
   "openAgent": "เปิดหน้า {{name}}",
   "started": "{{machine}} · {{when}}",
-  "notStarted": "{{machine}} · ยังไม่ได้เริ่ม"
+  "notStarted": "{{machine}} · ยังไม่ได้เริ่ม",
+  "stopped": "{{member}} หยุด Turn นี้ · {{when}}",
+  "interrupted": {
+    "title": "{{machine}} เริ่มใหม่กลาง Turn",
+    "body": "ไฟล์ที่แก้ไว้ยังอยู่ และ {{name}} จะไม่ทำต่อเอง เพราะอาจรันคำสั่งเดิมซ้ำ",
+    "continue": "ทำต่อ",
+    "continueMessage": "ทำต่อ"
+  },
+  "stop": {
+    "title": "หยุด Turn นี้?",
+    "message": "จะหยุด:\n• {{agent}}\n\nไฟล์ที่แก้ไปแล้วยังอยู่ และคุยต่อได้",
+    "action": "หยุด",
+    "cancel": "ยกเลิก",
+    "button": "หยุด",
+    "stopping": "กำลังหยุด…"
+  },
+  "authenticate": {
+    "approve": "อนุมัติให้ {{name}} รันคำสั่งนี้",
+    "always": "เพิ่ม {{entries}} เข้า Allowlist และอนุมัติ"
+  }
 }

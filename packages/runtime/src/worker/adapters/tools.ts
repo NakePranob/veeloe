@@ -13,10 +13,11 @@ export function combineTools(runners: ToolRunner[]): ToolRunner {
   }
   return {
     definitions: () => definitions,
-    async run(name, input) {
+    async run(name, input, signal) {
       const runner = byName.get(name);
       if (!runner) throw new Error(`there is no tool named ${name}`);
-      return runner.run(name, input);
+      // The Turn's signal goes through, or a Stop could not kill what the tool started (ADR 0017).
+      return runner.run(name, input, signal);
     },
   };
 }

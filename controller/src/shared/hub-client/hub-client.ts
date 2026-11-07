@@ -1,4 +1,5 @@
 import { answerChallenge, createBackoff, createSigner, HubCloseCode, MemorySeenSequences, parseFrame, verify, type HubError, type HubLinkRequest, type Outgoing, type Verified } from "@veeloe/protocol";
+import type { SeenSequences } from "@veeloe/protocol";
 import { clockSequence } from "./sequence";
 
 export type HubClientOptions = {
@@ -17,6 +18,10 @@ export type HubClientOptions = {
   onLinkRequest?: (request: HubLinkRequest) => void;
   /** The Hub closed with 4403: this key was revoked. The client stops for good. */
   onRevoked?: () => void;
+  /** Where the last number from each sender is kept; in memory when a caller has nothing better. */
+  seen?: SeenSequences;
+  /** Awaited before the first connection, so a number kept on disk is in hand before any envelope is checked. */
+  seenReady?: Promise<unknown>;
   backoff?: ReturnType<typeof createBackoff>;
 };
 
@@ -24,17 +29,34 @@ export type HubClientOptions = {
  * This Controller's one connection to a Hub (ADR 0022): proves the key, reconnects
  * with backoff until stop(), signs what goes out and checks what comes in.
  *
- * ponytail: the last number per sender is in memory. Keep it in SQLite when
- * Task events start arriving and a replay could change what is on screen.
+ * The last number from each sender comes from the caller when it can keep it
+ * (`protocol-envelope`): a Controller that forgot after a restart would accept
+ * one replayed envelope.
  */
-export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, onCertificates, onLinkRequest, onRevoked, backoff = createBackoff() }: HubClientOptions) {
+export function startHubClient({
+  hubUrl,
+  secretKey,
+  trustedKeys,
+  onReady,
+  onEnvelope,
+  onHubError,
+  onCertificates,
+  onLinkRequest,
+  onRevoked,
+  seen: kept,
+  seenReady,
+  backoff = createBackoff(),
+}: HubClientOptions) {
   const url = `${hubUrl.replace(/\/+$/, "")}/connect`;
   const signEnvelope = createSigner(secretKey, clockSequence());
-  const seen = new MemorySeenSequences();
+  const seen = kept ?? new MemorySeenSequences();
   let member: string | undefined;
   let socket: WebSocket | undefined;
   let stopped = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
+
+  /** Set once the kept numbers are in hand, so no envelope is checked against an empty memory. */
+  const began = seenReady ?? Promise.resolve();
 
   function connect() {
     const ws = new WebSocket(url);
@@ -78,7 +100,8 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
     };
   }
 
-  connect();
+  // The first connection waits for the kept numbers; a failure there still connects, as before.
+  void began.then(() => !stopped && connect(), () => !stopped && connect());
   return {
     /** The sent envelope's sig, which answers name it by; null when not connected, and nothing was signed or sent. */
     send(out: Outgoing): string | null {

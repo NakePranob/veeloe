@@ -66,3 +66,26 @@ test("what a command left running in the background does not outlive it", async 
 test("a command does not get the variables the worker reaches the supervisor by", async () => {
   expect(await bash("env | grep -c NODE_CHANNEL || true")).toBe("0\nexit code: 0");
 });
+
+test("a Stop kills the command and everything it started, and says the owner stopped it", async () => {
+  const marker = `veeloe-stop-${process.pid}-${Date.now()}`;
+  const controller = new AbortController();
+  const running = tool.run("bash", { command: `echo started; exec -a ${marker} sleep 300` }, controller.signal);
+  await Bun.sleep(200);
+  const started = Date.now();
+  controller.abort();
+  const message = await failure(running);
+  expect(Date.now() - started).toBeLessThan(2000);
+  expect(message).toBe("started\nthe owner stopped this Turn before the command finished");
+  await Bun.sleep(100);
+  expect(Bun.spawnSync(["pgrep", "-f", marker]).stdout.toString()).toBe("");
+}, 20_000);
+
+test("a Stop that arrives before the command starts leaves nothing behind", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const message = await failure(tool.run("bash", { command: "sleep 300" }, controller.signal));
+  expect(message).toBe("the owner stopped this Turn before the command finished");
+  // Nothing was left running: a second Stop still ends at once.
+  expect(await failure(tool.run("bash", { command: "echo x" }, controller.signal))).toContain("the owner stopped this Turn");
+}, 20_000);

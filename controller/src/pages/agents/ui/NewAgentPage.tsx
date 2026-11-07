@@ -13,7 +13,7 @@ import { modelsOf } from "../model/providers";
 import { ProviderModelSections } from "./ProviderModelSections";
 
 // controller-prototype's NewAgentPage, with what this version sends: a Character, a name, a Machine, a Provider and a model.
-// ponytail: no description, instructions or Allowlist yet; each comes with the change that uses it.
+// ponytail: no description or instructions yet; each comes with the change that uses it.
 export function NewAgentPage() {
   const t = useT("agents");
   const colors = useColors();

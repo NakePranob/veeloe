@@ -31,5 +31,6 @@
   "provider.unreachable": "The Machine couldn't reach the Provider",
   "task.not_found": "This Machine doesn't have that Task",
   "turn.too_many_rounds": "The Agent stopped after too many steps in one go",
-  "usage.invalid_range": "That usage range isn't valid. It must be between 1 and 90 days"
+  "usage.invalid_range": "That usage range isn't valid. It must be between 1 and 90 days",
+  "turn.not_running": "This Task has no Turn running, so there is nothing to stop"
 }

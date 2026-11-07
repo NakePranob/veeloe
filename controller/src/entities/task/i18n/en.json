@@ -4,5 +4,6 @@
   "failed": "Turn failed",
   "done": "Done",
   "offline": "Offline",
-  "new": "Not started"
+  "new": "Not started",
+  "interrupted": "Turn interrupted"
 }

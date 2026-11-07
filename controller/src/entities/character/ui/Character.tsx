@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
-import { motion, useColors } from "../../../shared/ui";
+import { motion, useColors, type Colors } from "../../../shared/ui";
 import type { Decal, Look, Shell, Sides, Top } from "../model/look";
 import type { Mood } from "../model/mood";
 
@@ -12,6 +12,8 @@ interface Props {
   size?: number;
   // Holds the pose without moving, as for the small heads on the Character editor's option cards.
   still?: boolean;
+  // What it floats over, so the raised hand's cut-out reads as one with the background.
+  backdrop?: keyof Colors;
 }
 
 // A screen and its LEDs look the same in light and dark, like the hardware they draw.
@@ -21,12 +23,12 @@ const SCREEN_BOTTOM = "#1f2836";
 const LED = "#eef6ff";
 
 // Each shell on a 100 × 100 grid, its bottom on y 84. visor: x, y, width, height, radius; top: the top
-// socket's y; side: the side sockets' x.
-const SHELLS: Record<Shell, { d: string; round?: number; visor: number[]; top: number; side: [number, number] }> = {
-  box: { d: "M30 26H70A16 16 0 0 1 86 42V68A16 16 0 0 1 70 84H30A16 16 0 0 1 14 68V42A16 16 0 0 1 30 26Z", visor: [22, 37, 56, 34, 11], top: 26, side: [14, 86] },
-  capsule: { d: "M37 30H63A27 27 0 0 1 63 84H37A27 27 0 0 1 37 30Z", visor: [20, 41, 60, 30, 15], top: 30, side: [10, 90] },
-  dome: { d: "M14 76V58a36 36 0 0 1 72 0v18q0 8-8 8H22q-8 0-8-8Z", visor: [22, 44, 56, 28, 12], top: 22, side: [14, 86] },
-  chamfer: { d: "M30 24H70L86 40V68L70 84H30L14 68V40Z", round: 6, visor: [22, 38, 56, 34, 10], top: 21, side: [12, 88] },
+// socket's y; side: the side sockets' x; hand: where the raised hand floats.
+const SHELLS: Record<Shell, { d: string; round?: number; visor: number[]; top: number; side: [number, number]; hand: [number, number] }> = {
+  box: { d: "M30 26H70A16 16 0 0 1 86 42V68A16 16 0 0 1 70 84H30A16 16 0 0 1 14 68V42A16 16 0 0 1 30 26Z", visor: [22, 37, 56, 34, 11], top: 26, side: [14, 86], hand: [86, 27] },
+  capsule: { d: "M37 30H63A27 27 0 0 1 63 84H37A27 27 0 0 1 37 30Z", visor: [20, 41, 60, 30, 15], top: 30, side: [10, 90], hand: [88, 33] },
+  dome: { d: "M14 76V58a36 36 0 0 1 72 0v18q0 8-8 8H22q-8 0-8-8Z", visor: [22, 44, 56, 28, 12], top: 22, side: [14, 86], hand: [81, 27] },
+  chamfer: { d: "M30 24H70L86 40V68L70 84H30L14 68V40Z", round: 6, visor: [22, 38, 56, 34, 10], top: 21, side: [12, 88], hand: [84, 27] },
 };
 
 // How each Mood holds the head: tilt in degrees, turn from −1 (its left) to 1, how far it sinks and
@@ -35,12 +37,13 @@ const POSE: Record<Mood, { tilt: number; turn: number; lift: number; look: [numb
   idle: { tilt: 0, turn: 0, lift: 0, look: [0, 0], open: 1 },
   thinking: { tilt: -8, turn: 0.4, lift: 0, look: [3, -4], open: 1 },
   working: { tilt: 2, turn: 0, lift: 1, look: [0, 1], open: 0.4 },
+  waiting: { tilt: -6, turn: 0, lift: -1, look: [0, 0], open: 1.08 },
   done: { tilt: -4, turn: 0, lift: 0, look: [0, 0], open: 1 },
   offline: { tilt: 12, turn: 0, lift: 8, look: [0, 0], open: 1 },
 };
 
 // How long one float up (or down) takes; working nods instead, offline rests on the ground.
-const FLOAT: Partial<Record<Mood, number>> = { idle: 1800, thinking: 2500, done: 1800 };
+const FLOAT: Partial<Record<Mood, number>> = { idle: 1800, thinking: 2500, waiting: 1200, done: 1800 };
 
 const AT_REST: Mood[] = ["idle", "done", "offline"];
 const native = process.env.EXPO_OS !== "web";
@@ -134,7 +137,7 @@ function DecalPart({ decal, visor: [vx, vy, vw, vh], c }: { decal: Decal; visor:
 // A floating robot head drawn 2.5D: a lit front over a darker wall, a screen set into it. Turning slides
 // the screen toward the turn and the wall and side parts against it. Who it is never changes with the
 // Mood; offline is the one exception, greyed out because the Agent can't be reached.
-export function Character({ look, mood, size = 44, still }: Props) {
+export function Character({ look, mood, size = 44, still, backdrop }: Props) {
   const colors = useColors();
   const reduce = useReduceMotion() || !!still;
   const id = useId().replace(/[^\w-]/g, "");
@@ -162,6 +165,7 @@ export function Character({ look, mood, size = 44, still }: Props) {
     nod: new Animated.Value(0),
     pulse: new Animated.Value(1),
     scan: new Animated.Value(0),
+    wave: new Animated.Value(0),
     hop: new Animated.Value(1),
   }).current;
   const last = useRef(mood);
@@ -217,6 +221,7 @@ export function Character({ look, mood, size = 44, still }: Props) {
     const loops: Animated.CompositeAnimation[] = [];
     if (FLOAT[mood]) loops.push(swing(v.float, 0, 1, FLOAT[mood]));
     if (mood === "working") loops.push(swing(v.nod, 0, 1, 250), swing(v.scan, 0, 1, 900));
+    if (mood === "waiting") loops.push(swing(v.wave, 0, 1, 800));
     if (mood === "thinking") loops.push(swing(v.pulse, 1, 0.25, 600));
     if (mood !== "done" && mood !== "offline")
       loops.push(
@@ -356,6 +361,21 @@ export function Character({ look, mood, size = 44, still }: Props) {
                   {mood === "working" && (
                     <Layer style={{ transform: [{ translateX: v.scan.interpolate({ inputRange: [0, 1], outputRange: [0, (vw - 22) * u] }) }] }}>
                       <Rect x={vx + 6} y={vy + vh - 6} width={10} height={2.2} rx={1.1} fill={LED} />
+                    </Layer>
+                  )}
+                  {/* Waiting on a person: the one orange in the app floats up beside the head and waves. */}
+                  {mood === "waiting" && (
+                    <Layer style={{ transformOrigin: `${s.hand[0]}% ${s.hand[1] + 18}%`, transform: [{ rotate: deg(v.wave, [0, 1], [-10, 14]) }] }}>
+                      <Rect
+                        x={s.hand[0] - 7.5}
+                        y={s.hand[1] - 8.5}
+                        width={15}
+                        height={17}
+                        rx={5.5}
+                        fill={colors.orange}
+                        stroke={backdrop ? colors[backdrop] : "none"}
+                        strokeWidth={backdrop ? 3 : 0}
+                      />
                     </Layer>
                   )}
                 </Animated.View>

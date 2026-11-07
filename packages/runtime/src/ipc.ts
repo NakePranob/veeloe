@@ -14,6 +14,8 @@ export type ToWorker =
   | { kind: "sync"; task: string; after: number; member: string; ref: string }
   /** Which of this Agent's Tasks the Member may open: the ones they started (ADR 0060). */
   | { kind: "list"; member: string }
+  /** A Member stops the Turn running in this Task: `ref` is its envelope, for errors (`stop-and-restart`). */
+  | { kind: "stop"; task: string; id: string; member: string; ref: string }
   /** The Agent was renamed, its Allowlist or its Approval timeout changed: the next tool call uses all three. `allowlist` and `approvalTimeoutS` are missing from a supervisor older than `approval-and-allowlist`, read as empty and an hour (ADR 0023). */
   | { kind: "agent"; name: string; allowlist?: string[]; approvalTimeoutS?: number }
   | ({ kind: "llm.response"; id: string } & LlmResponse)

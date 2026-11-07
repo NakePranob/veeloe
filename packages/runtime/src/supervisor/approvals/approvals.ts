@@ -28,8 +28,10 @@ export function createApprovalsSlice({
       // Allow-always adds to the Allowlist too, so it needs Manage as well.
       if (body.allowAlways !== undefined && !canManage(from.member, agent, members())) return outbox.error(from, "agent.unknown");
       if (body.allowAlways !== undefined) {
+        // One entry or several, in one write: the command may have more than one part still asking.
+        const added = (Array.isArray(body.allowAlways) ? body.allowAlways : [body.allowAlways]).map((entry) => entry.trim()).filter(Boolean);
         const kept = agent.allowlist ?? [];
-        const next: Agent = { ...agent, allowlist: kept.includes(body.allowAlways) ? kept : [...kept, body.allowAlways] };
+        const next: Agent = { ...agent, allowlist: [...kept, ...added.filter((entry) => !kept.includes(entry))] };
         registry.replace(next);
         broadcast();
       }

@@ -28,6 +28,13 @@ export function openEventStore(file: string, clock: Clock = { now: Date.now }): 
   const next = db.query<{ seq: number }, [string]>("SELECT coalesce(max(seq), 0) + 1 AS seq FROM event WHERE task_id = ?");
   const insert = db.query("INSERT INTO event (task_id, seq, kind, body, at, message_id) VALUES (?, ?, ?, ?, ?, ?)");
   const list = db.query<Row, [string, number]>("SELECT seq, kind, body, at FROM event WHERE task_id = ? AND seq > ? ORDER BY seq");
+  // A Task whose latest Turn boundary is a start: its Turn was running when this worker ended (ADR 0033).
+  // The last boundary decides, not the last event of any kind: a worker that died after an
+  // `llm.message` still left a Turn open, and this is the query that has to see it (ADR 0033).
+  const openTurnsQuery = db.query<{ task_id: string }, [string, string, string, string, string]>(
+    `SELECT e.task_id FROM event e WHERE e.kind IN (?, ?)
+     GROUP BY e.task_id HAVING (SELECT kind FROM event WHERE task_id = e.task_id AND kind IN (?, ?) ORDER BY seq DESC LIMIT 1) = ?`,
+  );
   const append = db.transaction((task: string, kind: string, body: unknown, messageId?: string): TaskEvent => {
     const { seq } = next.get(task)!;
     const at = clock.now();
@@ -42,6 +49,7 @@ export function openEventStore(file: string, clock: Clock = { now: Date.now }): 
     events: (task, after = 0) => list.all(task, after).map((row) => ({ seq: row.seq, kind: row.kind, at: row.at, body: JSON.parse(row.body) })),
     tasksStartedBy: (member) =>
       db.query<{ id: string; updated: number }, [string]>("SELECT t.id, coalesce((SELECT max(at) FROM event WHERE task_id = t.id), t.created_at) AS updated FROM task t WHERE t.starter = ?").all(member),
+    openTurns: () => openTurnsQuery.all("turn.started", "turn.ended", "turn.started", "turn.ended", "turn.started").map((row) => row.task_id),
     close: () => db.close(),
   };
 }

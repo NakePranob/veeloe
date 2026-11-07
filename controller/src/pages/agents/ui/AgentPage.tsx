@@ -16,7 +16,7 @@ import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
 
 // controller-prototype's AgentPage: the Agent's Tasks first, then its settings.
-// ponytail: only what this version has. Description, instructions, Budget, Approval, Allowlist and the rest come with their changes.
+// ponytail: only what this version has. Description, instructions, Memory, Skill and the rest come with their changes.
 function AgentView({ agent }: { agent: AgentRow }) {
   const t = useT("agents");
   const status = useT("task-status");

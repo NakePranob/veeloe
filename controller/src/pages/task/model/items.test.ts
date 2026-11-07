@@ -114,3 +114,26 @@ test("an approve with a reason keeps both, and a bad Approval row draws nothing"
   expect(shown).toHaveLength(1);
   expect(shown[0]).toMatchObject({ kind: "approval", approval: { parts: ["ls", "rm -rf dist"], reason: "clean the build folder", status: "approved" } });
 });
+
+test("a Stop shows who braked, and the Turn it ended is the last thing in the log", () => {
+  const { items: shown, working } = items([
+    row(1, "turn.started", {}),
+    row(2, "llm.message", { content: [{ type: "text", text: "starting" }] }),
+    row(3, "turn.stopped", { member: "m_kai" }),
+    row(4, "turn.ended", { reason: "stopped" }),
+  ]);
+  expect(working).toBe(false);
+  expect(shown.map((i) => i.kind)).toEqual(["agent", "stopped"]);
+  expect(shown.at(-1)).toMatchObject({ kind: "stopped", member: "m_kai" });
+});
+
+test("a restart that cut a Turn off shows the card that carries it on", () => {
+  const { items: shown, working } = items([
+    row(1, "turn.started", {}),
+    row(2, "llm.message", { content: [{ type: "text", text: "deploying" }] }),
+    row(3, "turn.interrupted", { reason: "restart" }),
+    row(4, "turn.ended", { reason: "interrupted" }),
+  ]);
+  expect(working).toBe(false);
+  expect(shown.map((i) => i.kind)).toEqual(["agent", "interrupted"]);
+});

@@ -1,7 +1,7 @@
 // The Markdown an Agent writes: headings, bullet and numbered lists, ``` blocks,
-// and inside a line `code`, **bold** and [links](https://…).
+// `>` quotes, tables, and inside a line `code`, **bold** and [links](https://…).
 // Ported from controller-prototype.
-// ponytail: no tables, quotes or nesting; add them when Agents send them.
+// ponytail: no nesting; add it when Agents nest lists.
 export interface Inline {
   text: string;
   code?: boolean;
@@ -13,7 +13,20 @@ export type Block =
   | { kind: "code"; text: string }
   | { kind: "heading"; inline: Inline[] }
   | { kind: "item"; marker: string; inline: Inline[] }
-  | { kind: "paragraph"; inline: Inline[] };
+  | { kind: "paragraph"; inline: Inline[] }
+  | { kind: "quote"; inline: Inline[] }
+  | { kind: "table"; header: Inline[][]; rows: Inline[][][] };
+
+/** One table row as cells, split on the pipes a table uses. */
+const cells = (line: string) =>
+  line
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+
+/** The line under a table's header: `| --- | :-: |` and nothing else. */
+const isTableRule = (line: string) => line.includes("|") && /^\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?$/.test(line);
 
 const INLINE = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\))/;
 
@@ -43,11 +56,31 @@ export function parseMarkdown(text: string): Block[] {
       if (paragraph.length) blocks.push({ kind: "paragraph", inline: parseInline(paragraph.join("\n")) });
       paragraph = [];
     };
-    for (const raw of part.split("\n")) {
-      const line = raw.trim();
+    const lines = part.split("\n").map((line) => line.trim());
+    for (let index = 0; index < lines.length; index++) {
+      const line = lines[index]!;
       const heading = line.match(/^#{1,3}\s+(.*)$/);
       const bullet = line.match(/^[-*•]\s+(.*)$/);
       const numbered = line.match(/^(\d+)[.)]\s+(.*)$/);
+      const quoted = line.match(/^>\s?(.*)$/);
+      // A table is a header row with pipes, then the rule line under it.
+      const tabular = line.includes("|") && isTableRule(lines[index + 1] ?? "");
+      if (tabular) {
+        flush();
+        const header = cells(line).map(parseInline);
+        const rows: Inline[][][] = [];
+        for (index += 2; index < lines.length && lines[index]!.includes("|"); index++) rows.push(cells(lines[index]!).map(parseInline));
+        index--;
+        blocks.push({ kind: "table", header, rows });
+        continue;
+      }
+      if (quoted) {
+        flush();
+        const quotedLines = [quoted[1]!];
+        while (/^>\s?/.test(lines[index + 1] ?? "")) quotedLines.push(lines[++index]!.replace(/^>\s?/, ""));
+        blocks.push({ kind: "quote", inline: parseInline(quotedLines.join("\n")) });
+        continue;
+      }
       if (line && !heading && !bullet && !numbered) {
         paragraph.push(line);
         continue;

@@ -19,7 +19,7 @@ export function LogHead({ agent, machine, events, online }: { agent: AgentRow; m
       <Pressable role="button" aria-label={t("openAgent", { name: agent.name })} hitSlop={space.xs} onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })}>
         {({ pressed }) => (
           <View style={{ transform: [{ scale: pressed ? motion.press : 1 }] }}>
-            <Character look={lookOfJson(agent.character)} mood={moodOf(events, online)} size={56} />
+            <Character look={lookOfJson(agent.character)} mood={moodOf(events, online)} size={56} backdrop="background" />
           </View>
         )}
       </Pressable>

@@ -46,5 +46,9 @@
     "asks": "ต้องขอ Approval",
     "asksAlways": "ต้องขอ Approval ทุกครั้ง: แยกท่อนให้แน่ใจไม่ได้ ($( ), backtick หรือ eval)"
   },
-  "cancel": "ยกเลิก"
+  "cancel": "ยกเลิก",
+  "authenticate": {
+    "add": "เพิ่ม {{entry}} เข้า Allowlist ของ {{name}}",
+    "remove": "ลบ {{entry}} ออกจาก Allowlist ของ {{name}}"
+  }
 }

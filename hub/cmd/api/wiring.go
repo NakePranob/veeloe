@@ -120,8 +120,10 @@ func run() error {
 	hub.Register(api)
 	machine.NewHandlerFromDB(db).Register(api)
 	controller.NewHandlerFromDB(db).Register(api)
-	pairing.NewHandlerFromDB(db, cfg.HubPublicURL).Register(api)
-	linking.NewHandlerFromDB(db, hub).Register(api)
+	// The two routes that need no account: a stranger gets a minute's worth, not a flood.
+	open := api.Group("/", middleware.RateLimit(60))
+	pairing.NewHandlerFromDB(db, cfg.HubPublicURL).Register(open)
+	linking.NewHandlerFromDB(db, hub).Register(open)
 	// go-scaffold:routes
 
 	srv := &http.Server{

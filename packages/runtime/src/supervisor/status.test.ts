@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { supervisorDir } from "./config";
@@ -33,6 +33,27 @@ test("a pid file left by a supervisor that is gone reads as not running", async 
   await gone.exited;
   writeFileSync(join(supervisorDir(dir), "supervisor.pid"), `${gone.pid}\n`);
   expect(supervisorPid(dir)).toBeUndefined();
-  writeFileSync(join(dir, "runtime/supervisor.pid"), `${process.pid}\n`);
-  expect(supervisorPid(dir)).toBe(process.pid);
+  // Alive and named like the supervisor: this is the one it is.
+  const alive = Bun.spawn(["/bin/bash", "-c", "exec -a veeloe sleep 30"]);
+  cleanup.push(() => alive.kill());
+  writeFileSync(join(dir, "runtime/supervisor.pid"), `${alive.pid}\n`);
+  expect(supervisorPid(dir)).toBe(alive.pid);
+});
+
+test("a pid the OS has given to another program is not taken for the supervisor", () => {
+  const home = mkdtempSync(join(tmpdir(), "veeloe-status-"));
+  cleanup.push(() => rmSync(home, { recursive: true, force: true }));
+  mkdirSync(join(home, "runtime"), { recursive: true, mode: 0o700 });
+
+  // A process that is alive, but is not a supervisor.
+  const other = Bun.spawn(["/bin/sleep", "30"]);
+  cleanup.push(() => other.kill());
+  writeFileSync(join(home, "runtime", "supervisor.pid"), `${other.pid}\n`);
+  expect(supervisorPid(home)).toBeUndefined();
+
+  // One whose argv says veeloe is believed, as the compiled supervisor's would.
+  const named = Bun.spawn(["/bin/bash", "-c", "exec -a veeloe sleep 30"]);
+  cleanup.push(() => named.kill());
+  writeFileSync(join(home, "runtime", "supervisor.pid"), `${named.pid}\n`);
+  expect(supervisorPid(home)).toBe(named.pid);
 });

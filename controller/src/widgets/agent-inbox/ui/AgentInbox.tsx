@@ -55,7 +55,12 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
             backgroundColor: colors[pressed ? "chipPressed" : selected ? "chip" : replace ? "surface" : "background"],
           }}
         >
-          <Character look={lookOfJson(agent.character)} mood={moodOf(task ? latestEvents(task) : [], online)} size={AVATAR} />
+          <Character
+            look={lookOfJson(agent.character)}
+            mood={moodOf(task ? latestEvents(task) : [], online)}
+            size={AVATAR}
+            backdrop={pressed ? "chipPressed" : selected ? "chip" : replace ? "surface" : "background"}
+          />
           <View style={{ flex: 1, gap: space.xs / 2 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
               <Text variant="headline" numberOfLines={1} style={{ flexShrink: 1 }}>

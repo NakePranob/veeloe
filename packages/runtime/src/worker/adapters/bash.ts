@@ -50,7 +50,7 @@ export function bashTool({ workdir, env, secondMs = 1000 }: { workdir: string; e
         },
       },
     ],
-    async run(name, input) {
+    async run(name, input, signal) {
       if (name !== "bash") throw new Error(`there is no tool named ${name}`);
       const { command, timeout } = (input ?? {}) as { command?: unknown; timeout?: unknown };
       if (typeof command !== "string" || command.trim() === "") throw new Error("bash needs a command");
@@ -78,8 +78,13 @@ export function bashTool({ workdir, env, secondMs = 1000 }: { workdir: string; e
         timedOut = true;
         killGroup();
       }, seconds * secondMs);
+      // A Stop kills what the command started, so the Turn ends now rather than when it would have finished.
+      const onStop = () => killGroup();
+      signal?.addEventListener("abort", onStop, { once: true });
+      if (signal?.aborted) killGroup();
       const code = await proc.exited;
       clearTimeout(timer);
+      signal?.removeEventListener("abort", onStop);
       // What the command left running in the background goes too, or it would hold the output open.
       // One that left the group (setsid) still may, so the output is read for a moment longer at most.
       killGroup();
@@ -89,9 +94,14 @@ export function bashTool({ workdir, env, secondMs = 1000 }: { workdir: string; e
 
       const text = tail.trim();
       const cut = tail.dropped ? `[the first ${tail.dropped} characters were cut]\n` : "";
-      const end = timedOut ? `timed out after ${seconds} seconds, so it was stopped` : `exit code: ${code}`;
+      const stopped = signal?.aborted === true;
+      const end = stopped
+        ? "the owner stopped this Turn before the command finished"
+        : timedOut
+          ? `timed out after ${seconds} seconds, so it was stopped`
+          : `exit code: ${code}`;
       const result = `${cut}${text}${text && !text.endsWith("\n") ? "\n" : ""}${end}`;
-      if (timedOut || code !== 0) throw new Error(result);
+      if (stopped || timedOut || code !== 0) throw new Error(result);
       return result;
     },
   };

@@ -129,7 +129,7 @@ export function latestOf(events: readonly Pick<TaskEventRow, "kind" | "body">[])
 export const latestEvents = ({ latest_kind, latest_body }: Latest) => (latest_kind ? [{ kind: latest_kind, body: latest_body }] : []);
 
 /** What a Task is doing, in the prototype's words for it. `failed`: its latest Turn ended in an error. */
-export type TaskStatus = "waiting" | "working" | "failed" | "done" | "offline" | "new";
+export type TaskStatus = "waiting" | "working" | "interrupted" | "failed" | "done" | "offline" | "new";
 
 /**
  * Offline first; then from the latest known event: none is not started, an Approval
@@ -140,9 +140,15 @@ export function statusOf(latest: Latest | undefined, online: boolean | null): Ta
   if (online === false) return "offline";
   if (!latest?.latest_kind) return "new";
   if (latest.latest_kind === TaskEventKind.ApprovalRequested) return "waiting";
+  // A restart cut this Turn off (ADR 0033): the files are there, and a word carries it on.
+  if (latest.latest_kind === TaskEventKind.TurnInterrupted) return "interrupted";
   if (latest.latest_kind !== TaskEventKind.TurnEnded) return "working";
   try {
-    return (JSON.parse(latest.latest_body ?? "null") as { reason?: unknown } | null)?.reason === "done" ? "done" : "failed";
+    const reason = (JSON.parse(latest.latest_body ?? "null") as { reason?: unknown } | null)?.reason;
+    if (reason === "done") return "done";
+    // A Stop is a person ending the Turn, not a failure: the Task is finished, not broken (ADR 0017).
+    if (reason === "stopped") return "done";
+    return reason === "interrupted" ? "interrupted" : "failed";
   } catch {
     return "failed";
   }

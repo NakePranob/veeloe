@@ -23,6 +23,14 @@ function memoryStore(): EventStore & { all: Map<string, TaskEvent[]> } {
     },
     events: (task, after = 0) => (all.get(task) ?? []).filter((e) => e.seq > after),
     tasksStartedBy: (member) => [...starters].filter(([, s]) => s === member).map(([id]) => ({ id, updated: all.get(id)?.at(-1)?.at ?? 0 })),
+    // The last Turn boundary, as the SQL does: a Turn left open survives later events of other kinds.
+    openTurns: () =>
+      [...all]
+        .filter(([, events]) => {
+          const last = events.filter((e) => e.kind === "turn.started" || e.kind === "turn.ended").at(-1);
+          return last?.kind === "turn.started";
+        })
+        .map(([id]) => id),
   };
 }
 
@@ -198,6 +206,19 @@ function bashFake(ran: string[]): ToolRunner {
   };
 }
 
+/** A bash tool that never finishes on its own, until the Turn's signal stops it. */
+function hangingTool(): ToolRunner {
+  return {
+    definitions: () => [{ name: "bash", description: "bash", input_schema: { type: "object" } }],
+    run: (_name, _input, signal) =>
+      new Promise((_resolve, reject) => {
+        const stop = () => reject(new Error("the owner stopped this Turn before the command finished"));
+        if (signal?.aborted) stop();
+        else signal?.addEventListener("abort", stop, { once: true });
+      }),
+  };
+}
+
 const bashUse = (command: string) => ({ type: "tool_use", id: `tu-${command}`, name: "bash", input: { command } });
 const requestedOf = (store: ReturnType<typeof memoryStore>, task = "t1") => store.all.get(task)?.find((e) => e.kind === "approval.requested")?.body as { request: string } | undefined;
 async function waitForRequested(store: ReturnType<typeof memoryStore>) {
@@ -346,3 +367,105 @@ test("a new timeout reaches the next wait, and a bad value keeps the old one", a
   expect(result[0]!.content).toContain("expired");
   expect(store.all.get("t1")!.find((e) => e.kind === "approval.answered")!.body).toMatchObject({ decision: "deny" });
 }, 10000);
+
+const stopMessage = (id: string, task = "t1"): Extract<ToWorker, { kind: "stop" }> => ({ kind: "stop", task, id, member: "m_owner", ref: `sig-${id}` });
+
+test("a Stop ends the Turn with who stopped it, and the Task goes on from the same conversation", async () => {
+  const { core, store, requests } = setup({ tools: hangingTool(), allowlist: ["sleep 1000"], replies: [{ content: [bashUse("sleep 1000")], stopReason: "tool_use" }, text("back")] });
+  core.receive(message("run"));
+  for (let i = 0; i < 200 && !store.all.get("t1")?.some((e) => e.kind === "tool.result"); i++) await Bun.sleep(5);
+  // The command is running: the Stop cuts it and the Turn ends as stopped, not as an error.
+  core.receive(stopMessage("stop-1"));
+  await core.idle();
+  expect(kinds(store.all.get("t1"))).toEqual(["member.message", "turn.started", "llm.message", "turn.stopped", "turn.ended"]);
+  expect(store.all.get("t1")!.find((e) => e.kind === "turn.stopped")!.body).toEqual({ member: "m_owner" });
+  expect(store.all.get("t1")!.at(-1)!.body).toEqual({ reason: "stopped" });
+
+  // The same Stop again changes nothing, and the Task talks again with its history.
+  core.receive(stopMessage("stop-1"));
+  expect(kinds(store.all.get("t1")).filter((k) => k === "turn.stopped")).toHaveLength(1);
+  core.receive(message("continue"));
+  await core.idle();
+  expect(requests.at(-1)!.messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+  expect(store.all.get("t1")!.at(-1)!.body).toEqual({ reason: "done" });
+}, 15_000);
+
+test("a Stop while waiting on the LLM drops the answer that arrives after it", async () => {
+  const { core, store, sent, gate } = setup({ replies: [text("late answer")] });
+  let open!: () => void;
+  gate.wait = new Promise((resolve) => (open = resolve));
+  core.receive(message("ask"));
+  core.receive(stopMessage("stop-2"));
+  open();
+  await core.idle();
+  expect(kinds(store.all.get("t1"))).toEqual(["member.message", "turn.started", "turn.stopped", "turn.ended"]);
+  expect(store.all.get("t1")!.at(-1)!.body).toEqual({ reason: "stopped" });
+  // The answer is not written as this Turn's words.
+  expect(sent.some((m) => m.kind === "event" && m.event.kind === "llm.message")).toBe(false);
+});
+
+test("a Stop while an Approval waits ends the Turn, and a late answer is approval.unknown", async () => {
+  const { core, store, sent } = setup({ tools: bashFake([]), replies: [{ content: [bashUse("rm -rf dist")], stopReason: "tool_use" }, text("ok")] });
+  core.receive(message("go"));
+  const { request } = await waitForRequested(store);
+  core.receive(stopMessage("stop-3"));
+  await core.idle();
+  expect(store.all.get("t1")!.find((e) => e.kind === "approval.answered")).toBeUndefined();
+  expect(store.all.get("t1")!.at(-1)!.body).toEqual({ reason: "stopped" });
+  core.receive(approvalAnswer(request, "approve"));
+  expect(sent.at(-1)).toEqual({ kind: "error", member: "m_owner", ref: `sig-${request}`, code: "approval.unknown" });
+});
+
+test("a Stop with no Turn running is turn.not_running, and one for another Task is task.not_found", async () => {
+  const { core, store, sent } = setup({ tools: hangingTool(), allowlist: ["sleep 1000"], replies: [{ content: [bashUse("sleep 1000")], stopReason: "tool_use" }, text("ok")] });
+  core.receive(stopMessage("stop-4"));
+  expect(sent.at(-1)).toEqual({ kind: "error", member: "m_owner", ref: "sig-stop-4", code: "turn.not_running", task: "t1" });
+
+  core.receive(message("run"));
+  for (let i = 0; i < 200 && !store.all.get("t1")?.some((e) => e.kind === "llm.message"); i++) await Bun.sleep(5);
+  // A Task someone else started is not even said to exist to this Member.
+  store.createTask("t-other", "m_other");
+  core.receive({ kind: "stop", task: "t-other", id: "stop-5", member: "m_owner", ref: "sig-stop-5" });
+  expect(sent.at(-1)).toEqual({ kind: "error", member: "m_owner", ref: "sig-stop-5", code: "task.not_found", task: "t-other" });
+  core.receive(stopMessage("stop-6"));
+  await core.idle();
+}, 15_000);
+
+
+test("a worker that starts again closes every Turn that was left open, and nothing runs twice", async () => {
+  const store = memoryStore();
+  // What a worker that died mid-Turn leaves behind: a start with no end.
+  store.createTask("t-open", "m_owner");
+  store.append("t-open", "member.message", { member: "m_owner", id: "m-1", text: "deploy" }, "m-1");
+  store.append("t-open", "turn.started", { member: "m_owner" });
+  store.createTask("t-done", "m_owner");
+  store.append("t-done", "turn.started", { member: "m_owner" });
+  store.append("t-done", "turn.ended", { reason: "done" });
+
+  const sent: FromWorker[] = [];
+  const core = createAgentCore({ name: "Deployer", store, tools: noTools, link: { send: (m) => sent.push(m) }, llm: { send: async () => text("back") } });
+  core.closeOpenTurns();
+
+  expect(kinds(store.all.get("t-open"))).toEqual(["member.message", "turn.started", "turn.interrupted", "turn.ended"]);
+  expect(store.all.get("t-open")!.at(-2)!.body).toEqual({ reason: "restart" });
+  expect(store.all.get("t-open")!.at(-1)!.body).toEqual({ reason: "interrupted" });
+  // A Task that had ended is left alone.
+  expect(kinds(store.all.get("t-done"))).toEqual(["turn.started", "turn.ended"]);
+
+  // The Agent is free again: the same Task takes a new message.
+  core.receive(message("continue", { task: "t-open", id: "m-2" }));
+  await core.idle();
+  expect(store.all.get("t-open")!.at(-1)!.body).toEqual({ reason: "done" });
+});
+
+test("a second Stop for the same Turn writes no second turn.stopped and the Turn still ends once", async () => {
+  const { core, store } = setup({ tools: hangingTool(), allowlist: ["sleep 1000"], replies: [{ content: [bashUse("sleep 1000")], stopReason: "tool_use" }, text("back")] });
+  core.receive(message("run"));
+  for (let i = 0; i < 200 && !store.all.get("t1")?.some((e) => e.kind === "llm.message"); i++) await Bun.sleep(5);
+  // Two different Stop commands arrive before the Turn has settled: one brake, one record.
+  core.receive(stopMessage("stop-a"));
+  core.receive(stopMessage("stop-b"));
+  await core.idle();
+  expect(kinds(store.all.get("t1")).filter((k) => k === "turn.stopped")).toHaveLength(1);
+  expect(kinds(store.all.get("t1")).filter((k) => k === "turn.ended")).toHaveLength(1);
+}, 15_000);

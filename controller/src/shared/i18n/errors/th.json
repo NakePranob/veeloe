@@ -31,5 +31,6 @@
   "provider.unreachable": "Machine ติดต่อ Provider ไม่ได้",
   "task.not_found": "Machine เครื่องนี้ไม่มี Task นั้น",
   "turn.too_many_rounds": "Agent หยุดเพราะทำต่อกันหลายขั้นเกินไปในรอบเดียว",
-  "usage.invalid_range": "ช่วงวันที่ที่ขอไม่ถูกต้อง ต้องอยู่ระหว่าง 1 ถึง 90 วัน"
+  "usage.invalid_range": "ช่วงวันที่ที่ขอไม่ถูกต้อง ต้องอยู่ระหว่าง 1 ถึง 90 วัน",
+  "turn.not_running": "Task นี้ไม่ได้กำลังทำ Turn อยู่ จึงไม่มีอะไรให้หยุด"
 }

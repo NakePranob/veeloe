@@ -33,3 +33,11 @@ describe("approval event bodies", () => {
     expect(parsed.success).toBe(true);
   });
 });
+
+test("allowAlways takes one entry or several, so every part still asking can be signed", () => {
+  expect(ApprovalAnswerBodySchema.safeParse({ agent: "a1", request: "ap_1", decision: "approve", allowAlways: "npm" }).success).toBe(true);
+  const many = ApprovalAnswerBodySchema.safeParse({ agent: "a1", request: "ap_1", decision: "approve", allowAlways: ["rm -rf dist", "npm run build"] });
+  expect(many.success).toBe(true);
+  expect(many.success && many.data.allowAlways).toEqual(["rm -rf dist", "npm run build"]);
+  expect(ApprovalAnswerBodySchema.safeParse({ agent: "a1", request: "ap_1", decision: "approve", allowAlways: [] }).success).toBe(false);
+});

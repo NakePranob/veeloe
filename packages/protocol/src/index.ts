@@ -54,12 +54,14 @@ export {
   TaskListBodySchema,
   TaskListedBodySchema,
   TaskMessageBodySchema,
+  TaskStopBodySchema,
   TaskSyncBodySchema,
   type TaskEvent,
   type TaskEventBody,
   type TaskEventsBody,
   type TaskListedBody,
   type TaskMessageBody,
+  type TaskStopBody,
   type TaskSyncBody,
 } from "./messages/task";
 export { EGRESS_MAX, EgressDomainSchema, EgressSchema, EgressSetBodySchema, type EgressSetBody } from "./messages/egress";
@@ -74,6 +76,7 @@ export {
   type Allowlist,
 } from "./messages/allowlist";
 export {
+  AllowAlwaysSchema,
   ApprovalAnswerBodySchema,
   ApprovalAnsweredBodySchema,
   ApprovalDecisionSchema,

@@ -108,3 +108,16 @@ test("the answer carries its Task to the worker, so another Task's wait stays un
     s.cleanup();
   }
 });
+
+test("allow-always with several entries adds them all, once each, and still answers", () => {
+  const s = setup();
+  try {
+    s.answer("m_1", { agent: "a1", request: "ap_1", decision: "approve", allowAlways: ["rm -rf dist", "npm run build", "ls"] });
+    expect(s.errors).toEqual([]);
+    expect(s.registry.get("a1")).toMatchObject({ allowlist: ["ls", "rm -rf dist", "npm run build"] });
+    expect(s.broadcasts()).toBe(1);
+    expect(s.sent).toHaveLength(1);
+  } finally {
+    s.cleanup();
+  }
+});

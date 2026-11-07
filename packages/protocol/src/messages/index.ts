@@ -6,7 +6,7 @@ import { EgressSetBodySchema } from "./egress";
 import { ErrorBodySchema } from "./error";
 import { DeviceHandoffBodySchema, DeviceLinkedBodySchema } from "./linking";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
-import { TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskSyncBodySchema } from "./task";
+import { TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskStopBodySchema, TaskSyncBodySchema } from "./task";
 import { UsageGetBodySchema, UsageListedBodySchema } from "./usage";
 
 const known = {
@@ -20,6 +20,7 @@ const known = {
   "agent.usage": AgentUsageBodySchema,
   "approval.answer": ApprovalAnswerBodySchema,
   "task.message": TaskMessageBodySchema,
+  "task.stop": TaskStopBodySchema,
   "task.event": TaskEventBodySchema,
   "task.sync": TaskSyncBodySchema,
   "task.events": TaskEventsBodySchema,

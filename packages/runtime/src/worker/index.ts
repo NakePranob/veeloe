@@ -60,5 +60,7 @@ export function runWorker(agentId: string) {
     } else core.receive(m);
   });
   process.on("disconnect", () => process.exit(0));
+  // Before taking work: whatever was running when this worker last ended is closed as interrupted (ADR 0033).
+  core.closeOpenTurns();
   send({ kind: "ready" });
 }

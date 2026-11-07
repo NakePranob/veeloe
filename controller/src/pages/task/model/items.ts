@@ -1,4 +1,6 @@
-type EventRow = { seq: number; kind: string; body: string };
+type EventRow = { seq: number; kind: string; body: string; at?: number };
+
+const atOf = (event: EventRow) => event.at ?? 0;
 
 /** One command the Agent asked for, by the tool's own id, and how it went so far. */
 export type ToolCall = { id: string; command: string; state: "running" | "ok" | "failed" | "unfinished"; output?: string };
@@ -30,7 +32,11 @@ export type Item =
   | { key: string; kind: "error"; code: string }
   /** Commands run back to back, with no words of the Agent between them (controller-prototype's items). */
   | { key: string; kind: "tools"; calls: ToolCall[] }
-  | { key: string; kind: "approval"; approval: Approval };
+  | { key: string; kind: "approval"; approval: Approval }
+  /** A Member stopped the Turn that was running (ADR 0017). */
+  | { key: string; kind: "stopped"; member: string; at: number }
+  /** The worker started again with a Turn still open (ADR 0033). */
+  | { key: string; kind: "interrupted"; at: number };
 
 const textOf = (content: unknown) =>
   Array.isArray(content)
@@ -109,6 +115,10 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
         found.item.approval.status = expired ? "expired" : body.decision === "approve" ? "approved" : "denied";
         if (typeof body.member === "string") found.item.approval.answeredBy = { member: body.member, decision: body.decision, ...(typeof body.message === "string" && { message: body.message }) };
       }
+    } else if (event.kind === "turn.stopped" && typeof body.member === "string") {
+      out.push({ key, kind: "stopped", member: body.member, at: atOf(event) });
+    } else if (event.kind === "turn.interrupted") {
+      out.push({ key, kind: "interrupted", at: atOf(event) });
     } else if (event.kind === "turn.started") open = true;
     else if (event.kind === "turn.ended") {
       open = false;

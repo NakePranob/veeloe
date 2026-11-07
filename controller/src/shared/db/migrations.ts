@@ -73,4 +73,7 @@ export const MIGRATIONS = [
   `ALTER TABLE agent ADD COLUMN allowlist TEXT`,
   // How long one Approval waits, in seconds; null from a Machine older than `approval-and-allowlist`.
   `ALTER TABLE agent ADD COLUMN approval_timeout_s INTEGER`,
+  // The last envelope number from each sender, so a replay after a restart is still refused
+  // (`protocol-envelope`; the Runtime keeps its own in a file).
+  `CREATE TABLE seen_sequence (sender_key TEXT PRIMARY KEY NOT NULL, seq INTEGER NOT NULL)`,
 ] as const;
