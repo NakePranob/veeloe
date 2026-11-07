@@ -23,7 +23,7 @@
 - [x] `agent-and-task`: สร้าง Agent, supervisor กับ worker, Task แบบ event log และคุยกับ Provider ผ่าน proxy รอ `machine-pairing` (ADR 0004, 0018, 0020, 0032, 0042)
 - [x] `sandboxed-commands`: คำสั่งรันใน sandbox บน macOS และ Linux พร้อม Egress รายชื่อเดียวทั้ง Machine รอ `agent-and-task` (ADR 0008)
 - [x] `workdir-file-tools`: tool อ่านและเขียนไฟล์ใน Workdir (read, write, edit, glob, grep) (ADR 0008, 0011, 0032)
-- [ ] `approval-and-allowlist`: ขอและตอบ Approval พร้อม Allowlist รอ `sandboxed-commands` (ADR 0030)
+- [x] `approval-and-allowlist`: ขอและตอบ Approval พร้อม Allowlist รอ `sandboxed-commands` (ADR 0030)
 
 ### ส่วนที่เหลือของ v0.1
 
