@@ -1,4 +1,4 @@
-This is the Veeloe Controller, the real app. `../controller-prototype/` is a throwaway on Demo data: look at it for how a screen should feel, but do not build on it.
+This is the Veeloe Controller, the real app. `../controller-prototype/` is a throwaway on Demo data: do not build on it, but it is the design source of truth for a screen. Before writing or changing any screen, read its prototype page and the entity/state module it imports, and match every state, label, hint line, button and its order, and control shape — a value that opens a picker in one row, not one row per option. A screen that invents its own layout or repeats a label down a list is wrong even if it works. Prove parity state by state against the prototype, then delete any temporary preview route or seed helper.
 
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
