@@ -1,4 +1,4 @@
-import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type AgentUpdateBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol";
+import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
@@ -291,6 +291,15 @@ export function createMachineLinks({
      */
     setEgress(machine: Machine, egress: string[]) {
       return sendTo(machine, "other", { type: "egress.set", body: { egress } }) !== null;
+    },
+
+    /**
+     * The answer to one waiting Approval. Nothing shows as answered until the
+     * Machine's `approval.answered` event says so (ADR 0006). The sig, or null
+     * when the Hub is not connected and nothing went.
+     */
+    answerApproval(machine: Machine, { agent, task, request, decision, message, allowAlways }: Omit<ApprovalAnswerBody, "agent"> & { agent: string; task: string }) {
+      return sendTo(machine, "other", { type: "approval.answer", task, body: { agent, request, decision, ...(message !== undefined && { message }), ...(allowAlways !== undefined && { allowAlways }) } });
     },
 
     async sendMessage(machine: Machine, { agent, task, text }: { agent: string; task: string; text: string }) {

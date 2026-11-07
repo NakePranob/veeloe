@@ -29,7 +29,7 @@ function memoryStore(): EventStore & { all: Map<string, TaskEvent[]> } {
 const noTools: ToolRunner = { definitions: () => [], run: async () => "" };
 const echoTool: ToolRunner = { definitions: () => [{ name: "echo", description: "echo", input_schema: { type: "object" } }], run: async (_, input) => JSON.stringify(input) };
 
-function setup({ replies = [] as (LlmReply | Error)[], tools = noTools } = {}) {
+function setup({ replies = [] as (LlmReply | Error)[], tools = noTools, allowlist = [] as string[], approvalTimeoutMs }: { replies?: (LlmReply | Error)[]; tools?: ToolRunner; allowlist?: string[]; approvalTimeoutMs?: number } = {}) {
   const store = memoryStore();
   const sent: FromWorker[] = [];
   const requests: LlmRequest[] = [];
@@ -37,6 +37,8 @@ function setup({ replies = [] as (LlmReply | Error)[], tools = noTools } = {}) {
   const gate: { wait?: Promise<void> } = {};
   const core = createAgentCore({
     name: "Deployer",
+    allowlist,
+    ...(approvalTimeoutMs !== undefined && { approvalTimeoutMs }),
     store,
     tools,
     link: { send: (m) => sent.push(m) },
@@ -103,7 +105,7 @@ test("a message during a Turn is refused as busy and leaves the log alone", asyn
 });
 
 test("a new name reaches the next Turn, and the Turn running keeps the old one to its end", async () => {
-  const { core, requests, gate } = setup({ replies: [{ content: [{ type: "tool_use", id: "u1", name: "echo", input: {} }], stopReason: "tool_use" }], tools: echoTool });
+  const { core, requests, gate } = setup({ replies: [{ content: [{ type: "tool_use", id: "u1", name: "echo", input: {} }], stopReason: "tool_use" }], tools: echoTool, allowlist: ["echo"] });
   let open!: () => void;
   gate.wait = new Promise((resolve) => (open = resolve));
   core.receive(message("first"));
@@ -117,7 +119,7 @@ test("a new name reaches the next Turn, and the Turn running keeps the old one t
 
 test("a tool the LLM asks for runs, and its result goes into the next request", async () => {
   const use = { type: "tool_use", id: "tu1", name: "echo", input: { a: 1 } };
-  const { core, store, requests } = setup({ tools: echoTool, replies: [{ content: [use], stopReason: "tool_use" }, text("done")] });
+  const { core, store, requests } = setup({ tools: echoTool, allowlist: ["echo"], replies: [{ content: [use], stopReason: "tool_use" }, text("done")] });
   core.receive(message("go"));
   await core.idle();
   expect(kinds(store.all.get("t1"))).toEqual(["member.message", "turn.started", "llm.message", "tool.result", "llm.message", "turn.ended"]);
@@ -135,7 +137,7 @@ test("a tool the Agent does not have comes back as an error result, and the Turn
 
 test("a Turn that keeps asking for tools stops at the ceiling", async () => {
   const use = { type: "tool_use", id: "tu", name: "echo", input: {} };
-  const { core, store, requests } = setup({ tools: echoTool, replies: Array.from({ length: MAX_ROUNDS + 5 }, () => ({ content: [use], stopReason: "tool_use" })) });
+  const { core, store, requests } = setup({ tools: echoTool, allowlist: ["echo"], replies: Array.from({ length: MAX_ROUNDS + 5 }, () => ({ content: [use], stopReason: "tool_use" })) });
   core.receive(message("loop"));
   await core.idle();
   expect(requests).toHaveLength(MAX_ROUNDS);
@@ -184,3 +186,163 @@ test("a Turn its worker never finished keeps the Member's words and drops its to
     { role: "user", content: [{ type: "text", text: "two" }] },
   ]);
 });
+
+function bashFake(ran: string[]): ToolRunner {
+  return {
+    definitions: () => [{ name: "bash", description: "bash", input_schema: { type: "object" } }],
+    run: async (name, input) => {
+      if (name !== "bash") throw new Error(`there is no tool named ${name}`);
+      ran.push((input as { command?: string }).command ?? "");
+      return "ran";
+    },
+  };
+}
+
+const bashUse = (command: string) => ({ type: "tool_use", id: `tu-${command}`, name: "bash", input: { command } });
+const requestedOf = (store: ReturnType<typeof memoryStore>, task = "t1") => store.all.get(task)?.find((e) => e.kind === "approval.requested")?.body as { request: string } | undefined;
+async function waitForRequested(store: ReturnType<typeof memoryStore>) {
+  for (let i = 0; i < 200 && !requestedOf(store); i++) await Bun.sleep(5);
+  return requestedOf(store)!;
+}
+const approvalAnswer = (request: string, decision: "approve" | "deny" | "redirect", message?: string): Extract<ToWorker, { kind: "approval" }> => ({ kind: "approval", request, decision, ...(message !== undefined && { message }), member: "m_owner", ref: `sig-${request}` });
+
+test("a bash command in the Allowlist runs without asking", async () => {
+  const ran: string[] = [];
+  const { core, store } = setup({ tools: bashFake(ran), allowlist: ["ls"], replies: [{ content: [bashUse("ls -la")], stopReason: "tool_use" }, text("done")] });
+  core.receive(message("go"));
+  await core.idle();
+  expect(ran).toEqual(["ls -la"]);
+  expect(kinds(store.all.get("t1"))).not.toContain("approval.requested");
+});
+
+test("an approved command runs, and the log holds the Approval pair", async () => {
+  const ran: string[] = [];
+  const { core, store, requests } = setup({ tools: bashFake(ran), replies: [{ content: [bashUse("rm -rf dist")], stopReason: "tool_use" }, text("done")] });
+  core.receive(message("go"));
+  const { request } = await waitForRequested(store);
+  expect(ran).toEqual([]);
+  core.receive(approvalAnswer(request, "approve"));
+  await core.idle();
+  expect(ran).toEqual(["rm -rf dist"]);
+  expect(kinds(store.all.get("t1"))).toEqual(["member.message", "turn.started", "llm.message", "approval.requested", "approval.answered", "tool.result", "llm.message", "turn.ended"]);
+  expect(store.all.get("t1")!.find((e) => e.kind === "approval.answered")!.body).toMatchObject({ request, member: "m_owner", decision: "approve" });
+  expect(requests[1]!.messages.at(-1)).toEqual({ role: "user", content: [{ type: "tool_result", tool_use_id: "tu-rm -rf dist", content: "ran" }] });
+});
+
+test("a denied command comes back as an error result, and the Turn goes on", async () => {
+  const ran: string[] = [];
+  const { core, store, requests } = setup({ tools: bashFake(ran), replies: [{ content: [bashUse("rm -rf dist")], stopReason: "tool_use" }, text("sorry")] });
+  core.receive(message("go"));
+  const { request } = await waitForRequested(store);
+  core.receive(approvalAnswer(request, "deny"));
+  await core.idle();
+  expect(ran).toEqual([]);
+  const result = requests[1]!.messages.at(-1)!.content as { content: string; is_error?: boolean }[];
+  expect(result[0]!.is_error).toBe(true);
+  expect(result[0]!.content).toContain("denied");
+  expect(store.all.get("t1")!.at(-1)!.body).toEqual({ reason: "done" });
+});
+
+test("a redirect tells the LLM what to do instead", async () => {
+  const ran: string[] = [];
+  const { core, store, requests } = setup({ tools: bashFake(ran), replies: [{ content: [bashUse("rm -rf dist")], stopReason: "tool_use" }, text("ok")] });
+  core.receive(message("go"));
+  const { request } = await waitForRequested(store);
+  core.receive(approvalAnswer(request, "redirect", "use ls instead"));
+  await core.idle();
+  expect(ran).toEqual([]);
+  const result = requests[1]!.messages.at(-1)!.content as { content: string }[];
+  expect(result[0]!.content).toContain("use ls instead");
+});
+
+test("an Approval no one answers expires, and the command does not run", async () => {
+  const ran: string[] = [];
+  const { core, store, requests } = setup({ tools: bashFake(ran), approvalTimeoutMs: 20, replies: [{ content: [bashUse("rm -rf dist")], stopReason: "tool_use" }, text("ok")] });
+  core.receive(message("go"));
+  await core.idle();
+  expect(ran).toEqual([]);
+  const result = requests[1]!.messages.at(-1)!.content as { content: string }[];
+  expect(result[0]!.content).toContain("expired");
+  expect(store.all.get("t1")!.find((e) => e.kind === "approval.answered")!.body).toMatchObject({ decision: "deny", message: "expired without an answer" });
+}, 10000);
+
+test("an answer to no waiting Approval is approval.unknown", async () => {
+  const { core, sent } = setup();
+  core.receive({ kind: "approval", request: "ap_nope", decision: "approve", member: "m_owner", ref: "sig-nope" });
+  expect(sent).toEqual([{ kind: "error", member: "m_owner", ref: "sig-nope", code: "approval.unknown" }]);
+});
+
+test("a new Allowlist reaches the next tool call", async () => {
+  const ran: string[] = [];
+  const { core, store } = setup({ tools: bashFake(ran), replies: [{ content: [bashUse("ls")], stopReason: "tool_use" }, text("done")] });
+  core.setAllowlist(["ls"]);
+  core.receive(message("go"));
+  await core.idle();
+  expect(ran).toEqual(["ls"]);
+  expect(kinds(store.all.get("t1"))).not.toContain("approval.requested");
+});
+
+test("a connector tool outside the Allowlist waits too, and an exact name runs it", async () => {
+  const ran: string[] = [];
+  const tools: ToolRunner = {
+    definitions: () => [{ name: "github/create_pull_request", description: "pr", input_schema: { type: "object" } }],
+    run: async (name) => (ran.push(name), "opened"),
+  };
+  const use = { type: "tool_use", id: "tu-pr", name: "github/create_pull_request", input: {} };
+  const { core, store, requests } = setup({ tools, replies: [{ content: [use], stopReason: "tool_use" }, text("done")] });
+  core.receive(message("go"));
+  const { request } = await waitForRequested(store);
+  expect(store.all.get("t1")!.find((e) => e.kind === "approval.requested")!.body).toMatchObject({ parts: ["github/create_pull_request"] });
+  core.receive(approvalAnswer(request, "approve"));
+  await core.idle();
+  expect(ran).toEqual(["github/create_pull_request"]);
+  expect(requests[1]!.messages.at(-1)).toEqual({ role: "user", content: [{ type: "tool_result", tool_use_id: "tu-pr", content: "opened" }] });
+});
+
+test("a connector tool named in the Allowlist runs without asking, and file tools always do", async () => {
+  const ran: string[] = [];
+  const tools: ToolRunner = {
+    definitions: () => [
+      { name: "read", description: "read", input_schema: { type: "object" } },
+      { name: "github/create_pull_request", description: "pr", input_schema: { type: "object" } },
+    ],
+    run: async (name) => (ran.push(name), "ok"),
+  };
+  const { core, store } = setup({
+    tools,
+    allowlist: ["github/create_pull_request"],
+    replies: [
+      { content: [{ type: "tool_use", id: "u1", name: "github/create_pull_request", input: {} }], stopReason: "tool_use" },
+      { content: [{ type: "tool_use", id: "u2", name: "read", input: {} }], stopReason: "tool_use" },
+      text("done"),
+    ],
+  });
+  core.receive(message("go"));
+  await core.idle();
+  expect(ran).toEqual(["github/create_pull_request", "read"]);
+  expect(kinds(store.all.get("t1"))).not.toContain("approval.requested");
+});
+
+test("an answer for another Task is approval.unknown", async () => {
+  const { core, store, sent } = setup({ tools: bashFake([]), replies: [{ content: [bashUse("rm -rf dist")], stopReason: "tool_use" }, text("ok")] });
+  core.receive(message("go"));
+  const { request } = await waitForRequested(store);
+  core.receive({ kind: "approval", request, decision: "approve", member: "m_owner", ref: "sig-x", task: "other-task" });
+  expect(sent.at(-1)).toEqual({ kind: "error", member: "m_owner", ref: "sig-x", code: "approval.unknown" });
+  core.receive(approvalAnswer(request, "deny"));
+  await core.idle();
+  expect(store.all.get("t1")!.at(-1)!.body).toEqual({ reason: "done" });
+});
+
+test("a new timeout reaches the next wait, and a bad value keeps the old one", async () => {
+  const ran: string[] = [];
+  const { core, store, requests } = setup({ tools: bashFake(ran), approvalTimeoutMs: 60_000, replies: [{ content: [bashUse("rm -rf dist")], stopReason: "tool_use" }, text("ok")] });
+  core.setApprovalTimeoutMs(Number.NaN);
+  core.setApprovalTimeoutMs(30);
+  core.receive(message("go"));
+  await core.idle();
+  expect(ran).toEqual([]);
+  const result = requests[1]!.messages.at(-1)!.content as { content: string }[];
+  expect(result[0]!.content).toContain("expired");
+  expect(store.all.get("t1")!.find((e) => e.kind === "approval.answered")!.body).toMatchObject({ decision: "deny" });
+}, 10000);

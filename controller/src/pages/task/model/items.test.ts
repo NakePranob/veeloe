@@ -59,3 +59,58 @@ test("a command the Turn ended before it answered is unfinished, and a tool with
   expect(shown[0]).toMatchObject({ kind: "tools", calls: [{ command: "sleep 1000", state: "unfinished" }, { command: "read", state: "unfinished" }] });
   expect(shown[1]).toMatchObject({ kind: "error" });
 });
+
+test("an Approval shows waiting, then answered, in the log's order", () => {
+  const events = [
+    row(1, "turn.started", {}),
+    row(2, "approval.requested", { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 2000 }),
+    row(3, "approval.answered", { request: "ap_1", member: "m_kai", decision: "deny" }),
+  ];
+  const { items: shown } = items(events, 1000);
+  expect(shown).toHaveLength(1);
+  expect(shown[0]).toEqual({
+    key: "2",
+    kind: "approval",
+    approval: { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 2000, status: "denied", answeredBy: { member: "m_kai", decision: "deny" } },
+  });
+});
+
+test("an Approval nobody answers shows waiting, then expired past its time", () => {
+  const events = [row(1, "approval.requested", { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 2000 })];
+  expect(items(events, 1000).items[0]).toMatchObject({ kind: "approval", approval: { status: "open" } });
+  expect(items(events, 3000).items[0]).toMatchObject({ kind: "approval", approval: { status: "expired" } });
+});
+
+test("the Machine's own expiry counts as expired, not as a denial by someone", () => {
+  const { items: shown } = items(
+    [
+      row(1, "approval.requested", { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 2000 }),
+      row(2, "approval.answered", { request: "ap_1", decision: "deny", message: "expired without an answer" }),
+    ],
+    1000,
+  );
+  expect(shown[0]).toMatchObject({ kind: "approval", approval: { status: "expired" } });
+  expect((shown[0] as { approval: { answeredBy?: unknown } }).approval.answeredBy).toBeUndefined();
+});
+
+test("a Turn that ends before anyone answers closes the Approval", () => {
+  const { items: shown } = items([
+    row(1, "turn.started", {}),
+    row(2, "approval.requested", { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 60_000 }),
+    row(3, "turn.ended", { reason: "done" }),
+  ]);
+  expect(shown[0]).toMatchObject({ kind: "approval", approval: { status: "closed" } });
+});
+
+test("an approve with a reason keeps both, and a bad Approval row draws nothing", () => {
+  const { items: shown } = items(
+    [
+      row(1, "approval.requested", { request: "ap_1", command: "ls && rm -rf dist", parts: ["ls", "rm -rf dist"], expiresAt: 2000, reason: "clean the build folder" }),
+      row(2, "approval.answered", { request: "ap_1", member: "m_kai", decision: "approve" }),
+      row(3, "approval.requested", { command: "ls" }),
+    ],
+    1000,
+  );
+  expect(shown).toHaveLength(1);
+  expect(shown[0]).toMatchObject({ kind: "approval", approval: { parts: ["ls", "rm -rf dist"], reason: "clean the build folder", status: "approved" } });
+});

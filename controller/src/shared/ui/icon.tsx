@@ -5,6 +5,9 @@ import { icon as sizes, useColors, type Colors } from "./theme";
 // Android and web: one icon family per platform (expo-native-ui).
 const SYMBOLS = {
   check: { ios: "checkmark", android: "check", web: "check" },
+  // An Agent is waiting on a person: for an Approval, or an allowlist entry (ADR 0030).
+  approval: { ios: "hand.raised.fill", android: "back_hand", web: "back_hand" },
+  shield: { ios: "checkmark.shield", android: "verified_user", web: "verified_user" },
   scan: { ios: "qrcode.viewfinder", android: "qr_code_scanner", web: "qr_code_scanner" },
   agent: { ios: "cpu", android: "smart_toy", web: "smart_toy" },
   send: { ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" },

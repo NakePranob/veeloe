@@ -1,6 +1,6 @@
 // What the supervisor and a worker say to each other over IPC (ADR 0020). It
 // sits beside both because neither may import the other.
-import type { TaskEvent } from "@veeloe/protocol";
+import type { ApprovalDecision, TaskEvent } from "@veeloe/protocol";
 
 /** One HTTP request to the LLM, carried over IPC because the sandbox gives a worker no port to reach (ADR 0008, 0042). */
 export type LlmRequest = { method: string; path: string; headers: Record<string, string>; body: string };
@@ -14,9 +14,11 @@ export type ToWorker =
   | { kind: "sync"; task: string; after: number; member: string; ref: string }
   /** Which of this Agent's Tasks the Member may open: the ones they started (ADR 0060). */
   | { kind: "list"; member: string }
-  /** The Agent was renamed: the next Turn of every Task uses this name (`agent-settings`). */
-  | { kind: "agent"; name: string }
-  | ({ kind: "llm.response"; id: string } & LlmResponse);
+  /** The Agent was renamed, its Allowlist or its Approval timeout changed: the next tool call uses all three. `allowlist` and `approvalTimeoutS` are missing from a supervisor older than `approval-and-allowlist`, read as empty and an hour (ADR 0023). */
+  | { kind: "agent"; name: string; allowlist?: string[]; approvalTimeoutS?: number }
+  | ({ kind: "llm.response"; id: string } & LlmResponse)
+  /** The supervisor's answer to one waiting Approval: `ref` is the answer's envelope, for errors. `task` binds it to the Task that asked. */
+  | { kind: "approval"; request: string; decision: ApprovalDecision; message?: string; member: string; ref: string; task?: string };
 
 export type FromWorker =
   | { kind: "ready" }

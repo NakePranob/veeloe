@@ -29,6 +29,9 @@ export {
   type ParsedPairingLink,
 } from "./messages/pairing-link";
 export {
+  APPROVAL_TIMEOUT_S_DEFAULT,
+  APPROVAL_TIMEOUT_S_MAX,
+  APPROVAL_TIMEOUT_S_MIN,
   AgentCreateBodySchema,
   AgentIdSchema,
   AgentListBodySchema,
@@ -60,6 +63,26 @@ export {
   type TaskSyncBody,
 } from "./messages/task";
 export { EGRESS_MAX, EgressDomainSchema, EgressSchema, EgressSetBodySchema, type EgressSetBody } from "./messages/egress";
+export {
+  ALLOWLIST_MAX,
+  AllowlistEntrySchema,
+  AllowlistSchema,
+  isUnsafeCommand,
+  matchesAllowlist,
+  READ_ONLY_ALLOWLIST,
+  splitCommand,
+  type Allowlist,
+} from "./messages/allowlist";
+export {
+  ApprovalAnswerBodySchema,
+  ApprovalAnsweredBodySchema,
+  ApprovalDecisionSchema,
+  ApprovalRequestedBodySchema,
+  type ApprovalAnswerBody,
+  type ApprovalAnsweredBody,
+  type ApprovalDecision,
+  type ApprovalRequestedBody,
+} from "./messages/approval";
 export {
   UsageAgentSchema,
   UsageDaySchema,

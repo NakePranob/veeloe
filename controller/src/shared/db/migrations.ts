@@ -68,4 +68,9 @@ export const MIGRATIONS = [
     PRIMARY KEY (agent_id, day)
   );
   ALTER TABLE machine ADD COLUMN usage_fetched_at INTEGER`,
+  // The Allowlist the Machine last sent, as JSON; null from a Machine older than `approval-and-allowlist`.
+  // Appended last, never inserted before an older entry: `user_version` counts entries (`approval-and-allowlist`).
+  `ALTER TABLE agent ADD COLUMN allowlist TEXT`,
+  // How long one Approval waits, in seconds; null from a Machine older than `approval-and-allowlist`.
+  `ALTER TABLE agent ADD COLUMN approval_timeout_s INTEGER`,
 ] as const;

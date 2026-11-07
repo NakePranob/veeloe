@@ -1,4 +1,4 @@
-import type { Agent, AgentCreateBody, AgentListedBody, AgentUpdateBody, ProviderInfo } from "@veeloe/protocol";
+import { APPROVAL_TIMEOUT_S_DEFAULT, type Agent, type AgentCreateBody, type AgentListedBody, type AgentUpdateBody, type ProviderInfo } from "@veeloe/protocol";
 import { canManage } from "../access";
 import type { AgentRegistry } from "../agent-registry/registry";
 import type { Budgets } from "../budget/budget";
@@ -40,7 +40,8 @@ export function createAgentsSlice({
 
   async function listed(): Promise<AgentListedBody> {
     // The Budget is filled in here, so an Agent made before `daily-budget` shows its default (ADR 0023).
-    return { agents: registry.all().map((agent) => ({ ...agent, ...budgets.listedOf(agent) })), providers: await providerInfo(), egress: egress() };
+    // So are the Allowlist (empty) and the Approval timeout (an hour), for Agents made before `approval-and-allowlist`.
+    return { agents: registry.all().map((agent) => ({ allowlist: [], approvalTimeoutS: APPROVAL_TIMEOUT_S_DEFAULT, ...agent, ...budgets.listedOf(agent) })), providers: await providerInfo(), egress: egress() };
   }
 
   return {
@@ -57,7 +58,15 @@ export function createAgentsSlice({
         if (!models.ok) return outbox.error(from, models.problem);
         if (!models.models.some((m) => m.id === body.model)) return outbox.error(from, "agent.provider_unknown");
         // The look is kept as sent, so it never changes with a Controller's version (ADR 0006).
-        const agent = { id: body.id, name: body.name, provider: body.provider, model: body.model, ...(body.character && { character: body.character }) };
+        const agent: Agent = {
+          id: body.id,
+          name: body.name,
+          provider: body.provider,
+          model: body.model,
+          ...(body.character && { character: body.character }),
+          allowlist: body.allowlist ?? [],
+          approvalTimeoutS: body.approvalTimeoutS ?? APPROVAL_TIMEOUT_S_DEFAULT,
+        };
         registry.add(agent);
         workers.start(agent);
       }
@@ -84,9 +93,11 @@ export function createAgentsSlice({
         ...(body.model !== undefined && { provider: body.provider ?? agent.provider, model: body.model }),
         ...(body.character && { character: body.character }),
         ...(body.budget !== undefined && { budget: body.budget }),
+        ...(body.allowlist !== undefined && { allowlist: body.allowlist }),
+        ...(body.approvalTimeoutS !== undefined && { approvalTimeoutS: body.approvalTimeoutS }),
       };
       registry.replace(next);
-      if (next.name !== now.name) workers.rename(next);
+      if (next.name !== now.name || JSON.stringify(next.allowlist ?? []) !== JSON.stringify(now.allowlist ?? []) || (next.approvalTimeoutS ?? APPROVAL_TIMEOUT_S_DEFAULT) !== (now.approvalTimeoutS ?? APPROVAL_TIMEOUT_S_DEFAULT)) workers.rename(next);
       const list = await listed();
       for (const member of members()) outbox.toMember(member, "agent.listed", list);
     },

@@ -3,8 +3,9 @@ import { statusOf, type Latest, type TaskStatus } from "../../../entities/task";
 export type InboxAgent = { id: string; machine_id: string };
 export type InboxTask = Latest & { id: string; agent_id: string; updated_at: number };
 
-// A failed Turn sorts with the finished ones, by time.
-const ORDER: Record<TaskStatus, number> = { working: 0, failed: 1, done: 1, new: 2, offline: 3 };
+// A Turn waiting on an Approval is still an Agent held up, so it sorts with the working ones;
+// a failed Turn sorts with the finished ones, by time.
+const ORDER: Record<TaskStatus, number> = { waiting: 0, working: 0, failed: 1, done: 1, new: 2, offline: 3 };
 
 /**
  * One row per Agent, as the prototype's Inbox has it: the Agent's latest Task,

@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "bun:test";
 import type { Agent } from "@veeloe/protocol";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { saveAgents, saveUsage } from "./agents";
+import { allowlistOf, approvalTimeoutOf, saveAgents, saveUsage } from "./agents";
 
 // Real SQL on bun:sqlite, behind the few methods expo-sqlite gives the app.
 function connect(): Connection {
@@ -68,4 +68,30 @@ test("a tally from an older day, or a lower one on the same day, never replaces 
 test("a tally for an Agent this Controller has never heard of changes nothing", async () => {
   await saveUsage(database, { agent: "ghost", day: "2026-11-06", tokens: 10 });
   expect(await row()).toBeUndefined();
+});
+
+test("an Approval timeout is kept, and an answer without one does not erase what is kept", async () => {
+  await saveAgents(database, "machine-1", [{ ...agent, approvalTimeoutS: 300 }]);
+  expect(await row()).toMatchObject({ approval_timeout_s: 300 });
+  expect(approvalTimeoutOf({ approval_timeout_s: (await row())!.approval_timeout_s as number })).toBe(300);
+
+  await saveAgents(database, "machine-1", [{ id: "a1", name: "Renamed", provider: "main", model: "model-a" }]);
+  expect(await row()).toMatchObject({ approval_timeout_s: 300 });
+  expect(approvalTimeoutOf({ approval_timeout_s: null })).toBeNull();
+});
+
+test("an Allowlist is kept as JSON, and an answer without one does not erase what is kept", async () => {
+  await saveAgents(database, "machine-1", [{ ...agent, allowlist: ["ls", "git status"] }]);
+  expect(await row()).toMatchObject({ allowlist: JSON.stringify(["ls", "git status"]) });
+  expect(allowlistOf({ allowlist: (await row())!.allowlist as string })).toEqual(["ls", "git status"]);
+
+  // A Machine older than `approval-and-allowlist` says nothing of it.
+  await saveAgents(database, "machine-1", [{ id: "a1", name: "Renamed", provider: "main", model: "model-a" }]);
+  expect(await row()).toMatchObject({ allowlist: JSON.stringify(["ls", "git status"]) });
+});
+
+test("allowlistOf reads null as unknown and broken JSON as empty", async () => {
+  expect(allowlistOf({ allowlist: null })).toBeNull();
+  expect(allowlistOf({ allowlist: "nope{" })).toEqual([]);
+  expect(allowlistOf({ allowlist: JSON.stringify([1]) })).toEqual([]);
 });

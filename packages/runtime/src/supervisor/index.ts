@@ -1,6 +1,7 @@
 import { createBackoff, createSigner, normalizeHubUrl, parseMessage, publicKeyOf, TASK_EVENTS_PAGE, toBase64url, verify } from "@veeloe/protocol";
 import { createAgentRegistry } from "./agent-registry/registry";
 import { createAgentsSlice } from "./agents/agents";
+import { createApprovalsSlice } from "./approvals/approvals";
 import { budgetDay, createBudgets } from "./budget/budget";
 import type { Inbound, Outbox } from "./outbox";
 import { createEgressSlice, loadEgress } from "./egress/egress";
@@ -110,6 +111,18 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
 
   const egress = createEgressSlice({ home, apply: sandbox.setEgress, outbox, listed: () => agents.listed() });
   const agents = createAgentsSlice({ registry, workers, providers, egress: egress.current, outbox, fetchFn, members: membersInTrust, budgets });
+  const approvals = createApprovalsSlice({
+    registry,
+    workers,
+    outbox,
+    members: membersInTrust,
+    broadcast: () => {
+      void (async () => {
+        const list = await agents.listed();
+        for (const member of membersInTrust()) outbox.toMember(member, "agent.listed", list);
+      })();
+    },
+  });
   const taskMessage = createTaskMessageSlice({
     registry,
     workers,
@@ -154,6 +167,7 @@ export function startSupervisor({ home, hubUrl, secretKey, workerCommand, sandbo
       if (message.type === "agent.list") void agents.list(from);
       else if (message.type === "agent.create") void agents.create(from, message.body);
       else if (message.type === "agent.update") void agents.update(from, message.body);
+      else if (message.type === "approval.answer") approvals.answer(from, message.body);
       else if (message.type === "task.message" && from.task) taskMessage({ ...from, task: from.task }, message.body);
       else if (message.type === "task.sync" && from.task) taskSync({ ...from, task: from.task }, message.body);
       else if (message.type === "egress.set") void egress.set(from, message.body);

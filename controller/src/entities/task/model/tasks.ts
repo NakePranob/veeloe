@@ -129,12 +129,17 @@ export function latestOf(events: readonly Pick<TaskEventRow, "kind" | "body">[])
 export const latestEvents = ({ latest_kind, latest_body }: Latest) => (latest_kind ? [{ kind: latest_kind, body: latest_body }] : []);
 
 /** What a Task is doing, in the prototype's words for it. `failed`: its latest Turn ended in an error. */
-export type TaskStatus = "working" | "failed" | "done" | "offline" | "new";
+export type TaskStatus = "waiting" | "working" | "failed" | "done" | "offline" | "new";
 
-/** Offline first; then from the latest known event: none is not started, and anything before turn.ended is a Turn still running. */
+/**
+ * Offline first; then from the latest known event: none is not started, an Approval
+ * asked and not yet answered is waiting on a person, and anything else before
+ * `turn.ended` is a Turn still running.
+ */
 export function statusOf(latest: Latest | undefined, online: boolean | null): TaskStatus {
   if (online === false) return "offline";
   if (!latest?.latest_kind) return "new";
+  if (latest.latest_kind === TaskEventKind.ApprovalRequested) return "waiting";
   if (latest.latest_kind !== TaskEventKind.TurnEnded) return "working";
   try {
     return (JSON.parse(latest.latest_body ?? "null") as { reason?: unknown } | null)?.reason === "done" ? "done" : "failed";

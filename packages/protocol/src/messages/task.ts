@@ -59,4 +59,8 @@ export const TaskEventKind = {
   ToolResult: "tool.result",
   /** `{ reason: "done" } | { reason: "error", code }` */
   TurnEnded: "turn.ended",
+  /** `{ request, command, parts, expiresAt }`: the worker asks for an Approval and waits. */
+  ApprovalRequested: "approval.requested",
+  /** `{ request, member, decision, message? }`: who answered and how. */
+  ApprovalAnswered: "approval.answered",
 } as const;

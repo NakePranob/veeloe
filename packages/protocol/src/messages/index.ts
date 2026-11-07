@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { SignedPart } from "../envelope/schema";
 import { AgentCreateBodySchema, AgentListBodySchema, AgentListedBodySchema, AgentUpdateBodySchema, AgentUsageBodySchema } from "./agent";
+import { ApprovalAnswerBodySchema } from "./approval";
 import { EgressSetBodySchema } from "./egress";
 import { ErrorBodySchema } from "./error";
 import { DeviceHandoffBodySchema, DeviceLinkedBodySchema } from "./linking";
@@ -17,6 +18,7 @@ const known = {
   "agent.listed": AgentListedBodySchema,
   "agent.update": AgentUpdateBodySchema,
   "agent.usage": AgentUsageBodySchema,
+  "approval.answer": ApprovalAnswerBodySchema,
   "task.message": TaskMessageBodySchema,
   "task.event": TaskEventBodySchema,
   "task.sync": TaskSyncBodySchema,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AllowlistSchema } from "./allowlist";
 import { EgressSchema } from "./egress";
 
 /** Also a folder name on the Machine (ADR 0032), so nothing that could leave it. */
@@ -16,6 +17,12 @@ const CharacterSchema = z.looseObject({ color: z.string().regex(/^#[0-9a-fA-F]{6
 /** Tokens per day: a whole number, never zero, up to a trillion (`daily-budget`, ADR 0043). */
 const budget = z.number().int().min(1).max(1_000_000_000_000);
 
+/** How long one Approval waits, in whole seconds: a minute to a day (`approval-and-allowlist`). */
+export const APPROVAL_TIMEOUT_S_MIN = 60;
+export const APPROVAL_TIMEOUT_S_MAX = 86_400;
+export const APPROVAL_TIMEOUT_S_DEFAULT = 3_600;
+const approvalTimeoutS = z.number().int().min(APPROVAL_TIMEOUT_S_MIN).max(APPROVAL_TIMEOUT_S_MAX);
+
 /** The day of a Budget in the Machine's own time (ADR 0043). */
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const usage = z.looseObject({ day, tokens: z.number().int().min(0) });
@@ -27,6 +34,8 @@ export const AgentCreateBodySchema = z.looseObject({
   provider: z.string().min(1),
   model: z.string().min(1),
   character: CharacterSchema.optional(),
+  allowlist: AllowlistSchema.optional(),
+  approvalTimeoutS: approvalTimeoutS.optional(),
 });
 export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
 
@@ -35,8 +44,8 @@ export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
  * belongs to its Provider, so a new Provider comes with its model.
  */
 export const AgentUpdateBodySchema = z
-  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional() })
-  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined, "nothing to change")
+  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional(), allowlist: AllowlistSchema.optional(), approvalTimeoutS: approvalTimeoutS.optional() })
+  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined || b.allowlist !== undefined || b.approvalTimeoutS !== undefined, "nothing to change")
   .refine((b) => b.provider === undefined || b.model !== undefined, "a provider needs its model");
 export type AgentUpdateBody = z.infer<typeof AgentUpdateBodySchema>;
 
@@ -49,6 +58,10 @@ const AgentSchema = z.looseObject({
   provider: z.string().min(1),
   model: z.string().min(1),
   character: CharacterSchema.optional(),
+  /** What this Agent may run without an Approval. Absent from a Machine older than `approval-and-allowlist`. */
+  allowlist: AllowlistSchema.optional(),
+  /** How long one Approval waits, in seconds. Absent from a Machine older than `approval-and-allowlist`. */
+  approvalTimeoutS: approvalTimeoutS.optional(),
   /** The Budget the Machine keeps, defaulted when it never said one (`daily-budget`). */
   budget: budget.optional(),
   /** Today's tokens, as of this answer. Absent from a Machine older than `daily-budget`. */

@@ -46,6 +46,25 @@
     "footer": "Only the Tasks you started are here (ADR 0060).",
     "untitled": "No message yet"
   },
+  "approval": {
+    "heading": "Approval",
+    "footer": "An Approval nobody answers before this time counts as denied (ADR 0003).",
+    "waiting": "Approval waits",
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours"
+  },
+  "more": {
+    "heading": "More settings"
+  },
+  "allowlist": {
+    "heading": "Commands that run without asking for an Approval",
+    "footer": "The read-only set is ticked for you; untick what you don't want before signing. There is no find, which has -exec and -delete, no sed, which has -i, and neither git nor npm on its own (ADR 0030).",
+    "row": "Allowlist",
+    "count_one": "{{count}} entry",
+    "count_other": "{{count}} entries"
+  },
   "save": "Save",
   "saving": "Saving on the Machine",
   "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",

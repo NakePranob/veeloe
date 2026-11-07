@@ -139,3 +139,45 @@ test("a Budget raised past today's tokens no longer counts the Agent as exhauste
   await s.slice.update(from, { id: "a1", budget: 20_000_000 });
   expect(s.budgets.exhausted(s.registry.get("a1")!)).toBe(false);
 });
+
+test("an Allowlist is stored on create, listed back, and starts empty when not sent", async () => {
+  const s = setup();
+  await s.slice.create(from, { id: "a2", name: "B", provider: "main", model: "model-a", allowlist: ["ls", "git status"] });
+  expect(s.errors()).toEqual([]);
+  expect(s.registry.get("a2")).toMatchObject({ allowlist: ["ls", "git status"] });
+  const listed = await s.slice.listed();
+  expect(listed.agents.find((a) => a.id === "a2")).toMatchObject({ allowlist: ["ls", "git status"] });
+  // An Agent made before `approval-and-allowlist` lists an empty Allowlist (ADR 0023).
+  expect(listed.agents.find((a) => a.id === "a1")).toMatchObject({ allowlist: [] });
+});
+
+test("an Allowlist is replaced whole by agent.update and survives a reopen", async () => {
+  const s = setup();
+  await s.slice.update(from, { id: "a1", allowlist: ["npm test"] });
+  expect(s.errors()).toEqual([]);
+  expect(s.registry.get("a1")).toMatchObject({ name: "A", allowlist: ["npm test"] });
+  expect(createAgentRegistry(s.home).get("a1")).toMatchObject({ allowlist: ["npm test"] });
+});
+
+test("a Member without Manage cannot set an Allowlist", async () => {
+  const s = setup();
+  await s.slice.update({ member: "m_stranger", ref: "sig-2" }, { id: "a1", allowlist: ["ls"] });
+  expect(s.errors()).toEqual(["agent.unknown"]);
+  expect(s.registry.get("a1")).toEqual(s.agent);
+});
+
+test("an Approval timeout starts at an hour, changes whole, and lists back", async () => {
+  const s = setup();
+  await s.slice.create(from, { id: "a2", name: "B", provider: "main", model: "model-a" });
+  expect(s.registry.get("a2")).toMatchObject({ approvalTimeoutS: 3600 });
+  const listed = await s.slice.listed();
+  expect(listed.agents.find((a) => a.id === "a2")).toMatchObject({ approvalTimeoutS: 3600 });
+  // An Agent made before the change lists the default too.
+  expect(listed.agents.find((a) => a.id === "a1")).toMatchObject({ approvalTimeoutS: 3600 });
+
+  await s.slice.update(from, { id: "a2", approvalTimeoutS: 300 });
+  expect(s.errors()).toEqual([]);
+  expect(s.registry.get("a2")).toMatchObject({ approvalTimeoutS: 300 });
+  const relisted = await s.slice.listed();
+  expect(relisted.agents.find((a) => a.id === "a2")).toMatchObject({ approvalTimeoutS: 300 });
+});

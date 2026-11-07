@@ -137,3 +137,20 @@ test("after unsubscribing, a listener hears nothing", async () => {
   await db.write(["t"], async () => {});
   expect(heard).toBe(0);
 });
+
+test("the real list stays append-only: a database migrated before approval-and-allowlist upgrades cleanly", async () => {
+  const { MIGRATIONS } = await import("./migrations");
+  const usageDay = MIGRATIONS.findIndex((m) => m.includes("CREATE TABLE usage_day"));
+  expect(usageDay).toBeGreaterThan(-1);
+  // Everything after `usage_day` must be a later change's own entry: an older
+  // device replays from its version, so inserting before it would rerun it.
+  for (const later of MIGRATIONS.slice(usageDay + 1)) expect(later).not.toContain("CREATE TABLE usage_day");
+
+  await migrate(connection, MIGRATIONS.slice(0, usageDay + 1));
+  await connection.runAsync("INSERT INTO agent (id, machine_id, name, provider, model) VALUES (?, ?, ?, ?, ?)", ["a1", "m1", "A", "main", "model-a"] as never[]);
+  await migrate(connection, MIGRATIONS);
+  const columns = await connection.getAllAsync<{ name: string }>("PRAGMA table_info(agent)");
+  expect(columns.map((c) => c.name)).toContain("allowlist");
+  expect(columns.map((c) => c.name)).toContain("approval_timeout_s");
+  expect(await connection.getAllAsync("SELECT id, name FROM agent")).toEqual([{ id: "a1", name: "A" }]);
+});

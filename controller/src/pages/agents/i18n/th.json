@@ -46,6 +46,25 @@
     "footer": "แสดงเฉพาะ Task ที่คุณเริ่ม (ADR 0060)",
     "untitled": "ยังไม่มีข้อความ"
   },
+  "approval": {
+    "heading": "Approval",
+    "footer": "Approval ที่ไม่มีใครตอบจนเกินเวลานี้นับว่าถูกปฏิเสธ (ADR 0003)",
+    "waiting": "Approval หมดอายุใน",
+    "minutes_one": "{{count}} นาที",
+    "minutes_other": "{{count}} นาที",
+    "hours_one": "{{count}} ชั่วโมง",
+    "hours_other": "{{count}} ชั่วโมง"
+  },
+  "more": {
+    "heading": "ตั้งค่าเพิ่มเติม"
+  },
+  "allowlist": {
+    "heading": "คำสั่งที่รันได้เลยไม่ต้องขอ Approval",
+    "footer": "ชุดอ่านอย่างเดียวติ๊กไว้ให้ เอาออกได้ก่อนเซ็น ไม่มี find เพราะมี -exec กับ -delete ไม่มี sed เพราะมี -i และไม่มี git หรือ npm ทั้งตัว (ADR 0030)",
+    "row": "Allowlist",
+    "count_one": "{{count}} รายการ",
+    "count_other": "{{count}} รายการ"
+  },
   "save": "บันทึก",
   "saving": "กำลังบันทึกบน Machine",
   "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",

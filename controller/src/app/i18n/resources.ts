@@ -1,6 +1,7 @@
 import { addMachineI18n } from "../../pages/add-machine";
 import { agentCharacterI18n } from "../../pages/agent-character";
 import { agentsI18n } from "../../pages/agents";
+import { allowlistI18n } from "../../pages/allowlist";
 import { createKeyI18n } from "../../pages/create-key";
 import { devicesI18n } from "../../pages/devices";
 import { linkDeviceI18n } from "../../pages/link-device";
@@ -25,6 +26,7 @@ const slices = {
   "add-machine": addMachineI18n,
   "agent-character": agentCharacterI18n,
   agents: agentsI18n,
+  allowlist: allowlistI18n,
   "create-key": createKeyI18n,
   devices: devicesI18n,
   "link-device": linkDeviceI18n,

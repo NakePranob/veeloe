@@ -2,7 +2,8 @@ import { randomUUID } from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Keyboard, View } from "react-native";
-import { useAgents, type AgentRow } from "../../../entities/agent";
+import { APPROVAL_TIMEOUT_S_DEFAULT, APPROVAL_TIMEOUT_S_MAX, APPROVAL_TIMEOUT_S_MIN } from "@veeloe/protocol";
+import { allowlistOf, approvalTimeoutOf, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { previewOf, statusOf, useTaskSummaries } from "../../../entities/task";
@@ -12,6 +13,7 @@ import { formatTokens, useNow, when } from "../../../shared/lib";
 import { Empty, Field, Icon, Meter, Note, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
 import { providerProblem } from "../model/providers";
 import { budgetOf } from "../model/budget";
+import { ExpiryPicker } from "./ExpiryPicker";
 
 // controller-prototype's AgentPage: the Agent's Tasks first, then its settings.
 // ponytail: only what this version has. Description, instructions, Budget, Approval, Allowlist and the rest come with their changes.
@@ -31,6 +33,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const [sent, setSent] = useState<{ name: string; budget?: number } | null>(null);
   const [tried, setTried] = useState(false);
   const [notSent, setNotSent] = useState(false);
+  // How long an Approval waits, as the Machine last said (ADR 0030).
+  const approvalSeconds = approvalTimeoutOf(agent) ?? APPROVAL_TIMEOUT_S_DEFAULT;
   const offline = online === false || !link || notSent;
   const problem = providerProblem(agent, machineStatus.providers);
   const dirty = name.trim() !== agent.name;
@@ -111,6 +115,20 @@ function AgentView({ agent }: { agent: AgentRow }) {
       <Section title="Agent">
         <Row icon="agent" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} />
         <Field label={t("name")} value={name} onChangeText={setName} />
+      </Section>
+
+      <Section title={t("approval.heading")} footer={t("approval.footer")}>
+        <ExpiryPicker
+          seconds={approvalSeconds}
+          disabled={offline}
+          onPick={(next) => {
+            if (link && machine) link.updateAgent(machine, { id: agent.id, approvalTimeoutS: next });
+          }}
+        />
+      </Section>
+
+      <Section title={t("more.heading")}>
+        <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} />
       </Section>
 
       <Section title={t("provider.heading")} footer={t("provider.nextTask")}>

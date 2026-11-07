@@ -229,3 +229,51 @@ test("usage.list answers with the Machine's own days, the Tasks behind the token
   expect(weekBody.from < today).toBe(true);
   owner.client.stop();
 }, 90_000);
+
+/** The SSE a Provider streams for one message that asks for one `bash` command. */
+function bashUseSse(command: string) {
+  const start = JSON.stringify({ type: "message_start", message: { id: "msg_bash", type: "message", role: "assistant", model: "model-a", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } } });
+  const block = JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tu1", name: "bash", input: { command } } });
+  const delta = JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify({ command }) } });
+  const stop = JSON.stringify({ type: "content_block_stop", index: 0 });
+  const end = JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 3 } });
+  return new Response([start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
+}
+
+test("an Approval answered from the Controller runs the real command, and a denied one does not", async () => {
+  const owner = controller();
+  await owner.ready;
+  const events = (task: string, kind: string) => owner.inbox.filter((m) => m.type === "task.event" && m.task === task && m.body.kind === kind);
+  const requested = (task: string) => owner.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "approval.requested");
+  async function ask(task: string, agent: string, command: string) {
+    let calls = 0;
+    provider.reply = () => (++calls === 1 ? bashUseSse(command) : sse([{ type: "text", text: "done" }]));
+    owner.send("agent.create", { id: agent, name: agent, provider: "main", model: "model-a" });
+    await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === agent));
+    owner.send("task.message", { agent, id: `${task}-m`, text: "go" }, task);
+    const asked = await requested(task);
+    return (asked.body as { body: { request: string; command: string } }).body;
+  }
+
+  // Approve: the command the Owner allowed runs on the Machine.
+  const approved = await ask("task-approve", "agent-approve", "touch approved-marker");
+  expect(approved.command).toBe("touch approved-marker");
+  const marker = join(home, "agents", "agent-approve", "workdir", "approved-marker");
+  expect(await Bun.file(marker).exists()).toBe(false);
+  owner.send("approval.answer", { agent: "agent-approve", request: approved.request, decision: "approve" }, "task-approve");
+  await owner.waitFor((m) => m.type === "task.event" && m.task === "task-approve" && m.body.kind === "turn.ended");
+  expect(await Bun.file(marker).exists()).toBe(true);
+  expect(events("task-approve", "approval.answered").map((m) => (m.body as { body: { decision: string } }).body)).toMatchObject([{ decision: "approve" }]);
+
+  // Deny: the command never runs, and the LLM hears why.
+  const denied = await ask("task-deny", "agent-deny", "touch denied-marker");
+  owner.send("approval.answer", { agent: "agent-deny", request: denied.request, decision: "deny" }, "task-deny");
+  await owner.waitFor((m) => m.type === "task.event" && m.task === "task-deny" && m.body.kind === "turn.ended");
+  expect(await Bun.file(join(home, "agents", "agent-deny", "workdir", "denied-marker")).exists()).toBe(false);
+  const followUp = provider.requests.filter((r) => r.path === "/v1/messages").at(-1)!.body as { messages: { content: { type: string; content?: string; is_error?: boolean }[] }[] };
+  const results = followUp.messages.at(-1)!.content.filter((b) => b.type === "tool_result");
+  expect(results).toHaveLength(1);
+  expect(results[0]).toMatchObject({ is_error: true });
+  expect(results[0]!.content).toContain("denied");
+  owner.client.stop();
+}, 90_000);

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { createBackoff, type Agent } from "@veeloe/protocol";
+import { APPROVAL_TIMEOUT_S_DEFAULT, createBackoff, type Agent } from "@veeloe/protocol";
 import type { FromWorker, LlmRequest, LlmResponse, ToWorker } from "../../ipc";
 import { agentDir } from "../agent-registry/registry";
 import { policyFor, type Sandbox } from "../sandbox/sandbox";
@@ -46,7 +46,7 @@ export function createWorkers({
   function ended(agent: Agent, entry: Running, why: string) {
     if (running.get(agent.id) !== entry) return;
     running.delete(agent.id);
-    for (const lost of entry.waiting) if (lost.kind === "message" || lost.kind === "sync") onMessage(agent.id, { kind: "error", member: lost.member, ref: lost.ref, code: "agent.unavailable", task: lost.task });
+    for (const lost of entry.waiting) if (lost.kind === "message" || lost.kind === "sync" || lost.kind === "approval") onMessage(agent.id, { kind: "error", member: lost.member, ref: lost.ref, code: "agent.unavailable", ...(lost.kind !== "approval" && { task: lost.task }) });
     if (stopping) return;
     const b = backoffs.get(agent.id) ?? backoff();
     backoffs.set(agent.id, b);
@@ -64,7 +64,7 @@ export function createWorkers({
     entry.process = Bun.spawn(argv, {
       cwd: join(dir, "workdir"),
       // Only what a worker needs. Never a Provider's key: the supervisor holds that (ADR 0042).
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: tmp, CLAUDE_CODE_TMPDIR: tmp, VEELOE_AGENT_DIR: dir, VEELOE_AGENT_NAME: agent.name },
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: tmp, CLAUDE_CODE_TMPDIR: tmp, VEELOE_AGENT_DIR: dir, VEELOE_AGENT_NAME: agent.name, VEELOE_AGENT_ALLOWLIST: JSON.stringify(agent.allowlist ?? []), VEELOE_AGENT_APPROVAL_TIMEOUT_S: String(agent.approvalTimeoutS ?? APPROVAL_TIMEOUT_S_DEFAULT) },
       stdout: "inherit",
       stderr: "inherit",
       serialization: "json",
@@ -106,7 +106,7 @@ export function createWorkers({
     /** A new name reaches the worker without stopping it, and a worker started later gets it too. */
     rename(agent: Agent) {
       latest.set(agent.id, agent);
-      send(agent.id, { kind: "agent", name: agent.name });
+      send(agent.id, { kind: "agent", name: agent.name, allowlist: agent.allowlist ?? [], approvalTimeoutS: agent.approvalTimeoutS ?? APPROVAL_TIMEOUT_S_DEFAULT });
     },
     pid: (agent: string) => running.get(agent)?.process?.pid,
     stop() {

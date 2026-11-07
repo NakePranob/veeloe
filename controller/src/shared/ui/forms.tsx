@@ -1,6 +1,6 @@
 import { Link, Stack } from "expo-router";
 import type { ReactNode } from "react";
-import { Pressable, ScrollView, TextInput, View, type KeyboardTypeOptions } from "react-native";
+import { Pressable, ScrollView, Switch, TextInput, View, type KeyboardTypeOptions } from "react-native";
 import { Card } from "./card";
 import { HeaderAction } from "./header-action";
 import { Icon, type IconName } from "./icon";
@@ -107,6 +107,12 @@ export function Row({ title, detail, value, icon, iconColor, href, onPress, dest
     );
   }
   return body(false);
+}
+
+// A Row with a switch: for a setting that is simply on or off (controller-prototype's ToggleRow).
+export function ToggleRow({ title, detail, value, onChange, icon, mono }: { title: string; detail?: string; value: boolean; onChange: (value: boolean) => void; icon?: IconName; mono?: boolean }) {
+  const colors = useColors();
+  return <Row title={title} detail={detail} icon={icon} mono={mono} accessory={<Switch aria-label={title} value={value} onValueChange={onChange} trackColor={{ true: colors.accent }} />} />;
 }
 
 interface FieldProps {

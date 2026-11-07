@@ -15,7 +15,27 @@ export type AgentRow = {
   budget: number | null;
   usage_day: string | null;
   usage_tokens: number | null;
+  /** The Allowlist as JSON, or null from a Machine older than `approval-and-allowlist`. */
+  allowlist: string | null;
+  /** How long one Approval waits, in seconds, or null from a Machine older than `approval-and-allowlist`. */
+  approval_timeout_s: number | null;
 };
+
+/** The Approval timeout the Machine last sent, in seconds, or null when it never sent one. */
+export function approvalTimeoutOf(row: Pick<AgentRow, "approval_timeout_s">): number | null {
+  return typeof row.approval_timeout_s === "number" ? row.approval_timeout_s : null;
+}
+
+/** The Allowlist the Machine last sent, or null when it never sent one. Broken JSON reads as an empty list. */
+export function allowlistOf(row: Pick<AgentRow, "allowlist">): string[] | null {
+  if (row.allowlist === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(row.allowlist);
+    return Array.isArray(parsed) && parsed.every((entry): entry is string => typeof entry === "string") ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export const LIST_AGENTS = "SELECT * FROM agent ORDER BY name, id";
 
@@ -41,15 +61,17 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
   return database.write([AGENT_TOPIC], async (transaction) => {
     for (const agent of agents) {
       await transaction.run(
-        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            machine_id = excluded.machine_id,
            name = excluded.name,
            provider = excluded.provider,
            model = excluded.model,
            character = COALESCE(excluded.character, agent.character),
-           budget = COALESCE(excluded.budget, agent.budget)`,
-        [agent.id, machineId, agent.name, agent.provider, agent.model, agent.character ? JSON.stringify(agent.character) : null, agent.budget ?? null],
+           budget = COALESCE(excluded.budget, agent.budget),
+           allowlist = COALESCE(excluded.allowlist, agent.allowlist),
+           approval_timeout_s = COALESCE(excluded.approval_timeout_s, agent.approval_timeout_s)`,
+        [agent.id, machineId, agent.name, agent.provider, agent.model, agent.character ? JSON.stringify(agent.character) : null, agent.budget ?? null, agent.allowlist ? JSON.stringify(agent.allowlist) : null, agent.approvalTimeoutS ?? null],
       );
       if (agent.usage) await writeUsage(transaction, { agent: agent.id, ...agent.usage });
     }

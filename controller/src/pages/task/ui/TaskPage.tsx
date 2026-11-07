@@ -1,16 +1,17 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from "react-native";
-import { useAgents } from "../../../entities/agent";
-import { useMachines } from "../../../entities/machine";
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { allowlistOf, useAgents } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
 import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useT } from "../../../shared/i18n";
+import { useNow } from "../../../shared/lib";
 import { Button, Card, column, HeaderAction, Label, radius, space, Text, type, useColors } from "../../../shared/ui";
 import { items } from "../model/items";
 import { AgentText } from "./AgentText";
+import { ApprovalCard } from "./ApprovalCard";
 import { ToolCalls } from "./ToolCalls";
 import { FADE, LogFade } from "./LogFade";
 import { LogHead } from "./LogHead";
@@ -69,11 +70,13 @@ export function TaskPage() {
   const events = useTaskEvents(task);
   const pending = usePendingMessages(task);
   const [text, setText] = useState("");
+  const now = useNow();
+  const input = useRef<TextInputInstance>(null);
   const scroll = useRef<ScrollViewInstance>(null);
   const viewport = useRef(0);
 
   if (!agent || !machine || !events || !pending) return <Stack.Screen options={{ title: t("title") }} />;
-  const { items: shown, working } = items(events);
+  const { items: shown, working } = items(events, now);
   const message = text.trim();
   const latest = latestOf(events);
   const taskStatus = statusOf(latest, status.online);
@@ -133,6 +136,23 @@ export function TaskPage() {
             <AgentText key={item.key} text={item.text} />
           ) : item.kind === "tools" ? (
             <ToolCalls key={item.key} calls={item.calls} />
+          ) : item.kind === "approval" ? (
+            <ApprovalCard
+              key={item.key}
+              approval={item.approval}
+              agentName={agent.name}
+              allowlist={allowlistOf(agent) ?? []}
+              // v0.1 Members in trust are all Owners, who may Approve and Manage every Agent; v0.3 reads Grants.
+              canAnswer
+              canManage
+              online={status.online !== false && !!link}
+              now={now}
+              // Answering takes a fresh unlock in v0.3 (ADR 0012); the Controller already asks for it when it unlocks.
+              onAnswer={({ decision, allowAlways }) =>
+                link && machine ? link.answerApproval(machine, { agent: agent.id, task, request: item.approval.request, decision, ...(allowAlways && { allowAlways: allowAlways[0] }) }) : null
+              }
+              onSteer={() => input.current?.focus()}
+            />
           ) : item.code === "budget.exhausted" ? (
             <BudgetCard key={item.key} machine={machine.name} agent={agent.id} />
           ) : (
@@ -176,6 +196,7 @@ export function TaskPage() {
         {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
         <Card raised style={{ gap: space.xs, padding: space.sm }}>
           <TextInput
+            ref={input}
             aria-label={t("placeholder", { name: agent.name })}
             placeholder={status.online === false ? t("offline") : busy ? t("busy") : t("placeholder", { name: agent.name })}
             placeholderTextColor={colors.tertiaryLabel}
