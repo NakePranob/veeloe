@@ -29,11 +29,11 @@
 
 ทำได้หลังจบเส้นทางแรก ลำดับสลับกันได้ถ้าไม่ได้รอกัน
 
-- [ ] `stop-and-restart`: Stop และปิด Turn ที่ค้างเมื่อเริ่มใหม่ (ADR 0017, 0033)
+- [x] `stop-and-restart`: Stop และปิด Turn ที่ค้างเมื่อเริ่มใหม่ (ADR 0017, 0033)
 - [ ] `one-writer-queue`: คิวงานและคนเขียนทีละ Turn (ADR 0011)
 - [ ] `provider-keys-in-app`: ใส่ key ของ Provider ในแอปครั้งเดียวแล้วเข้ารหัสแบบ sealed box ให้แต่ละ Machine เลือกได้จากรายชื่อ Provider ที่เราตั้งค่าไว้ให้แล้ว (URL, header และค่าเฉพาะของแต่ละเจ้า เช่น `x-opencode-session` ของ OpenCode Go) หรือเพิ่ม Provider เองด้วย URL ที่รับ Anthropic Messages API (ADR 0005, 0042)
 - [x] `agent-settings`: แก้ Agent หลังสร้างด้วย `agent.update` ที่เซ็นแล้ว ทั้ง Provider, model และหน้าตา Character (ADR 0006, 0042)
-- [ ] `delete-agent`: ลบ Agent จากแอปพร้อมยืนยัน และตัดสินว่า Workdir กับ Task เดิมลบทิ้งหรือเก็บไว้ รอ `agent-settings`
+- [ ] `delete-agent`: ลบ Agent จากแอปพร้อมยืนยัน และตัดสินว่า Workdir กับ Task เดิมลบทิ้งหรือเก็บไว้ รอ `agent-settings` (ต้องเรียก `taskRoutes.forget` ของ Task ที่ลบ ด้วย ไม่ให้บรรทัด Provider/model ของ Task ค้าง)
 - [ ] `runtime-service`: ติดตั้ง supervisor เป็น service ของระบบ (launchd บน macOS, systemd บน Linux) ให้ Agent ทำงานต่อหลังปิด terminal หรือเปิดเครื่องใหม่
 - [x] `daily-budget`: Budget ต่อวันที่ proxy (ADR 0043)
 - [x] `usage-history`: ประวัติการใช้ token 30 วันและหน้า "การใช้ token" (ADR 0066)
@@ -50,6 +50,6 @@
 ยังไม่แตกเป็น change จนกว่าจะใกล้ถึงคิว ขอบเขตเต็มอยู่ใน ADR 0048
 
 - **v0.2 Agent ทำงานเองได้มากขึ้น**: Schedule, Idle Work, Watch, เส้นร้อย Task, เว็บ, Skill, Connector และ Library
-- **v0.3 องค์กรและเปิดให้คนอื่นใช้**: เริ่มจาก E2E แล้วตามด้วยการแยกสิทธิ์ของหลาย Member, รูปโปรไฟล์ของ Member ที่เก็บบน Runtime (ADR 0053) และชุดเปิดตัว
+- **v0.3 องค์กรและเปิดให้คนอื่นใช้**: เริ่มจาก E2E แล้วตามด้วยการแยกสิทธิ์ของหลาย Member, รูปโปรไฟล์ของ Member ที่เก็บบน Runtime (ADR 0053), **การย้าย Machine ไป Workspace ใหม่ด้วยการปล่อยแล้ว Pairing ใหม่ (ADR 0035)**, **Egress แยกต่อ Agent พร้อมโหมดทั้งเน็ต (ADR 0029) ซึ่งต้องมาพร้อมหรือก่อน Member คนที่สองและก่อน Channel** และชุดเปิดตัว
 - **v0.4 Project และ Team**: Project, Team, Ask, Mention, Worktree และหลาย Turn พร้อมกัน (ADR 0064)
 - **v0.5 Channel**: Telegram และ `/claim`

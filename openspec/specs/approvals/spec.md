@@ -35,6 +35,10 @@ Approval คือคำขอที่ Agent ส่งให้ Member ที�
 ### Requirement: ข้อความ approval.answer จาก Controller ถึง Machine
 Protocol SHALL มีข้อความ `approval.answer` จาก Controller ถึง Machine ที่มีรหัส Agent รหัสคำขอ (มากับ Task ของซอง) และการตัดสินใจอย่างใดอย่างหนึ่งคืออนุมัติครั้งเดียว ปฏิเสธ หรือบอกให้ทำอย่างอื่นพร้อมข้อความ และมีคำนำหน้า `allowAlways` ที่ไม่บังคับสำหรับปุ่มอนุญาตตลอด ข้อความ SHALL ถูกเซ็นและตรวจเหมือนข้อความอื่นของ Controller
 
+#### Scenario: ต้องยืนยันตัวก่อนอนุมัติ
+- **WHEN** Owner กดอนุมัติหรืออนุญาตตลอดในแอป
+- **THEN** Controller ขอยืนยันตัว (Face ID, ลายนิ้วมือ หรือ passkey) ก่อนเซ็น `approval.answer` และถ้าไม่ผ่านจะไม่มีซองออกไป (ADR 0012)
+
 #### Scenario: ตอบอนุมัติ
 - **WHEN** Owner ส่ง `approval.answer` ที่อนุมัติด้วยรหัสคำขอที่รออยู่
 - **THEN** worker ได้คำตอบนั้นและรันคำสั่งต่อ

@@ -72,6 +72,10 @@ Agent ที่สร้างใหม่ SHALL เริ่มจาก Allowl
 ### Requirement: แก้ Allowlist ด้วย agent.update ทั้งชุด
 `agent.update` SHALL รับ `allowlist` ทั้งชุดเหมือน field อื่น และการเปลี่ยน SHALL มีผลกับคำขอถัดไปของ worker โดยไม่ตัด Turn ที่ทำอยู่ Member ที่มี Manage ที่ Agent นั้น (ใน v0.1 คือ Owner) เท่านั้น SHALL แก้ได้
 
+#### Scenario: ต้องยืนยันตัวก่อนแก้
+- **WHEN** Owner เพิ่มหรือลบรายการในหน้า Allowlist
+- **THEN** Controller ขอยืนยันตัวก่อนเซ็น และถ้าไม่ผ่านจะไม่มีซองออกไป (ADR 0012)
+
 #### Scenario: เพิ่มรายการ
 - **WHEN** Owner ส่ง `agent.update` ที่มี `allowlist` เพิ่ม `npm test` แล้ว LLM ขอ `npm test` ในคำขอถัดไป
 - **THEN** คำสั่งนั้นรันได้เลย
