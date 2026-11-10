@@ -98,14 +98,14 @@ export function TaskPage() {
   const message = text.trim();
   const latest = latestOf(events);
   const taskStatus = statusOf(latest, status.online);
-  // A Turn is running: the Machine would refuse a second message (agent.busy), so it waits here, kept in the field.
+  // A Turn is running: the Machine queues a new message until it ends.
   const busy = statusOf(latest, true) === "working";
   // The Turn ended (by the Stop or by itself) or the Machine refused: nothing is stopping any more.
   if (stopAsked && (!busy || status.stopError)) setStopAsked(false);
   const isStopping = stopAsked && busy && !status.stopError;
 
   function send(text = message) {
-    if (!text || !link || !machine || !agent || busy) return;
+    if (!text || !link || !machine || !agent) return;
     Keyboard.dismiss();
     setText("");
     void link.sendMessage(machine, { agent: agent.id, task, text });
@@ -235,7 +235,7 @@ export function TaskPage() {
           <TextInput
             ref={input}
             aria-label={t("placeholder", { name: agent.name })}
-            placeholder={status.online === false ? t("offline") : busy ? t("busy") : t("placeholder", { name: agent.name })}
+            placeholder={status.online === false ? t("offline") : busy ? t("queued", { name: agent.name }) : t("placeholder", { name: agent.name })}
             placeholderTextColor={colors.tertiaryLabel}
             value={text}
             onChangeText={setText}
@@ -253,7 +253,7 @@ export function TaskPage() {
                 onPress={() => void stop()}
               />
             ) : (
-              <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link || busy} onPress={() => send()} />
+              <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link} onPress={() => send()} />
             )}
           </View>
         </Card>
