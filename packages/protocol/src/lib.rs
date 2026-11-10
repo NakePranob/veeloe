@@ -15,6 +15,7 @@ pub mod hub_auth;
 pub mod linking;
 pub mod messages;
 pub mod pairing;
+pub mod sealed;
 pub mod signer;
 pub mod uri;
 

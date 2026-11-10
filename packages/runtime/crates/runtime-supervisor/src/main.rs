@@ -246,6 +246,7 @@ impl HubLinkSink for Supervisor {
                 registry: &me.registry,
                 workers,
                 routes: Some(me.routes.as_ref()),
+                secret_key: Some(&me.secret_key),
                 providers: &providers,
                 egress: &egress,
                 budgets: Some(me.budgets.as_ref()),

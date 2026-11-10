@@ -122,6 +122,7 @@ impl HubLinkSink for Slice {
                 registry: &me.registry,
                 workers: &me.workers,
                 routes: None,
+                secret_key: None,
                 providers: &[],
                 egress: &[],
                 budgets: None,

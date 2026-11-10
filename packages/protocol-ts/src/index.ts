@@ -2,6 +2,8 @@ export const PROTOCOL_VERSION = 1;
 
 export { createBackoff } from "./backoff";
 export { fromBase64url, toBase64url } from "./crypto/base64url";
+export { boxPublic, sealFor } from "./sealed";
+export { ProviderAddBodySchema, type ProviderAddBody } from "./messages/provider";
 export { generateSecretKey, publicKeyOf, sign, verifySignature } from "./crypto/ed25519";
 export { EnvelopeSchema, SignedPartSchema, type Envelope, type Route, type SignedPart } from "./envelope/schema";
 export { createSigner, type Outgoing } from "./envelope/sign";

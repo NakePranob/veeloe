@@ -84,6 +84,7 @@
     "packages/protocol-ts": {
       "name": "@veeloe/protocol-ts",
       "dependencies": {
+        "@noble/ciphers": "2.0.1",
         "@noble/curves": "2.4.0",
         "@noble/hashes": "2.4.0",
         "zod": "4.6.7",
@@ -374,6 +375,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@nakedev/go-scaffold": ["@nakedev/go-scaffold@0.14.0", "", { "dependencies": { "@inquirer/prompts": "^7.5.1", "commander": "^15.0.0", "fs-extra": "^11.3.0", "handlebars": "^4.7.8", "picocolors": "^1.1.1", "pluralize": "^8.0.0" }, "bin": { "go-scaffold": "bin/go-scaffold.js" } }, "sha512-tz7CGgX8wLW0n6oid+wUtk8WItLRdNl+8Rhj5tNSkbcbeGXNGL/PciXIe4farZ/FTm8a/YRwHlSfY1Ldp0hFBQ=="],
+
+    "@noble/ciphers": ["@noble/ciphers@2.0.1", "", {}, "sha512-xHK3XHPUW8DTAobU+G0XT+/w+JLM7/8k1UFdB5xg/zTFPnFCobhftzw8wl4Lw2aq/Rvir5pxfZV5fEazmeCJ2g=="],
 
     "@noble/curves": ["@noble/curves@2.4.0", "", { "dependencies": { "@noble/hashes": "2.4.0" } }, "sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew=="],
 

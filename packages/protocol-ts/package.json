@@ -9,6 +9,7 @@
     "fixtures": "UPDATE_FIXTURES=1 bun test src/fixtures"
   },
   "dependencies": {
+    "@noble/ciphers": "2.0.1",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
     "zod": "4.6.7"

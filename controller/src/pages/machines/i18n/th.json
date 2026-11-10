@@ -29,7 +29,16 @@
     "none": "Machine นี้ยังไม่มี Provider",
     "command": "veeloe provider add --name <ชื่อ> --url <base url>",
     "models_one": "{{count}} model",
-    "models_other": "{{count}} model"
+    "models_other": "{{count}} model",
+    "add": "เพิ่ม Provider",
+    "name": "ชื่อ Provider",
+    "url": "Base URL",
+    "key": "API key (ปิดผนึกให้ Machine นี้)",
+    "save": "บันทึก Provider",
+    "cancel": "ยกเลิก",
+    "prompt": "เพิ่ม Provider นี้ให้ {{machine}}",
+    "failed": "เพิ่ม Provider ไม่สำเร็จ",
+    "failedBody": "Machine ไม่รับ key หรือ URL นี้"
   },
   "egress": {
     "who": "Agent ทุกตัวบน {{machine}}",

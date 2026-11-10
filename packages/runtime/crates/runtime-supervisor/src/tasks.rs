@@ -136,6 +136,8 @@ pub struct Machine<'a> {
     pub workers: &'a Workers,
     /// Task Provider/model pins; present in the real supervisor, absent in slices' tests.
     pub routes: Option<&'a crate::task_routes::TaskRoutes>,
+    /// The Machine's Ed25519 seed, only for opening sealed Provider keys.
+    pub secret_key: Option<&'a [u8; 32]>,
     pub providers: &'a [Provider],
     pub egress: &'a [String],
     pub budgets: Option<&'a crate::usage::Budgets>,
@@ -160,6 +162,53 @@ pub async fn dispatch(
             machine.egress,
         )
     };
+    if type_ == "provider.add" {
+        let Some(secret_key) = machine.secret_key else {
+            return outbox.error(from, "provider.unavailable");
+        };
+        let (Some(name), Some(url), Some(key)) = (
+            body.get("name").and_then(Value::as_str),
+            body.get("url").and_then(Value::as_str),
+            body.get("key").and_then(Value::as_str),
+        ) else {
+            return outbox.error(from, "provider.invalid");
+        };
+        let plaintext = match veeloe_protocol::sealed::open(secret_key, key) {
+            Ok(plaintext) => plaintext,
+            Err(_) => return outbox.error(from, "provider.invalid"),
+        };
+        let key = match String::from_utf8(plaintext) {
+            Ok(key) => key,
+            Err(_) => return outbox.error(from, "provider.invalid"),
+        };
+        let preset = body.get("preset").and_then(Value::as_str).map(str::to_string);
+        let (auth, _) = match crate::models::detect_auth(url, &key, preset.as_deref(), machine.http).await {
+            Ok(found) => found,
+            Err(code) => return outbox.error(from, code),
+        };
+        let mut providers = machine.providers.to_vec();
+        if providers.iter().any(|provider| provider.name == name) {
+            return outbox.error(from, "provider.exists");
+        }
+        providers.push(crate::providers::Provider {
+            name: name.to_string(),
+            url: url.to_string(),
+            key,
+            auth,
+            preset,
+        });
+        if crate::providers::save_providers(registry.home(), &providers).is_err() {
+            return outbox.error(from, "provider.invalid");
+        }
+        let models = crate::models::info(&providers, machine.http).await;
+        outbox.to_member(
+            &from.member,
+            "agent.listed",
+            crate::tasks::agents_listed(registry, &models, machine.egress),
+            None,
+        );
+        return;
+    }
     if type_ == "machine.status" {
         let agents = registry.all().unwrap_or_default();
         let today = crate::usage::budget_day(crate::usage::now_ms());

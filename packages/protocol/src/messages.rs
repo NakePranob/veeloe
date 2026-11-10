@@ -13,6 +13,7 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "agent.listed" => object.map(is_agent_listed).unwrap_or(false),
         "agent.usage" => object.map(is_agent_usage).unwrap_or(false),
         "machine.status" => object.map(is_machine_status).unwrap_or(false),
+        "provider.add" => object.map(is_provider_add).unwrap_or(false),
         "approval.answer" => object.map(is_approval_answer).unwrap_or(false),
         "task.message" => object.map(is_task_message).unwrap_or(false),
         "task.stop" => object.map(is_task_stop).unwrap_or(false),
@@ -303,6 +304,19 @@ fn is_machine_status(object: &Map<String, Value>) -> bool {
         && object.get("features").and_then(Value::as_array).is_some()
         && object.get("diskFreeBytes").and_then(Value::as_u64).is_some()
         && object.get("lastError").is_some()
+}
+
+fn is_provider_add(object: &Map<String, Value>) -> bool {
+    let Some(name) = text(object.get("name")) else {
+        return false;
+    };
+    name.as_bytes().first().is_some_and(|first| first.is_ascii_lowercase())
+        && name.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        && name.len() <= 32
+        && text(object.get("url"))
+            .and_then(|url| url::Url::parse(url).ok())
+            .is_some_and(|url| url.scheme() == "http" || url.scheme() == "https")
+        && non_empty(object.get("key"))
 }
 
 fn is_agent_listed(object: &Map<String, Value>) -> bool {

@@ -1,4 +1,4 @@
-import { createBackoff, parseMessage, publicKeyOf, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol-ts";
+import { createBackoff, fromBase64url, parseMessage, publicKeyOf, sealFor, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol-ts";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
@@ -20,6 +20,8 @@ export type MachineStatus = {
   deleteError: string | null;
   /** The code the last `task.stop` came back with, if it failed (`stop-and-restart`). */
   stopError: string | null;
+  /** The code the last `provider.add` came back with, if it failed. */
+  providerError: string | null;
   /** What `machine.status` last said; null until the Machine answers. */
   version: string | null;
   features: string[] | null;
@@ -28,7 +30,7 @@ export type MachineStatus = {
   budgetToday: { usedTokens: number; limitTokens: number } | null;
 };
 
-const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
+const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null, providerError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
 
 /** One page's usage request for one Machine: what it asked for, and how it went. */
 export type UsageStatus = {
@@ -50,7 +52,7 @@ const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, 
 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "delete" | "stop" | "hello" | "status" | "usage" | "other";
+type Kind = "create" | "update" | "delete" | "stop" | "hello" | "status" | "provider" | "usage" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -181,6 +183,7 @@ export function createMachineLinks({
       else if (about?.kind === "update") setStatus(machine.id, { updateError: message.body.code });
       else if (about?.kind === "delete") setStatus(machine.id, { deleteError: message.body.code });
       else if (about?.kind === "stop") setStatus(machine.id, { stopError: message.body.code });
+      else if (about?.kind === "provider") setStatus(machine.id, { providerError: message.body.code });
       else if (about?.kind === "usage") {
         const current = usageStatuses.get(about.machine);
         if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: message.body.code });
@@ -238,6 +241,7 @@ export function createMachineLinks({
         else if (about.kind === "update") setStatus(about.machine, { updateError: error.code });
         else if (about.kind === "delete") setStatus(about.machine, { deleteError: error.code });
         else if (about.kind === "stop") setStatus(about.machine, { stopError: error.code });
+        else if (about.kind === "provider") setStatus(about.machine, { providerError: error.code });
         else void failPendingMessage(database, error.ref!, error.code);
       },
     });
@@ -320,6 +324,13 @@ export function createMachineLinks({
     /** Ask for version, features, disk and today's Budget when the Machine page opens. */
     requestStatus(machine: Machine) {
       return sendTo(machine, "status", { type: "machine.status", body: {} });
+    },
+
+    /** Seal a Provider key to the Machine before sending it; the Hub cannot open it. */
+    async addProvider(machine: Machine, provider: { name: string; url: string; preset?: string; key: string }) {
+      setStatus(machine.id, { providerError: null });
+      const key = await sealFor(fromBase64url(machine.public_key), new TextEncoder().encode(provider.key));
+      return sendTo(machine, "provider", { type: "provider.add", body: { ...provider, key } });
     },
 
     /**

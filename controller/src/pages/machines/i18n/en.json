@@ -29,7 +29,16 @@
     "none": "This Machine has no Provider yet",
     "command": "veeloe provider add --name <name> --url <base url>",
     "models_one": "{{count}} model",
-    "models_other": "{{count}} models"
+    "models_other": "{{count}} models",
+    "add": "Add Provider",
+    "name": "Provider name",
+    "url": "Base URL",
+    "key": "API key (sealed to this Machine)",
+    "save": "Save Provider",
+    "cancel": "Cancel",
+    "prompt": "Add this Provider to {{machine}}",
+    "failed": "Couldn't add this Provider",
+    "failedBody": "The Machine did not accept the key or its URL."
   },
   "egress": {
     "who": "every Agent on {{machine}}",
