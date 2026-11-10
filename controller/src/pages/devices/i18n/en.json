@@ -6,6 +6,17 @@
   "firstDevice": "First device",
   "linkedBy": "Linked by {{name}} · {{when}}",
   "thisDevice": "This device",
+  "rename": {
+    "action": "Rename this device",
+    "label": "Device name",
+    "placeholder": "Work phone",
+    "footer": "This name is shown on this device. Other devices keep the name they learned when this device was linked.",
+    "save": "Save name",
+    "cancel": "Cancel",
+    "empty": "The name cannot be empty",
+    "taken": "Another device still in use has this name",
+    "failed": "Couldn't rename this device"
+  },
   "revokedSection": "Revoked",
   "revokedDetail": "No longer in use. Link it again to use it",
   "linkFooter": "Linking is only for your own devices. Other people join the Workspace by Invitation.",

@@ -1,13 +1,14 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { Switch, View } from "react-native";
-import { useDevices, type Device } from "../../../entities/device";
+import { renameDevice, useDevices, type Device } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink } from "../../../features/machine-link";
+import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { confirm, inform, Note, Row, Screen, Section, space } from "../../../shared/ui";
+import { confirm, Field, inform, Note, Row, Screen, Section, space } from "../../../shared/ui";
 import { revocationOf, revokeDevice } from "../model/revoke";
 
 // controller-prototype's DevicesPage: this Member's Controllers, who linked each and when,
@@ -47,8 +48,12 @@ export function DevicesPage() {
 function DeviceRow({ device, devices, here }: { device: Device; devices: Device[]; here: boolean }) {
   const t = useT("devices");
   const language = useLanguage();
+  const database = useDatabase();
   const machines = useMachines();
   const [open, setOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(device.name);
+  const [problem, setProblem] = useState<string | null>(null);
   // The certificates this key signed; those not kept stop working when it is revoked (ADR 0031).
   const signed = devices.filter((d) => d.linked_by === device.key && d.revoked_at === null);
   const [dropped, setDropped] = useState<string[]>([]);
@@ -57,6 +62,23 @@ function DeviceRow({ device, devices, here }: { device: Device; devices: Device[
   const name = device.name || t("firstDevice");
   const since = device.linked_at ? when(device.linked_at, language) : undefined;
   const detail = device.linked_by ? t("linkedBy", { name: nameOf(device.linked_by), when: since }) : t("firstDevice");
+
+  function startRename() {
+    setDraft(name);
+    setProblem(null);
+    setRenaming(true);
+  }
+
+  async function saveRename() {
+    const next = draft.trim();
+    if (!next) return setProblem(t("rename.empty"));
+    if (devices.some((other) => other.key !== device.key && other.revoked_at === null && other.name === next)) {
+      return setProblem(t("rename.taken"));
+    }
+    if (!(await renameDevice(database, device.key, next))) return setProblem(t("rename.failed"));
+    setProblem(null);
+    setRenaming(false);
+  }
 
   async function revoke() {
     const machine = machines?.[0];
@@ -80,6 +102,15 @@ function DeviceRow({ device, devices, here }: { device: Device; devices: Device[
       <Row icon="device" title={name} detail={detail} value={here ? t("thisDevice") : undefined} onPress={() => setOpen(!open)} />
       {open && (
         <View style={{ paddingLeft: space.xl }}>
+          {renaming ? (
+            <>
+              <Field label={t("rename.label")} value={draft} onChangeText={setDraft} placeholder={t("rename.placeholder")} footer={problem ?? t("rename.footer")} />
+              <Row title={t("rename.save")} onPress={() => void saveRename()} />
+              <Row title={t("rename.cancel")} onPress={() => setRenaming(false)} />
+            </>
+          ) : (
+            <Row icon="device" title={t("rename.action")} onPress={startRename} />
+          )}
           {signed.length > 0 && (
             <>
               <Row title={t("signed.title")} detail={t("signed.detail")} />

@@ -51,6 +51,16 @@ export function saveDeviceNames(database: Database, member: string, keys: { key:
   });
 }
 
+/** Rename a Controller on this device. Revoked Controllers keep their history name. */
+export function renameDevice(database: Database, key: string, name: string) {
+  return database.write([DEVICE_TOPIC], async (transaction) => {
+    const [row] = await transaction.all<{ revoked_at: number | null }>("SELECT revoked_at FROM device WHERE key = ?", [key]);
+    if (!row || row.revoked_at !== null) return false;
+    await transaction.run("UPDATE device SET name = ? WHERE key = ? AND revoked_at IS NULL", [name.trim(), key]);
+    return true;
+  });
+}
+
 export function listDevices(database: Database) {
   return database.query<Device>(LIST_DEVICES);
 }
