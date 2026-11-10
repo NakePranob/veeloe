@@ -2,7 +2,7 @@ import { randomUUID } from "expo-crypto";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { allowlistOf, useAgents } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
 import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
@@ -254,21 +254,21 @@ export function TaskPage() {
       <LogFade />
       {/* Clear of the home indicator, as in controller-prototype's TaskPage (insets.bottom under the Composer). */}
       <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }]}>
-        {contextOpen && contextUsage && (
-          <Card>
-            <Label icon="info">{t("context.title")}</Label>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
-              <Text>{t("context.used")}</Text>
-              <Text tone="secondary" style={{ flexShrink: 1, textAlign: "right" }}>{t("context.of", { used: contextUsage.tokens.toLocaleString(), window: contextUsage.window.toLocaleString() })}</Text>
-            </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
-              <Text>{t("context.compactAt")}</Text>
-              <Text tone="secondary">{t("context.threshold", { tokens: contextUsage.threshold.toLocaleString() })}</Text>
-            </View>
-          </Card>
-        )}
         {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
         <Card raised style={{ gap: space.xs, padding: space.sm }}>
+          {contextOpen && contextUsage && (
+            <View style={{ gap: space.xs, paddingBottom: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }}>
+              <Label icon="info">{t("context.title")}</Label>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
+                <Text>{t("context.used")}</Text>
+                <Text tone="secondary" style={{ flexShrink: 1, textAlign: "right" }}>{t("context.of", { used: contextUsage.tokens.toLocaleString(), window: contextUsage.window.toLocaleString() })}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
+                <Text>{t("context.compactAt")}</Text>
+                <Text tone="secondary">{t("context.threshold", { tokens: contextUsage.threshold.toLocaleString() })}</Text>
+              </View>
+            </View>
+          )}
           <TextInput
             ref={input}
             aria-label={t("placeholder", { name: agent.name })}
