@@ -16,5 +16,6 @@ pub mod trust;
 pub mod usage;
 pub mod workers;
 pub mod llm;
+pub mod logs;
 pub mod models;
 pub mod status;

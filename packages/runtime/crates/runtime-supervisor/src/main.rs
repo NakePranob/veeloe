@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
-use serde_json::Value;
+use serde_json::{json, Value};
 use veeloe_protocol::envelope::{verify, Route};
 use veeloe_protocol::hub_auth::normalize_hub_url;
 use veeloe_protocol::pairing::PAIRING_TTL_SECONDS;
@@ -19,6 +19,7 @@ use veeloe_runtime_supervisor::egress::{is_valid_egress, Egress};
 use veeloe_runtime_supervisor::help::{help_for, USAGE};
 use veeloe_runtime_supervisor::hub_link::{HubLink, HubLinkOptions, HubLinkSink, HubSender};
 use veeloe_runtime_supervisor::llm::{HttpClient, LlmProxy};
+use veeloe_runtime_supervisor::logs;
 use veeloe_runtime_supervisor::models;
 use veeloe_runtime_supervisor::pair::{run_pair, PairOptions, PairResult};
 use veeloe_runtime_supervisor::providers::{load_providers, upstream_headers};
@@ -152,6 +153,7 @@ impl HubLinkSink for Supervisor {
 
     fn on_ready(&self, machine: &str) {
         *self.machine.lock().expect("machine") = Some(machine.to_string());
+        let _ = logs::record(&self.home, "info", "hub.connected", json!({ "machine": machine }));
         println!("connected as machine {machine}");
         if let Some(workers) = self.workers.get() {
             for agent in self.registry.all().unwrap_or_default() {
@@ -339,6 +341,7 @@ async fn run() -> Result<(), CliError> {
             run_status(&home, &mut |line| println!("{line}"));
             Ok(())
         }
+        Some("logs") => logs::run(&home, args.iter().any(|arg| arg == "--follow")).map_err(CliError::from),
         Some("service") => match args.get(1).map(String::as_str) {
             Some("install") => service::install(&home).map_err(CliError::from),
             Some("uninstall") => service::uninstall(&home).map_err(CliError::from),
@@ -952,6 +955,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     if trust.owners.is_empty() {
         return Err("this Machine is not paired: run veeloe pair".into());
     }
+    let _ = logs::record(&home, "info", "runtime.start", json!({}));
     let egress = Arc::new(Egress::open(&home)?);
     // Every command reaches the network only through this proxy, which checks
     // the Egress on each connection; Seatbelt cannot match a domain itself.
