@@ -2,8 +2,9 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { generateSecretKey, parsePairingLink, publicKeyOf, toBase64url } from "@veeloe/protocol";
+import { generateSecretKey, parsePairingLink, publicKeyOf, toBase64url } from "@veeloe/protocol-ts";
 import { pairMachine } from "../controller/src/pages/add-machine/model/pair";
+import { buildRuntime } from "../scripts/runtime";
 
 // The real Hub on Postgres and the real `veeloe pair`, with the Controller's own
 // code on the other side. It needs a migrated database: TEST_DB_DSN.
@@ -15,14 +16,13 @@ const work = mkdtempSync(join(tmpdir(), "veeloe-e2e-"));
 const running: ReturnType<typeof Bun.spawn>[] = [];
 const port = 19000 + Math.floor(Math.random() * 1000);
 const hubUrl = `ws://127.0.0.1:${port}`;
-const veeloe = join(work, "veeloe");
+let runtimeBinary = "";
 
 beforeAll(async () => {
   if (!dsn) return;
   const built = Bun.spawnSync(["go", "build", "-o", join(work, "hub"), "./cmd/api"], { cwd: `${repo}/hub`, stderr: "inherit" });
   if (!built.success) throw new Error("could not build the Hub");
-  const runtime = Bun.spawnSync(["bun", "build", `${repo}/packages/runtime/src/main.ts`, "--compile", "--outfile", veeloe], { stdout: "ignore", stderr: "inherit" });
-  if (!runtime.success) throw new Error("could not build the Runtime");
+  runtimeBinary = buildRuntime();
   running.push(Bun.spawn([join(work, "hub")], { env: { ...process.env, PORT: String(port), DB_DSN: dsn, HUB_PUBLIC_URL: hubUrl, APP_ENV: "development" }, stdout: "ignore", stderr: "ignore" }));
   const end = Date.now() + 15_000;
   while (true) {
@@ -39,7 +39,7 @@ afterAll(() => {
 });
 
 async function startPair(home: string) {
-  const proc = Bun.spawn([veeloe, "pair", "--hub", hubUrl], { env: { VEELOE_HOME: home }, stdout: "pipe", stderr: "inherit" });
+  const proc = Bun.spawn([runtimeBinary, "pair", "--hub", hubUrl], { env: { VEELOE_HOME: home }, stdout: "pipe", stderr: "inherit" });
   running.push(proc);
   const reader = proc.stdout.getReader();
   let out = "";
@@ -69,7 +69,7 @@ test.skipIf(!dsn)("a Machine and a Controller pair through the real Hub, and the
   expect(JSON.parse(readFileSync(join(home, "config.json"), "utf8"))).toEqual({ hubUrl });
 
   // The Hub now accepts the Machine for good: plain `veeloe` reconnects with what pair saved.
-  const supervisor = Bun.spawn([veeloe], { env: { VEELOE_HOME: home, PATH: process.env.PATH, HOME: process.env.HOME }, stdout: "pipe", stderr: "inherit" });
+  const supervisor = Bun.spawn([runtimeBinary], { env: { VEELOE_HOME: home, PATH: process.env.PATH, HOME: process.env.HOME }, stdout: "pipe", stderr: "inherit" });
   running.push(supervisor);
   const reader = supervisor.stdout.getReader();
   let out = "";

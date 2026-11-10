@@ -2,12 +2,13 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { generateSecretKey, parseMessage, parsePairingLink, publicKeyOf, signCertificate, toBase64url, type HubLinkRequest, type KnownMessage, type SignedPart } from "@veeloe/protocol";
+import { generateSecretKey, parseMessage, parsePairingLink, publicKeyOf, signCertificate, toBase64url, type HubLinkRequest, type KnownMessage, type SignedPart } from "@veeloe/protocol-ts";
 import { pairMachine } from "../controller/src/pages/add-machine/model/pair";
 import { approveLink, handOff, handoffData, openLink } from "../controller/src/pages/link-device/model/link";
 import { readLink, sendLinkRequest, waitForHandoff } from "../controller/src/pages/link-this-device/model/wait";
 import { postCertificate, startHubClient } from "../controller/src/shared/hub-client";
-import { FAKE_KEY, fakeProvider } from "../packages/runtime/src/supervisor/providers/fake-provider";
+import { FAKE_KEY, fakeProvider } from "./helpers/fake-provider";
+import { buildRuntime } from "../scripts/runtime";
 
 // The real Hub on Postgres and the compiled `veeloe`, with the Controller's own code on both
 // devices: Linking while the Machine is off, the new device at work, then a revocation while
@@ -20,7 +21,7 @@ const work = mkdtempSync(join(tmpdir(), "veeloe-e2e-link-"));
 const running: ReturnType<typeof Bun.spawn>[] = [];
 const port = 20000 + Math.floor(Math.random() * 1000);
 const hubUrl = `ws://127.0.0.1:${port}`;
-const veeloe = join(work, "veeloe");
+let runtimeBinary = "";
 const home = join(work, "machine");
 const provider = fakeProvider();
 
@@ -28,8 +29,7 @@ beforeAll(async () => {
   if (!dsn) return;
   const built = Bun.spawnSync(["go", "build", "-o", join(work, "hub"), "./cmd/api"], { cwd: `${repo}/hub`, stderr: "inherit" });
   if (!built.success) throw new Error("could not build the Hub");
-  const runtime = Bun.spawnSync(["bun", "build", `${repo}/packages/runtime/src/main.ts`, "--compile", "--outfile", veeloe], { stdout: "ignore", stderr: "inherit" });
-  if (!runtime.success) throw new Error("could not build the Runtime");
+  runtimeBinary = buildRuntime();
   running.push(Bun.spawn([join(work, "hub")], { env: { ...process.env, PORT: String(port), DB_DSN: dsn, HUB_PUBLIC_URL: hubUrl, APP_ENV: "development" }, stdout: "ignore", stderr: "ignore" }));
   const end = Date.now() + 15_000;
   while (!(await fetch(`http://127.0.0.1:${port}/readyz`).then((r) => r.ok, () => false))) {
@@ -58,7 +58,7 @@ async function readUntil(proc: Bun.Subprocess<"ignore", "pipe", "inherit">, text
 
 /** `veeloe`, connected to the Hub. */
 async function startMachine() {
-  const proc = Bun.spawn([veeloe], { env: { VEELOE_HOME: home, PATH: process.env.PATH, HOME: process.env.HOME }, stdout: "pipe", stderr: "inherit" });
+  const proc = Bun.spawn([runtimeBinary], { env: { VEELOE_HOME: home, PATH: process.env.PATH, HOME: process.env.HOME }, stdout: "pipe", stderr: "inherit" });
   running.push(proc);
   await readUntil(proc, "connected to hub");
   return proc;
@@ -109,7 +109,7 @@ function controller(secretKey: Uint8Array, machineKey: string) {
 
 test.skipIf(!dsn)("a linked browser commands the Machine its phone paired, sees the phone's Tasks, and is shut out once revoked", async () => {
   // The phone pairs the Machine, which gets a Provider.
-  const pair = Bun.spawn([veeloe, "pair", "--hub", hubUrl], { env: { VEELOE_HOME: home }, stdout: "pipe", stderr: "inherit" });
+  const pair = Bun.spawn([runtimeBinary, "pair", "--hub", hubUrl], { env: { VEELOE_HOME: home }, stdout: "pipe", stderr: "inherit" });
   running.push(pair);
   const shown = await readUntil(pair, "Waiting up to");
   const parsedPair = parsePairingLink(shown.slice(shown.indexOf("veeloe://")).split("\n")[0]!, Date.now());
@@ -118,7 +118,7 @@ test.skipIf(!dsn)("a linked browser commands the Machine its phone paired, sees 
   const paired = await pairMachine({ link: parsedPair.link, secretKey: phone, retryMs: 200, giveUpAt: Date.now() + 15_000 });
   if (!paired.ok) throw new Error(paired.code);
   expect(await pair.exited).toBe(0);
-  const add = Bun.spawn([veeloe, "provider", "add", "--name", "main", "--url", provider.url], { env: { VEELOE_HOME: home }, stdin: new Blob([FAKE_KEY]), stdout: "pipe" });
+  const add = Bun.spawn([runtimeBinary, "provider", "add", "--name", "main", "--url", provider.url], { env: { VEELOE_HOME: home }, stdin: new Blob([FAKE_KEY]), stdout: "pipe" });
   expect(await add.exited).toBe(0);
   const { id: machineId, publicKey: machineKey, workspace, member } = paired.machine;
   const machineRow = { id: machineId, public_key: machineKey, name: paired.machine.name, hub_url: hubUrl, workspace_id: workspace, member_id: member, paired_at: 1, egress: "[]" };

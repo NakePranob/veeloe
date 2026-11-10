@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { tmpdir } from "node:os";
-import { answerChallenge, createSigner, MemorySeenSequences, parseFrame, publicKeyOf, toBase64url, verify, type Route } from "@veeloe/protocol";
+import { answerChallenge, createSigner, MemorySeenSequences, parseFrame, publicKeyOf, toBase64url, verify, type Route } from "@veeloe/protocol-ts";
 
 // A Controller and a Machine, signing with the real Protocol code, through the
 // real relay in Go. TEST-ONLY KEYS, the fixed seeds cmd/testhub knows.

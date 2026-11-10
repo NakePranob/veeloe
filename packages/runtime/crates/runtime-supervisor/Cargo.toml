@@ -1,0 +1,32 @@
+[package]
+name = "veeloe-runtime-supervisor"
+description = "The supervisor process of the Veeloe Runtime."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "veeloe"
+path = "src/main.rs"
+
+[dependencies]
+async-trait.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+rusqlite.workspace = true
+futures-util = "0.3"
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+tokio.workspace = true
+reqwest = { version = "0.12", features = ["rustls-tls", "json"], default-features = false }
+libc.workspace = true
+veeloe-protocol.workspace = true
+serde_json.workspace = true
+veeloe-runtime-core = { path = "../runtime-core" }
+veeloe-runtime-worker = { path = "../runtime-worker" }
+
+[dev-dependencies]
+tokio.workspace = true
+reqwest = { version = "0.12", features = ["rustls-tls", "json"], default-features = false }
+tempfile = "3"
+futures-util = "0.3"
+libc.workspace = true

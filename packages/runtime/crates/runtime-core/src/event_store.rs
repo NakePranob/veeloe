@@ -1,0 +1,205 @@
+//! The append-only Task event log (ADR 0018), over SQLite.
+//!
+//! The schema matches `packages/runtime-legacy/src/worker/adapters/sqlite-store.ts`
+//! exactly, so a Task log written by the Bun runtime opens here unchanged.
+
+use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use rusqlite::{params, Connection, OptionalExtension};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+const SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS task (id TEXT PRIMARY KEY NOT NULL, starter TEXT NOT NULL, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS event (
+  task_id TEXT NOT NULL REFERENCES task(id),
+  seq INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  body TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  message_id TEXT UNIQUE,
+  PRIMARY KEY (task_id, seq)
+);
+";
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TaskEvent {
+    pub seq: i64,
+    pub kind: String,
+    pub at: i64,
+    pub body: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskSummary {
+    pub id: String,
+    pub updated: i64,
+}
+
+pub trait Clock {
+    fn now(&self) -> i64;
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SystemClock;
+
+impl Clock for SystemClock {
+    fn now(&self) -> i64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("the clock is after 1970")
+            .as_millis() as i64
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    #[error("sqlite: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+    #[error("json: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+pub struct EventStore<C: Clock = SystemClock> {
+    conn: Connection,
+    clock: C,
+}
+
+impl EventStore<SystemClock> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, StoreError> {
+        Self::open_with(path, SystemClock)
+    }
+}
+
+impl<C: Clock> EventStore<C> {
+    pub fn open_with(path: impl AsRef<Path>, clock: C) -> Result<Self, StoreError> {
+        let conn = Connection::open(path)?;
+        conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;")?;
+        conn.execute_batch(SCHEMA)?;
+        Ok(Self { conn, clock })
+    }
+
+    pub fn create_task(&self, task: &str, starter: &str) -> Result<(), StoreError> {
+        self.conn.execute(
+            "INSERT INTO task (id, starter, created_at) VALUES (?1, ?2, ?3)",
+            params![task, starter, self.clock.now()],
+        )?;
+        Ok(())
+    }
+
+    pub fn starter_of(&self, task: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .conn
+            .query_row("SELECT starter FROM task WHERE id = ?1", [task], |row| {
+                row.get(0)
+            })
+            .optional()?)
+    }
+
+    pub fn has_message(&self, message_id: &str) -> Result<bool, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT 1 FROM event WHERE message_id = ?1",
+                [message_id],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some())
+    }
+
+    pub fn append(
+        &mut self,
+        task: &str,
+        kind: &str,
+        body: &Value,
+        message_id: Option<&str>,
+    ) -> Result<TaskEvent, StoreError> {
+        let at = self.clock.now();
+        let tx = self.conn.transaction()?;
+        let seq: i64 = tx.query_row(
+            "SELECT coalesce(max(seq), 0) + 1 FROM event WHERE task_id = ?1",
+            [task],
+            |row| row.get(0),
+        )?;
+        tx.execute(
+            "INSERT INTO event (task_id, seq, kind, body, at, message_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![task, seq, kind, serde_json::to_string(body)?, at, message_id],
+        )?;
+        tx.commit()?;
+        Ok(TaskEvent {
+            seq,
+            kind: kind.to_string(),
+            at,
+            body: body.clone(),
+        })
+    }
+
+    pub fn events(&self, task: &str, after: i64) -> Result<Vec<TaskEvent>, StoreError> {
+        let mut statement = self.conn.prepare(
+            "SELECT seq, kind, body, at FROM event WHERE task_id = ?1 AND seq > ?2 ORDER BY seq",
+        )?;
+        let rows = statement.query_map(params![task, after], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?;
+        let mut events = Vec::new();
+        for row in rows {
+            let (seq, kind, body, at) = row?;
+            events.push(TaskEvent {
+                seq,
+                kind,
+                at,
+                body: serde_json::from_str(&body)?,
+            });
+        }
+        Ok(events)
+    }
+
+    pub fn tasks_started_by(&self, member: &str) -> Result<Vec<TaskSummary>, StoreError> {
+        let mut statement = self.conn.prepare(
+            "SELECT t.id, coalesce((SELECT max(at) FROM event WHERE task_id = t.id), t.created_at) AS updated
+             FROM task t WHERE t.starter = ?1",
+        )?;
+        let rows = statement.query_map([member], |row| {
+            Ok(TaskSummary {
+                id: row.get(0)?,
+                updated: row.get(1)?,
+            })
+        })?;
+        let mut tasks = Vec::new();
+        for row in rows {
+            tasks.push(row?);
+        }
+        Ok(tasks)
+    }
+
+    /// The Tasks whose latest Turn boundary is a start: a Turn was running when
+    /// their worker ended (ADR 0033).
+    pub fn open_turns(&self) -> Result<Vec<String>, StoreError> {
+        let mut statement = self.conn.prepare(
+            "SELECT e.task_id FROM event e WHERE e.kind IN (?1, ?2)
+             GROUP BY e.task_id HAVING
+               (SELECT kind FROM event WHERE task_id = e.task_id AND kind IN (?3, ?4)
+                ORDER BY seq DESC LIMIT 1) = ?5",
+        )?;
+        let rows = statement.query_map(
+            params!["turn.started", "turn.ended", "turn.started", "turn.ended", "turn.started"],
+            |row| row.get::<_, String>(0),
+        )?;
+        let mut tasks = Vec::new();
+        for row in rows {
+            tasks.push(row?);
+        }
+        Ok(tasks)
+    }
+
+    pub fn close(self) -> Result<(), StoreError> {
+        self.conn.close().map_err(|(_, error)| error.into())
+    }
+}

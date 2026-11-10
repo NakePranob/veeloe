@@ -2,9 +2,10 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseMessage, publicKeyOf, toBase64url, type KnownMessage } from "@veeloe/protocol";
+import { parseMessage, publicKeyOf, toBase64url, type KnownMessage } from "@veeloe/protocol-ts";
 import { startHubClient } from "../controller/src/shared/hub-client";
-import { FAKE_KEY, fakeProvider, message } from "../packages/runtime/src/supervisor/providers/fake-provider";
+import { FAKE_KEY, fakeProvider, message } from "./helpers/fake-provider";
+import { buildRuntime } from "../scripts/runtime";
 
 // The compiled `veeloe` in the real OS sandbox (Seatbelt on macOS, bubblewrap on
 // Linux), with a stand-in Provider that asks for `bash` with whatever the Member
@@ -18,7 +19,8 @@ const machineKey = toBase64url(publicKeyOf(machineSeed));
 const work = realpathSync(mkdtempSync(join(tmpdir(), "veeloe-e2e-sandbox-")));
 const home = join(work, "home");
 const user = join(work, "user");
-const veeloe = join(work, "veeloe");
+/** The Rust debug binary this file drives, built by `scripts/runtime.ts`. */
+let runtimeBinary: string;
 const running: ReturnType<typeof Bun.spawn>[] = [];
 const provider = fakeProvider();
 let url: string;
@@ -77,8 +79,7 @@ beforeAll(async () => {
   const hubBinary = join(work, "testhub");
   const built = Bun.spawnSync(["go", "build", "-o", hubBinary, "./cmd/testhub"], { cwd: `${import.meta.dir}/../hub`, stderr: "inherit" });
   if (!built.success) throw new Error("could not build the Hub");
-  const runtime = Bun.spawnSync(["bun", "build", `${import.meta.dir}/../packages/runtime/src/main.ts`, "--compile", "--outfile", veeloe], { stdout: "ignore", stderr: "inherit" });
-  if (!runtime.success) throw new Error("could not build the Runtime");
+  runtimeBinary = buildRuntime();
   const hub = Bun.spawn([hubBinary], { stdout: "pipe", stderr: "inherit" });
   running.push(hub);
   const { value } = await (hub.stdout as ReadableStream<Uint8Array>).getReader().read();
@@ -95,10 +96,12 @@ beforeAll(async () => {
   writeFileSync(join(home, "runtime/trust.json"), JSON.stringify({ owners: [{ member: "member-1", keys: [toBase64url(publicKeyOf(controllerSeed))] }] }), { mode: 0o600 });
   chmodSync(home, 0o700);
 
-  const add = Bun.spawn([veeloe, "provider", "add", "--name", "main", "--url", provider.url], { env: { VEELOE_HOME: home }, stdin: new Blob([FAKE_KEY]), stdout: "pipe" });
+  const add = Bun.spawn([runtimeBinary, "provider", "add", "--name", "main", "--url", provider.url], { env: { VEELOE_HOME: home }, stdin: "pipe", stdout: "pipe" });
+  add.stdin.write(FAKE_KEY);
+  await add.stdin.end();
   if ((await add.exited) !== 0) throw new Error(await new Response(add.stdout).text());
 
-  const supervisor = Bun.spawn([veeloe], { env: { VEELOE_HOME: home, HOME: user, PATH: process.env.PATH }, stdout: "pipe", stderr: "inherit" });
+  const supervisor = Bun.spawn([runtimeBinary], { env: { VEELOE_HOME: home, HOME: user, PATH: process.env.PATH }, stdout: "pipe", stderr: "inherit" });
   running.push(supervisor);
   supervisorPid = supervisor.pid;
   const reader = supervisor.stdout.getReader();
@@ -139,7 +142,7 @@ function controller() {
       if (found) return found;
       await Bun.sleep(20);
     }
-    throw new Error(`nothing matched; got ${inbox.map((m) => m.type).join(", ")}`);
+    throw new Error(`nothing matched; got ${inbox.map((m) => (m.type === "task.event" ? `task.event:${m.body.kind}` : m.type)).join(", ")}`);
   };
   return { client, ready: ready.promise, inbox, send, waitFor };
 }
@@ -151,7 +154,19 @@ let n = 0;
 async function run(command: string, agent = "agent-a") {
   const task = `task-${++n}`;
   c.send("task.message", { agent, id: `m-${n}`, text: command }, task);
-  const ended = await c.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended");
+  // This file tests the sandbox, not the Allowlist: approve each command at once
+  // so it reaches the sandbox instead of waiting for a human (approval-and-allowlist).
+  const approval = await c.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "approval.requested");
+  if (approval.type === "task.event") {
+    const request = (approval.body.body as { request: string }).request;
+    c.send("approval.answer", { agent, request, decision: "approve" }, task);
+  }
+  const ended = await c
+    .waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended")
+    .catch((error: Error) => {
+      const mine = c.inbox.filter((m) => m.task === task).map((m) => (m.type === "task.event" ? `task.event:${m.body.kind}` : m.type));
+      throw new Error(`${error.message} | ${task}: ${mine.join(", ")}`);
+    });
   expect(ended.type === "task.event" && ended.body.body).toEqual({ reason: "done" });
   const result = await c.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "tool.result");
   const [first] = (result.type === "task.event" ? (result.body.body as { content: { content: string; is_error?: boolean }[] }).content : []) as { content: string; is_error?: boolean }[];

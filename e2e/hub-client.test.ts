@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { tmpdir } from "node:os";
-import { answerChallenge, createSigner, MemorySeenSequences, parseFrame, publicKeyOf, toBase64url, verify, type Route } from "@veeloe/protocol";
+import { answerChallenge, createSigner, MemorySeenSequences, parseFrame, publicKeyOf, toBase64url, verify, type Route } from "@veeloe/protocol-ts";
 import { startHubClient } from "../controller/src/shared/hub-client";
 
 // The Controller's real client through the real relay. TEST-ONLY KEYS, the seeds cmd/testhub knows.

@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+
+[workspace.dependencies]
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "io-util", "sync", "time", "signal", "fs", "io-std"] }
+globset = "0.4"
+walkdir = "2"
+regex = "1"
+libc = "0.2"
+veeloe-protocol = { path = "../protocol" }

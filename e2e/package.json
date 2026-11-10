@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@veeloe/protocol": "workspace:*"
+    "@veeloe/protocol-ts": "workspace:*"
   }
 }

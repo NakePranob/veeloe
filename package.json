@@ -2,17 +2,24 @@
   "name": "veeloe",
   "private": true,
   "packageManager": "bun@1.3.14",
-  "workspaces": ["packages/*", "controller", "controller-prototype", "e2e"],
+  "workspaces": [
+    "packages/*",
+    "controller",
+    "controller-prototype",
+    "e2e"
+  ],
   "scripts": {
-    "test": "cd packages && bun test && cd ../controller-prototype && bun test && cd ../controller && bun test ./src ./scripts",
+    "test": "cd packages/protocol-ts && bun test && cd ../../controller-prototype && bun test && cd ../controller && bun test ./src ./scripts",
     "test:e2e": "cd e2e && bun test",
-    "check": "bun run typecheck && bun run check:prototype && bun run check:controller && bun run check:runtime && bun run check:hub",
+    "check": "bun run typecheck && bun run check:prototype && bun run check:controller && bun run check:runtime && bun run check:protocol && bun run check:hub",
     "typecheck": "tsc --noEmit && tsc --noEmit -p controller-prototype && tsc --noEmit -p controller",
     "check:prototype": "cd controller-prototype && steiger ./src",
-    "check:runtime": "cd packages/runtime && depcruise src",
     "check:hub": "cd hub && go-scaffold check",
+    "check:runtime": "cd packages/runtime && cargo test --workspace -- --test-threads=1",
     "prototype": "cd controller-prototype && bunx expo start --web",
-    "check:controller": "cd controller && steiger ./src && bun scripts/check-i18n.ts"
+    "check:controller": "cd controller && steiger ./src && bun scripts/check-i18n.ts",
+    "build:runtime": "bun scripts/build-runtime.ts",
+    "check:protocol": "cd packages/protocol && cargo test && cd ../protocol-ts && bun test src/fixtures && cd ../../hub && go test ./internal/shared/protocol/..."
   },
   "devDependencies": {
     "@nakedev/go-scaffold": "0.14.0",

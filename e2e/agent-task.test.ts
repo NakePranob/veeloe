@@ -2,9 +2,10 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseMessage, publicKeyOf, toBase64url, type KnownMessage } from "@veeloe/protocol";
+import { parseMessage, publicKeyOf, toBase64url, type KnownMessage } from "@veeloe/protocol-ts";
 import { startHubClient } from "../controller/src/shared/hub-client";
-import { FAKE_KEY, fakeProvider, sse } from "../packages/runtime/src/supervisor/providers/fake-provider";
+import { FAKE_KEY, fakeProvider, sse } from "./helpers/fake-provider";
+import { buildRuntime } from "../scripts/runtime";
 
 // The compiled `veeloe`, its workers and its proxy, through the real relay, with
 // the Controller's own client and a stand-in Provider. TEST-ONLY KEYS, the seeds cmd/testhub knows.
@@ -14,7 +15,8 @@ const machineKey = toBase64url(publicKeyOf(machineSeed));
 
 const work = mkdtempSync(join(tmpdir(), "veeloe-e2e-agent-"));
 const home = join(work, "home");
-const veeloe = join(work, "veeloe");
+/** The Rust debug binary this file drives, built by `scripts/runtime.ts`. */
+let runtimeBinary: string;
 const running: ReturnType<typeof Bun.spawn>[] = [];
 const provider = fakeProvider();
 let url: string;
@@ -23,8 +25,8 @@ beforeAll(async () => {
   const hubBinary = join(work, "testhub");
   const built = Bun.spawnSync(["go", "build", "-o", hubBinary, "./cmd/testhub"], { cwd: `${import.meta.dir}/../hub`, stderr: "inherit" });
   if (!built.success) throw new Error("could not build the Hub");
-  const runtime = Bun.spawnSync(["bun", "build", `${import.meta.dir}/../packages/runtime/src/main.ts`, "--compile", "--outfile", veeloe], { stdout: "ignore", stderr: "inherit" });
-  if (!runtime.success) throw new Error("could not build the Runtime");
+  // The Rust Runtime is the only one; `scripts/runtime.ts` builds it.
+  runtimeBinary = buildRuntime();
   const hub = Bun.spawn([hubBinary], { stdout: "pipe", stderr: "inherit" });
   running.push(hub);
   const { value } = await (hub.stdout as ReadableStream<Uint8Array>).getReader().read();
@@ -37,10 +39,14 @@ beforeAll(async () => {
   writeFileSync(join(home, "runtime/trust.json"), JSON.stringify({ owners: [{ member: "member-1", keys: [toBase64url(publicKeyOf(controllerSeed))] }] }), { mode: 0o600 });
   chmodSync(home, 0o700);
 
-  const add = Bun.spawn([veeloe, "provider", "add", "--name", "main", "--url", provider.url], { env: { VEELOE_HOME: home }, stdin: new Blob([FAKE_KEY]), stdout: "pipe" });
+  // The key goes in on stdin, never in an argument. Written explicitly: a Blob
+  // stdin arrives empty after a spawnSync in the same hook.
+  const add = Bun.spawn([runtimeBinary, "provider", "add", "--name", "main", "--url", provider.url], { env: { VEELOE_HOME: home }, stdin: "pipe", stdout: "pipe" });
+  add.stdin.write(FAKE_KEY);
+  await add.stdin.end();
   if ((await add.exited) !== 0) throw new Error(await new Response(add.stdout).text());
 
-  const supervisor = Bun.spawn([veeloe], { env: { VEELOE_HOME: home, PATH: process.env.PATH }, stdout: "pipe", stderr: "inherit" });
+  const supervisor = Bun.spawn([runtimeBinary], { env: { VEELOE_HOME: home, PATH: process.env.PATH }, stdout: "pipe", stderr: "inherit" });
   running.push(supervisor);
   const reader = supervisor.stdout.getReader();
   let out = "";
@@ -137,10 +143,12 @@ test("after agent.update a Task keeps its model and a new one gets the new one, 
   // At the Machine: the Provider goes, and another comes.
   const other = fakeProvider();
   try {
-    const remove = Bun.spawn([veeloe, "provider", "remove", "main", "--yes"], { env: { VEELOE_HOME: home }, stdout: "pipe" });
+    const remove = Bun.spawn([runtimeBinary, "provider", "remove", "main", "--yes"], { env: { VEELOE_HOME: home }, stdout: "pipe" });
     expect(await remove.exited).toBe(0);
     expect(await new Response(remove.stdout).text()).toContain("on the Agent's page in the Veeloe app");
-    const add = Bun.spawn([veeloe, "provider", "add", "--name", "second", "--url", other.url], { env: { VEELOE_HOME: home }, stdin: new Blob([FAKE_KEY]), stdout: "pipe" });
+    const add = Bun.spawn([runtimeBinary, "provider", "add", "--name", "second", "--url", other.url], { env: { VEELOE_HOME: home }, stdin: "pipe", stdout: "pipe" });
+    add.stdin.write(FAKE_KEY);
+    await add.stdin.end();
     expect(await add.exited).toBe(0);
 
     expect(await talk("task-old", "four")).toMatchObject({ body: { reason: "error", code: "provider.missing" } });
@@ -150,6 +158,12 @@ test("after agent.update a Task keeps its model and a new one gets the new one, 
     expect(modelsAt(other)).toEqual(["model-a"]);
   } finally {
     other.server.stop(true);
+    // Put back the Provider the tests after this one use; removing it is this
+    // test's own doing, not theirs.
+    const restore = Bun.spawn([runtimeBinary, "provider", "add", "--name", "main", "--url", provider.url], { env: { VEELOE_HOME: home }, stdin: "pipe", stdout: "pipe" });
+    restore.stdin.write(FAKE_KEY);
+    await restore.stdin.end();
+    await restore.exited;
     owner.client.stop();
   }
 }, 90_000);
@@ -212,7 +226,7 @@ test("usage.list answers with the Machine's own days, the Tasks behind the token
     expect(ended(task)).toBe(before + 1);
   }
 
-  owner.send("usage.list", { request: "usage-e2e", days: 1 });
+  owner.send("usage.list", { request: "usage-e2e", days: 1, agent: "agent-usage" });
   const answer = await owner.waitFor((m) => m.type === "usage.listed" && m.body.request === "usage-e2e");
   const today = (answer.body as { from: string }).from;
   expect(answer.body).toMatchObject({
@@ -222,7 +236,7 @@ test("usage.list answers with the Machine's own days, the Tasks behind the token
     agents: [{ agent: "agent-usage", days: [{ day: today, tokens: 8 }], tasks: [{ task: "task-usage-1", tokens: 4 }, { task: "task-usage-2", tokens: 4 }], sources: [{ source: "task", tokens: 8 }] }],
   });
 
-  owner.send("usage.list", { request: "usage-week", days: 7 });
+  owner.send("usage.list", { request: "usage-week", days: 7, agent: "agent-usage" });
   const week = await owner.waitFor((m) => m.type === "usage.listed" && m.body.request === "usage-week");
   const weekBody = week.body as { from: string; to: string };
   expect(weekBody.to).toBe(today);
