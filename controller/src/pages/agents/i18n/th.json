@@ -78,6 +78,7 @@
     "choose": "เลือก Provider ใหม่"
   },
   "delete": {
+    "heading": "โซนอันตราย",
     "action": "ลบ Agent นี้",
     "title": "ลบ {{name}}?",
     "body": "Agent จะหยุดและหายจากรายการนี้ Workdir กับประวัติ Task ยังอยู่บน Machine แต่ Agent จะไม่ตอบอีก",

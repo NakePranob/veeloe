@@ -87,6 +87,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
       sig = link.deleteAgent(machine, agent.id);
     });
     if (!sig) inform(t("delete.failed"), t("needsOnline"));
+    else router.replace("/");
   }
 
   return (
@@ -172,7 +173,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
           {describeError({ code: machineStatus.deleteError })}
         </Note>
       )}
-      <Section title={t("delete.action")} footer={t("delete.body", { name: agent.name })}>
+      <Section title={t("delete.heading")} footer={t("delete.body", { name: agent.name })}>
         <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} />
       </Section>
     </Screen>
