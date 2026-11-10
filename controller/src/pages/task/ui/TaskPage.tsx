@@ -272,8 +272,8 @@ export function TaskPage() {
       <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }]}>
         <View style={{ position: "relative" }}>
           {contextOpen && contextUsage && (
-            <View style={{ position: "absolute", bottom: "100%", right: 0, width: "84%", paddingBottom: space.sm, zIndex: 20 }}>
-              <View style={{ borderRadius: radius.card, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, overflow: "hidden", backgroundColor: `${colors.surface}E6`, shadowColor: colors.label, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
+            <View style={{ position: "absolute", bottom: "100%", left: "8%", right: "8%", paddingBottom: space.sm, zIndex: 20 }}>
+              <View style={{ borderRadius: radius.card, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, overflow: "hidden", backgroundColor: `${colors.surface}E6`, shadowColor: colors.label, shadowOpacity: 0.035, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
                 <View style={{ padding: space.md, gap: space.xs }}>
                   <Label icon="info">{t("context.title")}</Label>
                   <ContextDetails usage={contextUsage} />
