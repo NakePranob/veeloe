@@ -10,8 +10,7 @@ import { Button, column, HeaderAction, Note, radius, space, Text, useColors, use
 import { characterToSend } from "../model/to-send";
 
 // The Moods the Member will see this look in, at inbox size, so they can tell they still read.
-// ponytail: the prototype's "waiting" comes with Approval (approval-and-allowlist).
-const MOODS = ["idle", "thinking", "working", "done", "offline"] as const;
+const MOODS = ["idle", "thinking", "working", "waiting", "done", "offline"] as const;
 
 const COLOR_NAMES: Record<(typeof COLORS)[number], "peach" | "sky" | "sage" | "lilac" | "rose" | "butter" | "mint" | "sand"> = {
   "#F4B183": "peach",
@@ -162,7 +161,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
         <Character look={draft} mood="idle" size={140} />
         <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: space.sm }}>
           {MOODS.map((mood) => (
-            <View key={mood} style={{ width: 56, alignItems: "center", gap: space.xs }}>
+            <View key={mood} style={{ width: 48, alignItems: "center", gap: space.xs }}>
               <Character look={draft} mood={mood} size={44} />
               <Text variant="caption" tone="secondary" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {t(`moods.${mood}`)}
