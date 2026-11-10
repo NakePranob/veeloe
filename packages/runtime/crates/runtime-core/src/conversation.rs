@@ -10,6 +10,32 @@ use crate::ports::LlmMessage;
 /// so no tool_use goes out without its result. The Turn running now counts as
 /// ended.
 pub fn conversation(events: &[TaskEvent]) -> Vec<LlmMessage> {
+    // The newest compaction owns the model's view: its summary, then only the
+    // events after it. The transcript itself keeps every original event.
+    if let Some(index) = events.iter().rposition(|event| event.kind == "context.compacted") {
+        let body = &events[index].body;
+        let summary = body.get("summary").and_then(Value::as_str).unwrap_or_default();
+        if !summary.is_empty() {
+            let through = body.get("throughSeq").and_then(Value::as_i64).unwrap_or(0);
+            let after: Vec<TaskEvent> = events
+                .iter()
+                .filter(|event| event.seq > through && event.kind != "context.compacted")
+                .cloned()
+                .collect();
+            let mut messages = conversation(&after);
+            messages.insert(
+                0,
+                LlmMessage {
+                    role: "user".into(),
+                    content: vec![json!({
+                        "type": "text",
+                        "text": format!("Summary of the earlier part of this Task:\n{summary}")
+                    })],
+                },
+            );
+            return messages;
+        }
+    }
     let mut ended = HashSet::new();
     let mut turn = 0i64;
     let mut turn_of = HashMap::new();

@@ -186,6 +186,7 @@ struct Setup {
     allowlist: Vec<String>,
     timeout_ms: Option<u64>,
     gated: bool,
+    context_window: Option<usize>,
 }
 
 impl Default for Setup {
@@ -196,6 +197,7 @@ impl Default for Setup {
             allowlist: Vec::new(),
             timeout_ms: None,
             gated: false,
+            context_window: None,
         }
     }
 }
@@ -226,6 +228,10 @@ fn setup(setup: Setup) -> Harness {
     if !setup.allowlist.is_empty() {
         core.set_allowlist(setup.allowlist.clone());
     }
+    let core = match setup.context_window {
+        Some(tokens) => core.with_context_window(tokens),
+        None => core,
+    };
     Harness {
         core,
         link,
@@ -1336,4 +1342,23 @@ async fn a_second_stop_for_the_same_turn_writes_no_second_turn_stopped_and_the_t
             .count(),
         1
     );
+}
+
+#[tokio::test]
+async fn a_long_turn_is_summarized_and_the_next_request_sees_the_summary() {
+    let harness = setup(Setup {
+        replies: vec![Ok(text("The earlier work was about a release.")), Ok(text("done"))],
+        context_window: Some(100),
+        ..Setup::default()
+    });
+    harness.core.receive(message(&"x".repeat(500))).expect("receive");
+    harness.core.idle().await;
+
+    let requests = harness.llm.requests();
+    assert_eq!(requests.len(), 2);
+    assert!(requests[0].system.contains("compact"));
+    let second = &requests[1].messages[0];
+    assert!(second.content.iter().any(|block| block["text"].as_str().is_some_and(|text| text.contains("The earlier work"))));
+    let events = harness.core.events("t1").expect("events");
+    assert!(events.iter().any(|event| event.kind == "context.compacted"));
 }

@@ -24,11 +24,11 @@
 
 **Why:** กัน prompt เปลี่ยนกลางเทิร์นและทำ cache เสีย
 
-### 4. Compaction ยังไม่ทำในรอบนี้
+### 4. Compaction สรุปทั้งก้อนก่อน 70% ของ context
 
-**Decision:** เก็บ ADR 0041 ไว้เป็นงานถัดไป; change นี้ส่ง Memory ก่อน
+**Decision:** ก่อน request ทุกครั้ง ประเมิน token แบบหยาบ; ถ้าถึง 70% และไม่ได้อยู่กลาง tool round ให้เรียก LLM สรุปประวัติก่อน `member.message` ล่าสุด เก็บ `context.compacted` แล้วใช้ summary + ข้อความหลังจุดนั้น
 
-**Why:** Compaction ต้องเรียก LLM สรุปและจัดการ tool round; เป็นงานแยกที่ต้องทดสอบกับ Provider จริง
+**Why:** ADR 0041 ต้องการ summary ทั้งก้อนและไม่แตะ result ของ tool ที่ยังค้าง; ประวัติเต็มยังอยู่ใน event log
 
 ### 5. Context window มาจาก Provider model list ก่อน
 

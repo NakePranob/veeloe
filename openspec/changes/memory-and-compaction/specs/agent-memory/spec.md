@@ -25,3 +25,18 @@ Runtime MUST ตัด Memory ที่เกิน 4,000 ตัวอักษ�
 #### Scenario: ไฟล์ยาวเกิน
 - **WHEN** `MEMORY.md` ยาวกว่า 4,000 ตัวอักษร
 - **THEN** prompt มี 4,000 ตัวแรกและข้อความให้ย่อ
+
+### Requirement: ย่อ context เมื่อใกล้เต็ม
+Runtime SHALL ประเมิน token ของ conversation ก่อน request; เมื่อถึง 70% ของ context window และไม่ได้อยู่กลาง tool round MUST สรุปประวัติก่อนข้อความล่าสุด เก็บ `context.compacted` ที่มี summary และ throughSeq และใช้ summary กับ request ถัดไป; event log เดิม MUST ยังอยู่ครบ
+
+#### Scenario: ใกล้เต็ม
+- **WHEN** conversation ถึง 70% ของ context window
+- **THEN** Runtime เรียก LLM สรุปและบันทึก `context.compacted`
+
+#### Scenario: หลังย่อ
+- **WHEN** request ถัดไปถูกสร้างหลัง `context.compacted`
+- **THEN** model เห็น summary และข้อความหลัง throughSeq ไม่ใช่ประวัติเก่าทั้งหมด
+
+#### Scenario: กลาง tool round
+- **WHEN** Turn ยังรอผลของ tool
+- **THEN** Runtime ไม่ย่อ context ในจังหวะนั้น

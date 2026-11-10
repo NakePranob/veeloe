@@ -7,7 +7,7 @@ Agent ยังจำข้าม Task ได้เฉพาะไฟล์ใ�
 - Runtime อ่าน `MEMORY.md` ที่ root ของ Workdir และใส่เข้า system prompt ของทุก Turn ใหม่
 - เพดาน 4,000 ตัวอักษร; ถ้าเกินใส่ส่วนต้นและบอก Agent ให้ย่อ
 - Memory ถูกตรึงตอนเริ่ม Turn; แก้กลาง Turn มีผล Turn ถัดไป
-- การย่อ context เมื่อ token ถึง 70% ยังเป็นงานถัดไป; รอบนี้ทำ Memory ก่อน
+- การย่อ context เมื่อ token ถึง 70%: Runtime สรุปประวัติเก่าเป็น `context.compacted` และใช้ summary กับ request ถัดไป
 
 ## Capabilities
 
@@ -23,7 +23,6 @@ Agent ยังจำข้าม Task ได้เฉพาะไฟล์ใ�
 
 - Full-text search Task เก่า (ADR 0036)
 - Page ใน Controller สำหรับอ่าน Memory
-- Compaction/AI summary เมื่อ context ใกล้เต็ม (ADR 0041)
 
 ## Impact
 

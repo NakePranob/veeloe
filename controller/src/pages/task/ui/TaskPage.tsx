@@ -10,7 +10,7 @@ import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
 import { Button, Card, column, confirm, HeaderAction, Label, radius, space, Text, type, useColors } from "../../../shared/ui";
-import { items } from "../model/items";
+import { items, type Item } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
 import { ToolCalls } from "./ToolCalls";
@@ -37,6 +37,25 @@ function Problem({ code }: { code: string }) {
     <Label icon="warning" iconColor="orange">
       {describeError({ code })}
     </Label>
+  );
+}
+
+function CompactedCard({ item }: { item: Extract<Item, { kind: "compacted" }> }) {
+  const t = useT("task");
+  const language = useLanguage();
+  const [open, setOpen] = useState(false);
+  return (
+    <Pressable onPress={() => setOpen(!open)} accessibilityRole="button">
+      <Card>
+        <Label icon="info">{t("compacted.title")} · {when(item.at, language)}</Label>
+        <Text numberOfLines={open ? undefined : 3} selectable>
+          {item.summary}
+        </Text>
+        <Text variant="footnote" tone="secondary">
+          {open ? t("compacted.hide") : t("compacted.show")}
+        </Text>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -188,6 +207,8 @@ export function TaskPage() {
             <Label key={item.key} icon="stopped" style={{ alignSelf: "center" }}>
               {t("stopped", { member: item.member, when: when(item.at, language, now) })}
             </Label>
+          ) : item.kind === "compacted" ? (
+            <CompactedCard key={item.key} item={item} />
           ) : item.kind === "interrupted" ? (
             <InterruptedCard key={item.key} machine={machine.name} agentName={agent.name} onContinue={() => send(t("interrupted.continueMessage"))} />
           ) : item.code === "budget.exhausted" ? (

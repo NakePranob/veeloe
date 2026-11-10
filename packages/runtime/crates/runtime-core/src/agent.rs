@@ -23,7 +23,7 @@ use veeloe_protocol::{matches_allowlist, split_command};
 use crate::conversation::conversation;
 use crate::event_store::{EventStore, StoreError, TaskEvent};
 use crate::ipc::{ApprovalDecision, FromWorker, SupervisorLink, ToWorker};
-use crate::ports::{Llm, LlmError, LlmRequest};
+use crate::ports::{Llm, LlmError, LlmMessage, LlmRequest};
 
 /// How many times one Turn may go back to the LLM, so a tool loop cannot run all night.
 pub const MAX_ROUNDS: usize = 50;
@@ -87,6 +87,7 @@ struct State {
     waiting: Mutex<HashMap<String, Waiter>>,
     approvals: AtomicU64,
     max_rounds: AtomicUsize,
+    context_window: AtomicUsize,
     turn: Mutex<Option<JoinHandle<()>>>,
 }
 
@@ -147,6 +148,7 @@ impl AgentCore {
                 waiting: Mutex::new(HashMap::new()),
                 approvals: AtomicU64::new(0),
                 max_rounds: AtomicUsize::new(MAX_ROUNDS),
+                context_window: AtomicUsize::new(128_000),
                 turn: Mutex::new(None),
             }),
         }
@@ -160,6 +162,14 @@ impl AgentCore {
     /// Pin this Workdir's `MEMORY.md` into each new Turn (ADR 0036).
     pub fn with_workdir(self, workdir: impl Into<PathBuf>) -> Self {
         *self.state.workdir.lock().expect("workdir") = Some(workdir.into());
+        self
+    }
+
+    /// The model's context window; the 70% compaction threshold derives from it.
+    pub fn with_context_window(self, tokens: usize) -> Self {
+        if tokens > 0 {
+            self.state.context_window.store(tokens, Ordering::SeqCst);
+        }
         self
     }
 
@@ -519,7 +529,26 @@ async fn run_turn(
 ) -> Result<(), AgentError> {
     let rounds = state.max_rounds.load(Ordering::SeqCst);
     for _ in 0..rounds {
-        let events = state.store.lock().expect("store").events(&task, 0)?;
+        let mut events = state.store.lock().expect("store").events(&task, 0)?;
+        if let Some(summary) = compact_if_needed(&state, &task, &events).await {
+            if state
+                .append(
+                    &task,
+                    &starter,
+                    "context.compacted",
+                    json!({
+                        "summary": summary.summary,
+                        "throughSeq": summary.through_seq,
+                        "tokensBefore": summary.tokens_before,
+                        "tokensAfter": summary.tokens_after,
+                    }),
+                    None,
+                )
+                .is_ok()
+            {
+                events = state.store.lock().expect("store").events(&task, 0)?;
+            }
+        }
         let request = LlmRequest {
             task: task.clone(),
             system: system.clone(),
@@ -625,6 +654,110 @@ fn end(
     }
     state.append(task, starter, "turn.ended", body, None)?;
     Ok(())
+}
+
+struct Compacted {
+    summary: String,
+    through_seq: i64,
+    tokens_before: usize,
+    tokens_after: usize,
+}
+
+/// Summarize older history when the rough token count reaches 70% of the
+/// window. A failed or empty summary leaves the Turn exactly as it was.
+async fn compact_if_needed(
+    state: &Arc<State>,
+    task: &str,
+    events: &[TaskEvent],
+) -> Option<Compacted> {
+    // A tool round is not a safe split: its call would lose its result.
+    if events.last().is_some_and(|event| event.kind == "llm.message") {
+        return None;
+    }
+    let window = state.context_window.load(Ordering::SeqCst);
+    if window == 0 {
+        return None;
+    }
+    // Keep the message that started this Turn outside the summary, so the
+    // model still sees the exact request beside the summary.
+    let split = if events.last().is_some_and(|event| event.kind == "member.message") {
+        events.len().saturating_sub(1)
+    } else {
+        events.len()
+    };
+    let messages = conversation(&events[..split]);
+    let before = rough_tokens(&messages);
+    if before < window * 70 / 100 {
+        return None;
+    }
+    let transcript = transcript_text(&messages);
+    if transcript.is_empty() {
+        return None;
+    }
+    let request = LlmRequest {
+        task: task.to_string(),
+        system: "You compact an AI Agent's Task history. Keep the goal, decisions, files changed, approvals, and work still pending. Do not invent facts. Return only the summary.".into(),
+        messages: vec![LlmMessage {
+            role: "user".into(),
+            content: vec![json!({ "type": "text", "text": transcript })],
+        }],
+        tools: Vec::new(),
+    };
+    let cancel = Cancel::new();
+    let reply = state.llm.send(request, &cancel).await.ok()?;
+    let summary = text_content(&reply.content).trim().to_string();
+    if summary.is_empty() {
+        return None;
+    }
+    let after = rough_text_tokens(&summary);
+    Some(Compacted {
+        summary,
+        through_seq: events[..split].last().map_or(0, |event| event.seq),
+        tokens_before: before,
+        tokens_after: after,
+    })
+}
+
+fn rough_tokens(messages: &[LlmMessage]) -> usize {
+    messages
+        .iter()
+        .flat_map(|message| message.content.iter())
+        .filter_map(|block| block.get("text").and_then(Value::as_str))
+        .map(rough_text_tokens)
+        .sum()
+}
+
+fn rough_text_tokens(text: &str) -> usize {
+    // Rough on purpose: three characters per token is conservative for Thai and
+    // English, and needs no Provider tokenizer (ADR 0041).
+    text.chars().count().div_ceil(3)
+}
+
+fn transcript_text(messages: &[LlmMessage]) -> String {
+    let mut text = String::new();
+    for message in messages {
+        let content = text_content(&message.content);
+        if content.is_empty() {
+            continue;
+        }
+        text.push_str(&message.role);
+        text.push_str(": ");
+        text.push_str(&content);
+        text.push_str("\n\n");
+        if text.chars().count() >= 100_000 {
+            text.push_str("(Transcript truncated before summarization.)");
+            break;
+        }
+    }
+    text
+}
+
+fn text_content(content: &[Value]) -> String {
+    content
+        .iter()
+        .filter_map(|block| block.get("text").and_then(Value::as_str))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// A tool call outside the Allowlist waits for an Approval first. `bash` matches
