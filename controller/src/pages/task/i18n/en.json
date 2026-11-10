@@ -20,6 +20,7 @@
   },
   "busy": "You can send once this Turn ends",
   "queued": "This Turn is running. Your message will wait for it to end.",
+  "queuedNote": "Waiting for the running Turn",
   "budget": {
     "out": "Today's Budget is used up",
     "body": "New work starts at 04:00 in {{machine}}'s time, or when you add Budget. Files it changed are still there.",

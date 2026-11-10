@@ -212,7 +212,7 @@ export function TaskPage() {
                 </View>
               ) : (
                 <Label icon="time" variant="caption">
-                  {t("sending")}
+                  {busy ? t("queuedNote") : t("sending")}
                 </Label>
               )
             }
