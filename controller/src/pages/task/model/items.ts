@@ -1,5 +1,24 @@
 type EventRow = { seq: number; kind: string; body: string; at?: number };
 
+export type ContextUsage = { tokens: number; window: number; threshold: number };
+
+/** The newest `context.usage` the Runtime wrote, for the ring beside Send. */
+export function contextUsageOf(events: EventRow[]): ContextUsage | null {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.kind !== "context.usage") continue;
+    try {
+      const body = JSON.parse(event.body) as { tokens?: unknown; window?: unknown; threshold?: unknown };
+      if (typeof body.tokens === "number" && typeof body.window === "number" && typeof body.threshold === "number") {
+        return { tokens: body.tokens, window: body.window, threshold: body.threshold };
+      }
+    } catch {
+      // A malformed row from an older build draws no meter.
+    }
+  }
+  return null;
+}
+
 const atOf = (event: EventRow) => event.at ?? 0;
 
 /** One command the Agent asked for, by the tool's own id, and how it went so far. */

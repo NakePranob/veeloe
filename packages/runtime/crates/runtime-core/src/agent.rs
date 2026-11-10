@@ -555,6 +555,18 @@ async fn run_turn(
             messages: conversation(&events),
             tools: state.tools.definitions(),
         };
+        let window = state.context_window.load(Ordering::SeqCst);
+        let _ = state.append(
+            &task,
+            &starter,
+            "context.usage",
+            json!({
+                "tokens": rough_tokens(&request.messages),
+                "window": window,
+                "threshold": window * 70 / 100,
+            }),
+            None,
+        );
         // A Stop ends the Turn as stopped, not as a Provider failure (ADR 0017).
         let reply = tokio::select! {
             biased;

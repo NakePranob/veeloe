@@ -26,6 +26,13 @@
     "show": "Show summary",
     "hide": "Hide summary"
   },
+  "context": {
+    "title": "Context window",
+    "used": "Used",
+    "of": "{{used}} / {{window}} tokens",
+    "compactAt": "Compacts at",
+    "threshold": "{{tokens}} tokens"
+  },
   "budget": {
     "out": "Today's Budget is used up",
     "body": "New work starts at 04:00 in {{machine}}'s time, or when you add Budget. Files it changed are still there.",

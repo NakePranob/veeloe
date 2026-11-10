@@ -26,6 +26,13 @@
     "show": "ดูสรุป",
     "hide": "ซ่อนสรุป"
   },
+  "context": {
+    "title": "Context window",
+    "used": "ใช้ไป",
+    "of": "{{used}} / {{window}} tokens",
+    "compactAt": "ย่อเมื่อถึง",
+    "threshold": "{{tokens}} tokens"
+  },
   "budget": {
     "out": "Budget ของวันนี้หมดแล้ว",
     "body": "งานใหม่จะเริ่มตอน 04:00 ตามเวลาของ {{machine}} หรือเมื่อเพิ่ม Budget ไฟล์ที่แก้ไว้ยังอยู่",

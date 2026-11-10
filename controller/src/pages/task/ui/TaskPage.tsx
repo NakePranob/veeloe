@@ -10,9 +10,10 @@ import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
 import { Button, Card, column, confirm, HeaderAction, Label, radius, space, Text, type, useColors } from "../../../shared/ui";
-import { items, type Item } from "../model/items";
+import { contextUsageOf, items, type Item } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
+import { ContextMeter } from "./ContextMeter";
 import { ToolCalls } from "./ToolCalls";
 import { FADE, LogFade } from "./LogFade";
 import { LogHead } from "./LogHead";
@@ -107,6 +108,7 @@ export function TaskPage() {
   const [text, setText] = useState("");
   // Set when the Stop went out, so the brake can say it is working on it until the Turn ends.
   const [stopAsked, setStopAsked] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
   const now = useNow();
   const input = useRef<TextInputInstance>(null);
   const scroll = useRef<ScrollViewInstance>(null);
@@ -117,6 +119,7 @@ export function TaskPage() {
   const message = text.trim();
   const latest = latestOf(events);
   const taskStatus = statusOf(latest, status.online);
+  const contextUsage = events ? contextUsageOf(events) : null;
   // A Turn is running: the Machine queues a new message until it ends.
   const busy = statusOf(latest, true) === "working";
   // The Turn ended (by the Stop or by itself) or the Machine refused: nothing is stopping any more.
@@ -251,6 +254,19 @@ export function TaskPage() {
       <LogFade />
       {/* Clear of the home indicator, as in controller-prototype's TaskPage (insets.bottom under the Composer). */}
       <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }]}>
+        {contextOpen && contextUsage && (
+          <Card>
+            <Label icon="info">{t("context.title")}</Label>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
+              <Text>{t("context.used")}</Text>
+              <Text tone="secondary" style={{ flexShrink: 1, textAlign: "right" }}>{t("context.of", { used: contextUsage.tokens.toLocaleString(), window: contextUsage.window.toLocaleString() })}</Text>
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
+              <Text>{t("context.compactAt")}</Text>
+              <Text tone="secondary">{t("context.threshold", { tokens: contextUsage.threshold.toLocaleString() })}</Text>
+            </View>
+          </Card>
+        )}
         {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
         <Card raised style={{ gap: space.xs, padding: space.sm }}>
           <TextInput
@@ -263,7 +279,8 @@ export function TaskPage() {
             multiline
             style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
           />
-          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.sm }}>
+            <ContextMeter usage={contextUsage} onPress={() => setContextOpen(!contextOpen)} />
             {/* A working Agent with nothing typed offers the brake instead of send (controller-prototype's Composer). */}
             {busy && !message ? (
               <Button

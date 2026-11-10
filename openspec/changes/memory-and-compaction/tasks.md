@@ -13,6 +13,7 @@
 - [x] 2.3 เก็บ summary เป็น event ใหม่และใช้กับ request ถัดไป
 - [x] 2.4 test กับ mock LLM; Provider จริงยังไม่ทดสอบ
 - [x] 2.6 แสดงการ์ด `context.compacted` ในหน้า Task พร้อมกดดู/ซ่อน summary
+- [x] 2.7 Runtime เขียน `context.usage`; Controller แสดงวงแหวนข้างปุ่มส่งและกดดู used/window/threshold
 
 ## 3. ตรวจ
 

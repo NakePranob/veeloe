@@ -279,7 +279,11 @@ fn stop_in(task: &str, id: &str) -> ToWorker {
 }
 
 fn kinds(events: &[TaskEvent]) -> Vec<String> {
-    events.iter().map(|event| event.kind.clone()).collect()
+    events
+        .iter()
+        .filter(|event| event.kind != "context.usage")
+        .map(|event| event.kind.clone())
+        .collect()
 }
 
 fn requested_of(harness: &Harness) -> Option<String> {
@@ -336,8 +340,12 @@ async fn a_message_starts_a_task_and_a_turn_and_every_event_reaches_the_member_w
         kinds(&events),
         vec!["member.message", "turn.started", "llm.message", "turn.ended"]
     );
-    let seqs: Vec<i64> = events.iter().map(|event| event.seq).collect();
-    assert_eq!(seqs, vec![1, 2, 3, 4]);
+    let seqs: Vec<i64> = events
+        .iter()
+        .filter(|event| event.kind != "context.usage")
+        .map(|event| event.seq)
+        .collect();
+    assert_eq!(seqs, vec![1, 2, 4, 5]);
     assert!(harness.link.take().iter().all(|message| matches!(
         message,
         FromWorker::Event { starter, .. } if starter == "m_owner"
@@ -625,7 +633,7 @@ async fn sync_answers_the_events_after_a_number_for_the_member_who_started_the_t
     match harness.link.last() {
         Some(FromWorker::Events { events, .. }) => {
             let seqs: Vec<i64> = events.iter().map(|event| event.seq).collect();
-            assert_eq!(seqs, vec![3, 4]);
+            assert_eq!(seqs, vec![3, 4, 5]);
         }
         other => panic!("expected events, got {other:?}"),
     }

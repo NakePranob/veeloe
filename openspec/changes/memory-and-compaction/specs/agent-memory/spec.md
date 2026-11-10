@@ -40,3 +40,14 @@ Runtime SHALL ประเมิน token ของ conversation ก่อน re
 #### Scenario: กลาง tool round
 - **WHEN** Turn ยังรอผลของ tool
 - **THEN** Runtime ไม่ย่อ context ในจังหวะนั้น
+
+### Requirement: แสดงการใช้ context ใน Composer
+Runtime SHALL เขียน `context.usage` ที่มี tokens/window/threshold ก่อน request; Controller SHALL แสดงวงแหวนข้างปุ่มส่งเมื่อมีข้อมูล และกดแล้ว MUST แสดง used/window และจุดที่จะ compact
+
+#### Scenario: เปิด Task
+- **WHEN** Task มี `context.usage` ล่าสุด
+- **THEN** Controller แสดงวงแหวนตามสัดส่วน tokens/window
+
+#### Scenario: กดวงแหวน
+- **WHEN** ผู้ใช้กดวงแหวน
+- **THEN** แสดงยอด used/window และ compact threshold
