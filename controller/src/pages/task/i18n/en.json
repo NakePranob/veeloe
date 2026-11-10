@@ -31,9 +31,7 @@
     "used": "Used",
     "of": "{{used}} / {{window}} tokens",
     "compactAt": "Compacts at",
-    "threshold": "{{tokens}} tokens",
-    "pill": "{{percent}}% context",
-    "close": "Close"
+    "threshold": "{{tokens}} tokens"
   },
   "budget": {
     "out": "Today's Budget is used up",

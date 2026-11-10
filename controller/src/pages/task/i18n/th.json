@@ -31,9 +31,7 @@
     "used": "ใช้ไป",
     "of": "{{used}} / {{window}} tokens",
     "compactAt": "ย่อเมื่อถึง",
-    "threshold": "{{tokens}} tokens",
-    "pill": "context {{percent}}%",
-    "close": "ปิด"
+    "threshold": "{{tokens}} tokens"
   },
   "budget": {
     "out": "Budget ของวันนี้หมดแล้ว",

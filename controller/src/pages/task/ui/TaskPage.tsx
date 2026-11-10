@@ -2,7 +2,7 @@ import { randomUUID } from "expo-crypto";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { allowlistOf, useAgents } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
 import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
@@ -114,7 +114,7 @@ export function TaskPage() {
   const language = useLanguage();
   const colors = useColors();
   const database = useDatabase();
-  const { task, agent: agentId, contextUi } = useLocalSearchParams<{ task: string; agent: string; contextUi?: string }>();
+  const { task, agent: agentId } = useLocalSearchParams<{ task: string; agent: string }>();
   const agent = useAgents()?.find((a) => a.id === agentId);
   const machine = useMachines()?.find((m) => m.id === agent?.machine_id);
   const status = useMachineStatus(machine?.id ?? "");
@@ -136,8 +136,6 @@ export function TaskPage() {
   const latest = latestOf(events);
   const taskStatus = statusOf(latest, status.online);
   const contextUsage = events ? contextUsageOf(events) : null;
-  const contextVariant = contextUi === "pill" || contextUi === "sheet" ? contextUi : "inline";
-  const contextPercent = contextUsage && contextUsage.window > 0 ? Math.round((contextUsage.tokens / contextUsage.window) * 100) : 0;
   // A Turn is running: the Machine queues a new message until it ends.
   const busy = statusOf(latest, true) === "working";
   // The Turn ended (by the Stop or by itself) or the Machine refused: nothing is stopping any more.
@@ -272,57 +270,46 @@ export function TaskPage() {
       <LogFade />
       {/* Clear of the home indicator, as in controller-prototype's TaskPage (insets.bottom under the Composer). */}
       <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }]}>
-        {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
-        <Card raised style={{ gap: space.xs, padding: space.sm }}>
-          {contextOpen && contextUsage && contextVariant !== "sheet" && (
-            <View style={{ gap: space.xs, paddingBottom: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }}>
-              <Label icon="info">{t("context.title")}</Label>
-              <ContextDetails usage={contextUsage} />
+        <View style={{ position: "relative" }}>
+          {contextOpen && contextUsage && (
+            <View style={{ position: "absolute", bottom: "100%", right: 0, width: "84%", paddingBottom: space.sm, zIndex: 20 }}>
+              <View style={{ borderRadius: radius.card, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, overflow: "hidden", backgroundColor: `${colors.surface}E6`, shadowColor: colors.label, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
+                <View style={{ padding: space.md, gap: space.xs }}>
+                  <Label icon="info">{t("context.title")}</Label>
+                  <ContextDetails usage={contextUsage} />
+                </View>
+              </View>
             </View>
           )}
-          <TextInput
-            ref={input}
-            aria-label={t("placeholder", { name: agent.name })}
-            placeholder={status.online === false ? t("offline") : busy ? t("queued", { name: agent.name }) : t("placeholder", { name: agent.name })}
-            placeholderTextColor={colors.tertiaryLabel}
-            value={text}
-            onChangeText={setText}
-            multiline
-            style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
-          />
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.sm }}>
-            {contextVariant === "pill" ? (
-              <Pressable accessibilityRole="button" onPress={() => setContextOpen(!contextOpen)} style={{ paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.lg, backgroundColor: colors.fill }}>
-                <Text variant="footnote">{t("context.pill", { percent: contextPercent })}</Text>
-              </Pressable>
-            ) : (
+          {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
+          <Card raised style={{ gap: space.xs, padding: space.sm }}>
+            <TextInput
+              ref={input}
+              aria-label={t("placeholder", { name: agent.name })}
+              placeholder={status.online === false ? t("offline") : busy ? t("queued", { name: agent.name }) : t("placeholder", { name: agent.name })}
+              placeholderTextColor={colors.tertiaryLabel}
+              value={text}
+              onChangeText={setText}
+              multiline
+              style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
+            />
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.sm }}>
               <ContextMeter usage={contextUsage} onPress={() => setContextOpen(!contextOpen)} />
-            )}
-            {/* A working Agent with nothing typed offers the brake instead of send (controller-prototype's Composer). */}
-            {busy && !message ? (
-              <Button
-                label={isStopping ? t("stop.stopping") : t("stop.button")}
-                icon="stopped"
-                variant="primary"
-                disabled={status.online === false || !link || isStopping}
-                onPress={() => void stop()}
-              />
-            ) : (
-              <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link} onPress={() => send()} />
-            )}
-          </View>
-        </Card>
-        <Modal transparent visible={contextVariant === "sheet" && contextOpen && contextUsage !== null} animationType="slide" onRequestClose={() => setContextOpen(false)}>
-          <Pressable style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.25)" }} onPress={() => setContextOpen(false)}>
-            <Pressable onPress={() => undefined} style={{ padding: space.lg, paddingBottom: space.lg + insets.bottom }}>
-              <Card>
-                <Label icon="info">{t("context.title")}</Label>
-                {contextUsage && <ContextDetails usage={contextUsage} />}
-                <Button label={t("context.close")} onPress={() => setContextOpen(false)} />
-              </Card>
-            </Pressable>
-          </Pressable>
-        </Modal>
+              {/* A working Agent with nothing typed offers the brake instead of send (controller-prototype's Composer). */}
+              {busy && !message ? (
+                <Button
+                  label={isStopping ? t("stop.stopping") : t("stop.button")}
+                  icon="stopped"
+                  variant="primary"
+                  disabled={status.online === false || !link || isStopping}
+                  onPress={() => void stop()}
+                />
+              ) : (
+                <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link} onPress={() => send()} />
+              )}
+            </View>
+          </Card>
+        </View>
         {status.stopError && (
           <View style={{ paddingTop: space.xs }}>
             <Problem code={status.stopError} />
