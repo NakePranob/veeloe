@@ -4,5 +4,12 @@ dist/
 *.bun-build
 .DS_Store
 
+# Rust build output (cargo writes target/ beside every manifest)
+target/
+
+# QA screenshots and the working notes a session keeps; not part of the product
+media/
+memory/
+
 # Worktrees that Claude Code agents work in
 .claude/worktrees/
