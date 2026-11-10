@@ -33,17 +33,20 @@ bun run test
 ```
 
 `check` runs the type check and Steiger on the Controller and its prototype
-(ADR 0022), and checks that the Controller's Thai and English words match
-(ADR 0065). `check` also type-checks `packages/` and `e2e/`, runs
-dependency-cruiser on the Runtime (ADR 0022) and `go-scaffold check` on the Hub.
-`test` runs the unit tests of `packages/`, the Controller and its prototype.
+(ADR 0022), checks that the Controller's Thai and English words match
+(ADR 0065), runs the Rust Runtime's `cargo test --workspace`, checks the Protocol
+against its vectors on both sides (`check:protocol`: Rust, TypeScript fixtures
+and the Hub's copy) and runs `go-scaffold check` on the Hub. `test` runs the
+unit tests of `packages/protocol-ts`, the Controller and its prototype; the Rust
+crates are tested by `check`, one test at a time (`--test-threads=1`): they start
+real supervisor, Hub and worker processes, and parallel runs flaked on timing.
 CI runs both, plus `go test -race ./...` in `hub/` and `bun run test:e2e`, which
 sends signed envelopes through a real relay, runs the compiled `veeloe` against a
 stand-in Provider, and needs Go. `veeloe` runs every Agent's worker in the OS
 sandbox (ADR 0008): nothing to install on macOS, and on Linux it needs
 `bubblewrap`, `socat` and `ripgrep`, with unprivileged user namespaces allowed
 (`sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` on Ubuntu
-24.04), for `test:e2e` and for the Runtime's own binary test in `test`. Its
+24.04), for `test:e2e` and for the Runtime's own binary tests in `check`. Its
 sandbox e2e also reaches `example.com`, so it needs the internet. The e2e's Pairing test also
 needs a migrated Postgres in `TEST_DB_DSN`, and skips without one unless
 `REQUIRE_TEST_DB` is set, as it is in CI.

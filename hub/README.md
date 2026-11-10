@@ -82,6 +82,13 @@ go mod tidy
 make run                           # needs `make migrate-up` first — the schema is the migrations'
 ```
 
+To pair a phone rather than the Simulator, the Hub must be reachable at the URL
+it advertises, because that URL is inside every handshake signature
+(ADR 0013): start it with `HUB_PUBLIC_URL=ws://<this machine's LAN IP>:8080
+make run` (or `wss://…` behind TLS), and give `veeloe pair --hub` the same URL.
+The development default, `ws://localhost:<PORT>`, only works for clients on
+this machine, such as the Simulator.
+
 `make run`/`make test`/`make migrate-up`/`make migrate-down` load `.env` if
 present (copy `.env.example` to `.env` to override defaults — the app itself
 just reads `os.Getenv`, no `.env` parsing at runtime). Point them at another
