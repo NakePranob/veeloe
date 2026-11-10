@@ -21,6 +21,7 @@ reqwest = { version = "0.12", features = ["rustls-tls", "json"], default-feature
 libc.workspace = true
 veeloe-protocol.workspace = true
 serde_json.workspace = true
+sha2 = "0.10"
 veeloe-runtime-core = { path = "../runtime-core" }
 veeloe-runtime-worker = { path = "../runtime-worker" }
 

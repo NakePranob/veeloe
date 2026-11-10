@@ -8,8 +8,18 @@ export const TaskMessageBodySchema = z.looseObject({
   agent,
   id: z.string().min(1).max(64),
   text: z.string().min(1).max(100_000),
+  attachments: z.array(z.looseObject({ name: z.string().min(1).max(200), size: z.number().int().positive(), hash: z.string().min(1).max(128) })).max(10).optional(),
 });
 export type TaskMessageBody = z.infer<typeof TaskMessageBodySchema>;
+
+/** One base64url chunk of a Task attachment (ADR 0050); `file` is the whole file's hash. */
+export const FileChunkBodySchema = z.looseObject({
+  file: z.string().min(1).max(128),
+  index: z.number().int().nonnegative(),
+  total: z.number().int().positive(),
+  data: z.string().min(1),
+});
+export type FileChunkBody = z.infer<typeof FileChunkBodySchema>;
 
 /**
  * Controller → Machine, with the Task's id in the header: stop the Turn running

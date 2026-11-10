@@ -22,6 +22,8 @@
   "queued": "This Turn is running. Your message will wait for it to end.",
   "queuedNote": "Waiting for the running Turn",
   "queuedPosition": "Queued #{{position}} for the running Turn",
+  "attach": "Attach a file",
+  "attachedOnly": "Attached file",
   "compacted": {
     "title": "Context compacted",
     "show": "Show summary",

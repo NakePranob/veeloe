@@ -22,6 +22,8 @@
   "queued": "Turn นี้กำลังทำงาน ข้อความของคุณจะรอจน Turn จบ",
   "queuedNote": "รอ Turn ที่กำลังทำงานอยู่",
   "queuedPosition": "คิว #{{position}} รอ Turn ที่กำลังทำงาน",
+  "attach": "แนบไฟล์",
+  "attachedOnly": "ไฟล์แนบ",
   "compacted": {
     "title": "ย่อ context แล้ว",
     "show": "ดูสรุป",

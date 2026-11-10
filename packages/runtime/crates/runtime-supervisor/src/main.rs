@@ -32,6 +32,7 @@ use veeloe_runtime_supervisor::task_routes::TaskRoutes;
 use veeloe_runtime_supervisor::trust::{
     load_hub_url, load_or_create_machine_key, load_trust, supervisor_dir, Trust,
 };
+use veeloe_runtime_supervisor::uploads::Uploads;
 use veeloe_runtime_supervisor::usage::UsageStore;
 use veeloe_runtime_supervisor::workers::{SupervisorLlm, Workers};
 
@@ -127,6 +128,7 @@ struct Supervisor {
     budgets: Arc<veeloe_runtime_supervisor::usage::Budgets>,
     routes: Arc<TaskRoutes>,
     http: Arc<dyn HttpClient>,
+    uploads: Uploads,
     /// The id the Hub gave this connection (`hub.ready`). Envelopes are addressed
     /// to it, not to the key, so nothing can be verified before it is known.
     machine: Mutex<Option<String>>,
@@ -247,6 +249,7 @@ impl HubLinkSink for Supervisor {
                 workers,
                 routes: Some(me.routes.as_ref()),
                 secret_key: Some(&me.secret_key),
+                uploads: Some(&me.uploads),
                 providers: &providers,
                 egress: &egress,
                 budgets: Some(me.budgets.as_ref()),
@@ -985,6 +988,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         budgets: Arc::clone(&budgets),
         routes: Arc::clone(&routes),
         http: Arc::clone(&http),
+        uploads: Uploads::default(),
         machine: Mutex::new(None),
         outbox: Mutex::new(None),
         workers: OnceLock::new(),

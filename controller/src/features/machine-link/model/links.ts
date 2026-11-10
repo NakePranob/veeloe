@@ -1,4 +1,4 @@
-import { createBackoff, fromBase64url, parseMessage, publicKeyOf, sealFor, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol-ts";
+import { createBackoff, fromBase64url, hashBytes, parseMessage, publicKeyOf, sealFor, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol-ts";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
@@ -333,6 +333,19 @@ export function createMachineLinks({
       return sendTo(machine, "provider", { type: "provider.add", body: { ...provider, key } });
     },
 
+    /** Send one attachment as 256 KiB chunks before its Task message (ADR 0050). */
+    async sendAttachment(machine: Machine, task: string, file: { name: string; uri: string }) {
+      const bytes = new Uint8Array(await (await fetch(file.uri)).arrayBuffer());
+      const hash = hashBytes(bytes);
+      const chunk = 256 * 1024;
+      const total = Math.max(1, Math.ceil(bytes.length / chunk));
+      for (let index = 0; index < total; index += 1) {
+        const data = toBase64url(bytes.slice(index * chunk, (index + 1) * chunk));
+        if (!sendTo(machine, "other", { type: "file.chunk", task, body: { file: hash, index, total, data } })) return null;
+      }
+      return { name: file.name, size: bytes.length, hash };
+    },
+
     /**
      * The Machine's whole new Egress. The page asks for a fresh authentication
      * first (ADR 0012); the Machine answers with `agent.listed`, which is what
@@ -361,12 +374,12 @@ export function createMachineLinks({
       return sendTo(machine, "other", { type: "approval.answer", task, body: { agent, request, decision, ...(message !== undefined && { message }), ...(allowAlways !== undefined && { allowAlways }) } });
     },
 
-    async sendMessage(machine: Machine, { agent, task, text }: { agent: string; task: string; text: string }) {
+    async sendMessage(machine: Machine, { agent, task, text, attachments }: { agent: string; task: string; text: string; attachments?: { name: string; size: number; hash: string }[] }) {
       // A new message means the Member moved on from whatever a Stop said (ADR 0017).
       setStatus(machine.id, { stopError: null });
       const id = newId();
       await addPendingMessage(database, { id, task, agent, machine: machine.id, text });
-      await markPendingSent(database, id, sendTo(machine, "other", { type: "task.message", task, body: { agent, id, text } }));
+      await markPendingSent(database, id, sendTo(machine, "other", { type: "task.message", task, body: { agent, id, text, ...(attachments?.length ? { attachments } : {}) } }));
     },
 
     /**

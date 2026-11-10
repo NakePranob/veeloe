@@ -2,6 +2,7 @@ export const PROTOCOL_VERSION = 1;
 
 export { createBackoff } from "./backoff";
 export { fromBase64url, toBase64url } from "./crypto/base64url";
+export { hashBytes } from "./crypto/hash";
 export { boxPublic, sealFor } from "./sealed";
 export { ProviderAddBodySchema, type ProviderAddBody } from "./messages/provider";
 export { generateSecretKey, publicKeyOf, sign, verifySignature } from "./crypto/ed25519";

@@ -12,6 +12,7 @@ const SYMBOLS = {
   agent: { ios: "cpu", android: "smart_toy", web: "smart_toy" },
   send: { ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" },
   add: { ios: "plus", android: "add", web: "add" },
+  attach: { ios: "paperclip", android: "attach_file", web: "attach_file" },
   disclosure: { ios: "chevron.right", android: "chevron_right", web: "chevron_right" },
   thread: { ios: "rectangle.stack", android: "layers", web: "layers" },
   inbox: { ios: "tray", android: "inbox", web: "inbox" },

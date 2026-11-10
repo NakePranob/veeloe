@@ -138,6 +138,7 @@ pub struct Machine<'a> {
     pub routes: Option<&'a crate::task_routes::TaskRoutes>,
     /// The Machine's Ed25519 seed, only for opening sealed Provider keys.
     pub secret_key: Option<&'a [u8; 32]>,
+    pub uploads: Option<&'a crate::uploads::Uploads>,
     pub providers: &'a [Provider],
     pub egress: &'a [String],
     pub budgets: Option<&'a crate::usage::Budgets>,
@@ -207,6 +208,29 @@ pub async fn dispatch(
             crate::tasks::agents_listed(registry, &models, machine.egress),
             None,
         );
+        return;
+    }
+    if type_ == "file.chunk" {
+        let Some(uploads) = machine.uploads else {
+            return outbox.error(from, "attachment.unavailable");
+        };
+        let (Some(file), Some(index), Some(total), Some(data)) = (
+            body.get("file").and_then(Value::as_str),
+            body.get("index").and_then(Value::as_u64),
+            body.get("total").and_then(Value::as_u64),
+            body.get("data").and_then(Value::as_str),
+        ) else {
+            return outbox.error(from, "attachment.invalid");
+        };
+        let Ok(bytes) = veeloe_protocol::base64url::from_base64url(data) else {
+            return outbox.error(from, "attachment.invalid");
+        };
+        if uploads
+            .add(file, index as usize, total as usize, &bytes)
+            .is_err()
+        {
+            return outbox.error(from, "attachment.invalid");
+        }
         return;
     }
     if type_ == "machine.status" {
@@ -429,13 +453,47 @@ pub async fn dispatch(
             ) else {
                 return outbox.error(from, "task.unknown");
             };
+            let mut text = text.to_string();
+            if let Some(attachments) = body.get("attachments").and_then(Value::as_array) {
+                let Some(uploads) = machine.uploads else {
+                    return outbox.error(from, "attachment.unavailable");
+                };
+                let workdir = match crate::agents::agent_dir(registry.home(), &agent.id) {
+                    Ok(dir) => dir.join("workdir"),
+                    Err(_) => return outbox.error(from, "agent.unavailable"),
+                };
+                let mut lines = Vec::new();
+                for attachment in attachments {
+                    let (Some(name), Some(size), Some(hash)) = (
+                        attachment.get("name").and_then(Value::as_str),
+                        attachment.get("size").and_then(Value::as_u64),
+                        attachment.get("hash").and_then(Value::as_str),
+                    ) else {
+                        return outbox.error(from, "attachment.invalid");
+                    };
+                    let Some(bytes) = uploads.take(hash) else {
+                        return outbox.error(from, "attachment.missing");
+                    };
+                    if bytes.len() as u64 != size {
+                        return outbox.error(from, "attachment.invalid");
+                    }
+                    let Ok(path) = uploads.place(&bytes, &workdir, &task, name) else {
+                        return outbox.error(from, "attachment.invalid");
+                    };
+                    lines.push(format!("- {} ({})", name, path.display()));
+                }
+                if !lines.is_empty() {
+                    text.push_str("\n\nAttached files on this Machine:\n");
+                    text.push_str(&lines.join("\n"));
+                }
+            }
             let sent = workers.send(
                 &agent.id,
                 ToWorker::Message {
                     task: task.clone(),
                     id: id.to_string(),
                     member: from.member.clone(),
-                    text: text.to_string(),
+                    text,
                     reference: from.reference.clone(),
                 },
             );

@@ -11,6 +11,7 @@ pub mod pair;
 pub mod proxy;
 pub mod service;
 pub mod tasks;
+pub mod uploads;
 pub mod task_routes;
 pub mod trust;
 pub mod usage;

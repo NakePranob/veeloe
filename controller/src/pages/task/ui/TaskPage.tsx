@@ -1,4 +1,5 @@
 import { randomUUID } from "expo-crypto";
+import * as DocumentPicker from "expo-document-picker";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,7 +10,7 @@ import { useMachineLink, useMachineStatus } from "../../../features/machine-link
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Button, Card, column, confirm, HeaderAction, Label, radius, space, Text, type, useColors } from "../../../shared/ui";
+import { Button, Card, column, confirm, HeaderAction, Icon, Label, radius, space, Text, type, useColors } from "../../../shared/ui";
 import { contextUsageOf, items, type Item } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
@@ -125,6 +126,7 @@ export function TaskPage() {
   // Set when the Stop went out, so the brake can say it is working on it until the Turn ends.
   const [stopAsked, setStopAsked] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
+  const [attachments, setAttachments] = useState<{ name: string; uri: string }[]>([]);
   const now = useNow();
   const input = useRef<TextInputInstance>(null);
   const scroll = useRef<ScrollViewInstance>(null);
@@ -142,11 +144,24 @@ export function TaskPage() {
   if (stopAsked && (!busy || status.stopError)) setStopAsked(false);
   const isStopping = stopAsked && busy && !status.stopError;
 
-  function send(text = message) {
-    if (!text || !link || !machine || !agent) return;
+  async function send(text = message) {
+    if ((!text && attachments.length === 0) || !link || !machine || !agent) return;
+    const files = attachments;
     Keyboard.dismiss();
     setText("");
-    void link.sendMessage(machine, { agent: agent.id, task, text });
+    setAttachments([]);
+    const sent = [];
+    for (const file of files) {
+      const attachment = await link.sendAttachment(machine, task, file);
+      if (attachment) sent.push(attachment);
+    }
+    void link.sendMessage(machine, { agent: agent.id, task, text: text || t("attachedOnly"), attachments: sent });
+  }
+
+  async function attach() {
+    const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true, multiple: false });
+    const asset = result.assets?.[0];
+    if (asset) setAttachments((current) => [...current, { name: asset.name, uri: asset.uri }]);
   }
 
   // Stop can cut work off halfway, so it asks first and says what stops (ADR 0017).
@@ -283,6 +298,16 @@ export function TaskPage() {
           )}
           {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
           <Card raised style={{ gap: space.xs, padding: space.sm }}>
+            {attachments.length > 0 && (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
+                {attachments.map((file) => (
+                  <Pressable key={file.uri} accessibilityRole="button" onPress={() => setAttachments(attachments.filter((item) => item.uri !== file.uri))} style={{ flexDirection: "row", alignItems: "center", gap: space.xs, paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.lg, backgroundColor: colors.fill }}>
+                    <Icon name="attach" size="sm" color="secondaryLabel" />
+                    <Text variant="footnote">{file.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
             <TextInput
               ref={input}
               aria-label={t("placeholder", { name: agent.name })}
@@ -294,6 +319,9 @@ export function TaskPage() {
               style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
             />
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.sm }}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t("attach")} hitSlop={8} onPress={() => void attach()}>
+                <Icon name="attach" size="md" color="secondaryLabel" />
+              </Pressable>
               <ContextMeter usage={contextUsage} onPress={() => setContextOpen(!contextOpen)} />
               {/* A working Agent with nothing typed offers the brake instead of send (controller-prototype's Composer). */}
               {busy && !message ? (
@@ -305,7 +333,7 @@ export function TaskPage() {
                   onPress={() => void stop()}
                 />
               ) : (
-                <Button label={t("send")} icon="send" variant="primary" disabled={!message || !link} onPress={() => send()} />
+                <Button label={t("send")} icon="send" variant="primary" disabled={(!message && attachments.length === 0) || !link} onPress={() => void send()} />
               )}
             </View>
           </Card>
