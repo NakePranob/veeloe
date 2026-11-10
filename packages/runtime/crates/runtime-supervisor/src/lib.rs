@@ -9,6 +9,7 @@ pub mod hub_link;
 pub mod json_file;
 pub mod pair;
 pub mod proxy;
+pub mod service;
 pub mod tasks;
 pub mod task_routes;
 pub mod trust;

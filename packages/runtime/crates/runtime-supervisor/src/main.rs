@@ -22,6 +22,7 @@ use veeloe_runtime_supervisor::llm::{HttpClient, LlmProxy};
 use veeloe_runtime_supervisor::models;
 use veeloe_runtime_supervisor::pair::{run_pair, PairOptions, PairResult};
 use veeloe_runtime_supervisor::providers::{load_providers, upstream_headers};
+use veeloe_runtime_supervisor::service;
 use veeloe_runtime_supervisor::status::{remove_pid_file, run_status, write_pid_file};
 use veeloe_runtime_supervisor::tasks::{
     agents_listed, dispatch, forward, Inbound, Machine, MachineOutbox, Outbox,
@@ -82,6 +83,12 @@ impl From<std::io::Error> for CliError {
             message: error.to_string(),
             code: 1,
         }
+    }
+}
+
+impl From<String> for CliError {
+    fn from(message: String) -> Self {
+        Self { message, code: 1 }
     }
 }
 
@@ -330,6 +337,11 @@ async fn run() -> Result<(), CliError> {
             run_status(&home, &mut |line| println!("{line}"));
             Ok(())
         }
+        Some("service") => match args.get(1).map(String::as_str) {
+            Some("install") => service::install(&home).map_err(CliError::from),
+            Some("uninstall") => service::uninstall(&home).map_err(CliError::from),
+            _ => Err(CliError::usage("not a service command: see veeloe help service")),
+        },
         Some("provider") => {
             match args.get(1).map(String::as_str) {
                 Some("add") | Some("list") | Some("remove") => {

@@ -3,9 +3,9 @@
 //! the Controller's).
 
 pub const USAGE: &str =
-    "usage: veeloe [pair | unpair | status | provider add|list|remove | help <command>]";
+    "usage: veeloe [pair | unpair | status | provider add|list|remove | service install|uninstall | help <command>]";
 
-const COMMANDS: [(&str, &str); 5] = [
+const COMMANDS: [(&str, &str); 6] = [
     (
         "start",
         "veeloe
@@ -54,6 +54,19 @@ veeloe provider remove [<name>] [--yes]
 
   Built-in: anthropic, opencode-go, openrouter",
     ),
+    (
+        "service",
+        "veeloe service install
+veeloe service uninstall
+  Install the Runtime as a user service, so its Agents keep running after the
+  terminal closes or the Machine logs in again.
+
+  veeloe service install             install and start the service
+  veeloe service uninstall           stop it and remove the service file
+
+  macOS uses a LaunchAgent; Linux uses a systemd user unit. The service uses
+  the current VEELOE_HOME and writes its log to runtime/logs/service.log.",
+    ),
 ];
 
 /// The help of one command, or of all of them. `None` for a command there is
@@ -86,7 +99,7 @@ mod tests {
     fn all_of_them_names_every_command_and_points_at_one_command_help() {
         let all = help_for(None).expect("all");
         assert!(all.starts_with("Veeloe Runtime: your Agents, on this Machine."));
-        for command in ["start", "pair", "unpair", "status", "provider"] {
+        for command in ["start", "pair", "unpair", "status", "provider", "service"] {
             assert!(help_for(Some(command)).is_some(), "{command}");
         }
         assert!(all.ends_with("More on one command: veeloe help <command>"));
