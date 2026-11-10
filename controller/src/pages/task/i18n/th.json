@@ -21,6 +21,7 @@
   "busy": "ส่งได้เมื่อ Turn นี้จบ",
   "queued": "Turn นี้กำลังทำงาน ข้อความของคุณจะรอจน Turn จบ",
   "queuedNote": "รอ Turn ที่กำลังทำงานอยู่",
+  "queuedPosition": "คิว #{{position}} รอ Turn ที่กำลังทำงาน",
   "compacted": {
     "title": "ย่อ context แล้ว",
     "show": "ดูสรุป",

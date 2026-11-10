@@ -236,7 +236,7 @@ export function TaskPage() {
             <Problem key={item.key} code={item.code} />
           ),
         )}
-        {pending.map((p) => (
+        {pending.map((p, index) => (
           <Bubble
             key={p.id}
             text={p.text}
@@ -252,7 +252,7 @@ export function TaskPage() {
                 </View>
               ) : (
                 <Label icon="time" variant="caption">
-                  {busy ? t("queuedNote") : t("sending")}
+                  {busy ? t("queuedPosition", { position: index + 1 }) : t("sending")}
                 </Label>
               )
             }

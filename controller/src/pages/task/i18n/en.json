@@ -21,6 +21,7 @@
   "busy": "You can send once this Turn ends",
   "queued": "This Turn is running. Your message will wait for it to end.",
   "queuedNote": "Waiting for the running Turn",
+  "queuedPosition": "Queued #{{position}} for the running Turn",
   "compacted": {
     "title": "Context compacted",
     "show": "Show summary",
