@@ -64,9 +64,10 @@ export function ProviderModelSections({
       {models.length > 0 && (
         <Section title="model">
           {models.length > 8 && <Field label={t("modelFilter")} value={filter} onChangeText={setFilter} mono />}
-          {matching.map((m) => (
-            <Row key={m.id} title={m.name ?? m.id} detail={m.name ? m.id : undefined} onPress={() => onModel(m.id)} accessory={m.id === model ? tick : undefined} />
-          ))}
+          {matching.map((m) => {
+            const context = m.contextWindow ? t("context", { count: Math.round(m.contextWindow / 1000) }) : undefined;
+            return <Row key={m.id} title={m.name ?? m.id} detail={[m.name ? m.id : null, context].filter(Boolean).join(" · ") || undefined} onPress={() => onModel(m.id)} accessory={m.id === model ? tick : undefined} />;
+          })}
           {matching.length === 0 && <Row title={t("noMatch")} />}
         </Section>
       )}

@@ -30,6 +30,7 @@
   },
   "modelFilter": "Search models",
   "noMatch": "No model matches",
+  "context": "{{count}}K context",
   "creating": "Creating on the Machine",
   "budget": {
     "heading": "Today's Budget",

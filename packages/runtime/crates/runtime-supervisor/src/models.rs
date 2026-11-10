@@ -103,10 +103,14 @@ pub async fn list_models(
                 .get("display_name")
                 .and_then(Value::as_str)
                 .or_else(|| entry.get("name").and_then(Value::as_str));
-            models.push(match name {
+            let mut model = match name {
                 Some(name) => json!({ "id": id, "name": name }),
                 None => json!({ "id": id }),
-            });
+            };
+            if let Some(context) = context_of(entry) {
+                model["contextWindow"] = json!(context);
+            }
+            models.push(model);
         }
         // Another page only when the Provider says so and names where it goes
         // on; a cursor that does not move stops the walk.
@@ -122,6 +126,38 @@ pub async fn list_models(
     Ok(models)
 }
 
+/// Providers disagree on the field name for a model's input window. Read the
+/// common ones; a model with none is shown without a number and compaction
+/// falls back to its documented 128K.
+fn context_of(entry: &Value) -> Option<u64> {
+    const FIELDS: [&str; 5] = [
+        "context_window",
+        "context_length",
+        "max_context_length",
+        "max_input_tokens",
+        "input_token_limit",
+    ];
+    for field in FIELDS {
+        if let Some(value) = entry.get(field) {
+            if let Some(number) = value.as_u64().filter(|number| *number > 0) {
+                return Some(number);
+            }
+            if let Some(number) = value
+                .as_str()
+                .and_then(|text| text.parse::<u64>().ok())
+                .filter(|number| *number > 0)
+            {
+                return Some(number);
+            }
+        }
+    }
+    entry
+        .get("top_provider")
+        .and_then(|provider| provider.get("context_length"))
+        .and_then(Value::as_u64)
+        .filter(|number| *number > 0)
+}
+
 /// Percent-encodes what a Provider may hand back as a cursor.
 fn encode(text: &str) -> String {
     let mut encoded = String::with_capacity(text.len());
@@ -134,4 +170,17 @@ fn encode(text: &str) -> String {
         }
     }
     encoded
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn context_comes_from_common_provider_fields() {
+        assert_eq!(context_of(&json!({ "context_length": 200000 })), Some(200000));
+        assert_eq!(context_of(&json!({ "max_input_tokens": "128000" })), Some(128000));
+        assert_eq!(context_of(&json!({ "top_provider": { "context_length": 64000 } })), Some(64000));
+        assert_eq!(context_of(&json!({ "id": "unknown" })), None);
+    }
 }

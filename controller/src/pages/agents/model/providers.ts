@@ -1,6 +1,6 @@
 import type { ProviderInfo } from "@veeloe/protocol-ts";
 
-export type Model = { id: string; name?: string };
+export type Model = { id: string; name?: string; contextWindow?: number };
 
 // The schemas are loose (ADR 0023), so `in` alone does not narrow them.
 export const modelsOf = (p: unknown): Model[] => (Array.isArray((p as { models?: unknown } | undefined)?.models) ? (p as { models: Model[] }).models : []);

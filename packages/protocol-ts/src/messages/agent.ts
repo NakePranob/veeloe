@@ -89,7 +89,7 @@ export type MachineStatusBody = z.infer<typeof MachineStatusBodySchema>;
 
 /** A Provider by name, never its URL or key: the models it offers, or why it could not say. */
 const ProviderSchema = z.union([
-  z.looseObject({ name: z.string().min(1), models: z.array(z.looseObject({ id: z.string().min(1), name: z.string().optional() })) }),
+  z.looseObject({ name: z.string().min(1), models: z.array(z.looseObject({ id: z.string().min(1), name: z.string().optional(), contextWindow: z.number().int().positive().optional() })) }),
   z.looseObject({ name: z.string().min(1), error: z.string().min(1) }),
 ]);
 export type ProviderInfo = z.infer<typeof ProviderSchema>;

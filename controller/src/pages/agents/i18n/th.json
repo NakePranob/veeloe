@@ -30,6 +30,7 @@
   },
   "modelFilter": "ค้นหา model",
   "noMatch": "ไม่มี model ที่ตรง",
+  "context": "context {{count}}K",
   "creating": "กำลังสร้างบน Machine",
   "budget": {
     "heading": "Budget วันนี้",

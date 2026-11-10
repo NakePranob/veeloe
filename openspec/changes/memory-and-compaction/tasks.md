@@ -7,6 +7,7 @@
 
 ## 2. Compaction
 
+- [x] 2.5 อ่าน context window จาก Provider model list และแสดงใน model picker; ไม่มีใช้ 128K fallback
 - [ ] 2.1 นับ token ของ conversation และย่อเมื่อถึง 70% ของ context
 - [ ] 2.2 เรียก LLM สรุปทั้งก้อนพร้อม prompt ที่บอกเป้าหมาย/ไฟล์ที่แก้/งานค้าง
 - [ ] 2.3 เก็บ summary เป็น event ใหม่และใช้กับ request ถัดไป

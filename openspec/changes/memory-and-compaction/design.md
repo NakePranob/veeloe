@@ -30,6 +30,14 @@
 
 **Why:** Compaction ต้องเรียก LLM สรุปและจัดการ tool round; เป็นงานแยกที่ต้องทดสอบกับ Provider จริง
 
+### 5. Context window มาจาก Provider model list ก่อน
+
+**Decision:** อ่าน `context_window`, `context_length`, `max_context_length`, `max_input_tokens`, `input_token_limit` หรือ `top_provider.context_length` จาก model list; ถ้าไม่มีใช้ 128K และแสดงว่าเป็นค่าประมาณ
+
+**Why:** Provider ไม่มีมาตรฐานเดียวกัน; การเดาจากชื่อ model เปราะและล้าสมัย
+
+**Open:** Owner override ต่อ model ในหน้า Provider (งานถัดไป)
+
 ## Risks
 
 - Memory อาจมีคำสั่งที่ถูกวางยา; file tools และหน้า Task แสดงการแก้ไข แต่ยังไม่มี UI อ่าน Memory
