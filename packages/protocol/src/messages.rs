@@ -8,6 +8,7 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
     let valid = match type_ {
         "agent.create" => object.map(is_agent_create).unwrap_or(false),
         "agent.update" => object.map(is_agent_update).unwrap_or(false),
+        "agent.delete" => object.map(is_agent_delete).unwrap_or(false),
         "agent.list" => object.is_some(),
         "agent.listed" => object.map(is_agent_listed).unwrap_or(false),
         "agent.usage" => object.map(is_agent_usage).unwrap_or(false),
@@ -290,6 +291,10 @@ fn is_provider(value: &Value) -> bool {
         }
     }
     object.contains_key("models") || object.contains_key("error")
+}
+
+fn is_agent_delete(object: &Map<String, Value>) -> bool {
+    text(object.get("id")).map(is_agent_id).unwrap_or(false)
 }
 
 fn is_agent_listed(object: &Map<String, Value>) -> bool {

@@ -124,6 +124,15 @@ impl TaskRoutes {
         Ok(())
     }
 
+    /// Drop every Task line of one Agent. The Task history itself is not here.
+    pub fn forget(&self, agent: &str) -> Result<(), TaskRoutesError> {
+        let mut pins = self.pins.lock().expect("task routes");
+        if pins.remove(agent).is_some() {
+            write_json_file(&self.file, &Self::to_value(&pins))?;
+        }
+        Ok(())
+    }
+
     fn to_value(pins: &Pins) -> Value {
         let mut agents = serde_json::Map::new();
         for (agent, tasks) in pins {

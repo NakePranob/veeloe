@@ -16,11 +16,13 @@ export type MachineStatus = {
   createError: string | null;
   /** The code the last `agent.update` came back with, if it failed. */
   updateError: string | null;
+  /** The code the last `agent.delete` came back with, if it failed. */
+  deleteError: string | null;
   /** The code the last `task.stop` came back with, if it failed (`stop-and-restart`). */
   stopError: string | null;
 };
 
-const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, stopError: null };
+const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null };
 
 /** One page's usage request for one Machine: what it asked for, and how it went. */
 export type UsageStatus = {
@@ -42,7 +44,7 @@ const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, 
 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "stop" | "hello" | "usage" | "other";
+type Kind = "create" | "update" | "delete" | "stop" | "hello" | "usage" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -163,6 +165,7 @@ export function createMachineLinks({
       const about = sentTo.get(message.body.ref);
       if (about?.kind === "create") setStatus(machine.id, { createError: message.body.code });
       else if (about?.kind === "update") setStatus(machine.id, { updateError: message.body.code });
+      else if (about?.kind === "delete") setStatus(machine.id, { deleteError: message.body.code });
       else if (about?.kind === "stop") setStatus(machine.id, { stopError: message.body.code });
       else if (about?.kind === "usage") {
         const current = usageStatuses.get(about.machine);
@@ -219,6 +222,7 @@ export function createMachineLinks({
         }
         if (about.kind === "create") setStatus(about.machine, { createError: error.code });
         else if (about.kind === "update") setStatus(about.machine, { updateError: error.code });
+        else if (about.kind === "delete") setStatus(about.machine, { deleteError: error.code });
         else if (about.kind === "stop") setStatus(about.machine, { stopError: error.code });
         else void failPendingMessage(database, error.ref!, error.code);
       },
@@ -291,6 +295,12 @@ export function createMachineLinks({
     updateAgent(machine: Machine, body: AgentUpdateBody) {
       setStatus(machine.id, { updateError: null });
       return sendTo(machine, "update", { type: "agent.update", body });
+    },
+
+    /** Remove an Agent. The Machine answers with `agent.listed`; the local row goes then. */
+    deleteAgent(machine: Machine, id: string) {
+      setStatus(machine.id, { deleteError: null });
+      return sendTo(machine, "delete", { type: "agent.delete", body: { id } });
     },
 
     /**

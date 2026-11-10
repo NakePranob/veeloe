@@ -49,6 +49,10 @@ export const AgentUpdateBodySchema = z
   .refine((b) => b.provider === undefined || b.model !== undefined, "a provider needs its model");
 export type AgentUpdateBody = z.infer<typeof AgentUpdateBodySchema>;
 
+/** Controller → Machine: remove an Agent. Its Workdir and Task history stay. */
+export const AgentDeleteBodySchema = z.looseObject({ id });
+export type AgentDeleteBody = z.infer<typeof AgentDeleteBodySchema>;
+
 /** Controller → Machine: what is on this Machine. */
 export const AgentListBodySchema = z.looseObject({});
 

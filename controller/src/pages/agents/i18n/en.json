@@ -76,5 +76,13 @@
     "provider": "Provider {{provider}} is no longer on the Machine, so this Agent can't answer. Pick a new Provider below.",
     "model": "Provider {{provider}} no longer lists model {{model}}. Pick a new model below.",
     "choose": "Pick a new Provider"
+  },
+  "delete": {
+    "action": "Delete this Agent",
+    "title": "Delete {{name}}?",
+    "body": "The Agent stops and disappears from this list. Its Workdir and Task history stay on the Machine, but it will not answer again.",
+    "cancel": "Cancel",
+    "prompt": "Delete {{name}}",
+    "failed": "Couldn't delete this Agent"
   }
 }

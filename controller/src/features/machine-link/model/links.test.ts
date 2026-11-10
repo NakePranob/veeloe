@@ -153,6 +153,18 @@ test("a change to an Agent goes signed with only its fields, and the Machine's e
   expect(links.updateAgent(machine, { id: "a1", name: "C" })).toBeNull();
 });
 
+test("deleting an Agent goes signed as agent.delete and its error is kept separately", async () => {
+  const { fake, links, machine } = await setup();
+  const sig = links.deleteAgent(machine, "a1");
+  await until(() => fake.hub.frames.length === 3);
+  const sent = fake.hub.frames.at(-1)!;
+  expect(sent.sig).toBe(sig!);
+  expect(JSON.parse(sent.signed)).toMatchObject({ type: "agent.delete", to: "machine-1", member, body: { id: "a1" } });
+  fake.push(signed("error", { code: "agent.unknown", ref: sent.sig }, { seq: 4 }));
+  await until(() => links.status("machine-1").deleteError === "agent.unknown");
+  expect(links.status("machine-1").updateError).toBeNull();
+});
+
 test("after a dropped connection it asks for each Task's events after the last one kept", async () => {
   const { database, fake } = await setup();
   fake.push(signed("task.event", { agent: "a1", seq: 1, kind: "member.message", at: 1, body: {} }, { seq: 2, task: "t1" }));

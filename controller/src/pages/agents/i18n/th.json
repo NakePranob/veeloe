@@ -76,5 +76,13 @@
     "provider": "Provider {{provider}} ไม่อยู่บน Machine แล้ว Agent นี้จึงตอบไม่ได้ เลือก Provider ใหม่ด้านล่าง",
     "model": "Provider {{provider}} ไม่มี model {{model}} ในรายชื่อแล้ว เลือก model ใหม่ด้านล่าง",
     "choose": "เลือก Provider ใหม่"
+  },
+  "delete": {
+    "action": "ลบ Agent นี้",
+    "title": "ลบ {{name}}?",
+    "body": "Agent จะหยุดและหายจากรายการนี้ Workdir กับประวัติ Task ยังอยู่บน Machine แต่ Agent จะไม่ตอบอีก",
+    "cancel": "ยกเลิก",
+    "prompt": "ลบ {{name}}",
+    "failed": "ลบ Agent นี้ไม่สำเร็จ"
   }
 }

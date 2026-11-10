@@ -9,8 +9,9 @@ import { useMachines } from "../../../entities/machine";
 import { previewOf, statusOf, useTaskSummaries } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
+import { keySession } from "../../../shared/keystore";
 import { formatTokens, useNow, when } from "../../../shared/lib";
-import { Empty, Field, Icon, Meter, Note, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
+import { confirm, Empty, Field, Icon, inform, Meter, Note, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
 import { providerProblem } from "../model/providers";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
@@ -76,6 +77,16 @@ function AgentView({ agent }: { agent: AgentRow }) {
     // A Budget that did not change is not sent, so a rename alone stays a rename; both go in one envelope when both change.
     if (!link.updateAgent(machine, { id: agent.id, name: next, ...(budget !== undefined && { budget }) })) return setNotSent(true);
     setSent({ name: next, ...(budget !== undefined && { budget }) });
+  }
+
+  async function remove() {
+    if (!link || !machine || offline) return inform(t("delete.failed"), t("needsOnline"));
+    if (!(await confirm({ title: t("delete.title", { name: agent.name }), message: t("delete.body"), action: t("delete.action"), cancel: t("delete.cancel", { name: agent.name }), destructive: true }))) return;
+    let sig: string | null = null;
+    await keySession.withFreshAuthentication(t("delete.prompt", { name: agent.name }), async () => {
+      sig = link.deleteAgent(machine, agent.id);
+    });
+    if (!sig) inform(t("delete.failed"), t("needsOnline"));
   }
 
   return (
@@ -156,6 +167,14 @@ function AgentView({ agent }: { agent: AgentRow }) {
           {describeError({ code: machineStatus.updateError })}
         </Note>
       )}
+      {machineStatus.deleteError && (
+        <Note icon="warning" iconColor="orange">
+          {describeError({ code: machineStatus.deleteError })}
+        </Note>
+      )}
+      <Section title={t("delete.action")} footer={t("delete.body", { name: agent.name })}>
+        <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} />
+      </Section>
     </Screen>
   );
 }

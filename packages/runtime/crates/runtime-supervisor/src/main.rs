@@ -124,6 +124,7 @@ struct Supervisor {
     /// can be handled after `on_envelope` has returned.
     me: Weak<Supervisor>,
     budgets: Arc<veeloe_runtime_supervisor::usage::Budgets>,
+    routes: Arc<TaskRoutes>,
     http: Arc<dyn HttpClient>,
     /// The id the Hub gave this connection (`hub.ready`). Envelopes are addressed
     /// to it, not to the key, so nothing can be verified before it is known.
@@ -242,6 +243,7 @@ impl HubLinkSink for Supervisor {
             let machine = Machine {
                 registry: &me.registry,
                 workers,
+                routes: Some(me.routes.as_ref()),
                 providers: &providers,
                 egress: &egress,
                 budgets: Some(me.budgets.as_ref()),
@@ -976,6 +978,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         seen: Mutex::new(MemorySeen::default()),
         me: me.clone(),
         budgets: Arc::clone(&budgets),
+        routes: Arc::clone(&routes),
         http: Arc::clone(&http),
         machine: Mutex::new(None),
         outbox: Mutex::new(None),

@@ -95,3 +95,11 @@ test("allowlistOf reads null as unknown and broken JSON as empty", async () => {
   expect(allowlistOf({ allowlist: "nope{" })).toEqual([]);
   expect(allowlistOf({ allowlist: JSON.stringify([1]) })).toEqual([]);
 });
+
+test("an Agent the Machine no longer lists is removed here, while another Machine's Agent stays", async () => {
+  await saveAgents(database, "machine-1", [agent, { ...agent, id: "a2", name: "B" }]);
+  await saveAgents(database, "machine-2", [{ ...agent, id: "a3", name: "C" }]);
+  await saveAgents(database, "machine-1", [{ ...agent, id: "a2", name: "B" }]);
+  const ids = (await database.query<{ id: string; machine_id: string }>("SELECT id, machine_id FROM agent ORDER BY id")).map((row) => `${row.machine_id}:${row.id}`);
+  expect(ids).toEqual(["machine-1:a2", "machine-2:a3"]);
+});

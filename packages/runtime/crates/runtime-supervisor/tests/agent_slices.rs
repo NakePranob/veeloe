@@ -117,6 +117,7 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
     let machine = Machine {
         registry: &registry,
         workers: &workers,
+        routes: None,
         providers: &providers,
         egress: &[],
         budgets: None,
@@ -180,4 +181,50 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
     );
 
     workers.stop_all();
+}
+
+#[tokio::test]
+async fn an_agent_can_be_deleted_while_its_workdir_stays() {
+    use veeloe_runtime_supervisor::agents::{agent_dir, Agent};
+
+    let home = tempdir().expect("home");
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    let workers = Workers::new(
+        home.path().to_path_buf(),
+        vec!["/bin/true".into()],
+        Arc::new(Silent) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent: &str, _message: FromWorker| {}),
+        Arc::new(|_line: &str| {}),
+        Arc::new(|_agent, command| command),
+    );
+    let agent = Agent {
+        id: "a1".into(),
+        name: "Deployer".into(),
+        provider: "main".into(),
+        model: "model-a".into(),
+        character: None,
+        allowlist: Vec::new(),
+        approval_timeout_s: 3_600,
+        budget: None,
+    };
+    registry.add(&agent).expect("add");
+    let dir = agent_dir(home.path(), "a1").expect("workdir");
+    let outbox = Recording::default();
+    let providers = providers();
+    let http = Models;
+    let machine = Machine {
+        registry: &registry,
+        workers: &workers,
+        routes: None,
+        providers: &providers,
+        egress: &[],
+        budgets: None,
+        http: &http,
+    };
+    dispatch(&machine, &outbox, &from(), "agent.delete", &json!({ "id": "a1" })).await;
+    assert!(registry.get("a1").expect("registry").is_none());
+    assert!(dir.exists());
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "agent.listed");
+    assert_eq!(body["agents"], json!([]));
 }

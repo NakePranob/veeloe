@@ -121,6 +121,7 @@ impl HubLinkSink for Slice {
             let machine = Machine {
                 registry: &me.registry,
                 workers: &me.workers,
+                routes: None,
                 providers: &[],
                 egress: &[],
                 budgets: None,

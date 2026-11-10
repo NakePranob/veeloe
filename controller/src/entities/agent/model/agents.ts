@@ -54,8 +54,8 @@ function writeUsage(transaction: WriteTransaction, { agent, day, tokens }: Agent
 }
 
 /**
- * What a Machine said it has. v0.1 never deletes an Agent, so this only adds and
- * updates, and a field the answer did not carry keeps what is kept (`daily-budget`).
+ * What a Machine said it has: add and update, then drop the Agents it no longer
+ * lists for that Machine. A field the answer did not carry keeps what is kept.
  */
 export function saveAgents(database: Database, machineId: string, agents: Agent[]) {
   return database.write([AGENT_TOPIC], async (transaction) => {
@@ -75,6 +75,9 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
       );
       if (agent.usage) await writeUsage(transaction, { agent: agent.id, ...agent.usage });
     }
+    const active = agents.map((agent) => agent.id);
+    if (active.length === 0) await transaction.run("DELETE FROM agent WHERE machine_id = ?", [machineId]);
+    else await transaction.run(`DELETE FROM agent WHERE machine_id = ? AND id NOT IN (${active.map(() => "?").join(", ")})`, [machineId, ...active]);
   });
 }
 

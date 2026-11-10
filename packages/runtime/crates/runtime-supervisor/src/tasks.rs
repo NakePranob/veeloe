@@ -134,6 +134,8 @@ fn agent_of(body: &Value) -> &str {
 pub struct Machine<'a> {
     pub registry: &'a AgentRegistry,
     pub workers: &'a Workers,
+    /// Task Provider/model pins; present in the real supervisor, absent in slices' tests.
+    pub routes: Option<&'a crate::task_routes::TaskRoutes>,
     pub providers: &'a [Provider],
     pub egress: &'a [String],
     pub budgets: Option<&'a crate::usage::Budgets>,
@@ -197,6 +199,24 @@ pub async fn dispatch(
         return;
     }
     if type_ == "agent.list" {
+        outbox.to_member(&from.member, "agent.listed", listed().await, None);
+        return;
+    }
+    if type_ == "agent.delete" {
+        let Some(id) = body.get("id").and_then(Value::as_str) else {
+            return outbox.error(from, "agent.unknown");
+        };
+        if registry.get(id).ok().flatten().is_none() {
+            return outbox.error(from, "agent.unknown");
+        }
+        // Stop the worker first: the registry entry is what starts a new one.
+        workers.stop(id);
+        if registry.remove(id).is_err() {
+            return outbox.error(from, "agent.unknown");
+        }
+        if let Some(routes) = machine.routes {
+            let _ = routes.forget(id);
+        }
         outbox.to_member(&from.member, "agent.listed", listed().await, None);
         return;
     }

@@ -133,6 +133,12 @@ impl Workers {
         );
     }
 
+    /// Drop one Agent's worker. The worker ends when its channel closes; a
+    /// Turn that was running is interrupted, as a stopped process is.
+    pub fn stop(&self, id: &str) {
+        self.inner.running.lock().expect("running").remove(id);
+    }
+
     /// Stops every worker, for good: the supervisor is ending.
     pub fn stop_all(&self) {
         self.inner.stopping.store(true, Ordering::SeqCst);
