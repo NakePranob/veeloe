@@ -24,4 +24,4 @@
 - [x] 4.3 `bun run typecheck`, `check:controller`, `check:protocol`
 - [x] 4.4 QA Android: เลือก `window.xml`, ส่ง, Agent ตอบ และไฟล์อยู่ที่ `workdir/attachments/<task>/`
 - [ ] 4.5 QA ไฟล์ >20 MB และ hash mismatch ผ่าน UI
-- [ ] 4.6 `send_file` กลับ Controller
+- [x] 4.6 `send_file` tool, `file.offered` card, `file.get` และ chunk กลับ Controller (ยังไม่ QA ด้วย model จริง)

@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use regex::RegexBuilder;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 use veeloe_plugin_api::{Cancel, ToolDefinition, ToolError, ToolRunner};
 
@@ -114,6 +115,15 @@ impl FileTools {
                 }),
             });
         }
+        definitions.push(ToolDefinition {
+            name: "send_file".into(),
+            description: "Offers a file from your working folder to the Member as an attachment. Use this for reports, screenshots, or other files they should open. The file must already exist.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": { "path": { "type": "string", "description": "A file inside your working folder." } },
+                "required": ["path"],
+            }),
+        });
         definitions
     }
 }
@@ -132,9 +142,23 @@ impl ToolRunner for FileTools {
             "grep" => grep(&self.workdir, &record),
             "write" if !self.read_only => write(&self.workdir, &record),
             "edit" if !self.read_only => edit(&self.workdir, &record),
+            "send_file" => send_file(&self.workdir, &record),
             other => Err(ToolError::Unknown(other.into())),
         }
     }
+}
+
+fn send_file(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String, ToolError> {
+    let path = text(input, "path")?;
+    let real = resolve_in_workdir(workdir, &path)?;
+    let bytes = fs::read(&real).map_err(|error| ToolError::Failed(error.to_string()))?;
+    let name = real.file_name().and_then(|name| name.to_str()).unwrap_or("file");
+    Ok(json!({
+        "name": name,
+        "size": bytes.len(),
+        "hash": veeloe_protocol::base64url::to_base64url(&Sha256::digest(&bytes)),
+        "path": real.display().to_string(),
+    }).to_string())
 }
 
 fn text(input: &serde_json::Map<String, Value>, name: &str) -> Result<String, ToolError> {

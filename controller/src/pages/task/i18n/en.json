@@ -24,6 +24,11 @@
   "queuedPosition": "Queued #{{position}} for the running Turn",
   "attach": "Attach a file",
   "attachedOnly": "Attached file",
+  "file": {
+    "offered": "File from the Agent",
+    "size": "{{size}} KB",
+    "open": "Open"
+  },
   "compacted": {
     "title": "Context compacted",
     "show": "Show summary",

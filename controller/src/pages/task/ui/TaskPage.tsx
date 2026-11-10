@@ -77,6 +77,20 @@ function ContextDetails({ usage }: { usage: NonNullable<ReturnType<typeof contex
   );
 }
 
+function FileCard({ item, onOpen }: { item: Extract<Item, { kind: "file" }>; onOpen: () => void }) {
+  const t = useT("task");
+  return (
+    <Card>
+      <Label icon="attach">{t("file.offered")}</Label>
+      <Text>{item.name}</Text>
+      <Text variant="footnote" tone="secondary">{t("file.size", { size: Math.max(1, Math.round(item.size / 1024)) })}</Text>
+      <View style={{ flexDirection: "row" }}>
+        <Button label={t("file.open")} variant="primary" onPress={onOpen} />
+      </View>
+    </Card>
+  );
+}
+
 // The one failure with a way out: the Turn stopped because today's token Budget ran out (`daily-budget`).
 function BudgetCard({ machine, agent }: { machine: string; agent: string }) {
   const t = useT("task");
@@ -243,6 +257,8 @@ export function TaskPage() {
             </Label>
           ) : item.kind === "compacted" ? (
             <CompactedCard key={item.key} item={item} />
+          ) : item.kind === "file" ? (
+            <FileCard key={item.key} item={item} onOpen={() => link && machine ? void link.openFile(machine, task, agent.id, item.path, item.hash) : undefined} />
           ) : item.kind === "interrupted" ? (
             <InterruptedCard key={item.key} machine={machine.name} agentName={agent.name} onContinue={() => send(t("interrupted.continueMessage"))} />
           ) : item.code === "budget.exhausted" ? (

@@ -21,6 +21,14 @@ export const FileChunkBodySchema = z.looseObject({
 });
 export type FileChunkBody = z.infer<typeof FileChunkBodySchema>;
 
+/** Controller → Machine: ask for a file the Agent offered in this Task. */
+export const FileGetBodySchema = z.looseObject({
+  agent: z.string().min(1).max(64),
+  path: z.string().min(1).max(4_000),
+  hash: z.string().min(1).max(128),
+});
+export type FileGetBody = z.infer<typeof FileGetBodySchema>;
+
 /**
  * Controller → Machine, with the Task's id in the header: stop the Turn running
  * now (`stop-and-restart`, ADR 0017). `id` makes a resend stop nothing twice.

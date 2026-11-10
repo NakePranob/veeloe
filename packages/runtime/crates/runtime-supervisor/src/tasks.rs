@@ -7,6 +7,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use veeloe_protocol::base64url::to_base64url;
 use veeloe_protocol::crypto::public_key_of;
 use veeloe_protocol::signer::{Outgoing, Signer};
@@ -230,6 +231,54 @@ pub async fn dispatch(
             .is_err()
         {
             return outbox.error(from, "attachment.invalid");
+        }
+        return;
+    }
+    if type_ == "file.get" {
+        let Ok(Some(agent)) = registry.get(agent_of(body)) else {
+            return outbox.error(from, "agent.unknown");
+        };
+        let Some(task) = from.task.as_deref() else {
+            return outbox.error(from, "task.unknown");
+        };
+        let (Some(path), Some(hash)) = (
+            body.get("path").and_then(Value::as_str),
+            body.get("hash").and_then(Value::as_str),
+        ) else {
+            return outbox.error(from, "attachment.invalid");
+        };
+        let Ok(workdir) = crate::agents::agent_dir(registry.home(), &agent.id) else {
+            return outbox.error(from, "agent.unavailable");
+        };
+        let Ok(real) = std::fs::canonicalize(path) else {
+            return outbox.error(from, "attachment.missing");
+        };
+        if !real.starts_with(workdir.join("workdir")) {
+            return outbox.error(from, "attachment.invalid");
+        }
+        let Ok(bytes) = std::fs::read(&real) else {
+            return outbox.error(from, "attachment.missing");
+        };
+        if to_base64url(&Sha256::digest(&bytes)) != hash {
+            return outbox.error(from, "attachment.invalid");
+        }
+        let chunk = 256 * 1024;
+        let total = std::cmp::max(1, bytes.len().div_ceil(chunk));
+        for index in 0..total {
+            let start = index * chunk;
+            let end = std::cmp::min(start + chunk, bytes.len());
+            outbox.to_member(
+                &from.member,
+                "file.chunk",
+                json!({
+                    "file": hash,
+                    "name": real.file_name().and_then(|name| name.to_str()).unwrap_or("file"),
+                    "index": index,
+                    "total": total,
+                    "data": veeloe_protocol::base64url::to_base64url(&bytes[start..end]),
+                }),
+                Some(task),
+            );
         }
         return;
     }

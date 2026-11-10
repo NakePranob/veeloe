@@ -30,7 +30,7 @@ pub const MAX_ROUNDS: usize = 50;
 
 /// The tools that read and write the Workdir: the sandbox holds them, never the
 /// Allowlist (`file-tools`, ADR 0030).
-const FILE_TOOL_NAMES: [&str; 5] = ["read", "write", "edit", "glob", "grep"];
+const FILE_TOOL_NAMES: [&str; 6] = ["read", "write", "edit", "glob", "grep", "send_file"];
 
 /// How long one Approval waits for an answer before it counts as denied
 /// (ADR 0030 proposes an hour).
@@ -623,11 +623,18 @@ async fn run_turn(
                 run_tool(&state, &task, &starter, name, &input, &cancel).await
             };
             match result {
-                Ok(content) => results.push(json!({
-                    "type": "tool_result",
-                    "tool_use_id": id,
-                    "content": content,
-                })),
+                Ok(content) => {
+                    if name == "send_file" {
+                        if let Ok(offered) = serde_json::from_str::<Value>(&content) {
+                            state.append(&task, &starter, "file.offered", offered, None)?;
+                        }
+                    }
+                    results.push(json!({
+                        "type": "tool_result",
+                        "tool_use_id": id,
+                        "content": content,
+                    }))
+                }
                 Err(error) => results.push(json!({
                     "type": "tool_result",
                     "tool_use_id": id,

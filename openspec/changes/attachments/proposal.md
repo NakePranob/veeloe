@@ -23,10 +23,10 @@
 
 ## Non-goals
 
-- `send_file` จาก Agent กลับ Controller
+- `send_file` จาก Agent กลับ Controller (รอบนี้เพิ่ม tool + file card + `file.get`/chunk กลับ)
 - Attachment ใน Channel/Telegram
 - Resume chunk หลังสายหลุด; รอบนี้ส่งใหม่ทั้งไฟล์
-- เปิด PDF/docx ในแอป
+- เปิด PDF/docx ในแอปด้วย native viewer (รอบนี้ใช้ OS เปิดไฟล์)
 
 ## Impact
 

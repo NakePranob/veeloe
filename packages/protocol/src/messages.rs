@@ -15,6 +15,7 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "machine.status" => object.map(is_machine_status).unwrap_or(false),
         "provider.add" => object.map(is_provider_add).unwrap_or(false),
         "file.chunk" => object.map(is_file_chunk).unwrap_or(false),
+        "file.get" => object.map(is_file_get).unwrap_or(false),
         "approval.answer" => object.map(is_approval_answer).unwrap_or(false),
         "task.message" => object.map(is_task_message).unwrap_or(false),
         "task.stop" => object.map(is_task_stop).unwrap_or(false),
@@ -325,6 +326,11 @@ fn is_file_chunk(object: &Map<String, Value>) -> bool {
         && object.get("index").and_then(Value::as_u64).is_some()
         && object.get("total").and_then(Value::as_u64).is_some_and(|total| total > 0)
         && non_empty(object.get("data"))
+}
+
+fn is_file_get(object: &Map<String, Value>) -> bool {
+    text(object.get("path")).is_some_and(|path| !path.is_empty() && path.len() <= 4_000)
+        && text(object.get("hash")).is_some_and(|hash| !hash.is_empty() && hash.len() <= 128)
 }
 
 fn is_agent_listed(object: &Map<String, Value>) -> bool {

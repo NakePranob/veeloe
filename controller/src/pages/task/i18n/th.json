@@ -24,6 +24,11 @@
   "queuedPosition": "คิว #{{position}} รอ Turn ที่กำลังทำงาน",
   "attach": "แนบไฟล์",
   "attachedOnly": "ไฟล์แนบ",
+  "file": {
+    "offered": "ไฟล์จาก Agent",
+    "size": "{{size}} KB",
+    "open": "เปิด"
+  },
   "compacted": {
     "title": "ย่อ context แล้ว",
     "show": "ดูสรุป",

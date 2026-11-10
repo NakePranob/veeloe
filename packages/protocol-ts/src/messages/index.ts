@@ -7,7 +7,7 @@ import { ErrorBodySchema } from "./error";
 import { DeviceHandoffBodySchema, DeviceLinkedBodySchema } from "./linking";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
 import { ProviderAddBodySchema } from "./provider";
-import { FileChunkBodySchema, TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskStopBodySchema, TaskSyncBodySchema } from "./task";
+import { FileChunkBodySchema, FileGetBodySchema, TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskStopBodySchema, TaskSyncBodySchema } from "./task";
 import { UsageGetBodySchema, UsageListedBodySchema } from "./usage";
 
 const known = {
@@ -25,6 +25,7 @@ const known = {
   "approval.answer": ApprovalAnswerBodySchema,
   "task.message": TaskMessageBodySchema,
   "file.chunk": FileChunkBodySchema,
+  "file.get": FileGetBodySchema,
   "task.stop": TaskStopBodySchema,
   "task.event": TaskEventBodySchema,
   "task.sync": TaskSyncBodySchema,

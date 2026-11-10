@@ -1761,9 +1761,11 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tokio",
  "veeloe-plugin-api",
+ "veeloe-protocol",
  "veeloe-runtime-core",
  "walkdir",
 ]

@@ -10,12 +10,14 @@ autobins = false
 async-trait.workspace = true
 veeloe-plugin-api = { path = "../plugin-api" }
 veeloe-runtime-core = { path = "../runtime-core" }
+veeloe-protocol.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 globset.workspace = true
 walkdir.workspace = true
 regex.workspace = true
+sha2 = "0.10"
 libc.workspace = true
 
 [dev-dependencies]

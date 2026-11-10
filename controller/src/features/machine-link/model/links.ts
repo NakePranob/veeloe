@@ -1,4 +1,6 @@
 import { createBackoff, fromBase64url, hashBytes, parseMessage, publicKeyOf, sealFor, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol-ts";
+import * as FileSystem from "expo-file-system/legacy";
+import { Linking } from "react-native";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
@@ -53,6 +55,8 @@ const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
 type Kind = "create" | "update" | "delete" | "stop" | "hello" | "status" | "provider" | "usage" | "other";
+
+const downloads = new Map<string, { total: number; chunks: (string | undefined)[]; name: string }>();
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -137,6 +141,26 @@ export function createMachineLinks({
     const parsed = parseMessage(signed);
     if (parsed.kind !== "message") return;
     const { message } = parsed;
+    if (message.type === "file.chunk") {
+      const body = message.body as { file?: unknown; index?: unknown; total?: unknown; data?: unknown; name?: unknown };
+      if (typeof body.file !== "string" || typeof body.index !== "number" || typeof body.total !== "number" || typeof body.data !== "string") return;
+      const item = downloads.get(body.file) ?? {
+        total: body.total,
+        chunks: new Array<string | undefined>(body.total).fill(undefined),
+        name: typeof body.name === "string" ? body.name : `${body.file.slice(0, 8)}.bin`,
+      };
+      item.chunks[body.index] = body.data;
+      downloads.set(body.file, item);
+      if (item.chunks.length === item.total && item.chunks.every((chunk) => typeof chunk === "string")) {
+        downloads.delete(body.file);
+        const bytes = fromBase64url(item.chunks.join(""));
+        let binary = "";
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        const uri = `${FileSystem.cacheDirectory}${item.name}`;
+        void FileSystem.writeAsStringAsync(uri, btoa(binary), { encoding: FileSystem.EncodingType.Base64 }).then(() => Linking.openURL(uri));
+      }
+      return;
+    }
     if (message.type === "agent.listed") {
       const retry = retries.get(machine.id);
       if (retry) {
@@ -344,6 +368,11 @@ export function createMachineLinks({
         if (!sendTo(machine, "other", { type: "file.chunk", task, body: { file: hash, index, total, data } })) return null;
       }
       return { name: file.name, size: bytes.length, hash };
+    },
+
+    /** Ask for a file the Agent offered; the Machine answers with `file.chunk`. */
+    openFile(machine: Machine, task: string, agent: string, path: string, hash: string) {
+      return sendTo(machine, "other", { type: "file.get", task, body: { agent, path, hash } });
     },
 
     /**

@@ -57,7 +57,8 @@ export type Item =
   /** The worker started again with a Turn still open (ADR 0033). */
   | { key: string; kind: "interrupted"; at: number }
   /** The Runtime summarized older history; the model now sees this summary and what follows. */
-  | { key: string; kind: "compacted"; summary: string; at: number; tokensBefore?: number; tokensAfter?: number };
+  | { key: string; kind: "compacted"; summary: string; at: number; tokensBefore?: number; tokensAfter?: number }
+  | { key: string; kind: "file"; name: string; size: number; hash: string; path: string };
 
 const textOf = (content: unknown) =>
   Array.isArray(content)
@@ -87,7 +88,7 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
   const approvals = new Map<string, { item: Extract<Item, { kind: "approval" }>; index: number }>();
   let open = false;
   for (const event of events) {
-    let body: { text?: string; content?: unknown; reason?: string; code?: string; request?: string; command?: string; parts?: string[]; expiresAt?: number; member?: string; decision?: string; message?: string; summary?: string; tokensBefore?: number; tokensAfter?: number };
+    let body: { text?: string; content?: unknown; reason?: string; code?: string; request?: string; command?: string; parts?: string[]; expiresAt?: number; member?: string; decision?: string; message?: string; summary?: string; tokensBefore?: number; tokensAfter?: number; name?: string; size?: number; hash?: string; path?: string };
     try {
       body = JSON.parse(event.body) ?? {};
     } catch {
@@ -140,6 +141,8 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       out.push({ key, kind: "stopped", member: body.member, at: atOf(event) });
     } else if (event.kind === "turn.interrupted") {
       out.push({ key, kind: "interrupted", at: atOf(event) });
+    } else if (event.kind === "file.offered" && typeof body.name === "string" && typeof body.size === "number" && typeof body.hash === "string" && typeof body.path === "string") {
+      out.push({ key, kind: "file", name: body.name, size: body.size, hash: body.hash, path: body.path });
     } else if (event.kind === "context.compacted" && typeof body.summary === "string") {
       out.push({ key, kind: "compacted", summary: body.summary, at: atOf(event), ...(typeof body.tokensBefore === "number" && { tokensBefore: body.tokensBefore }), ...(typeof body.tokensAfter === "number" && { tokensAfter: body.tokensAfter }) });
     } else if (event.kind === "turn.started") open = true;
