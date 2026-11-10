@@ -2,7 +2,7 @@ import { randomUUID } from "expo-crypto";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { allowlistOf, useAgents } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
 import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
@@ -60,6 +60,22 @@ function CompactedCard({ item }: { item: Extract<Item, { kind: "compacted" }> })
   );
 }
 
+function ContextDetails({ usage }: { usage: NonNullable<ReturnType<typeof contextUsageOf>> }) {
+  const t = useT("task");
+  return (
+    <View style={{ gap: space.xs }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
+        <Text>{t("context.used")}</Text>
+        <Text tone="secondary" style={{ flexShrink: 1, textAlign: "right" }}>{t("context.of", { used: usage.tokens.toLocaleString(), window: usage.window.toLocaleString() })}</Text>
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
+        <Text>{t("context.compactAt")}</Text>
+        <Text tone="secondary">{t("context.threshold", { tokens: usage.threshold.toLocaleString() })}</Text>
+      </View>
+    </View>
+  );
+}
+
 // The one failure with a way out: the Turn stopped because today's token Budget ran out (`daily-budget`).
 function BudgetCard({ machine, agent }: { machine: string; agent: string }) {
   const t = useT("task");
@@ -98,7 +114,7 @@ export function TaskPage() {
   const language = useLanguage();
   const colors = useColors();
   const database = useDatabase();
-  const { task, agent: agentId } = useLocalSearchParams<{ task: string; agent: string }>();
+  const { task, agent: agentId, contextUi } = useLocalSearchParams<{ task: string; agent: string; contextUi?: string }>();
   const agent = useAgents()?.find((a) => a.id === agentId);
   const machine = useMachines()?.find((m) => m.id === agent?.machine_id);
   const status = useMachineStatus(machine?.id ?? "");
@@ -120,6 +136,8 @@ export function TaskPage() {
   const latest = latestOf(events);
   const taskStatus = statusOf(latest, status.online);
   const contextUsage = events ? contextUsageOf(events) : null;
+  const contextVariant = contextUi === "pill" || contextUi === "sheet" ? contextUi : "inline";
+  const contextPercent = contextUsage && contextUsage.window > 0 ? Math.round((contextUsage.tokens / contextUsage.window) * 100) : 0;
   // A Turn is running: the Machine queues a new message until it ends.
   const busy = statusOf(latest, true) === "working";
   // The Turn ended (by the Stop or by itself) or the Machine refused: nothing is stopping any more.
@@ -256,17 +274,10 @@ export function TaskPage() {
       <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }]}>
         {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
         <Card raised style={{ gap: space.xs, padding: space.sm }}>
-          {contextOpen && contextUsage && (
+          {contextOpen && contextUsage && contextVariant !== "sheet" && (
             <View style={{ gap: space.xs, paddingBottom: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }}>
               <Label icon="info">{t("context.title")}</Label>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
-                <Text>{t("context.used")}</Text>
-                <Text tone="secondary" style={{ flexShrink: 1, textAlign: "right" }}>{t("context.of", { used: contextUsage.tokens.toLocaleString(), window: contextUsage.window.toLocaleString() })}</Text>
-              </View>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
-                <Text>{t("context.compactAt")}</Text>
-                <Text tone="secondary">{t("context.threshold", { tokens: contextUsage.threshold.toLocaleString() })}</Text>
-              </View>
+              <ContextDetails usage={contextUsage} />
             </View>
           )}
           <TextInput
@@ -280,7 +291,13 @@ export function TaskPage() {
             style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
           />
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.sm }}>
-            <ContextMeter usage={contextUsage} onPress={() => setContextOpen(!contextOpen)} />
+            {contextVariant === "pill" ? (
+              <Pressable accessibilityRole="button" onPress={() => setContextOpen(!contextOpen)} style={{ paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.lg, backgroundColor: colors.fill }}>
+                <Text variant="footnote">{t("context.pill", { percent: contextPercent })}</Text>
+              </Pressable>
+            ) : (
+              <ContextMeter usage={contextUsage} onPress={() => setContextOpen(!contextOpen)} />
+            )}
             {/* A working Agent with nothing typed offers the brake instead of send (controller-prototype's Composer). */}
             {busy && !message ? (
               <Button
@@ -295,6 +312,17 @@ export function TaskPage() {
             )}
           </View>
         </Card>
+        <Modal transparent visible={contextVariant === "sheet" && contextOpen && contextUsage !== null} animationType="slide" onRequestClose={() => setContextOpen(false)}>
+          <Pressable style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.25)" }} onPress={() => setContextOpen(false)}>
+            <Pressable onPress={() => undefined} style={{ padding: space.lg, paddingBottom: space.lg + insets.bottom }}>
+              <Card>
+                <Label icon="info">{t("context.title")}</Label>
+                {contextUsage && <ContextDetails usage={contextUsage} />}
+                <Button label={t("context.close")} onPress={() => setContextOpen(false)} />
+              </Card>
+            </Pressable>
+          </Pressable>
+        </Modal>
         {status.stopError && (
           <View style={{ paddingTop: space.xs }}>
             <Problem code={status.stopError} />
