@@ -1,4 +1,4 @@
-import type { UsageListedBody } from "@veeloe/protocol";
+import type { UsageListedBody } from "@veeloe/protocol-ts";
 import type { Database } from "../../../shared/db";
 import { shiftDay } from "../../../shared/lib/days";
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "expo-crypto";
-import type { DeviceLink } from "@veeloe/protocol";
+import type { DeviceLink } from "@veeloe/protocol-ts";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useMachines } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";

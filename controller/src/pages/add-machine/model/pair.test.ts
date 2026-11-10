@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { buildPairingLink, createSigner, fromBase64url, handshakeBytes, parsePairingLink, publicKeyOf, toBase64url, verifySignature, type PairingLink } from "@veeloe/protocol";
+import { buildPairingLink, createSigner, fromBase64url, handshakeBytes, parsePairingLink, publicKeyOf, toBase64url, verifySignature, type PairingLink } from "@veeloe/protocol-ts";
 import { createKeySession, type Vault } from "../../../shared/keystore/session";
 import { pairAfterAuthentication, pairMachine } from "./pair";
 

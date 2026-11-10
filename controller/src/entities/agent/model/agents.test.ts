@@ -1,6 +1,6 @@
 import { Database as Sqlite } from "bun:sqlite";
 import { beforeEach, expect, test } from "bun:test";
-import type { Agent } from "@veeloe/protocol";
+import type { Agent } from "@veeloe/protocol-ts";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
 import { allowlistOf, approvalTimeoutOf, saveAgents, saveUsage } from "./agents";

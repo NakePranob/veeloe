@@ -1,4 +1,4 @@
-import type { ProviderInfo } from "@veeloe/protocol";
+import type { ProviderInfo } from "@veeloe/protocol-ts";
 
 export type Model = { id: string; name?: string };
 

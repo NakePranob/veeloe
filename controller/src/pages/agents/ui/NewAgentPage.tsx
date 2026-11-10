@@ -1,4 +1,4 @@
-import { READ_ONLY_ALLOWLIST } from "@veeloe/protocol";
+import { READ_ONLY_ALLOWLIST } from "@veeloe/protocol-ts";
 import { randomUUID } from "expo-crypto";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -38,6 +38,15 @@ export function NewAgentPage() {
   const providers = status?.providers ?? [];
   const chosen = providers.find((p) => p.name === (provider ?? providers[0]?.name));
   const ready = !!machine && !!name.trim() && !!chosen && !!model && modelsOf(chosen).some((m) => m.id === model) && !creating && !!link;
+
+  // The Provider is picked for us (the first one), so its first model is too:
+  // a form that shows a Provider and a model list but leaves Create disabled
+  // with no chosen model reads as broken.
+  useEffect(() => {
+    if (!chosen) return;
+    const models = modelsOf(chosen);
+    if (!models.some((m) => m.id === model)) setModel(models[0]?.id ?? null);
+  }, [chosen, model]);
 
   // Done when the Machine lists the new Agent; its first Task opens in place of this page, as in the prototype.
   useEffect(() => {

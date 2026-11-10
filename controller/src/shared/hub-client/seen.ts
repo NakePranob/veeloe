@@ -1,4 +1,4 @@
-import type { SeenSequences } from "@veeloe/protocol";
+import type { SeenSequences } from "@veeloe/protocol-ts";
 import type { Database } from "../db";
 
 /**

@@ -1,5 +1,5 @@
 import "./polyfill";
-import { generateSecretKey } from "@veeloe/protocol";
+import { generateSecretKey } from "@veeloe/protocol-ts";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import { createKeySession } from "./session";

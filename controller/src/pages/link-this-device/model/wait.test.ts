@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { buildLinkingLink, checkLinkRequestProof, createSigner, fromBase64url, handshakeBytes, linkingProof, publicKeyOf, toBase64url, verifySignature, type Envelope, type LinkingLink } from "@veeloe/protocol";
+import { buildLinkingLink, checkLinkRequestProof, createSigner, fromBase64url, handshakeBytes, linkingProof, publicKeyOf, toBase64url, verifySignature, type Envelope, type LinkingLink } from "@veeloe/protocol-ts";
 import { readLink, sendLinkRequest, waitForHandoff } from "./wait";
 
 // TEST-ONLY KEYS.

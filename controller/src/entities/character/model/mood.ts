@@ -1,4 +1,4 @@
-import { TaskEventKind } from "@veeloe/protocol";
+import { TaskEventKind } from "@veeloe/protocol-ts";
 
 // How the Agent's Character carries itself (CONTEXT.md): it follows the events, the LLM never picks it.
 // The prototype's six: it raises a hand while it waits on a person (`approval-and-allowlist`).

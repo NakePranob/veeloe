@@ -1,6 +1,6 @@
-import { parsePairingLink, type PairingLink } from "@veeloe/protocol";
+import { parsePairingLink, type PairingLink } from "@veeloe/protocol-ts";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, TextInput, View } from "react-native";
 import { describeError, useT } from "../../../shared/i18n";
 import { Button, Card, column, Icon, QrScanner, radius, space, Text, useColors } from "../../../shared/ui";
@@ -8,12 +8,25 @@ import { usePairMachine } from "../model/use-pair-machine";
 
 const linkProblem = { malformed: "pairing.link_malformed", "bad-signature": "pairing.link_bad_signature", expired: "pairing.link_expired" } as const;
 
+type OpenedParams = { link?: string; machine?: string; secret?: string; expires?: string; sig?: string };
+
+// Expo Go hands a `link=` value whose `&` arrives unescaped, which splits the
+// pairing link into separate params before this screen reads it. Rebuilding it
+// from those parts keeps the same flow; a real veeloe://pair link never splits.
+function openedLink({ link, machine, secret, expires, sig }: OpenedParams): string | undefined {
+  if (!machine || !secret || !expires || !sig) return link;
+  const hub = link?.match(/[?&]hub=([^&]+)/)?.[1];
+  if (!hub) return link;
+  return `veeloe://pair?hub=${hub}&machine=${machine}&secret=${secret}&expires=${expires}&sig=${sig}`;
+}
+
 export function AddMachinePage() {
   const t = useT("add-machine");
   const colors = useColors();
   const pair = usePairMachine();
   // Filled when the phone's camera or another app opened a veeloe://pair link.
-  const { link: opened } = useLocalSearchParams<{ link?: string }>();
+  const params = useLocalSearchParams<OpenedParams>();
+  const opened = useMemo(() => openedLink(params), [params]);
   const [start] = useState(() => (opened ? parsePairingLink(opened, Date.now()) : null));
   const [text, setText] = useState(opened ?? "");
   const [link, setLink] = useState<PairingLink | null>(start?.ok ? start.link : null);

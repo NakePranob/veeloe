@@ -1,4 +1,4 @@
-import { checkLinkingProof, createBackoff, HandoffDataSchema, linkRequestProof, parseLinkingLink, parseMessage, publicKeyOf, toBase64url, type HandoffData, type LinkingLink } from "@veeloe/protocol";
+import { checkLinkingProof, createBackoff, HandoffDataSchema, linkRequestProof, parseLinkingLink, parseMessage, publicKeyOf, toBase64url, type HandoffData, type LinkingLink } from "@veeloe/protocol-ts";
 import { postLinkRequest, startHubClient, type HubAnswer } from "../../../shared/hub-client";
 
 export type WaitResult = { ok: true; data: HandoffData } | { ok: false; code: "linking.expired" };

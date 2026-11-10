@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { checkLinkingProof, createSigner, linkRequestProof, parseLinkingLink, publicKeyOf, toBase64url, verifyCertificate, type HubLinkRequest, type SignedPart } from "@veeloe/protocol";
+import { checkLinkingProof, createSigner, linkRequestProof, parseLinkingLink, publicKeyOf, toBase64url, verifyCertificate, type HubLinkRequest, type SignedPart } from "@veeloe/protocol-ts";
 import type { Device } from "../../../entities/device";
 import type { Machine } from "../../../entities/machine";
 import { approveLink, handOff, handoffData, nameProblem, openLink } from "./link";

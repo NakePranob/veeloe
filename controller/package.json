@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
-    "@veeloe/protocol": "workspace:*",
+    "@veeloe/protocol-ts": "workspace:*",
     "expo": "~58.0.16",
     "expo-camera": "58.0.11",
     "expo-constants": "~58.0.12",

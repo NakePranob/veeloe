@@ -1,4 +1,4 @@
-import { revokedWith, verifyCertificate, type DeviceLink } from "@veeloe/protocol";
+import { revokedWith, verifyCertificate, type DeviceLink } from "@veeloe/protocol-ts";
 import type { Database } from "../../../shared/db";
 
 export const DEVICE_TOPIC = "device";

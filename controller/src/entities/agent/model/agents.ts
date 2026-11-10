@@ -1,4 +1,4 @@
-import type { Agent } from "@veeloe/protocol";
+import type { Agent } from "@veeloe/protocol-ts";
 import type { Database, WriteTransaction } from "../../../shared/db";
 
 export const AGENT_TOPIC = "agent";

@@ -1,4 +1,4 @@
-import { fromBase64url, publicKeyOf, toBase64url } from "@veeloe/protocol";
+import { fromBase64url, publicKeyOf, toBase64url } from "@veeloe/protocol-ts";
 import * as SecureStore from "expo-secure-store";
 import type { Vault } from "./session";
 
@@ -8,10 +8,17 @@ const SECRET_OPTIONS = { keychainService: "veeloe.controller-secret", keychainAc
 // Public, and readable without authentication: when the secret reads null this tells "invalidated" from "never had one".
 const MARKER = "controller-public-key";
 
-const locked = (prompt: string) => ({ ...SECRET_OPTIONS, requireAuthentication: true, authenticationPrompt: prompt });
+// Development only: the simulator has no convenient Face ID, and a device test
+// needs one key without a prompt. A release build ignores the flag.
+const INSECURE_DEV = __DEV__ && process.env.EXPO_PUBLIC_INSECURE_KEY === "1";
+
+const locked = (prompt: string) =>
+  INSECURE_DEV
+    ? SECRET_OPTIONS
+    : { ...SECRET_OPTIONS, requireAuthentication: true, authenticationPrompt: prompt };
 
 export const vault: Vault = {
-  isSupported: async () => SecureStore.canUseBiometricAuthentication(),
+  isSupported: async () => INSECURE_DEV || SecureStore.canUseBiometricAuthentication(),
   hasKey: async () => (await SecureStore.getItemAsync(MARKER)) !== null,
 
   async create(secret, prompt) {

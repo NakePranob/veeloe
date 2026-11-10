@@ -1,4 +1,4 @@
-import { ErrorBodySchema, hubHttpUrl, type Certificate, type LinkRequest } from "@veeloe/protocol";
+import { ErrorBodySchema, hubHttpUrl, type Certificate, type LinkRequest } from "@veeloe/protocol-ts";
 
 export type HubAnswer = { ok: true } | { ok: false; code: string };
 

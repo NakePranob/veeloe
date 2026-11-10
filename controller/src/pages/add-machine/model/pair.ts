@@ -9,7 +9,7 @@ import {
   publicKeyOf,
   toBase64url,
   type PairingLink,
-} from "@veeloe/protocol";
+} from "@veeloe/protocol-ts";
 import { startHubClient } from "../../../shared/hub-client";
 
 export type PairResult = { ok: true; machine: PairedMachine } | { ok: false; code: string };

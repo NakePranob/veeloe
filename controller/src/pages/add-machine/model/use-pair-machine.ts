@@ -1,4 +1,4 @@
-import { publicKeyOf, toBase64url, type PairingLink } from "@veeloe/protocol";
+import { publicKeyOf, toBase64url, type PairingLink } from "@veeloe/protocol-ts";
 import { listDevices } from "../../../entities/device";
 import { saveMachine } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";

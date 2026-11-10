@@ -1,5 +1,5 @@
-import { answerChallenge, createBackoff, createSigner, HubCloseCode, MemorySeenSequences, parseFrame, verify, type HubError, type HubLinkRequest, type Outgoing, type Verified } from "@veeloe/protocol";
-import type { SeenSequences } from "@veeloe/protocol";
+import { answerChallenge, createBackoff, createSigner, HubCloseCode, MemorySeenSequences, parseFrame, verify, type HubError, type HubLinkRequest, type Outgoing, type Verified } from "@veeloe/protocol-ts";
+import type { SeenSequences } from "@veeloe/protocol-ts";
 import { clockSequence } from "./sequence";
 
 export type HubClientOptions = {

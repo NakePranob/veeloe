@@ -1,4 +1,4 @@
-import type { AgentUpdateBody } from "@veeloe/protocol";
+import type { AgentUpdateBody } from "@veeloe/protocol-ts";
 import type { Look } from "../../../entities/character";
 
 type Sent = NonNullable<AgentUpdateBody["character"]>;

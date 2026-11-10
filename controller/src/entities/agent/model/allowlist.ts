@@ -1,4 +1,4 @@
-import { matchesAllowlist, READ_ONLY_ALLOWLIST, splitCommand } from "@veeloe/protocol";
+import { matchesAllowlist, READ_ONLY_ALLOWLIST, splitCommand } from "@veeloe/protocol-ts";
 
 /**
  * The Allowlist as the screens work it out (ADR 0030). Every rule is the

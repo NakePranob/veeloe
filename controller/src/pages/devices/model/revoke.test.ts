@@ -1,5 +1,5 @@
 import { expect, mock, test } from "bun:test";
-import { publicKeyOf, toBase64url, verifyCertificate } from "@veeloe/protocol";
+import { publicKeyOf, toBase64url, verifyCertificate } from "@veeloe/protocol-ts";
 import * as devicesModel from "../../../entities/device/model/devices";
 import type { Device } from "../../../entities/device";
 

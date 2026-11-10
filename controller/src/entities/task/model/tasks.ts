@@ -1,4 +1,4 @@
-import { TaskEventKind, type TaskEvent } from "@veeloe/protocol";
+import { TaskEventKind, type TaskEvent } from "@veeloe/protocol-ts";
 import type { Database } from "../../../shared/db";
 import { plainFirstLine } from "../../../shared/lib";
 

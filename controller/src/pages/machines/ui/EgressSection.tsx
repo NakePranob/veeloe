@@ -1,4 +1,4 @@
-import { EgressDomainSchema } from "@veeloe/protocol";
+import { EgressDomainSchema } from "@veeloe/protocol-ts";
 import { useState } from "react";
 import { View } from "react-native";
 import { egressOf, type Machine } from "../../../entities/machine";

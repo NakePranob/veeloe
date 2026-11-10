@@ -1,4 +1,4 @@
-import type { LinkingLink } from "@veeloe/protocol";
+import type { LinkingLink } from "@veeloe/protocol-ts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";

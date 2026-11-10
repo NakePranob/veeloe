@@ -1,4 +1,4 @@
-import { signCertificate } from "@veeloe/protocol";
+import { signCertificate } from "@veeloe/protocol-ts";
 import { droppedWith, type Device } from "../../../entities/device";
 import type { Machine } from "../../../entities/machine";
 import { postCertificate, type HubAnswer } from "../../../shared/hub-client";

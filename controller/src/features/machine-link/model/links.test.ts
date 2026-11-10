@@ -1,6 +1,6 @@
 import { Database as Sqlite } from "bun:sqlite";
 import { afterEach, expect, mock, test } from "bun:test";
-import { createBackoff, createSigner, fromBase64url, handshakeBytes, publicKeyOf, signCertificate, toBase64url, verifySignature, type Envelope } from "@veeloe/protocol";
+import { createBackoff, createSigner, fromBase64url, handshakeBytes, publicKeyOf, signCertificate, toBase64url, verifySignature, type Envelope } from "@veeloe/protocol-ts";
 import type { Machine } from "../../../entities/machine";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
