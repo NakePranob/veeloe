@@ -218,13 +218,15 @@ impl Worker {
             Arc::clone(&transport) as Arc<dyn LlmTransport>
         ));
         let store = EventStore::open(config.dir.join("tasks.db"))?;
+        let workdir = config.dir.join("workdir");
         let core = AgentCore::new(
             config.name,
             store,
             llm,
             tools,
             Arc::clone(&link),
-        );
+        )
+        .with_workdir(workdir);
         if !config.allowlist.is_empty() {
             core.set_allowlist(config.allowlist);
         }

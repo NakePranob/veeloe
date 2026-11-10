@@ -9,6 +9,7 @@
 //! them already.
 
 use std::collections::{HashMap, VecDeque};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -74,6 +75,7 @@ struct Answer {
 
 struct State {
     name: RwLock<String>,
+    workdir: Mutex<Option<PathBuf>>,
     store: Mutex<EventStore>,
     llm: Arc<dyn Llm>,
     tools: Arc<ToolRegistry>,
@@ -133,6 +135,7 @@ impl AgentCore {
         Self {
             state: Arc::new(State {
                 name: RwLock::new(name.into()),
+                workdir: Mutex::new(None),
                 store: Mutex::new(store),
                 llm,
                 tools: Arc::new(tools),
@@ -151,6 +154,12 @@ impl AgentCore {
 
     pub fn with_max_rounds(self, max_rounds: usize) -> Self {
         self.state.max_rounds.store(max_rounds, Ordering::SeqCst);
+        self
+    }
+
+    /// Pin this Workdir's `MEMORY.md` into each new Turn (ADR 0036).
+    pub fn with_workdir(self, workdir: impl Into<PathBuf>) -> Self {
+        *self.state.workdir.lock().expect("workdir") = Some(workdir.into());
         self
     }
 
@@ -307,10 +316,17 @@ impl AgentCore {
         // Once per Turn: a rename reaches the next Turn, never one halfway
         // through. Both are written here, before the Turn task is spawned, so a
         // Stop that arrives at once still lands after the start.
-        let system = format!(
+        let mut system = format!(
             "You are {}, an Agent that runs on its owner's own machine through Veeloe. Answer in the language the person writes in.",
             self.state.name.read().expect("name")
         );
+        if let Some(workdir) = self.state.workdir.lock().expect("workdir").as_ref() {
+            let memory = crate::memory::memory_prompt(workdir);
+            if !memory.is_empty() {
+                system.push_str("\n\nMEMORY.md, notes you keep for every Task:\n");
+                system.push_str(&memory);
+            }
+        }
         self.state.append(
             task,
             &owner,
