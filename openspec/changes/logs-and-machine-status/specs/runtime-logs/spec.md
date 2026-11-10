@@ -31,12 +31,12 @@ Runtime SHALL เขียน log เป็น JSON lines ใต้ `<VEELOE_HOM
 - **THEN** บรรทัดใหม่ปรากฏจนกด Ctrl-C
 
 ### Requirement: Controller แสดงสถานะ Machine
-Runtime SHALL ส่ง `machine.status` ที่มี version, features, last error, disk free และ Budget วันนี้; Controller SHALL แสดงค่าเหล่านี้ในหน้า Machine
+Controller SHALL ขอ `machine.status` เมื่อเปิดหน้า Machine; Runtime SHALL ตอบด้วย version, features, last error, disk free และ Budget วันนี้; Controller SHALL แสดงค่าเหล่านี้ในหน้า Machine
 
-#### Scenario: ต่อ Hub
-- **WHEN** Runtime ต่อ Hub สำเร็จ
+#### Scenario: เปิดหน้า Machine
+- **WHEN** Controller เปิดหน้า Machine ที่ Runtime ต่ออยู่
 - **THEN** Controller ได้ `machine.status` และแสดงการ์ดสถานะ
 
 #### Scenario: ค่าเปลี่ยน
-- **WHEN** last error หรือ disk/budget เปลี่ยน
-- **THEN** Runtime ส่งสถานะใหม่และ Controller อัปเดต
+- **WHEN** last error หรือ disk/budget เปลี่ยนแล้วผู้ใช้เปิดหน้า Machine อีกครั้ง
+- **THEN** Controller ขอสถานะใหม่และแสดงค่าล่าสุด

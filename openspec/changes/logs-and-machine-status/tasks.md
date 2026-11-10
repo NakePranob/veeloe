@@ -7,14 +7,14 @@
 
 ## 2. Machine status
 
-- [ ] 2.1 เพิ่ม protocol `machine.status` body `{version, features, lastError, diskFreeBytes, budgetToday}`; Runtime ส่งเมื่อต่อ Hub และเมื่อค่าเปลี่ยน
-- [ ] 2.2 Controller เก็บสถานะและแสดงการ์ดในหน้า Machine: version, features, disk, budget, last error
-- [ ] 2.3 เพิ่ม test ว่า Runtime ส่ง status หลัง ready และ Controller แสดงค่าที่ได้รับ
+- [x] 2.1 เพิ่ม protocol `machine.status` body `{version, features, lastError, diskFreeBytes, budgetToday}`; Runtime ตอบเมื่อ Controller ขอ
+- [x] 2.2 Controller เก็บสถานะและแสดงการ์ดในหน้า Machine: version, features, disk, budget, last error
+- [x] 2.3 เพิ่ม test ว่า Runtime ส่ง status หลัง ready และ Controller แสดงค่าที่ได้รับ
 
 ## 3. ตรวจ
 
-- [ ] 3.1 `cd packages/runtime && cargo test -p veeloe-runtime-supervisor`
-- [ ] 3.2 `bun run check:protocol`
-- [ ] 3.3 `cd controller && bun test ./src`
-- [ ] 3.4 `bun run check:controller`
-- [ ] 3.5 รัน `./dist/veeloe logs` และ `--follow` บนเครื่องจริง
+- [x] 3.1 `cd packages/runtime && cargo test -p veeloe-runtime-supervisor`
+- [x] 3.2 `bun run check:protocol`
+- [x] 3.3 `cd controller && bun test ./src`
+- [x] 3.4 `bun run check:controller`
+- [x] 3.5 รัน `./dist/veeloe logs` และ `--follow` บนเครื่องจริง

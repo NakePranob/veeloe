@@ -25,11 +25,11 @@
 
 **Why:** ใช้งานบนเครื่องได้โดยไม่ต้องมีแอป
 
-### 4. สถานะ Machine เป็น event ที่ Runtime ส่ง
+### 4. สถานะ Machine เป็นคำตอบเมื่อ Controller ขอ
 
-**Decision:** Runtime ส่ง `machine.status` ให้ Owner เมื่อต่อ Hub และเมื่อค่าเปลี่ยน; Controller เก็บใน memory/DB และแสดงการ์ด
+**Decision:** Controller ส่ง `machine.status` เมื่อเปิดหน้า Machine; Runtime ตอบด้วย version/features/disk/budget; Controller เก็บใน memory และแสดงการ์ด
 
-**Why:** Controller ต้องรู้ version/features/disk/budget โดยไม่ต้องถามทุกครั้ง
+**Why:** ลด traffic ตอน connect และไม่ต้องให้ Runtime รู้ว่ามี Controller เปิดหน้าไหนอยู่; ค่าเปลี่ยนจะขอใหม่เมื่อเปิดหน้า
 
 **Open:** จะส่ง log ทั้งไฟล์ผ่าน Hub ใน change นี้หรือทำพร้อม Attachment ใน change ถัดไป
 

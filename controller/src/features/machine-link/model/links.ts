@@ -20,9 +20,15 @@ export type MachineStatus = {
   deleteError: string | null;
   /** The code the last `task.stop` came back with, if it failed (`stop-and-restart`). */
   stopError: string | null;
+  /** What `machine.status` last said; null until the Machine answers. */
+  version: string | null;
+  features: string[] | null;
+  lastError: string | null;
+  diskFreeBytes: number | null;
+  budgetToday: { usedTokens: number; limitTokens: number } | null;
 };
 
-const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null };
+const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
 
 /** One page's usage request for one Machine: what it asked for, and how it went. */
 export type UsageStatus = {
@@ -44,7 +50,7 @@ const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, 
 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "delete" | "stop" | "hello" | "usage" | "other";
+type Kind = "create" | "update" | "delete" | "stop" | "hello" | "status" | "usage" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -139,6 +145,14 @@ export function createMachineLinks({
       // A Machine older than `sandboxed-commands` says nothing of it, which is not the same as an empty Egress.
       if (message.body.egress) await saveEgress(database, machine.id, message.body.egress);
       setStatus(machine.id, { online: true, providers: message.body.providers });
+    } else if (message.type === "machine.status") {
+      setStatus(machine.id, {
+        version: message.body.version,
+        features: message.body.features,
+        lastError: message.body.lastError,
+        diskFreeBytes: message.body.diskFreeBytes,
+        budgetToday: message.body.budgetToday ?? null,
+      });
     } else if (message.type === "agent.usage") {
       // The tally of an answer already given, kept before anything shows it; older news never wins (`daily-budget`).
       await saveUsage(database, message.body);
@@ -301,6 +315,11 @@ export function createMachineLinks({
     deleteAgent(machine: Machine, id: string) {
       setStatus(machine.id, { deleteError: null });
       return sendTo(machine, "delete", { type: "agent.delete", body: { id } });
+    },
+
+    /** Ask for version, features, disk and today's Budget when the Machine page opens. */
+    requestStatus(machine: Machine) {
+      return sendTo(machine, "status", { type: "machine.status", body: {} });
     },
 
     /**

@@ -56,7 +56,7 @@ export function useMachineLink() {
   return useCurrent();
 }
 
-const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null };
+const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
 
 export function useMachineStatus(machine: string): MachineStatus {
   const links = useCurrent();

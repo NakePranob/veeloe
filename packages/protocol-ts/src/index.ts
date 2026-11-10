@@ -39,12 +39,14 @@ export {
   AgentListedBodySchema,
   AgentUpdateBodySchema,
   AgentUsageBodySchema,
+  MachineStatusBodySchema,
   type Agent,
   type AgentCreateBody,
   type AgentDeleteBody,
   type AgentListedBody,
   type AgentUpdateBody,
   type AgentUsageBody,
+  type MachineStatusBody,
   type ProviderInfo,
 } from "./messages/agent";
 export {

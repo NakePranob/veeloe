@@ -15,7 +15,12 @@
   },
   "status": {
     "heading": "สถานะ",
-    "checking": "กำลังตรวจ"
+    "checking": "กำลังตรวจ",
+    "version": "เวอร์ชัน Runtime",
+    "disk": "พื้นที่ว่าง",
+    "budget": "Budget วันนี้",
+    "lastError": "error ล่าสุด",
+    "features": "ฟีเจอร์"
   },
   "onMachine": "Agent บนเครื่องนี้",
   "noAgent": "ยังไม่มี Agent",

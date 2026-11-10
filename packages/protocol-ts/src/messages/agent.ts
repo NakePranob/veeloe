@@ -77,6 +77,16 @@ export type Agent = z.infer<typeof AgentSchema>;
 export const AgentUsageBodySchema = z.looseObject({ agent: id, day, tokens: z.number().int().min(0), budget });
 export type AgentUsageBody = z.infer<typeof AgentUsageBodySchema>;
 
+/** Machine → Member: the health of the Machine, without any Task content. */
+export const MachineStatusBodySchema = z.looseObject({
+  version: z.string().min(1),
+  features: z.array(z.string().min(1)),
+  lastError: z.string().nullable(),
+  diskFreeBytes: z.number().int().nonnegative(),
+  budgetToday: z.looseObject({ usedTokens: z.number().int().nonnegative(), limitTokens: z.number().int().nonnegative() }).optional(),
+});
+export type MachineStatusBody = z.infer<typeof MachineStatusBodySchema>;
+
 /** A Provider by name, never its URL or key: the models it offers, or why it could not say. */
 const ProviderSchema = z.union([
   z.looseObject({ name: z.string().min(1), models: z.array(z.looseObject({ id: z.string().min(1), name: z.string().optional() })) }),

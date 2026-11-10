@@ -12,6 +12,7 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "agent.list" => object.is_some(),
         "agent.listed" => object.map(is_agent_listed).unwrap_or(false),
         "agent.usage" => object.map(is_agent_usage).unwrap_or(false),
+        "machine.status" => object.map(is_machine_status).unwrap_or(false),
         "approval.answer" => object.map(is_approval_answer).unwrap_or(false),
         "task.message" => object.map(is_task_message).unwrap_or(false),
         "task.stop" => object.map(is_task_stop).unwrap_or(false),
@@ -295,6 +296,13 @@ fn is_provider(value: &Value) -> bool {
 
 fn is_agent_delete(object: &Map<String, Value>) -> bool {
     text(object.get("id")).map(is_agent_id).unwrap_or(false)
+}
+
+fn is_machine_status(object: &Map<String, Value>) -> bool {
+    text(object.get("version")).is_some()
+        && object.get("features").and_then(Value::as_array).is_some()
+        && object.get("diskFreeBytes").and_then(Value::as_u64).is_some()
+        && object.get("lastError").is_some()
 }
 
 fn is_agent_listed(object: &Map<String, Value>) -> bool {

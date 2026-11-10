@@ -15,7 +15,12 @@
   },
   "status": {
     "heading": "Status",
-    "checking": "Checking"
+    "checking": "Checking",
+    "version": "Runtime version",
+    "disk": "Free disk",
+    "budget": "Budget today",
+    "lastError": "Last error",
+    "features": "Features"
   },
   "onMachine": "Agents on this Machine",
   "noAgent": "No Agent yet",

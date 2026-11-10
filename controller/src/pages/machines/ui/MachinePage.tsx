@@ -1,8 +1,10 @@
 import { useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
 import { useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
-import { useMachineStatus } from "../../../features/machine-link";
+import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
+import { formatTokens } from "../../../shared/lib";
 import { Empty, Row, Screen, Section } from "../../../shared/ui";
 import { EgressSection } from "./EgressSection";
 
@@ -14,6 +16,12 @@ export function MachinePage() {
   const machine = useMachines()?.find((m) => m.id === id);
   const agents = (useAgents() ?? []).filter((a) => a.machine_id === id);
   const status = useMachineStatus(id);
+  const link = useMachineLink();
+  useEffect(() => {
+    if (machine) link?.requestStatus(machine);
+  }, [machine?.id, link]);
+  const disk = status.diskFreeBytes === null ? undefined : `${(status.diskFreeBytes / 1_000_000_000).toFixed(1)} GB`;
+  const budget = status.budgetToday && (status.budgetToday.usedTokens > 0 || status.budgetToday.limitTokens > 0) ? `${formatTokens(status.budgetToday.usedTokens)} / ${formatTokens(status.budgetToday.limitTokens)}` : undefined;
 
   if (!machine) {
     return (
@@ -28,6 +36,11 @@ export function MachinePage() {
       <Section title={t("status.heading")}>
         <Row icon="machine" iconColor={status.online ? "green" : "tertiaryLabel"} title={t("status.heading")} value={status.online === null ? t("status.checking") : t(status.online ? "online" : "offline")} />
         <Row icon="info" title="Hub" value={machine.hub_url} />
+        {status.version && <Row icon="info" title={t("status.version")} value={status.version} />}
+        {status.features && <Row icon="info" title={t("status.features")} detail={status.features.join(", ")} />}
+        {disk && <Row icon="usage" title={t("status.disk")} value={disk} />}
+        {budget && <Row icon="usage" title={t("status.budget")} value={budget} />}
+        {status.lastError && <Row icon="warning" iconColor="orange" title={t("status.lastError")} value={status.lastError} />}
       </Section>
 
       <Section title={t("onMachine")}>
