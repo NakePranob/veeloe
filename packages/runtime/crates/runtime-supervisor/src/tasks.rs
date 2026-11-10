@@ -246,6 +246,12 @@ pub async fn dispatch(
         if let Some(routes) = machine.routes {
             let _ = routes.forget(id);
         }
+        let _ = crate::logs::record(
+            registry.home(),
+            "info",
+            "agent.delete",
+            json!({ "agent": id }),
+        );
         outbox.to_member(&from.member, "agent.listed", listed().await, None);
         return;
     }
@@ -325,6 +331,12 @@ pub async fn dispatch(
         } else {
             workers.rename(&next);
         }
+        let _ = crate::logs::record(
+            registry.home(),
+            "info",
+            if type_ == "agent.create" { "agent.create" } else { "agent.update" },
+            json!({ "agent": id }),
+        );
         outbox.to_member(&from.member, "agent.listed", listed().await, None);
         return;
     }
@@ -371,7 +383,7 @@ pub async fn dispatch(
             let sent = workers.send(
                 &agent.id,
                 ToWorker::Message {
-                    task,
+                    task: task.clone(),
                     id: id.to_string(),
                     member: from.member.clone(),
                     text: text.to_string(),
@@ -380,6 +392,13 @@ pub async fn dispatch(
             );
             if !sent {
                 outbox.error(from, "agent.unavailable");
+            } else {
+                let _ = crate::logs::record(
+                    registry.home(),
+                    "info",
+                    "task.message",
+                    json!({ "agent": agent.id, "task": task }),
+                );
             }
         }
         "task.sync" => {

@@ -81,6 +81,11 @@ impl AgentRegistry {
         Ok(agents)
     }
 
+    /// The Runtime home this registry belongs to (`<home>/runtime/agents.json`).
+    pub fn home(&self) -> &Path {
+        self.file.parent().and_then(Path::parent).unwrap_or_else(|| Path::new("."))
+    }
+
     pub fn get(&self, id: &str) -> Result<Option<Agent>, AgentError> {
         Ok(self.all()?.into_iter().find(|agent| agent.id == id))
     }
