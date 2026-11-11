@@ -9,6 +9,7 @@ use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
 use veeloe_runtime_supervisor::llm::{HttpAnswer, HttpClient};
 use veeloe_runtime_supervisor::providers::{Auth, Provider};
+use veeloe_runtime_supervisor::push_tokens::PushTokens;
 use veeloe_runtime_supervisor::tasks::{agents_listed, dispatch, Inbound, Machine, Outbox};
 use veeloe_runtime_supervisor::workers::{SupervisorLlm, Workers};
 
@@ -97,6 +98,13 @@ fn from() -> Inbound {
         key: None,
         reference: "sig".into(),
         task: None,
+    }
+}
+
+fn from_key(key: &str) -> Inbound {
+    Inbound {
+        key: Some(key.into()),
+        ..from()
     }
 }
 
@@ -234,4 +242,59 @@ async fn an_agent_can_be_deleted_while_its_workdir_stays() {
     let (type_, body) = outbox.last();
     assert_eq!(type_, "agent.listed");
     assert_eq!(body["agents"], json!([]));
+}
+
+#[tokio::test]
+async fn a_push_token_is_kept_for_the_controller_key_and_then_removed() {
+    let home = tempdir().expect("home");
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    let workers = Workers::new(
+        home.path().to_path_buf(),
+        vec!["/bin/true".into()],
+        Arc::new(Silent) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent: &str, _message: FromWorker| {}),
+        Arc::new(|_line: &str| {}),
+        Arc::new(|_agent, command| command),
+    );
+    let tokens = PushTokens::open(home.path()).expect("tokens");
+    let outbox = Recording::default();
+    let providers = providers();
+    let http = Models;
+    let machine = Machine {
+        registry: &registry,
+        workers: &workers,
+        routes: None,
+        secret_key: None,
+        uploads: None,
+        push_tokens: Some(&tokens),
+        providers: &providers,
+        egress: &[],
+        budgets: None,
+        http: &http,
+    };
+
+    dispatch(
+        &machine,
+        &outbox,
+        &from_key("controller-1"),
+        "push.register",
+        &json!({ "token": "ExponentPushToken[abc]", "language": "th" }),
+    )
+    .await;
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "push.registered");
+    assert_eq!(body["token"], "ExponentPushToken[abc]");
+    assert_eq!(tokens.for_member("member-1").len(), 1);
+
+    dispatch(
+        &machine,
+        &outbox,
+        &from_key("controller-1"),
+        "push.unregister",
+        &json!({}),
+    )
+    .await;
+    let (type_, _) = outbox.last();
+    assert_eq!(type_, "push.unregistered");
+    assert!(tokens.for_member("member-1").is_empty());
 }
