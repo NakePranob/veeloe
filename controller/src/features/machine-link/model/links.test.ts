@@ -402,3 +402,16 @@ test("bytes that do not match the offered hash are not written or opened", async
   expect((FakeFile.last as FakeFile | null)?.bytes ?? null).toBeNull();
   expect(FakeFile.previews).toBe(0);
 });
+
+test("a push token goes to the Machine with the language, and unregister clears this device only", async () => {
+  const { fake, machine, links } = await setup();
+  expect(links.registerPush(machine, "ExponentPushToken[abc]", "th")).not.toBeNull();
+  await until(() => fake.hub.frames.length === 3);
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({
+    type: "push.register",
+    body: { token: "ExponentPushToken[abc]", language: "th" },
+  });
+  expect(links.unregisterPush(machine)).not.toBeNull();
+  await until(() => fake.hub.frames.length === 4);
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "push.unregister", body: {} });
+});

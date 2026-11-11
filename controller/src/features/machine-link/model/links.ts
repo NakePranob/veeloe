@@ -468,6 +468,16 @@ export function createMachineLinks({
       });
     },
 
+    /** Give this Controller's Expo token to the Machine (ADR 0044); null when nothing went. */
+    registerPush(machine: Machine, token: string, language: "th" | "en") {
+      return sendTo(machine, "other", { type: "push.register", body: { token, language } });
+    },
+
+    /** Stop pushes to this Controller; the other devices of the Member keep theirs. */
+    unregisterPush(machine: Machine) {
+      return sendTo(machine, "other", { type: "push.unregister", body: {} });
+    },
+
     /**
      * The Machine's whole new Egress. The page asks for a fresh authentication
      * first (ADR 0012); the Machine answers with `agent.listed`, which is what

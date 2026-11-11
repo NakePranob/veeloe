@@ -14,10 +14,10 @@
 
 ## 3. Controller
 
-- [ ] 3.1 ติดตั้ง `expo-notifications`, ขออนุญาตหลังผูก Machine/สร้าง Agent ครั้งแรก และขอ token; ตรวจด้วย `bunx tsc --noEmit`
-- [ ] 3.2 ส่ง `push.register` พร้อมภาษาทุกครั้งที่ `hello` สำเร็จ และเก็บ token ไว้ลงทะเบียนใหม่; ตรวจด้วย `bun test ./src ./scripts`
+- [x] 3.1 ติดตั้ง `expo-notifications`, ขออนุญาตหลังผูก Machine/สร้าง Agent ครั้งแรก และขอ token; ตรวจด้วย `bunx tsc --noEmit`
+- [x] 3.2 ส่ง `push.register` พร้อมภาษาทุกครั้งที่เชื่อม Machine และเก็บ token ไว้ลงทะเบียนใหม่; ตรวจด้วย `bun test ./src ./scripts`
 - [ ] 3.3 เพิ่มสวิตช์เปิด/ปิด notification ของเครื่องนี้; ปิดแล้วส่ง `push.unregister`; ตรวจด้วย `bun test ./src ./scripts`
-- [ ] 3.4 จัดการ foreground: ไม่แสดง banner เมื่อเปิด Active Task เดียวกัน และกด push แล้วเปิด Task/Approval ที่ถูกต้อง; ตรวจด้วย `bun run check:controller`
+- [x] 3.4 จัดการ foreground: ไม่แสดง banner เมื่อเปิด Active Task เดียวกัน และกด push แล้วเปิด Task/Approval ที่ถูกต้อง; ตรวจด้วย `bun run check:controller`
 
 ## 4. ตรวจ
 
