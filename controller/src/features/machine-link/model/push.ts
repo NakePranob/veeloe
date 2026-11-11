@@ -98,7 +98,7 @@ export function usePushRegistration() {
     if (!link || !machines) return;
     for (const machine of machines) {
       if (!enabled) link.unregisterPush(machine);
-      else if (token) link.registerPush(machine, token, language);
+      else if (token) link.registerPush(machine, token, language === "th" ? "th" : "en");
     }
   }, [token, link, machines, language, enabled]);
 }
