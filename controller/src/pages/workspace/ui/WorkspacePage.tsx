@@ -1,7 +1,7 @@
 import { useAgents } from "../../../entities/agent";
 import { useDevices } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
-import { savePushEnabled } from "../../../features/machine-link";
+import { PUSH_READY, savePushEnabled } from "../../../features/machine-link";
 import { useDatabase, useLiveQuery } from "../../../shared/db";
 import { LANGUAGES, saveLanguage, useLanguage, useT } from "../../../shared/i18n";
 import { Icon, Note, Row, Screen, Section } from "../../../shared/ui";
@@ -37,9 +37,11 @@ export function WorkspacePage() {
           {t("oneDevice")}
         </Note>
       )}
-      <Section title={t("notifications.heading")} footer={t("notifications.note")}>
-        <Row icon="bell" title={t("notifications.title")} value={pushOn ? t("notifications.on") : t("notifications.off")} onPress={() => void savePushEnabled(database, !pushOn)} />
-      </Section>
+      {PUSH_READY && (
+        <Section title={t("notifications.heading")} footer={t("notifications.note")}>
+          <Row icon="bell" title={t("notifications.title")} value={pushOn ? t("notifications.on") : t("notifications.off")} onPress={() => void savePushEnabled(database, !pushOn)} />
+        </Section>
+      )}
       <Section title={t("language.heading")} footer={t("language.note")}>
         {LANGUAGES.map((option) => (
           <Row

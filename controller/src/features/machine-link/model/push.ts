@@ -11,6 +11,9 @@ import { useMachineLink } from "./use-machine-links";
 /** The Task on screen, so its own push does not also draw a banner (ADR 0044). */
 let activeTask: string | null = null;
 
+/** Off until the Expo project, credentials, and real-device QA are all ready. */
+export const PUSH_READY = false;
+
 export function setActiveTask(task: string | null) {
   activeTask = task;
 }
@@ -61,6 +64,7 @@ export function usePushRegistration() {
   const started = useRef(false);
 
   useEffect(() => {
+    if (!PUSH_READY) return;
     if (started.current || !machines?.length) return;
     started.current = true;
     if (process.env.EXPO_OS === "web" || !Device.isDevice) return;
@@ -95,6 +99,7 @@ export function usePushRegistration() {
   }, [machines]);
 
   useEffect(() => {
+    if (!PUSH_READY) return;
     if (!link || !machines) return;
     for (const machine of machines) {
       if (!enabled) link.unregisterPush(machine);
