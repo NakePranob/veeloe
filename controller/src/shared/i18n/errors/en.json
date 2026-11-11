@@ -8,6 +8,7 @@
   "attachment.missing": "That file is no longer on the Machine",
   "attachment.open": "The file is downloaded, but no app on this device can open it",
   "attachment.timeout": "The Machine didn't send the file in time. Try again",
+  "attachment.too_large": "The file is over 20 MB, so the app cannot send it. Use git or a Connector instead",
   "attachment.unavailable": "This Machine can't send files yet",
   "budget.exhausted": "Today's Budget is used up. You can add Budget on the Agent's page",
   "egress.invalid_domain": "The Machine kept its Egress: one entry isn't a plain domain name",

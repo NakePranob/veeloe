@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { allowlistOf, useAgents } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
 import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
-import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
+import { MAX_ATTACHMENT_BYTES, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
@@ -156,6 +156,7 @@ export function TaskPage() {
   const [stopAsked, setStopAsked] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [attachments, setAttachments] = useState<{ name: string; uri: string }[]>([]);
+  const [sendProblem, setSendProblem] = useState<string | null>(null);
   const now = useNow();
   const input = useRef<TextInputInstance>(null);
   const scroll = useRef<ScrollViewInstance>(null);
@@ -176,21 +177,35 @@ export function TaskPage() {
   async function send(text = message) {
     if ((!text && attachments.length === 0) || !link || !machine || !agent) return;
     const files = attachments;
+    const words = text;
     Keyboard.dismiss();
+    setSendProblem(null);
+    const sent = [];
+    try {
+      for (const file of files) {
+        const attachment = await link.sendAttachment(machine, task, file);
+        if (!attachment) throw new Error("hub.machine_offline");
+        sent.push(attachment);
+      }
+    } catch (problem) {
+      setSendProblem(problem instanceof Error ? problem.message : "attachment.invalid");
+      return;
+    }
     setText("");
     setAttachments([]);
-    const sent = [];
-    for (const file of files) {
-      const attachment = await link.sendAttachment(machine, task, file);
-      if (attachment) sent.push(attachment);
-    }
-    void link.sendMessage(machine, { agent: agent.id, task, text: text || t("attachedOnly"), attachments: sent });
+    void link.sendMessage(machine, { agent: agent.id, task, text: words || t("attachedOnly"), attachments: sent });
   }
 
   async function attach() {
     const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true, multiple: false });
     const asset = result.assets?.[0];
-    if (asset) setAttachments((current) => [...current, { name: asset.name, uri: asset.uri }]);
+    if (!asset) return;
+    if (asset.size && asset.size > MAX_ATTACHMENT_BYTES) {
+      setSendProblem("attachment.too_large");
+      return;
+    }
+    setSendProblem(null);
+    setAttachments((current) => [...current, { name: asset.name, uri: asset.uri }]);
   }
 
   // Stop can cut work off halfway, so it asks first and says what stops (ADR 0017).
@@ -372,6 +387,11 @@ export function TaskPage() {
         {status.stopError && (
           <View style={{ paddingTop: space.xs }}>
             <Problem code={status.stopError} />
+          </View>
+        )}
+        {sendProblem && (
+          <View style={{ paddingTop: space.xs }}>
+            <Problem code={sendProblem} />
           </View>
         )}
       </View>

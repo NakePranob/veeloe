@@ -7,7 +7,7 @@ import { addListedTasks, addPendingMessage, failPendingMessage, listTasks, markP
 import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
 import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
-import { decodeChunks, isFileHash, MAX_CHUNK_TEXT, MAX_DOWNLOAD_CHUNKS, safeFileName, type Download } from "./downloads";
+import { decodeChunks, isFileHash, MAX_ATTACHMENT_BYTES, MAX_CHUNK_TEXT, MAX_DOWNLOAD_CHUNKS, safeFileName, type Download } from "./downloads";
 import { openDownloadedFile } from "./open-file";
 
 /** What this Controller knows of a Machine right now, beside what is in the database. */
@@ -195,7 +195,7 @@ export function createMachineLinks({
       if (!isFileHash(body.file) || !downloadWaiters.has(body.file) || opening.has(body.file)) return;
       if (!Number.isInteger(body.total) || body.total < 1 || !Number.isInteger(body.index) || body.index < 0 || body.index >= body.total) return;
       if (body.total > MAX_DOWNLOAD_CHUNKS || body.data.length > MAX_CHUNK_TEXT) {
-        settleDownload(body.file, new Error("attachment.invalid"));
+        settleDownload(body.file, new Error("attachment.too_large"));
         return;
       }
       const item = downloads.get(body.file) ?? {
@@ -418,6 +418,7 @@ export function createMachineLinks({
     /** Send one attachment as 256 KiB chunks before its Task message (ADR 0050). */
     async sendAttachment(machine: Machine, task: string, file: { name: string; uri: string }) {
       const bytes = new Uint8Array(await (await fetch(file.uri)).arrayBuffer());
+      if (bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("attachment.too_large");
       const hash = hashBytes(bytes);
       const chunk = 256 * 1024;
       const total = Math.max(1, Math.ceil(bytes.length / chunk));

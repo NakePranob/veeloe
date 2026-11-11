@@ -22,6 +22,7 @@ pub const READ_MAX_LINES: usize = 2_000;
 pub const READ_MAX_BYTES: usize = 256 * 1024;
 pub const READ_MAX_FILE: u64 = 10 * 1024 * 1024;
 pub const WRITE_MAX_BYTES: usize = 2 * 1024 * 1024;
+pub const SEND_FILE_MAX_BYTES: u64 = 20 * 1024 * 1024;
 pub const GLOB_MAX: usize = 200;
 pub const GREP_MAX: usize = 200;
 pub const GREP_MAX_FILE: u64 = 1024 * 1024;
@@ -117,7 +118,7 @@ impl FileTools {
         }
         definitions.push(ToolDefinition {
             name: "send_file".into(),
-            description: "Offers a file from your working folder to the Member as an attachment. Use this for reports, screenshots, or other files they should open. The file must already exist.".into(),
+            description: "Offers a file from your working folder to the Member as an attachment. Use this for reports, screenshots, or other files they should open. The file must already exist and be at most 20 MB; for bigger files, use git or a Connector.".into(),
             input_schema: json!({
                 "type": "object",
                 "properties": { "path": { "type": "string", "description": "A file inside your working folder." } },
@@ -151,8 +152,14 @@ impl ToolRunner for FileTools {
 fn send_file(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String, ToolError> {
     let path = text(input, "path")?;
     let real = resolve_in_workdir(workdir, &path)?;
-    let bytes = fs::read(&real).map_err(|error| ToolError::Failed(error.to_string()))?;
     let name = real.file_name().and_then(|name| name.to_str()).unwrap_or("file");
+    let size = fs::metadata(&real).map_err(|error| ToolError::Failed(error.to_string()))?.len();
+    if size > SEND_FILE_MAX_BYTES {
+        return Err(ToolError::Failed(format!(
+            "{name} is {size} bytes; send_file is limited to 20 MB. Put it in git or share it through a Connector instead."
+        )));
+    }
+    let bytes = fs::read(&real).map_err(|error| ToolError::Failed(error.to_string()))?;
     Ok(json!({
         "name": name,
         "size": bytes.len(),

@@ -19,6 +19,7 @@ use crate::llm::HttpClient;
 use crate::models;
 use crate::providers::Provider;
 use crate::trust::{FileSeenSequences, TrustError};
+use crate::uploads::UploadError;
 use crate::workers::Workers;
 
 /// How many events one `task.events` frame carries.
@@ -226,11 +227,10 @@ pub async fn dispatch(
         let Ok(bytes) = veeloe_protocol::base64url::from_base64url(data) else {
             return outbox.error(from, "attachment.invalid");
         };
-        if uploads
-            .add(file, index as usize, total as usize, &bytes)
-            .is_err()
-        {
-            return outbox.error(from, "attachment.invalid");
+        match uploads.add(file, index as usize, total as usize, &bytes) {
+            Ok(_) => {}
+            Err(UploadError::TooLarge) => return outbox.error(from, "attachment.too_large"),
+            Err(_) => return outbox.error(from, "attachment.invalid"),
         }
         return;
     }

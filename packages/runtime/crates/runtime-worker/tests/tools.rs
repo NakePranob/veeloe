@@ -429,6 +429,23 @@ fn read_refuses_a_binary_file_a_missing_file_and_one_over_10mb() {
 }
 
 #[test]
+fn send_file_refuses_a_file_over_20mb_and_says_where_to_put_it_instead() {
+    let (_root, files) = files();
+    fs::write(
+        files.workdir.join("huge-report.bin"),
+        vec![0x41u8; 20 * 1024 * 1024 + 1],
+    )
+    .expect("write");
+    let said = failure(run(
+        &files.tools,
+        "send_file",
+        json!({ "path": "huge-report.bin" }),
+    ));
+    assert!(said.contains("20 MB"));
+    assert!(said.contains("git"));
+}
+
+#[test]
 fn write_creates_folders_overwrites_atomically_and_keeps_an_existing_files_mode() {
     let (_root, files) = files();
     assert!(run(

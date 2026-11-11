@@ -8,6 +8,7 @@ export type Download = {
 };
 
 /** 20 MB at 256 KiB a chunk; nothing the Agent can offer is meant to be bigger (ADR 0050). */
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 export const MAX_DOWNLOAD_CHUNKS = 80;
 /** A 256 KiB chunk in base64url, padding included: ceil(262144 / 3) * 4. */
 export const MAX_CHUNK_TEXT = 349_528;
