@@ -7,6 +7,7 @@ import { ErrorBodySchema } from "./error";
 import { DeviceHandoffBodySchema, DeviceLinkedBodySchema } from "./linking";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
 import { ProviderAddBodySchema } from "./provider";
+import { PushRegisterBodySchema, PushRegisteredBodySchema, PushUnregisterBodySchema, PushUnregisteredBodySchema } from "./push";
 import { FileChunkBodySchema, FileGetBodySchema, TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskStopBodySchema, TaskSyncBodySchema } from "./task";
 import { UsageGetBodySchema, UsageListedBodySchema } from "./usage";
 
@@ -37,6 +38,10 @@ const known = {
   "usage.listed": UsageListedBodySchema,
   "device.handoff": DeviceHandoffBodySchema,
   "device.linked": DeviceLinkedBodySchema,
+  "push.register": PushRegisterBodySchema,
+  "push.registered": PushRegisteredBodySchema,
+  "push.unregister": PushUnregisterBodySchema,
+  "push.unregistered": PushUnregisteredBodySchema,
 };
 
 type KnownType = keyof typeof known;

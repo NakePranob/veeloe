@@ -32,6 +32,10 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "pairing.done" => object.map(is_pairing_done).unwrap_or(false),
         "device.handoff" => object.map(is_device_handoff).unwrap_or(false),
         "device.linked" => object.is_some(),
+        "push.register" => object.map(is_push_register).unwrap_or(false),
+        "push.registered" => object.map(is_push_registered).unwrap_or(false),
+        "push.unregister" => object.is_some(),
+        "push.unregistered" => object.is_some(),
         _ => return None,
     };
     Some(valid)
@@ -331,6 +335,25 @@ fn is_file_chunk(object: &Map<String, Value>) -> bool {
 fn is_file_get(object: &Map<String, Value>) -> bool {
     text(object.get("path")).is_some_and(|path| !path.is_empty() && path.len() <= 4_000)
         && text(object.get("hash")).is_some_and(|hash| !hash.is_empty() && hash.len() <= 128)
+}
+
+fn is_push_token(value: &str) -> bool {
+    value.len() <= 256
+        && value.starts_with("ExponentPushToken[")
+        && value.ends_with(']')
+        && value.len() > "ExponentPushToken[]".len()
+}
+
+fn is_push_register(object: &Map<String, Value>) -> bool {
+    text(object.get("token")).is_some_and(is_push_token)
+        && object
+            .get("language")
+            .map(|language| matches!(language.as_str(), Some("th" | "en")))
+            .unwrap_or(true)
+}
+
+fn is_push_registered(object: &Map<String, Value>) -> bool {
+    text(object.get("token")).is_some_and(is_push_token)
 }
 
 fn is_agent_listed(object: &Map<String, Value>) -> bool {

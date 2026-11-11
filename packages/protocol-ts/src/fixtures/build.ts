@@ -310,6 +310,14 @@ export function messageVectors() {
     { name: "usage with more than 20 Tasks", type: "usage.listed", body: { request: "req-1", from: "2026-11-06", to: "2026-11-06", agents: [{ agent: "agent-1", days: [], tasks: Array.from({ length: 21 }, (_, i) => ({ task: `task-${i}`, tokens: 1 })), sources: [] }] }, valid: false },
     { name: "set the Egress with more than 100 domains", type: "egress.set", body: { egress: Array.from({ length: 101 }, (_, i) => `d${i}.example.com`) }, valid: false },
   ];
+  cases.push(
+    { name: "register a push token", type: "push.register", body: { token: "ExponentPushToken[abc123]", language: "th" }, valid: true },
+    { name: "register a token with an unknown language", type: "push.register", body: { token: "ExponentPushToken[abc123]", language: "fr" }, valid: false },
+    { name: "a push token that is not from Expo", type: "push.register", body: { token: "abc123" }, valid: false },
+    { name: "the Machine keeps a push token", type: "push.registered", body: { token: "ExponentPushToken[abc123]" }, valid: true },
+    { name: "unregister a push token", type: "push.unregister", body: {}, valid: true },
+    { name: "the Machine removed a push token", type: "push.unregistered", body: {}, valid: true },
+  );
   return { note: "`valid` is whether a receiver accepts the body of an envelope of `type` that verify already accepted.", vectors: cases };
 }
 

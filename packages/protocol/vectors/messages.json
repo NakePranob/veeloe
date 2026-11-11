@@ -1083,6 +1083,52 @@
         ]
       },
       "valid": false
+    },
+    {
+      "name": "register a push token",
+      "type": "push.register",
+      "body": {
+        "token": "ExponentPushToken[abc123]",
+        "language": "th"
+      },
+      "valid": true
+    },
+    {
+      "name": "register a token with an unknown language",
+      "type": "push.register",
+      "body": {
+        "token": "ExponentPushToken[abc123]",
+        "language": "fr"
+      },
+      "valid": false
+    },
+    {
+      "name": "a push token that is not from Expo",
+      "type": "push.register",
+      "body": {
+        "token": "abc123"
+      },
+      "valid": false
+    },
+    {
+      "name": "the Machine keeps a push token",
+      "type": "push.registered",
+      "body": {
+        "token": "ExponentPushToken[abc123]"
+      },
+      "valid": true
+    },
+    {
+      "name": "unregister a push token",
+      "type": "push.unregister",
+      "body": {},
+      "valid": true
+    },
+    {
+      "name": "the Machine removed a push token",
+      "type": "push.unregistered",
+      "body": {},
+      "valid": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 ## 1. Protocol
 
-- [ ] 1.1 เพิ่ม `push.register`, `push.registered`, `push.unregister`, `push.unregistered` ใน `packages/protocol-ts/src/messages` และ `packages/protocol/src/messages.rs` พร้อม validation ของ token/ภาษา; ตรวจด้วย `bun run check:protocol`
-- [ ] 1.2 เพิ่ม fixture ของข้อความใหม่ใน `packages/protocol/vectors/messages.json` และให้ทั้ง Rust/TypeScript อ่านตรงกัน; ตรวจด้วย `bun run check:protocol`
+- [x] 1.1 เพิ่ม `push.register`, `push.registered`, `push.unregister`, `push.unregistered` ใน `packages/protocol-ts/src/messages` และ `packages/protocol/src/messages.rs` พร้อม validation ของ token/ภาษา; ตรวจด้วย `bun run check:protocol`
+- [x] 1.2 เพิ่ม fixture ของข้อความใหม่ใน `packages/protocol/vectors/messages.json` และให้ทั้ง Rust/TypeScript อ่านตรงกัน; ตรวจด้วย `bun run check:protocol`
 
 ## 2. Runtime
 
