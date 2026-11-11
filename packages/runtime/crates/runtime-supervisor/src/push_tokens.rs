@@ -143,6 +143,19 @@ impl PushTokens {
         Ok(())
     }
 
+    /// Drop one token Expo says no longer belongs to a device.
+    pub fn remove_token(&self, token: &str) -> Result<(), PushTokenError> {
+        let mut tokens = self.tokens.lock().expect("push tokens");
+        let before = tokens.len();
+        tokens.retain(|held| held.token != token);
+        let changed = tokens.len() != before;
+        drop(tokens);
+        if changed {
+            self.save()?;
+        }
+        Ok(())
+    }
+
     /// Every token registered by a Member, for a push that Member should get.
     pub fn for_member(&self, member: &str) -> Vec<PushToken> {
         self.tokens

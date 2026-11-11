@@ -129,7 +129,8 @@ struct Supervisor {
     routes: Arc<TaskRoutes>,
     http: Arc<dyn HttpClient>,
     uploads: Uploads,
-    push_tokens: veeloe_runtime_supervisor::push_tokens::PushTokens,
+    push_tokens: Arc<veeloe_runtime_supervisor::push_tokens::PushTokens>,
+    push: Arc<veeloe_runtime_supervisor::push::ExpoPush>,
     /// The id the Hub gave this connection (`hub.ready`). Envelopes are addressed
     /// to it, not to the key, so nothing can be verified before it is known.
     machine: Mutex<Option<String>>,
@@ -142,10 +143,74 @@ type MemorySeen = veeloe_protocol::envelope::MemorySeenSequences;
 
 impl Supervisor {
     fn deliver(&self, agent: &str, message: FromWorker) {
+        self.notify(agent, &message);
         let outbox = self.outbox.lock().expect("outbox");
         if let Some(outbox) = outbox.as_ref() {
             forward(outbox.as_ref(), agent, message);
         }
+    }
+
+    /// Turn two worker events into a Generic Push; nothing else is sent (ADR 0044).
+    fn notify(&self, agent: &str, message: &FromWorker) {
+        let FromWorker::Event { task, starter, event } = message else {
+            return;
+        };
+        let (kind, approval, tokens) = match event.kind.as_str() {
+            "approval.requested" => {
+                let approval = event
+                    .body
+                    .get("request")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                let members: Vec<String> = self
+                    .trust
+                    .lock()
+                    .expect("trust")
+                    .owners
+                    .iter()
+                    .map(|owner| owner.member.clone())
+                    .collect();
+                let tokens = members
+                    .iter()
+                    .flat_map(|member| self.push_tokens.for_member(member))
+                    .collect::<Vec<_>>();
+                (veeloe_runtime_supervisor::push::PushKind::Approval, approval, tokens)
+            }
+            "turn.ended" => (
+                veeloe_runtime_supervisor::push::PushKind::TurnEnded,
+                None,
+                self.push_tokens.for_member(starter),
+            ),
+            _ => return,
+        };
+        if tokens.is_empty() {
+            return;
+        }
+        let push = Arc::clone(&self.push);
+        let held = Arc::clone(&self.push_tokens);
+        let home = self.home.clone();
+        let agent = agent.to_string();
+        let task = task.clone();
+        tokio::spawn(async move {
+            match push
+                .send(&tokens, kind, &agent, &task, approval.as_deref())
+                .await
+            {
+                Ok(tickets) => {
+                    for ticket in tickets.into_iter().filter(|ticket| ticket.drop) {
+                        let _ = held.remove_token(&ticket.token);
+                    }
+                }
+                Err(code) => {
+                    let _ = veeloe_runtime_supervisor::logs::record(
+                        &home,
+                        "warn",
+                        "push.failed",
+                        json!({ "code": code }),
+                    );
+                }
+            }
+        });
     }
 }
 
@@ -255,7 +320,7 @@ impl HubLinkSink for Supervisor {
                 routes: Some(me.routes.as_ref()),
                 secret_key: Some(&me.secret_key),
                 uploads: Some(&me.uploads),
-                push_tokens: Some(&me.push_tokens),
+                push_tokens: Some(me.push_tokens.as_ref()),
                 providers: &providers,
                 egress: &egress,
                 budgets: Some(me.budgets.as_ref()),
@@ -995,7 +1060,8 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     routes.prune(&agent_ids)?;
 
     let http: Arc<dyn HttpClient> = Arc::new(ReqwestClient::new());
-    let push_tokens = veeloe_runtime_supervisor::push_tokens::PushTokens::open(&home)?;
+    let push_tokens = Arc::new(veeloe_runtime_supervisor::push_tokens::PushTokens::open(&home)?);
+    let push = Arc::new(veeloe_runtime_supervisor::push::ExpoPush::new(Arc::clone(&http)));
     let supervisor = Arc::new_cyclic(|me| Supervisor {
         home: home.clone(),
         registry,
@@ -1009,6 +1075,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         http: Arc::clone(&http),
         uploads: Uploads::default(),
         push_tokens,
+        push,
         machine: Mutex::new(None),
         outbox: Mutex::new(None),
         workers: OnceLock::new(),
