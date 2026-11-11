@@ -30,7 +30,7 @@
 ทำได้หลังจบเส้นทางแรก ลำดับสลับกันได้ถ้าไม่ได้รอกัน
 
 - [x] `stop-and-restart`: Stop และปิด Turn ที่ค้างเมื่อเริ่มใหม่ (ADR 0017, 0033)
-- [ ] `one-writer-queue`: คิวงานและคนเขียนทีละ Turn (ADR 0011)
+- [x] `one-writer-queue`: คิวงานและคนเขียนทีละ Turn (ADR 0011)
 - [ ] `provider-keys-in-app`: ใส่ key ของ Provider ในแอปครั้งเดียวแล้วเข้ารหัสแบบ sealed box ให้แต่ละ Machine เลือกได้จากรายชื่อ Provider ที่เราตั้งค่าไว้ให้แล้ว (URL, header และค่าเฉพาะของแต่ละเจ้า เช่น `x-opencode-session` ของ OpenCode Go) หรือเพิ่ม Provider เองด้วย URL ที่รับ Anthropic Messages API (ADR 0005, 0042)
 - [x] `agent-settings`: แก้ Agent หลังสร้างด้วย `agent.update` ที่เซ็นแล้ว ทั้ง Provider, model และหน้าตา Character (ADR 0006, 0042)
 - [ ] `device-rename`: เปลี่ยนชื่อ Controller หลัง Link จากช่องในหน้า เครื่องของฉัน (เลื่อนจาก `linking-and-revocation`)
