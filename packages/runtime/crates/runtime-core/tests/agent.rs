@@ -395,30 +395,23 @@ async fn a_message_sent_again_is_not_written_twice_and_starts_no_turn() {
 }
 
 #[tokio::test]
-async fn a_message_during_a_turn_is_refused_as_busy_and_leaves_the_log_alone() {
+async fn a_message_during_a_turn_waits_and_then_becomes_the_next_turn() {
     let harness = setup(Setup {
         gated: true,
         ..Setup::default()
     });
     harness.core.receive(message("first")).expect("first");
     harness.core.receive(message("second")).expect("second");
-    assert_eq!(
-        harness.link.last(),
-        Some(FromWorker::Error {
-            member: "m_owner".into(),
-            reference: "sig-second".into(),
-            code: "agent.busy".into(),
-            task: Some("t1".into()),
-        })
-    );
     let _ = harness.gate.send(true);
     harness.core.idle().await;
-    assert!(!harness
-        .core
-        .events("t1")
-        .expect("events")
+    let events = harness.core.events("t1").expect("events");
+    let texts: Vec<&str> = events
         .iter()
-        .any(|event| event.body.get("text").and_then(Value::as_str) == Some("second")));
+        .filter(|event| event.kind == "member.message")
+        .filter_map(|event| event.body.get("text").and_then(Value::as_str))
+        .collect();
+    assert_eq!(texts, vec!["first", "second"]);
+    assert_eq!(harness.llm.requests().len(), 2);
 }
 
 #[tokio::test]

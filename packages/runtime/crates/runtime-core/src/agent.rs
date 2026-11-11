@@ -83,6 +83,8 @@ struct State {
     allowlist: RwLock<Vec<String>>,
     approval_timeout_ms: AtomicU64,
     running: Mutex<Option<RunningTurn>>,
+    /// Messages that arrived while a Turn was running, in arrival order.
+    queued: Mutex<VecDeque<ToWorker>>,
     stopped_ids: Mutex<VecDeque<String>>,
     waiting: Mutex<HashMap<String, Waiter>>,
     approvals: AtomicU64,
@@ -144,6 +146,7 @@ impl AgentCore {
                 allowlist: RwLock::new(Vec::new()),
                 approval_timeout_ms: AtomicU64::new(APPROVAL_TIMEOUT_MS),
                 running: Mutex::new(None),
+                queued: Mutex::new(VecDeque::new()),
                 stopped_ids: Mutex::new(VecDeque::new()),
                 waiting: Mutex::new(HashMap::new()),
                 approvals: AtomicU64::new(0),
@@ -308,7 +311,18 @@ impl AgentCore {
             return Ok(()); // a resend: it is in the log already
         }
         if self.state.running.lock().expect("running").is_some() {
-            return self.refuse(member, reference, "agent.busy", Some(task));
+            self.state
+                .queued
+                .lock()
+                .expect("queued")
+                .push_back(ToWorker::Message {
+                    task: task.to_string(),
+                    id: id.to_string(),
+                    member: member.to_string(),
+                    text: text.to_string(),
+                    reference: reference.to_string(),
+                });
+            return Ok(());
         }
         let fresh = starter.is_none();
         let owner = starter.unwrap_or_else(|| member.to_string());
@@ -376,6 +390,7 @@ impl AgentCore {
                     None,
                 );
             }
+            drain_queued(state);
         });
         *self.state.turn.lock().expect("turn") = Some(handle);
         Ok(())
@@ -658,6 +673,17 @@ async fn run_turn(
         "error",
         Some("turn.too_many_rounds"),
     )
+}
+
+/// Start one queued message after a Turn ends; that Turn's own end drains the next.
+fn drain_queued(state: Arc<State>) {
+    let Some(next) = state.queued.lock().expect("queued").pop_front() else {
+        return;
+    };
+    let core = AgentCore {
+        state: Arc::clone(&state),
+    };
+    let _ = core.receive(next);
 }
 
 fn end(

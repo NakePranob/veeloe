@@ -292,7 +292,12 @@ async function serve() {
   // enough for the app's Stop to end the Turn.
   let answered = 0;
   provider.reply =
-    process.env.HARNESS_FILE === "1"
+    process.env.HARNESS_SLOW === "1"
+      ? async () => {
+          await Bun.sleep(4_000);
+          return sse([{ type: "text", text: "done" }]);
+        }
+      : process.env.HARNESS_FILE === "1"
       ? () => {
           answered += 1;
           if (answered === 1) return toolUseSse("write", "tu-write", { path: "report.txt", content: "Hello from the harness.\n" });
