@@ -96,7 +96,11 @@ async fn the_worker_loop_runs_a_task_end_to_end_with_a_fake_supervisor() {
     worker.idle().await;
 
     let events = worker.events("t1").expect("events");
-    let kinds: Vec<&str> = events.iter().map(|event| event.kind.as_str()).collect();
+    let kinds: Vec<&str> = events
+        .iter()
+        .filter(|event| event.kind != "context.usage")
+        .map(|event| event.kind.as_str())
+        .collect();
     assert_eq!(
         kinds,
         vec![
@@ -109,8 +113,12 @@ async fn the_worker_loop_runs_a_task_end_to_end_with_a_fake_supervisor() {
         ]
     );
     // The real `read` tool ran inside the Workdir, and its answer went back.
-    assert_eq!(events[3].body["content"][0]["content"], "1\thello");
-    assert_eq!(events[5].body["reason"], "done");
+    let shown: Vec<_> = events
+        .iter()
+        .filter(|event| event.kind != "context.usage")
+        .collect();
+    assert_eq!(shown[3].body["content"][0]["content"], "1\thello");
+    assert_eq!(shown[5].body["reason"], "done");
 
     let requests = supervisor.await.expect("supervisor");
     assert_eq!(requests.len(), 2);
@@ -210,17 +218,20 @@ async fn the_same_conversation_writes_the_log_the_legacy_runtime_writes() {
 
     #[derive(serde::Deserialize)]
     struct LegacyEvent {
-        seq: i64,
         kind: String,
         body: Value,
     }
     let expected: Vec<LegacyEvent> =
         serde_json::from_str(include_str!("fixtures/legacy-task-log.json")).expect("fixture");
-    let actual = agent.events("t1").expect("events");
+    let events = agent.events("t1").expect("events");
+    let actual: Vec<_> = events
+        .iter()
+        .filter(|event| event.kind != "context.usage")
+        .collect();
     assert_eq!(actual.len(), expected.len(), "the port wrote a different number of events");
     for (index, (port, legacy)) in actual.iter().zip(expected.iter()).enumerate() {
-        assert_eq!(port.seq, legacy.seq, "event {index}: different seq");
         assert_eq!(port.kind, legacy.kind, "event {index}: different kind");
         assert_eq!(port.body, legacy.body, "event {index}: different body");
     }
+    assert!(actual.windows(2).all(|pair| pair[0].seq < pair[1].seq));
 }

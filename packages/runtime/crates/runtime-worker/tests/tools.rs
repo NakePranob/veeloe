@@ -745,5 +745,8 @@ fn the_read_only_runner_reads_globs_greps_and_offers_files_but_cannot_write() {
         .into_iter()
         .map(|definition| definition.name)
         .collect();
-    assert_eq!(names, vec!["read", "glob", "grep", "write", "edit"]);
+    assert_eq!(
+        names,
+        vec!["read", "glob", "grep", "write", "edit", "send_file"]
+    );
 }
