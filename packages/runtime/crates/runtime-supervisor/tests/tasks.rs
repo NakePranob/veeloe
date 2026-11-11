@@ -106,6 +106,7 @@ impl HubLinkSink for Slice {
         };
         let from = Inbound {
             member: verified.signed.member.clone().unwrap_or_default(),
+            key: None,
             reference: value
                 .get("sig")
                 .and_then(Value::as_str)
@@ -123,7 +124,8 @@ impl HubLinkSink for Slice {
                 workers: &me.workers,
                 routes: None,
                 secret_key: None,
-        uploads: None,
+                uploads: None,
+                push_tokens: None,
                 providers: &[],
                 egress: &[],
                 budgets: None,

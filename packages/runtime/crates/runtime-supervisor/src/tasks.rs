@@ -34,6 +34,8 @@ pub const TASK_EVENTS_PAGE: usize = 100;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inbound {
     pub member: String,
+    /// The Controller key that signed this envelope, when the sender has one.
+    pub key: Option<String>,
     pub reference: String,
     pub task: Option<String>,
 }
@@ -141,6 +143,7 @@ pub struct Machine<'a> {
     /// The Machine's Ed25519 seed, only for opening sealed Provider keys.
     pub secret_key: Option<&'a [u8; 32]>,
     pub uploads: Option<&'a crate::uploads::Uploads>,
+    pub push_tokens: Option<&'a crate::push_tokens::PushTokens>,
     pub providers: &'a [Provider],
     pub egress: &'a [String],
     pub budgets: Option<&'a crate::usage::Budgets>,
@@ -165,6 +168,48 @@ pub async fn dispatch(
             machine.egress,
         )
     };
+    if type_ == "push.register" {
+        let (Some(tokens), Some(device)) = (machine.push_tokens, from.key.as_deref()) else {
+            return outbox.error(from, "push.unavailable");
+        };
+        let (Some(token), language) = (
+            body.get("token").and_then(Value::as_str),
+            body.get("language").and_then(Value::as_str).unwrap_or("en"),
+        ) else {
+            return outbox.error(from, "push.invalid");
+        };
+        match tokens.register(
+            &from.member,
+            device,
+            token,
+            language,
+            crate::usage::now_ms() as u64,
+        ) {
+            Ok(held) => outbox.to_member(
+                &from.member,
+                "push.registered",
+                json!({ "token": held.token }),
+                None,
+            ),
+            Err(_) => outbox.error(from, "push.invalid"),
+        }
+        return;
+    }
+    if type_ == "push.unregister" {
+        let (Some(tokens), Some(device)) = (machine.push_tokens, from.key.as_deref()) else {
+            return outbox.error(from, "push.unavailable");
+        };
+        match tokens.unregister(device) {
+            Ok(_) => outbox.to_member(
+                &from.member,
+                "push.unregistered",
+                json!({}),
+                None,
+            ),
+            Err(_) => outbox.error(from, "push.invalid"),
+        }
+        return;
+    }
     if type_ == "provider.add" {
         let Some(secret_key) = machine.secret_key else {
             return outbox.error(from, "provider.unavailable");

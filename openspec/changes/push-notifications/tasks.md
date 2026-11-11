@@ -5,7 +5,7 @@
 
 ## 2. Runtime
 
-- [ ] 2.1 เพิ่ม Token Store ใต้ Runtime home ต่อ Member ต่อกุญแจ Controller พร้อมภาษาและเวลา; ตรวจด้วย `cargo test -p veeloe-runtime-supervisor push_tokens`
+- [x] 2.1 เพิ่ม Token Store ใต้ Runtime home ต่อ Member ต่อกุญแจ Controller พร้อมภาษาและเวลา; ตรวจด้วย `cargo test -p veeloe-runtime-supervisor push_tokens`
 - [ ] 2.2 รับ `push.register`/`push.unregister` ใน `dispatch`; ลงทะเบียนซ้ำเขียนทับ record เดิม และตอบ ack/error; ตรวจด้วย `cargo test -p veeloe-runtime-supervisor`
 - [ ] 2.3 ลบ Token Record เมื่อกุญแจ Controller ถูกถอน; ตรวจด้วย `cargo test -p veeloe-runtime-supervisor`
 - [ ] 2.4 เพิ่ม Expo Push client ที่ส่ง Generic Push ตามภาษา และลบ token เมื่อ receipts ตอบ `DeviceNotRegistered`; ตรวจด้วย `cargo test -p veeloe-runtime-supervisor`

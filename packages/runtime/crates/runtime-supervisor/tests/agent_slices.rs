@@ -94,6 +94,7 @@ impl Recording {
 fn from() -> Inbound {
     Inbound {
         member: "member-1".into(),
+        key: None,
         reference: "sig".into(),
         task: None,
     }
@@ -120,6 +121,7 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
         routes: None,
         secret_key: None,
         uploads: None,
+        push_tokens: None,
         providers: &providers,
         egress: &[],
         budgets: None,
@@ -220,6 +222,7 @@ async fn an_agent_can_be_deleted_while_its_workdir_stays() {
         routes: None,
         secret_key: None,
         uploads: None,
+        push_tokens: None,
         providers: &providers,
         egress: &[],
         budgets: None,
