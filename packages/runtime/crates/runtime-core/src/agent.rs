@@ -10,7 +10,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -85,6 +85,8 @@ struct State {
     running: Mutex<Option<RunningTurn>>,
     /// Messages that arrived while a Turn was running, in arrival order.
     queued: Mutex<VecDeque<ToWorker>>,
+    /// One drainer owns the hand-off between a finished Turn and the next.
+    draining: AtomicBool,
     stopped_ids: Mutex<VecDeque<String>>,
     waiting: Mutex<HashMap<String, Waiter>>,
     approvals: AtomicU64,
@@ -147,6 +149,7 @@ impl AgentCore {
                 approval_timeout_ms: AtomicU64::new(APPROVAL_TIMEOUT_MS),
                 running: Mutex::new(None),
                 queued: Mutex::new(VecDeque::new()),
+                draining: AtomicBool::new(false),
                 stopped_ids: Mutex::new(VecDeque::new()),
                 waiting: Mutex::new(HashMap::new()),
                 approvals: AtomicU64::new(0),
@@ -245,7 +248,7 @@ impl AgentCore {
                 member,
                 text,
                 reference,
-            } => self.message(&task, &id, &member, &text, &reference),
+            } => self.message(&task, &id, &member, &text, &reference, false),
         }
     }
 
@@ -300,6 +303,7 @@ impl AgentCore {
         member: &str,
         text: &str,
         reference: &str,
+        from_queue: bool,
     ) -> Result<(), AgentError> {
         let starter = self.state.store.lock().expect("store").starter_of(task)?;
         if let Some(starter) = starter.as_deref() {
@@ -310,7 +314,11 @@ impl AgentCore {
         if self.state.store.lock().expect("store").has_message(id)? {
             return Ok(()); // a resend: it is in the log already
         }
-        if self.state.running.lock().expect("running").is_some() {
+        if !from_queue
+            && (self.state.running.lock().expect("running").is_some()
+                || self.state.draining.load(Ordering::SeqCst)
+                || !self.state.queued.lock().expect("queued").is_empty())
+        {
             self.state
                 .queued
                 .lock()
@@ -677,13 +685,43 @@ async fn run_turn(
 
 /// Start one queued message after a Turn ends; that Turn's own end drains the next.
 fn drain_queued(state: Arc<State>) {
-    let Some(next) = state.queued.lock().expect("queued").pop_front() else {
+    if state.draining.swap(true, Ordering::SeqCst) {
         return;
-    };
-    let core = AgentCore {
-        state: Arc::clone(&state),
-    };
-    let _ = core.receive(next);
+    }
+    loop {
+        let next = state.queued.lock().expect("queued").pop_front();
+        let Some(next) = next else {
+            state.draining.store(false, Ordering::SeqCst);
+            // A message may have queued while this drainer was deciding to stop.
+            if state.queued.lock().expect("queued").is_empty()
+                || state.draining.swap(true, Ordering::SeqCst)
+            {
+                return;
+            }
+            continue;
+        };
+        let core = AgentCore {
+            state: Arc::clone(&state),
+        };
+        let result = match next {
+            ToWorker::Message {
+                task,
+                id,
+                member,
+                text,
+                reference,
+            } => core.message(&task, &id, &member, &text, &reference, true),
+            other => core.receive(other),
+        };
+        if let Err(error) = result {
+            // The message was already popped; say so without its text and keep the queue moving.
+            eprintln!("queued message failed: {error}");
+        }
+        if state.running.lock().expect("running").is_some() {
+            state.draining.store(false, Ordering::SeqCst);
+            return;
+        }
+    }
 }
 
 fn end(

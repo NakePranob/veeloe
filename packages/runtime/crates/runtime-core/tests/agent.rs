@@ -402,7 +402,11 @@ async fn a_message_during_a_turn_waits_and_then_becomes_the_next_turn() {
     });
     harness.core.receive(message("first")).expect("first");
     harness.core.receive(message("second")).expect("second");
+    harness.core.receive(message("third")).expect("third");
     let _ = harness.gate.send(true);
+    harness.core.idle().await;
+    // The first Turn's end starts the queued one; wait for that one too.
+    harness.core.idle().await;
     harness.core.idle().await;
     let events = harness.core.events("t1").expect("events");
     let texts: Vec<&str> = events
@@ -410,8 +414,16 @@ async fn a_message_during_a_turn_waits_and_then_becomes_the_next_turn() {
         .filter(|event| event.kind == "member.message")
         .filter_map(|event| event.body.get("text").and_then(Value::as_str))
         .collect();
-    assert_eq!(texts, vec!["first", "second"]);
-    assert_eq!(harness.llm.requests().len(), 2);
+    assert_eq!(texts, vec!["first", "second", "third"]);
+    assert_eq!(
+        events.iter().filter(|event| event.kind == "turn.started").count(),
+        3
+    );
+    assert_eq!(
+        events.iter().filter(|event| event.kind == "turn.ended").count(),
+        3
+    );
+    assert_eq!(harness.llm.requests().len(), 3);
 }
 
 #[tokio::test]
