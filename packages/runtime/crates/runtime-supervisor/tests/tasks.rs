@@ -336,7 +336,11 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
         );
         let body = body_of(&envelope);
         assert_eq!(body["agent"], "a1");
-        kinds.push(body["kind"].as_str().unwrap_or_default().to_string());
+        let kind = body["kind"].as_str().unwrap_or_default();
+        // The context meter rides alongside a Turn; the kinds here are the conversation.
+        if kind != "context.usage" {
+            kinds.push(kind.to_string());
+        }
     }
     assert_eq!(
         kinds,
@@ -351,7 +355,8 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
     assert_eq!(answer["type"], "task.events");
     let body = body_of(&answer);
     assert_eq!(body["agent"], "a1");
-    assert_eq!(body["events"].as_array().expect("events").len(), 2);
+    // context.usage, llm.message and turn.ended come after the first two.
+    assert_eq!(body["events"].as_array().expect("events").len(), 3);
 
     // A list names the Task this Member started.
     controller.send("task.list", None, json!({})).await;

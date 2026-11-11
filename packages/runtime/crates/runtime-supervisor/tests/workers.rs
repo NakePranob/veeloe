@@ -224,7 +224,10 @@ async fn an_agent_is_created_and_its_worker_is_ready_and_runs_a_task() {
     let kinds: Vec<String> = events
         .iter()
         .filter_map(|message| match message {
-            FromWorker::Event { event, .. } => Some(event.kind.clone()),
+            FromWorker::Event { event, .. } if event.kind != "context.usage" => {
+                Some(event.kind.clone())
+            }
+            FromWorker::Event { .. } => None,
             _ => None,
         })
         .collect();
