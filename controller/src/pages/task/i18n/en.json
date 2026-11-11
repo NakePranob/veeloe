@@ -27,7 +27,8 @@
   "file": {
     "offered": "File from the Agent",
     "size": "{{size}} KB",
-    "open": "Open"
+    "open": "Open",
+    "opening": "Opening…"
   },
   "compacted": {
     "title": "Context compacted",

@@ -15,7 +15,7 @@
 // authenticate there. The Hub API needs Postgres — `make docker-up` and
 // `make migrate-up` in `hub/`, which is the same database `e2e/pairing.test.ts` uses.
 
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateSecretKey, parseMessage, parsePairingLink, type KnownMessage } from "@veeloe/protocol-ts";
@@ -145,6 +145,15 @@ async function addProvider(home: string, url: string) {
   step(`provider main -> ${url}`);
 }
 
+/** A real Provider home's providers.json, copied in for a QA run that should spend real tokens. */
+async function useRealProviders(home: string) {
+  const source = process.env.HARNESS_PROVIDERS;
+  if (!source) return false;
+  copyFileSync(source, join(home, "runtime/providers.json"));
+  step(`provider file <- ${source}`);
+  return true;
+}
+
 /** The supervisor itself, waiting until the Hub has taken its key again. */
 async function startSupervisor(home: string, hub: Hub) {
   const proc = Bun.spawn([runtimeBinary()], {
@@ -267,16 +276,34 @@ function bashUseSse(command: string) {
   return new Response([start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
 }
 
+/** The SSE a Provider streams for one message that asks for one tool with `input`. */
+function toolUseSse(name: string, id: string, input: Record<string, unknown>) {
+  const start = JSON.stringify({ type: "message_start", message: { id: "msg_tool", type: "message", role: "assistant", model: "model-a", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } } });
+  const block = JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id, name, input } });
+  const delta = JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify(input) } });
+  const stop = JSON.stringify({ type: "content_block_stop", index: 0 });
+  const end = JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 3 } });
+  return new Response([start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
+}
+
 async function serve() {
   // 5.8b-2c: the first message asks for a command outside the Agent's
   // Allowlist, so the app must answer an Approval; the command then runs long
   // enough for the app's Stop to end the Turn.
   let answered = 0;
-  provider.reply = () => {
-    answered += 1;
-    if (answered === 1) return bashUseSse("sleep 300 && touch survived-stop");
-    return sse([{ type: "text", text: "done" }]);
-  };
+  provider.reply =
+    process.env.HARNESS_FILE === "1"
+      ? () => {
+          answered += 1;
+          if (answered === 1) return toolUseSse("write", "tu-write", { path: "report.txt", content: "Hello from the harness.\n" });
+          if (answered === 2) return toolUseSse("send_file", "tu-send", { path: "report.txt" });
+          return sse([{ type: "text", text: "ส่ง report.txt แล้ว" }]);
+        }
+      : () => {
+          answered += 1;
+          if (answered === 1) return bashUseSse("sleep 300 && touch survived-stop");
+          return sse([{ type: "text", text: "done" }]);
+        };
   const hub = await startHub();
   const home = join(work, "machine");
   const { link, text } = await startPair(hub, home);
@@ -295,7 +322,7 @@ async function serve() {
   if (!existsSync(trust)) throw new Error("the app never paired; no trust.json in the Machine's home");
   step("the app paired");
 
-  await addProvider(home, provider.url);
+  if (!(await useRealProviders(home))) await addProvider(home, provider.url);
   await startSupervisor(home, hub);
   chmodSync(home, 0o700);
   console.log(`MACHINE READY ${JSON.stringify({ hubUrl: hub.url, http: hub.http, home })}`);

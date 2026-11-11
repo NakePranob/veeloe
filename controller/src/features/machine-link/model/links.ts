@@ -1,6 +1,5 @@
 import { createBackoff, fromBase64url, hashBytes, parseMessage, publicKeyOf, sealFor, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol-ts";
-import * as FileSystem from "expo-file-system/legacy";
-import { Linking } from "react-native";
+import { Directory, File, Paths } from "expo-file-system";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
@@ -8,6 +7,8 @@ import { addListedTasks, addPendingMessage, failPendingMessage, listTasks, markP
 import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
 import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
+import { decodeChunks, isFileHash, MAX_CHUNK_TEXT, MAX_DOWNLOAD_CHUNKS, safeFileName, type Download } from "./downloads";
+import { openDownloadedFile } from "./open-file";
 
 /** What this Controller knows of a Machine right now, beside what is in the database. */
 export type MachineStatus = {
@@ -54,9 +55,7 @@ const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, 
 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "delete" | "stop" | "hello" | "status" | "provider" | "usage" | "other";
-
-const downloads = new Map<string, { total: number; chunks: (string | undefined)[]; name: string }>();
+type Kind = "create" | "update" | "delete" | "stop" | "hello" | "status" | "provider" | "usage" | "download" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -88,6 +87,54 @@ export function createMachineLinks({
   const linkListeners = new Set<(links: DeviceLink[]) => void>();
   const requestListeners = new Set<(hubUrl: string, request: HubLinkRequest) => void>();
   const statuses = new Map<string, MachineStatus>();
+  // A File card's press waits here until its chunks are a file on disk, so the card can say it failed.
+  const downloadWaiters = new Map<string, Set<{ resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>>();
+  const downloads = new Map<string, Download>();
+  /** The name the card asked for, so the cache lookup and the write agree even if chunks say another. */
+  const downloadNames = new Map<string, string>();
+  /** A hash being written or opened; a retransmitted chunk set must not open it twice. */
+  const opening = new Set<string>();
+
+  function settleDownload(hash: string, error?: Error) {
+    downloads.delete(hash);
+    downloadNames.delete(hash);
+    const waiters = downloadWaiters.get(hash);
+    if (!waiters) return;
+    downloadWaiters.delete(hash);
+    for (const waiter of waiters) {
+      clearTimeout(waiter.timer);
+      if (error) waiter.reject(error);
+      else waiter.resolve();
+    }
+  }
+
+  /** Downloaded files live under the cache, one folder per hash, so two files with one name cannot collide. */
+  function cachedFile(hash: string, name: string): File {
+    return new File(new Directory(Paths.cache, "veeloe-files", hash), safeFileName(name));
+  }
+
+  async function keepAndOpen(hash: string, download: Download) {
+    let written = false;
+    try {
+      const bytes = decodeChunks(download.chunks as string[]);
+      // The Machine checked this before chunking; checking again here keeps a bad cache out.
+      if (hashBytes(bytes) !== hash) {
+        settleDownload(hash, new Error("attachment.invalid"));
+        return;
+      }
+      const file = cachedFile(hash, download.name);
+      file.parentDirectory.create({ intermediates: true, idempotent: true });
+      await file.write(bytes);
+      written = true;
+      await openDownloadedFile(file);
+      settleDownload(hash);
+    } catch {
+      settleDownload(hash, new Error(written ? "attachment.open" : "attachment.invalid"));
+    } finally {
+      opening.delete(hash);
+    }
+  }
+
   // A new object on every change, so React can tell that something moved.
   let all: Record<string, MachineStatus> = {};
   const listeners = new Set<() => void>();
@@ -144,20 +191,25 @@ export function createMachineLinks({
     if (message.type === "file.chunk") {
       const body = message.body as { file?: unknown; index?: unknown; total?: unknown; data?: unknown; name?: unknown };
       if (typeof body.file !== "string" || typeof body.index !== "number" || typeof body.total !== "number" || typeof body.data !== "string") return;
+      // Only a File card that is waiting may put bytes on disk; an unsolicited chunk opens nothing.
+      if (!isFileHash(body.file) || !downloadWaiters.has(body.file) || opening.has(body.file)) return;
+      if (!Number.isInteger(body.total) || body.total < 1 || !Number.isInteger(body.index) || body.index < 0 || body.index >= body.total) return;
+      if (body.total > MAX_DOWNLOAD_CHUNKS || body.data.length > MAX_CHUNK_TEXT) {
+        settleDownload(body.file, new Error("attachment.invalid"));
+        return;
+      }
       const item = downloads.get(body.file) ?? {
         total: body.total,
         chunks: new Array<string | undefined>(body.total).fill(undefined),
-        name: typeof body.name === "string" ? body.name : `${body.file.slice(0, 8)}.bin`,
+        name: downloadNames.get(body.file) ?? safeFileName(typeof body.name === "string" ? body.name : `${body.file.slice(0, 8)}.bin`),
       };
+      if (item.total !== body.total) return;
       item.chunks[body.index] = body.data;
       downloads.set(body.file, item);
-      if (item.chunks.length === item.total && item.chunks.every((chunk) => typeof chunk === "string")) {
+      if (item.chunks.every((chunk) => typeof chunk === "string")) {
+        opening.add(body.file);
         downloads.delete(body.file);
-        const bytes = fromBase64url(item.chunks.join(""));
-        let binary = "";
-        for (const byte of bytes) binary += String.fromCharCode(byte);
-        const uri = `${FileSystem.cacheDirectory}${item.name}`;
-        void FileSystem.writeAsStringAsync(uri, btoa(binary), { encoding: FileSystem.EncodingType.Base64 }).then(() => Linking.openURL(uri));
+        void keepAndOpen(body.file, item);
       }
       return;
     }
@@ -211,6 +263,8 @@ export function createMachineLinks({
       else if (about?.kind === "usage") {
         const current = usageStatuses.get(about.machine);
         if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: message.body.code });
+      } else if (about?.kind === "download" && about.request) {
+        settleDownload(about.request, new Error(message.body.code));
       } else await failPendingMessage(database, message.body.ref, message.body.code);
     }
   }
@@ -259,6 +313,10 @@ export function createMachineLinks({
         if (about.kind === "usage") {
           const current = usageStatuses.get(about.machine);
           if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: error.code });
+          return;
+        }
+        if (about.kind === "download" && about.request) {
+          settleDownload(about.request, new Error(error.code));
           return;
         }
         if (about.kind === "create") setStatus(about.machine, { createError: error.code });
@@ -370,9 +428,43 @@ export function createMachineLinks({
       return { name: file.name, size: bytes.length, hash };
     },
 
-    /** Ask for a file the Agent offered; the Machine answers with `file.chunk`. */
-    openFile(machine: Machine, task: string, agent: string, path: string, hash: string) {
-      return sendTo(machine, "other", { type: "file.get", task, body: { agent, path, hash } });
+    /**
+     * Opens a file the Agent offered. A cached copy opens at once; otherwise the
+     * Machine answers `file.get` with `file.chunk`, and the card waits until the
+     * file is written and handed to the OS.
+     */
+    async openFile(machine: Machine, task: string, agent: string, path: string, hash: string, name: string) {
+      if (!isFileHash(hash)) throw new Error("attachment.invalid");
+      const cached = cachedFile(hash, name);
+      if (cached.exists) {
+        try {
+          if (hashBytes(await cached.bytes()) === hash) return await openDownloadedFile(cached);
+        } catch {
+          // A cache file we cannot read is no better than none.
+        }
+        cached.delete();
+      }
+      return new Promise<void>((resolve, reject) => {
+        const alreadyAsked = downloadWaiters.has(hash);
+        const waiters = downloadWaiters.get(hash) ?? new Set<{ resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+        const waiter = {
+          resolve,
+          reject,
+          timer: setTimeout(() => settleDownload(hash, new Error("attachment.timeout")), 120_000),
+        };
+        waiters.add(waiter);
+        downloadWaiters.set(hash, waiters);
+        if (alreadyAsked) return;
+        downloadNames.set(hash, safeFileName(name));
+        downloads.delete(hash);
+        if (!sendTo(machine, "download", { type: "file.get", task, body: { agent, path, hash } }, hash)) {
+          clearTimeout(waiter.timer);
+          waiters.delete(waiter);
+          downloadNames.delete(hash);
+          if (waiters.size === 0) downloadWaiters.delete(hash);
+          reject(new Error("hub.machine_offline"));
+        }
+      });
     },
 
     /**

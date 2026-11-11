@@ -77,16 +77,31 @@ function ContextDetails({ usage }: { usage: NonNullable<ReturnType<typeof contex
   );
 }
 
-function FileCard({ item, onOpen }: { item: Extract<Item, { kind: "file" }>; onOpen: () => void }) {
+function FileCard({ item, onOpen }: { item: Extract<Item, { kind: "file" }>; onOpen: () => Promise<void> }) {
   const t = useT("task");
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function open() {
+    if (opening) return;
+    setOpening(true);
+    setError(null);
+    try {
+      await onOpen();
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "attachment.invalid");
+    } finally {
+      setOpening(false);
+    }
+  }
   return (
     <Card>
       <Label icon="attach">{t("file.offered")}</Label>
       <Text>{item.name}</Text>
       <Text variant="footnote" tone="secondary">{t("file.size", { size: Math.max(1, Math.round(item.size / 1024)) })}</Text>
       <View style={{ flexDirection: "row" }}>
-        <Button label={t("file.open")} variant="primary" onPress={onOpen} />
+        <Button label={opening ? t("file.opening") : t("file.open")} variant="primary" disabled={opening} onPress={() => void open()} />
       </View>
+      {error && <Problem code={error} />}
     </Card>
   );
 }
@@ -258,7 +273,7 @@ export function TaskPage() {
           ) : item.kind === "compacted" ? (
             <CompactedCard key={item.key} item={item} />
           ) : item.kind === "file" ? (
-            <FileCard key={item.key} item={item} onOpen={() => link && machine ? void link.openFile(machine, task, agent.id, item.path, item.hash) : undefined} />
+            <FileCard key={item.key} item={item} onOpen={() => (link && machine ? link.openFile(machine, task, agent.id, item.path, item.hash, item.name) : Promise.reject(new Error("hub.machine_offline")))} />
           ) : item.kind === "interrupted" ? (
             <InterruptedCard key={item.key} machine={machine.name} agentName={agent.name} onContinue={() => send(t("interrupted.continueMessage"))} />
           ) : item.code === "budget.exhausted" ? (

@@ -253,7 +253,12 @@ pub async fn dispatch(
         let Ok(real) = std::fs::canonicalize(path) else {
             return outbox.error(from, "attachment.missing");
         };
-        if !real.starts_with(workdir.join("workdir")) {
+        // The path the Agent offered is already real; resolve the folder too, or a
+        // symlinked home (`/var` on macOS) would fail a prefix that is really inside it.
+        let Ok(root) = std::fs::canonicalize(workdir.join("workdir")) else {
+            return outbox.error(from, "agent.unavailable");
+        };
+        if !real.starts_with(root) {
             return outbox.error(from, "attachment.invalid");
         }
         let Ok(bytes) = std::fs::read(&real) else {

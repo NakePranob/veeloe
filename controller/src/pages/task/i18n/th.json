@@ -27,7 +27,8 @@
   "file": {
     "offered": "ไฟล์จาก Agent",
     "size": "{{size}} KB",
-    "open": "เปิด"
+    "open": "เปิด",
+    "opening": "กำลังเปิด…"
   },
   "compacted": {
     "title": "ย่อ context แล้ว",

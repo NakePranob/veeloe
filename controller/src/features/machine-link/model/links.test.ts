@@ -1,6 +1,6 @@
 import { Database as Sqlite } from "bun:sqlite";
 import { afterEach, expect, mock, test } from "bun:test";
-import { createBackoff, createSigner, fromBase64url, handshakeBytes, publicKeyOf, signCertificate, toBase64url, verifySignature, type Envelope } from "@veeloe/protocol-ts";
+import { createBackoff, createSigner, fromBase64url, handshakeBytes, hashBytes, publicKeyOf, signCertificate, toBase64url, verifySignature, type Envelope } from "@veeloe/protocol-ts";
 import type { Machine } from "../../../entities/machine";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
@@ -13,6 +13,38 @@ mock.module("../../../entities/task", () => import("../../../entities/task/model
 mock.module("../../../entities/machine", () => import("../../../entities/machine/model/machines"));
 mock.module("../../../entities/device", () => import("../../../entities/device/model/devices"));
 mock.module("../../../entities/usage", () => import("../../../entities/usage/model/usage"));
+class FakeFile {
+  static last: FakeFile | null = null;
+  static previews = 0;
+  exists = false;
+  parentDirectory = { create() {} };
+  bytes: Uint8Array | null = null;
+  private parts: unknown[];
+  constructor(..._parts: unknown[]) {
+    this.parts = _parts;
+    FakeFile.last = this;
+  }
+  get name() {
+    const last = this.parts.at(-1);
+    return typeof last === "string" ? last.split("/").at(-1)! : "file";
+  }
+  get type() {
+    return "text/plain";
+  }
+  write = async (content: Uint8Array) => {
+    this.bytes = content;
+  };
+  static canPreview = async () => true;
+  static preview = async () => {
+    FakeFile.previews++;
+  };
+}
+mock.module("expo-file-system", () => ({
+  Paths: { cache: "file:///cache/" },
+  Directory: class {},
+  File: FakeFile,
+}));
+mock.module("react-native", () => ({ Linking: { openURL: async () => {} } }));
 const { egressOf, saveMachine } = await import("../../../entities/machine/model/machines");
 const { createMachineLinks } = await import("./links");
 
@@ -334,4 +366,39 @@ test("a Hub that says the Machine is offline fails this request only, and does n
   await until(() => links.usage("machine-1").error === "hub.machine_offline");
   expect(links.usage("machine-1").loading).toBe(false);
   expect(await database.query("SELECT * FROM pending_message")).toEqual([]);
+});
+
+test("opening an offered file asks the Machine, decodes every chunk, keeps the bytes and hands the file to the OS", async () => {
+  const { fake, machine, links } = await setup();
+  const bytes = new Uint8Array(256 * 1024 + 7).map((_, index) => index % 256);
+  const hash = hashBytes(bytes);
+  const opening = links.openFile(machine, "task-1", "a1", "/workdir/report.txt", hash, "report.txt");
+  await until(() => fake.hub.frames.some((frame) => JSON.parse(frame.signed).type === "file.get"));
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "file.get", task: "task-1", body: { agent: "a1", path: "/workdir/report.txt", hash } });
+
+  fake.push(signed("file.chunk", { file: hash, name: "report.txt", index: 0, total: 2, data: toBase64url(bytes.slice(0, 256 * 1024)) }, { task: "task-1", seq: 1 }));
+  fake.push(signed("file.chunk", { file: hash, name: "report.txt", index: 1, total: 2, data: toBase64url(bytes.slice(256 * 1024)) }, { task: "task-1", seq: 2 }));
+  await opening;
+
+  expect(FakeFile.last!.bytes).toEqual(bytes);
+  expect(FakeFile.previews).toBe(1);
+});
+
+test("a hash that is not a SHA-256 is refused before it can name a cache folder", async () => {
+  const { fake, machine, links } = await setup();
+  await expect(links.openFile(machine, "task-1", "a1", "/workdir/report.txt", "../../etc/passwd", "report.txt")).rejects.toThrow("attachment.invalid");
+  expect(fake.hub.frames.some((frame) => JSON.parse(frame.signed).type === "file.get")).toBe(false);
+});
+
+test("bytes that do not match the offered hash are not written or opened", async () => {
+  const { fake, machine, links } = await setup();
+  const expected = hashBytes(new Uint8Array([1, 2, 3]));
+  FakeFile.last = null;
+  FakeFile.previews = 0;
+  const opening = links.openFile(machine, "task-1", "a1", "/workdir/report.txt", expected, "report.txt");
+  await until(() => fake.hub.frames.some((frame) => JSON.parse(frame.signed).type === "file.get"));
+  fake.push(signed("file.chunk", { file: expected, name: "report.txt", index: 0, total: 1, data: toBase64url(new Uint8Array([9, 9, 9])) }, { task: "task-1" }));
+  await expect(opening).rejects.toThrow("attachment.invalid");
+  expect((FakeFile.last as FakeFile | null)?.bytes ?? null).toBeNull();
+  expect(FakeFile.previews).toBe(0);
 });
