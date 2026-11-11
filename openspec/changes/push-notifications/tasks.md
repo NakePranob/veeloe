@@ -21,8 +21,8 @@
 
 ## 4. ตรวจ
 
-- [ ] 4.1 `bun run check` ผ่าน
-- [ ] 4.2 `bun run test` ผ่าน
+- [x] 4.1 `bun run check` ผ่าน
+- [x] 4.2 `bun run test` ผ่าน
 - [ ] 4.3 QA บน iPhone จริง: อนุญาต notification, สร้าง Approval, เห็น Generic Push และกดแล้วเปิด Task
 - [ ] 4.4 QA บน Android จริง: เหมือน 4.3 และตรวจว่าปิด notification แล้วไม่ได้รับ push
 - [ ] 4.5 ตรวจว่าเนื้อหา push ไม่มีข้อความ Task ชื่อไฟล์ หรือชื่อ Agent และถอนกุญแจแล้ว token ใช้ไม่ได้
