@@ -4,6 +4,7 @@ import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useMachines } from "../../../entities/machine";
+import { useDatabase, useLiveQuery, type Database } from "../../../shared/db";
 import { useLanguage } from "../../../shared/i18n";
 import { useMachineLink } from "./use-machine-links";
 
@@ -12,6 +13,16 @@ let activeTask: string | null = null;
 
 export function setActiveTask(task: string | null) {
   activeTask = task;
+}
+
+/** This Controller's own switch; the other devices of the Member keep theirs (ADR 0044). */
+export async function savePushEnabled(database: Database, enabled: boolean) {
+  await database.write(["device_setting"], ({ run }) =>
+    run(
+      "INSERT INTO device_setting (key, value) VALUES ('push', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      [enabled ? "on" : "off"],
+    ),
+  );
 }
 
 if (process.env.EXPO_OS !== "web") {
@@ -43,6 +54,9 @@ export function usePushRegistration() {
   const machines = useMachines();
   const link = useMachineLink();
   const language = useLanguage();
+  const database = useDatabase();
+  const saved = useLiveQuery<{ value: string }>("SELECT value FROM device_setting WHERE key = 'push'", [], ["device_setting"]);
+  const enabled = (saved?.[0]?.value ?? "on") !== "off";
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,7 +92,10 @@ export function usePushRegistration() {
   }, []);
 
   useEffect(() => {
-    if (!token || !link || !machines) return;
-    for (const machine of machines) link.registerPush(machine, token, language);
-  }, [token, link, machines, language]);
+    if (!link || !machines) return;
+    for (const machine of machines) {
+      if (!enabled) link.unregisterPush(machine);
+      else if (token) link.registerPush(machine, token, language);
+    }
+  }, [token, link, machines, language, enabled]);
 }

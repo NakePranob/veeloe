@@ -19,6 +19,7 @@ const SYMBOLS = {
   time: { ios: "clock", android: "schedule", web: "schedule" },
   info: { ios: "info.circle", android: "info", web: "info" },
   offline: { ios: "wifi.slash", android: "wifi_off", web: "wifi_off" },
+  bell: { ios: "bell", android: "notifications", web: "notifications" },
   settings: { ios: "gearshape", android: "settings", web: "settings" },
   machine: { ios: "desktopcomputer", android: "computer", web: "computer" },
   window: { ios: "macwindow", android: "tab", web: "tab" },

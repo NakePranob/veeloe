@@ -1,6 +1,7 @@
 import { useAgents } from "../../../entities/agent";
 import { useDevices } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
+import { savePushEnabled } from "../../../features/machine-link";
 import { useDatabase, useLiveQuery } from "../../../shared/db";
 import { LANGUAGES, saveLanguage, useLanguage, useT } from "../../../shared/i18n";
 import { Icon, Note, Row, Screen, Section } from "../../../shared/ui";
@@ -16,6 +17,8 @@ export function WorkspacePage() {
   const live = devices?.filter((d) => d.revoked_at === null);
   const saved = useLiveQuery<{ value: string }>("SELECT value FROM device_setting WHERE key = 'language'", [], ["device_setting"]);
   const current = saved?.[0]?.value ?? language;
+  const push = useLiveQuery<{ value: string }>("SELECT value FROM device_setting WHERE key = 'push'", [], ["device_setting"]);
+  const pushOn = (push?.[0]?.value ?? "on") !== "off";
   return (
     <Screen title="Workspace">
       <Section title={t("onMachines")}>
@@ -34,6 +37,9 @@ export function WorkspacePage() {
           {t("oneDevice")}
         </Note>
       )}
+      <Section title={t("notifications.heading")} footer={t("notifications.note")}>
+        <Row icon="bell" title={t("notifications.title")} value={pushOn ? t("notifications.on") : t("notifications.off")} onPress={() => void savePushEnabled(database, !pushOn)} />
+      </Section>
       <Section title={t("language.heading")} footer={t("language.note")}>
         {LANGUAGES.map((option) => (
           <Row
