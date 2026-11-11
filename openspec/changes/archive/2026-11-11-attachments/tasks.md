@@ -23,5 +23,6 @@
 - [x] 4.2 `cargo test -p veeloe-runtime-supervisor --no-run`
 - [x] 4.3 `bun run typecheck`, `check:controller`, `check:protocol`
 - [x] 4.4 QA Android: เลือก `window.xml`, ส่ง, Agent ตอบ และไฟล์อยู่ที่ `workdir/attachments/<task>/`
-- [ ] 4.5 QA ไฟล์ >20 MB และ hash mismatch ผ่าน UI
-- [x] 4.6 `send_file` tool, `file.offered` card, `file.get` และ chunk กลับ Controller (ยังไม่ QA ด้วย model จริง)
+- [x] 4.5 QA ไฟล์ >20 MB ผ่าน UI: Android emulator เลือก `big.bin` 22 MB แล้วขึ้น "ไฟล์ใหญ่เกิน 20 MB ส่งผ่านแอปไม่ได้ ให้ใช้ git หรือ Connector แทน"
+- [x] 4.6 `send_file` tool, `file.offered` card, `file.get` และ chunk กลับ Controller (QA ด้วย `opencode-go`/`deepseek-v4.1-flash` แล้ว)
+- [x] 4.7 hash mismatch: Controller คำนวณ hash เอง จึงไม่เกิดผ่าน UI; ครอบด้วย `links.test` ว่าไบต์ไม่ตรง hash แล้วไม่เขียนและไม่เปิด

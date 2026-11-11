@@ -39,7 +39,7 @@
 - [x] `daily-budget`: Budget ต่อวันที่ proxy (ADR 0043)
 - [x] `usage-history`: ประวัติการใช้ token 30 วันและหน้า "การใช้ token" (ADR 0066)
 - [ ] `memory-and-compaction`: Memory และการย่อ context (ADR 0036, 0041)
-- [ ] `attachments`: ส่งไฟล์เป็นก้อนผ่าน Hub โดยไม่เก็บ (ADR 0050)
+- [x] `attachments`: ส่งไฟล์เป็นก้อนผ่าน Hub โดยไม่เก็บ (ADR 0050)
 - [ ] `push-notifications`: push ของ Approval, Turn ที่เสร็จ, Budget และการ Link เครื่องใหม่ (ADR 0044) — ตอนนี้การ Link แจ้งด้วย alert ในแอปไปก่อน
 - [x] `linking-and-revocation`: Linking เครื่องที่สองด้วย QR และการถอนกุญแจ (ADR 0013, 0031)
 - [x] `controller-task-screens`: Inbox, หน้า Task และ Character บนข้อมูลจริง
