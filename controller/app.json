@@ -24,6 +24,11 @@
       "favicon": "./assets/favicon.png",
       "output": "single"
     },
+    "extra": {
+      "eas": {
+        "projectId": "9d2e2d71-7141-4290-9ad9-19d1adb06be4"
+      }
+    },
     "plugins": [
       [
         "expo-router",
