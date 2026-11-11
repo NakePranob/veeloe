@@ -2,7 +2,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMachines } from "../../../entities/machine";
 import { useDatabase, useLiveQuery, type Database } from "../../../shared/db";
 import { useLanguage } from "../../../shared/i18n";
@@ -58,8 +58,11 @@ export function usePushRegistration() {
   const saved = useLiveQuery<{ value: string }>("SELECT value FROM device_setting WHERE key = 'push'", [], ["device_setting"]);
   const enabled = (saved?.[0]?.value ?? "on") !== "off";
   const [token, setToken] = useState<string | null>(null);
+  const started = useRef(false);
 
   useEffect(() => {
+    if (started.current || !machines?.length) return;
+    started.current = true;
     if (process.env.EXPO_OS === "web" || !Device.isDevice) return;
     let cancelled = false;
     void (async () => {
@@ -89,7 +92,7 @@ export function usePushRegistration() {
       cancelled = true;
       response.remove();
     };
-  }, []);
+  }, [machines]);
 
   useEffect(() => {
     if (!link || !machines) return;
