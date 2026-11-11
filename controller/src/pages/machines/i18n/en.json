@@ -31,6 +31,7 @@
     "models_one": "{{count}} model",
     "models_other": "{{count}} models",
     "add": "Add Provider",
+    "custom": "Custom Provider",
     "name": "Provider name",
     "url": "Base URL",
     "key": "API key (sealed to this Machine)",

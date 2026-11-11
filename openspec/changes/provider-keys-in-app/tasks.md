@@ -15,7 +15,7 @@
 - [x] 3.1 เพิ่ม `links.addProvider` ที่ seal key ด้วย `machine.public_key`
 - [x] 3.2 เพิ่มฟอร์ม Add Provider ใน MachinePage (name/url/key), fresh authentication, clear key หลังส่ง
 - [x] 3.3 เพิ่ม i18n th/en และแสดง error
-- [ ] 3.4 เพิ่ม preset picker (งานถัดไป)
+- [x] 3.4 เพิ่ม preset picker
 
 ## 4. ตรวจ
 

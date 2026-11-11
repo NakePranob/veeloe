@@ -31,6 +31,7 @@
     "models_one": "{{count}} model",
     "models_other": "{{count}} model",
     "add": "เพิ่ม Provider",
+    "custom": "Provider อื่นๆ",
     "name": "ชื่อ Provider",
     "url": "Base URL",
     "key": "API key (ปิดผนึกให้ Machine นี้)",
