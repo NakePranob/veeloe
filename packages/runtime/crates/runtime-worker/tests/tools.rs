@@ -718,7 +718,7 @@ fn grep_returns_path_and_line_respects_include_and_case_skips_binary_and_caps_re
 }
 
 #[test]
-fn the_read_only_runner_has_only_read_glob_and_grep() {
+fn the_read_only_runner_reads_globs_greps_and_offers_files_but_cannot_write() {
     let (_root, files) = files();
     let read_only = FileTools::new(&files.workdir, true);
     let names: Vec<String> = read_only
@@ -726,7 +726,7 @@ fn the_read_only_runner_has_only_read_glob_and_grep() {
         .into_iter()
         .map(|definition| definition.name)
         .collect();
-    assert_eq!(names, vec!["read", "glob", "grep"]);
+    assert_eq!(names, vec!["read", "glob", "grep", "send_file"]);
     assert!(failure(run(
         &read_only,
         "write",

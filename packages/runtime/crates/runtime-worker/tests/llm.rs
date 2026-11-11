@@ -306,6 +306,7 @@ async fn a_turn_runs_the_tool_loop_through_the_llm_adapter_and_ends_with_done() 
         .events("t1")
         .expect("events")
         .into_iter()
+        .filter(|event| event.kind != "context.usage")
         .map(|event| event.kind)
         .collect();
     assert_eq!(
