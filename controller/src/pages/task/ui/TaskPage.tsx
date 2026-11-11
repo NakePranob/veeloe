@@ -1,12 +1,12 @@
 import { randomUUID } from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { allowlistOf, useAgents } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
 import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
-import { MAX_ATTACHMENT_BYTES, setActiveTask, useMachineLink, useMachineStatus } from "../../../features/machine-link";
+import { MAX_ATTACHMENT_BYTES, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
@@ -161,11 +161,6 @@ export function TaskPage() {
   const input = useRef<TextInputInstance>(null);
   const scroll = useRef<ScrollViewInstance>(null);
   const viewport = useRef(0);
-
-  useEffect(() => {
-    setActiveTask(task ?? null);
-    return () => setActiveTask(null);
-  }, [task]);
 
   if (!agent || !machine || !events || !pending) return <Stack.Screen options={{ title: t("title") }} />;
   const { items: shown, working } = items(events, now);

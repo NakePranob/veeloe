@@ -7,7 +7,7 @@ import { LockPage } from "../../pages/lock";
 import { OtherTabPage } from "../../pages/other-tab";
 import { StorageUnavailablePage } from "../../pages/storage-unavailable";
 import { listDevices } from "../../entities/device";
-import { useMachineLinks, usePushRegistration } from "../../features/machine-link";
+import { useMachineLinks } from "../../features/machine-link";
 import { DatabaseProvider, useDatabase } from "../../shared/db";
 import { deviceLanguage, initI18n, useT } from "../../shared/i18n";
 import { useKeyActivity, useKeyStatus } from "../../shared/keystore";
@@ -33,7 +33,6 @@ initI18n(resources, deviceLanguage());
 function MachineLinks() {
   const t = useT("devices");
   const database = useDatabase();
-  usePushRegistration();
   useMachineLinks({
     onRevoked: () => void forgetThisDevice(database).then(() => inform(t("revoked.title"), t("revoked.body"))),
     // ponytail: an alert in the app stands in for the push the prototype shows, until there is push (ADR 0044).
