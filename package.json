@@ -9,6 +9,16 @@
     "e2e"
   ],
   "scripts": {
+    "dev": "bun scripts/dev.ts up",
+    "dev:down": "bun scripts/dev.ts down",
+    "dev:status": "bun scripts/dev.ts status",
+    "dev:pair": "bun scripts/dev.ts pair",
+    "dev:link": "bun scripts/dev.ts link",
+    "dev:unpair": "bun scripts/dev.ts unpair",
+    "dev:reset-sim": "bun scripts/dev.ts reset-sim",
+    "dev:restart": "bun scripts/dev.ts restart",
+    "dev:seed": "bun scripts/dev.ts seed",
+    "dev:ios": "bun e2e/ios-flow-harness.ts serve",
     "test": "cd packages/protocol-ts && bun test && cd ../../controller-prototype && bun test && cd ../controller && bun test ./src ./scripts",
     "test:e2e": "cd e2e && bun test",
     "check": "bun run typecheck && bun run check:prototype && bun run check:controller && bun run check:runtime && bun run check:protocol && bun run check:hub",

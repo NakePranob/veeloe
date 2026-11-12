@@ -13,3 +13,6 @@ memory/
 
 # Worktrees that Claude Code agents work in
 .claude/worktrees/
+
+# The local stack `bun run dev` starts: its pids, logs and nothing else
+.dev/
