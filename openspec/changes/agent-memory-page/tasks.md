@@ -25,4 +25,4 @@
 - [ ] 4.1 QA บน emulator (ยังไม่ได้รัน: เครื่องนี้ไม่มี Simulator GUI/input และเว็บสร้าง key ไม่ได้): เปิดหน้ามีไฟล์เห็นเนื้อหาตรงกับไฟล์ ไฟล์เกินเพดานเห็นข้อความให้ย่อ ยังไม่มีไฟล์เห็นสถานะว่าง ออฟไลน์เห็น note และกดโหลดใหม่แล้วได้เนื้อหาใหม่
 - [ ] 4.2 ตรวจว่าเนื้อหาที่มี `<script>` (รอ 4.1) หรือ Markdown แสดงเป็นข้อความ ไม่ถูกตีความ และไม่มีลิงก์ที่กดได้จาก Memory
 - [x] 4.3 ตรวจ `bun run check` ผ่านทั้งชุด
-- [ ] 4.4 ติ๊กบรรทัด `agent-memory-page` ใน `docs/roadmap.md` แล้ว archive change นี้พร้อม merge spec deltas เข้า `openspec/specs/`
+- [ ] 4.4 archive change นี้พร้อม merge spec deltas เข้า `openspec/specs/`

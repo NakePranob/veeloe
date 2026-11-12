@@ -12,8 +12,9 @@ GitHub environments or the host, never in git.
 architecture decisions: do not contradict one; if a change has to, say so and
 change the ADR in the same commit. `openspec/` holds the specs and changes,
 versioned with the code; it starts empty until the build restarts.
-`docs/roadmap.md` lists the changes of each version and what is done: open the
-next change from there, and tick it in the commit that archives it.
+GitHub Issues track the work of each version (ADR 0048 sets what each version
+holds): open the next change from an issue, and close the issue in the commit
+that archives it.
 
 GitHub Releases are for the Runtime only — its updater takes the latest
 release as its own (ADR 0009, 0025). The Hub ships as an image on GHCR, the

@@ -4,7 +4,7 @@ ADR 0036 วาง Memory ไว้เป็น `MEMORY.md` ที่ root ข�
 
 `memory-and-compaction` ทำกลไก Memory กับ compaction จบแล้ว แต่ตั้งใจเว้นหน้าใน Controller ไว้เป็น Non-goal และเหลือไว้แค่คำสั่ง `veeloe memory <agent>` บน Machine (ปิด task 1.4 ด้วยคำสั่งนั้น) ผลคือ Owner ต้องอยู่หน้า terminal ของ Machine เพื่อตรวจว่า Agent จำอะไรอยู่ ซึ่งขัดกับเส้นทางหลักของ v0.1 ที่สั่งและตรวจงานจากมือถือ
 
-ตามปกติ `docs/roadmap.md` ให้เปิด change เมื่อถึงคิวเท่านั้น แต่รอบนี้เปิดเลยเพราะ v0.1 เป็นเฟสที่กำลังทำอยู่ และ ADR 0036 ระบุไว้ใน Consequences แล้วว่าแอปต้องมีหน้าให้อ่าน `MEMORY.md`; หน้า Memory จึงเป็นส่วนที่ยังค้างของ v0.1 ไม่ใช่ของเวอร์ชันถัดไป
+ตามปกติให้เปิด change เมื่อถึงคิวเท่านั้น แต่รอบนี้เปิดเลยเพราะ v0.1 เป็นเฟสที่กำลังทำอยู่ และ ADR 0036 ระบุไว้ใน Consequences แล้วว่าแอปต้องมีหน้าให้อ่าน `MEMORY.md`; หน้า Memory จึงเป็นส่วนที่ยังค้างของ v0.1 ไม่ใช่ของเวอร์ชันถัดไป
 
 ## What Changes
 
@@ -39,7 +39,7 @@ ADR 0036 วาง Memory ไว้เป็น `MEMORY.md` ที่ root ข�
 - **Runtime core:** `runtime-core/src/memory.rs` เพิ่มตัวอ่านที่คืนทั้งข้อความและจำนวนตัวอักษรในครั้งเดียว; `memory_prompt` ยังเป็นทางเดิมของ prompt
 - **Runtime supervisor:** `tasks.rs` รับ `memory.get` และตอบ `memory.got`; `memory.rs` (คำสั่ง CLI) ใช้ตัวอ่านเดียวกัน
 - **Controller:** `features/machine-link/model/links.ts` (คำขอ สถานะ ตัวรับคำตอบ), หน้าใหม่ `pages/agent-memory/`, route `app/agents/[agent]/memory.tsx`, แถวทางเข้าใน `pages/agents/ui/AgentPage.tsx`, i18n th/en
-- **Docs:** `docs/roadmap.md` เพิ่มบรรทัดใต้ v0.1 (ADR 0048 นับ Memory อยู่ใน v0.1 แล้ว จึงไม่ต้องแก้ ADR)
+- **Docs:** ไม่ต้องแก้ ADR เพราะ ADR 0048 นับ Memory อยู่ใน v0.1 แล้ว
 
 ## Acceptance anchor cases
 

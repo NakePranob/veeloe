@@ -77,7 +77,7 @@ _Avoid_: Avatar, persona, mascot
 _Avoid_: Emotion, expression, animation
 
 **Sandbox**:
-ขอบเขตที่ OS บังคับ (macOS Seatbelt, Linux bubblewrap) ว่า Agent แตะไฟล์หรือเน็ตอะไรได้ ตาม ADR 0008 เป้าหมายคือครอบทั้ง worker; v0.1 บังคับกับทุกคำสั่งที่ worker เปิด และ tool ทุกตัวใช้ resolver path ชุดเดียวกัน Approval กับ Allowlist เป็นนโยบาย ไม่ใช่ sandbox และไม่ได้ให้สิทธิ์นอกขอบเขต
+ขอบเขตที่ OS บังคับว่า Agent แตะไฟล์ เน็ต และโปรเซสอะไรได้ ครอบ Agent ทั้งตัว ทั้ง tool และทุกคำสั่งที่มันรัน Agent อ่านได้เฉพาะสิ่งที่เปิดไว้ให้ มี localhost ของตัวเองไว้รัน dev server และฐานข้อมูล และออกนอกเครื่องได้ทางเดียวคือผ่าน Runtime ขอบเขตของแต่ละ Turn คือสิ่งที่ Agent ได้รับ ซ้อนกับสิ่งที่คนส่งข้อความมีสิทธิ์ Approval กับ Allowlist เป็นนโยบาย ไม่ใช่ sandbox และไม่ได้ให้สิทธิ์นอกขอบเขต
 _Avoid_: Allowlist, Approval, Permission
 
 **Workdir**:

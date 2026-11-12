@@ -1,5 +1,7 @@
 # Agent แตะไฟล์ได้เฉพาะ Workdir, Project ที่ได้งาน และ Library ตามสิทธิ์
 
+> **ADR 0069 แก้บางส่วน** ข้อที่ว่า Rust worker abort ใต้ `sandbox-exec` ยังไม่ยืนยัน: บน macOS 27 worker ขึ้น ready ได้ทั้งกับ profile เดิมและแบบ allow-list ที่มี path ระบบครบ เป้าหมายจึงกลับเป็นการครอบทั้ง worker และ Task log ย้ายไปให้ supervisor เขียน ไม่อยู่ในส่วนที่คำสั่งเขียนได้
+
 ทุก Turn ของ Agent ควรแตะได้แค่สามที่: **Workdir ของตัวเอง**, **Project ที่ Task นี้ทำงานอยู่** และ **Library ที่ได้รับสิทธิ์** — ที่อื่นincluding home ของผู้ใช้ต้องถูกปฏิเสธโดย OS ไม่ใช่โดยคำสั่งใน prompt หรือการกดอนุมัติ เพราะ Approval กับ Allowlist เป็นนโยบาย "จะถามคนไหม" ไม่ได้ให้สิทธิ์ไฟล์ (ADR 0008, 0030)
 
 ที่มาคือเคสจริง: Owner อนุมัติ `ls ~` แล้ว Agent เห็นรายชื่อโฟลเดอร์ใน home (แม้ `.ssh`, `.aws`, `.veeloe` จะถูกบล็อก) และก่อนหน้านั้น Memory reader อ่านผ่าน symlink ออกนอก Workdir ได้ เพราะการอ่านไม่ได้ confine เท่าการเขียน — การป้องกันต้องอยู่ที่ sandbox และ path resolver ของ tool ไม่ใช่ที่ harness
