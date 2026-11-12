@@ -15,7 +15,7 @@ use veeloe_runtime_supervisor::agents::{agent_dir, Agent, AgentRegistry};
 use veeloe_runtime_supervisor::providers::{
     load_providers, save_providers, upstream_headers, Auth, Provider,
 };
-use veeloe_runtime_supervisor::workers::{SupervisorLlm, Workers};
+use veeloe_runtime_supervisor::workers::{sandboxed, SupervisorLlm, Workers};
 
 fn agent() -> Agent {
     Agent {
@@ -276,4 +276,159 @@ async fn an_agent_is_created_and_its_worker_is_ready_and_runs_a_task() {
     );
 
     workers.stop_all();
+}
+
+/// Answers the first request with tool calls that try to leave the Agent's
+/// folder, and the second with the end of the Turn.
+struct ScriptedLlm {
+    secret: String,
+    link: String,
+    requests: Mutex<usize>,
+}
+
+#[async_trait]
+impl SupervisorLlm for ScriptedLlm {
+    async fn answer(&self, _agent: &str, _request: LlmHttpRequest) -> LlmHttpResponse {
+        let first = {
+            let mut seen = self.requests.lock().expect("requests");
+            *seen += 1;
+            *seen == 1
+        };
+        let body = if first {
+            let bash = |id: &str, command: String| {
+                json!({ "type": "tool_use", "id": id, "name": "bash", "input": { "command": command } })
+            };
+            json!({
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    bash("t-secret", format!("cat {}", self.secret)),
+                    bash("t-home", "echo $HOME".into()),
+                    bash("t-write", "touch made.txt".into()),
+                    { "type": "tool_use", "id": "t-link", "name": "read", "input": { "path": self.link } },
+                ],
+                "stop_reason": "tool_use",
+            })
+        } else {
+            json!({
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "done" }],
+                "stop_reason": "end_turn",
+            })
+        };
+        LlmHttpResponse {
+            status: 200,
+            headers: vec![("content-type".into(), "application/json".into())],
+            body: body.to_string(),
+        }
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn a_sandboxed_worker_runs_a_turn_and_its_tools_stay_in_the_agents_folder() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut agent = agent();
+    agent.allowlist = vec!["cat".into(), "echo".into(), "touch".into()];
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    // Something of the owner's, outside the Agent's folder and the Runtime's.
+    let owner = tempdir().expect("owner");
+    let secret = std::fs::canonicalize(owner.path())
+        .expect("real owner")
+        .join("secret.txt");
+    std::fs::write(&secret, "TOPSECRET").expect("secret");
+    let dir = agent_dir(&home_path, "a1").expect("dir");
+    std::os::unix::fs::symlink(&secret, dir.join("workdir/link")).expect("symlink");
+
+    let llm = Arc::new(ScriptedLlm {
+        secret: secret.to_string_lossy().to_string(),
+        link: "link".into(),
+        requests: Mutex::new(0),
+    });
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::clone(&llm) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        // No proxy listens here: this Turn needs no network.
+        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+    );
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the sandboxed worker never said ready: {:?}",
+        lines.lock().expect("lines")
+    );
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    let ended = || {
+        heard.lock().expect("heard").iter().any(
+            |message| matches!(message, FromWorker::Event { event, .. } if event.kind == "turn.ended"),
+        )
+    };
+    assert!(
+        until(ended, 20_000).await,
+        "the Turn never ended: {:?} {:?}",
+        heard.lock().expect("heard"),
+        lines.lock().expect("lines")
+    );
+    workers.stop_all();
+
+    let results: Vec<(String, String)> = heard
+        .lock()
+        .expect("heard")
+        .iter()
+        .filter_map(|message| match message {
+            FromWorker::Event { event, .. } if event.kind == "tool.result" => {
+                Some(event.body["content"].as_array().cloned().unwrap_or_default())
+            }
+            _ => None,
+        })
+        .flatten()
+        .map(|block| {
+            (
+                block["tool_use_id"].as_str().unwrap_or_default().to_string(),
+                block["content"].to_string(),
+            )
+        })
+        .collect();
+    let result = |id: &str| {
+        results
+            .iter()
+            .find(|(seen, _)| seen == id)
+            .map(|(_, content)| content.clone())
+            .unwrap_or_else(|| panic!("no result for {id}: {results:?}"))
+    };
+    // Neither the command nor the read tool got the owner's file.
+    assert!(!result("t-secret").contains("TOPSECRET"), "{results:?}");
+    assert!(!result("t-link").contains("TOPSECRET"), "{results:?}");
+    // The command's home is the Agent's own, and its Workdir is writable.
+    assert!(
+        result("t-home").contains(&format!("{}", dir.join(".home").display())),
+        "{results:?}"
+    );
+    assert!(dir.join("workdir/made.txt").is_file(), "{results:?}");
+    assert!(dir.join(".home/.gitconfig").is_file());
 }

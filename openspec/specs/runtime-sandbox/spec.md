@@ -7,7 +7,7 @@
 ## Requirements
 
 ### Requirement: worker ทุกตัวรันใน sandbox ของ OS
-supervisor SHALL เปิด worker ของทุก Agent ภายใน sandbox ของ OS ที่ครอบทั้งโปรเซส worker และทุกโปรเซสลูกของมัน supervisor MUST NOT เปิด worker นอก sandbox ไม่ว่ากรณีใด กฎของ sandbox SHALL เป็นของ Agent ตัวนั้นเอง และ worker SHALL คุยกับ supervisor ได้ทางช่อง IPC ของตัวเองเท่านั้น
+supervisor SHALL เปิด worker ของทุก Agent ภายใน sandbox ของ OS ที่ครอบทั้งโปรเซส worker และทุกโปรเซสลูกของมัน supervisor MUST NOT เปิด worker นอก sandbox ไม่ว่ากรณีใด กฎของ sandbox SHALL เป็นของ Agent ตัวนั้นเอง และ worker SHALL คุยกับ supervisor ได้ทางช่อง IPC ของตัวเองเท่านั้น tool ทุกตัวของ worker รวมถึง tool อ่านเขียนไฟล์และ Memory SHALL อยู่ใต้ sandbox เดียวกับคำสั่ง bash การตรวจ path ของ tool เป็นชั้นสำรอง ไม่ใช่กำแพงเพียงชั้นเดียว
 
 #### Scenario: เปิด worker
 - **WHEN** supervisor เปิด worker ของ Agent ตอนเริ่มหรือตอนสร้าง Agent ใหม่
@@ -16,6 +16,10 @@ supervisor SHALL เปิด worker ของทุก Agent ภายใน sa
 #### Scenario: worker พังแล้วเปิดใหม่
 - **WHEN** worker จบเองแล้ว supervisor เปิดใหม่
 - **THEN** worker ตัวใหม่อยู่ใต้ sandbox ด้วยกฎเดิม
+
+#### Scenario: tool อ่านไฟล์ผ่าน symlink ที่ชี้ออกนอก
+- **WHEN** Agent สร้าง symlink ใน Workdir ที่ชี้ไปไฟล์ใน home ของเจ้าของเครื่อง แล้วใช้ tool `read` อ่านผ่าน symlink นั้น
+- **THEN** tool ได้ error และ LLM ไม่ได้เนื้อหาของไฟล์
 
 ### Requirement: Agent เขียนได้แค่ในโฟลเดอร์ของตัวเอง
 ภายใต้ sandbox worker SHALL เขียนได้แค่ในโฟลเดอร์ `<VEELOE_HOME>/agents/<agent-id>/` ของ Agent ตัวเอง ซึ่งมี Workdir, `tmp/` และ `tasks.db` การเขียนที่อื่นบนเครื่อง SHALL ล้มเหลว รวมถึงการเขียนผ่าน symlink หรือ hard link ที่ชี้ออกไปข้างนอก worker แต่ละตัว SHALL มีโฟลเดอร์ชั่วคราวของตัวเอง และ MUST NOT ใช้โฟลเดอร์ชั่วคราวร่วมกับ Agent ตัวอื่น
@@ -33,7 +37,7 @@ supervisor SHALL เปิด worker ของทุก Agent ภายใน sa
 - **THEN** การเขียนล้มเหลว
 
 ### Requirement: Agent อ่านโฟลเดอร์ของ Runtime และไฟล์ลับไม่ได้
-ภายใต้ sandbox worker MUST NOT อ่านอะไรใน `<VEELOE_HOME>` นอกจากโฟลเดอร์ของ Agent ตัวเองและ binary ของ Runtime ซึ่งรวมถึงกุญแจของ Machine, `runtime/` ที่มีกุญแจที่ไว้ใจกับ key ของ Provider และโฟลเดอร์ของ Agent ตัวอื่น worker MUST NOT อ่านไฟล์ลับในรายชื่อที่ Runtime กำหนด เช่น `~/.ssh`, `~/.aws`, `~/.gnupg`, credential ของ git กับ package manager และ keychain ของ OS การอ่านผ่าน symlink หรือ hard link SHALL ได้ผลเดียวกับการอ่านตรง ไฟล์อื่นบนเครื่อง worker SHALL อ่านได้ เพราะใน v0.1 ทุก Turn เป็นของ Owner ซึ่งมี Manage (ADR 0008)
+ภายใต้ sandbox worker SHALL อ่านได้เฉพาะ path ที่ Runtime เปิดให้: path ระบบที่โปรแกรมต้องใช้ (เช่น `/usr`, `/bin`, `/System`, `/dev`, `/etc`), toolchain ที่ติดตั้งในที่มาตรฐานของ OS (เช่น Command Line Tools, Xcode และ Homebrew บน macOS), binary ของ Runtime และโฟลเดอร์ของ Agent ตัวเอง ทั้งหมดนอกจากโฟลเดอร์ของ Agent SHALL อ่านได้อย่างเดียว worker MUST NOT อ่าน home ของเจ้าของเครื่อง, `<VEELOE_HOME>` นอกจากโฟลเดอร์ของตัวเอง ซึ่งรวมถึงกุญแจของ Machine, `runtime/` และโฟลเดอร์ของ Agent ตัวอื่น และ path อื่นที่ไม่ได้เปิดไว้ แม้เป็น Turn ของ Owner และแม้คำสั่งได้ Approval แล้ว การอ่านผ่าน symlink หรือ hard link SHALL ได้ผลเดียวกับการอ่านตรง (ADR 0068, 0069)
 
 #### Scenario: อ่านไฟล์ลับ
 - **WHEN** Agent รัน `cat ~/.ssh/id_ed25519` หรืออ่านผ่าน symlink ใน Workdir ที่ชี้ไปไฟล์นั้น
@@ -47,8 +51,16 @@ supervisor SHALL เปิด worker ของทุก Agent ภายใน sa
 - **WHEN** Agent ตัวหนึ่งรัน `ls` ที่ Workdir ของอีกตัว
 - **THEN** คำสั่งได้ error จาก OS
 
+#### Scenario: อ่านโปรเจกต์อื่นใน home ของเจ้าของ
+- **WHEN** Agent รัน `ls ~` หรือ `cat ~/Develop/app/.env` แม้ Owner กดอนุมัติคำสั่งนั้นแล้ว
+- **THEN** คำสั่งได้ error จาก OS
+
+#### Scenario: ใช้ toolchain ของเครื่อง
+- **WHEN** Agent รัน `git --version`, `python3 -c 'print(1)'` หรือ `bun --version` ที่ติดตั้งไว้ในที่มาตรฐาน
+- **THEN** คำสั่งทำงานได้
+
 #### Scenario: อ่านไฟล์ทั่วไป
-- **WHEN** Agent อ่านไฟล์ที่ไม่ได้อยู่ในรายชื่อไฟล์ลับและไม่ได้อยู่ใน `<VEELOE_HOME>` เช่น `/etc/hosts`
+- **WHEN** Agent อ่านไฟล์ระบบที่อยู่ใน path ที่เปิดไว้ เช่น `/etc/hosts`
 - **THEN** อ่านได้
 
 ### Requirement: Agent ออกเน็ตได้แค่โดเมนใน Egress
@@ -87,3 +99,18 @@ supervisor SHALL เปิด worker ของทุก Agent ภายใน sa
 #### Scenario: macOS
 - **WHEN** Owner รัน `veeloe` บน macOS
 - **THEN** supervisor เปิด worker ใน sandbox ได้โดยไม่ต้องติดตั้งอะไรเพิ่ม
+
+### Requirement: Agent มี home ของตัวเอง
+worker SHALL ได้ home ของตัวเองที่ `.home/` ในโฟลเดอร์ของ Agent ซึ่ง Runtime สร้างให้ `HOME` และที่เก็บ cache มาตรฐานของ worker และคำสั่งทุกตัว SHALL ชี้มาที่นี่ Runtime SHALL ให้ git config ส่วนกลางของ Agent ที่มีชื่อและอีเมลที่ Runtime ตั้ง และ MUST NOT ส่ง config, credential หรือ SSH key จาก home ของเจ้าของเครื่องเข้ามา ไฟล์ใน `.home/` SHALL อยู่ข้าม Turn และข้ามการเปิด worker ใหม่
+
+#### Scenario: HOME ของคำสั่ง
+- **WHEN** Agent รัน `echo $HOME`
+- **THEN** ได้ path ของ `.home/` ในโฟลเดอร์ของ Agent ไม่ใช่ home ของเจ้าของเครื่อง
+
+#### Scenario: commit ใน Workdir
+- **WHEN** Agent รัน `git init` แล้ว `git commit` ใน Workdir
+- **THEN** commit สำเร็จด้วยชื่อและอีเมลที่ Runtime ตั้ง และไม่ได้อ่าน `~/.gitconfig` ของเจ้าของ
+
+#### Scenario: cache อยู่ข้ามการเปิด worker ใหม่
+- **WHEN** Agent เขียนไฟล์ลง `$HOME` แล้ว worker ถูกเปิดใหม่
+- **THEN** ไฟล์นั้นยังอยู่

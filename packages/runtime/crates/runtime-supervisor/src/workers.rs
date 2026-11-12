@@ -7,7 +7,7 @@
 //! over its own IPC, so which Agent sent one is never in question (ADR 0042).
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -18,6 +18,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{mpsc, watch};
 use veeloe_protocol::backoff::Backoff;
+use veeloe_runtime_core::sandbox::{self, Policy, Sandbox};
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, ToWorker};
 
 use crate::agents::{agent_dir, Agent};
@@ -34,8 +35,61 @@ pub trait SupervisorLlm: Send + Sync {
 }
 
 pub type OnMessage = Arc<dyn Fn(&str, FromWorker) + Send + Sync>;
-/// Wraps the worker's own argv in the rules it must run under (task 4.4).
+/// Wraps the worker's own argv in the rules it must run under. An empty argv
+/// means it may not run, and its session ends before it starts.
 pub type Wrap = Arc<dyn Fn(&Agent, Vec<String>) -> Vec<String> + Send + Sync>;
+
+/// The Wrap a Runtime uses: each worker inside its own Agent's sandbox, which
+/// every command it starts inherits, reaching the network only through the
+/// Egress proxy at `proxy_url` (ADR 0008, 0069). On a system with no sandbox,
+/// or an Agent whose folder cannot be made, no worker runs.
+pub fn sandboxed(home: PathBuf, proxy_url: String) -> Wrap {
+    Arc::new(move |agent, mut command| {
+        if !sandbox::AVAILABLE {
+            return Vec::new();
+        }
+        // The folder of the program the worker runs, which must be readable to
+        // start it: the `veeloe` binary itself in a release.
+        let Some(bin) = command
+            .first()
+            .and_then(|program| Path::new(program).parent())
+            .map(Path::to_path_buf)
+        else {
+            return Vec::new();
+        };
+        let Ok(dir) = agent_dir(&home, &agent.id) else {
+            return Vec::new();
+        };
+        let mut policy = Policy::new(&dir.join("workdir"), &dir.join("tmp"), &bin);
+        policy.proxy = proxy_url
+            .trim_end_matches('/')
+            .rsplit_once(':')
+            .and_then(|(_, port)| port.parse().ok());
+        command.push("--proxy".to_string());
+        command.push(proxy_url.clone());
+        Sandbox::new(policy).wrap(&command)
+    })
+}
+
+/// The Agent's own home, `<agent>/.home`: where `$HOME`, caches and its git
+/// identity live, so nothing reads or writes the owner's (ADR 0069). The git
+/// config is written once; the Agent may change it after.
+fn agent_home(dir: &Path, agent: &Agent) -> std::io::Result<PathBuf> {
+    let home = dir.join(".home");
+    std::fs::create_dir_all(home.join(".cache"))?;
+    let gitconfig = home.join(".gitconfig");
+    if !gitconfig.exists() {
+        std::fs::write(
+            &gitconfig,
+            format!(
+                "[user]\n\tname = {}\n\temail = {}@agents.veeloe.invalid\n",
+                agent.name.replace(['\n', '\\', '"'], " "),
+                agent.id
+            ),
+        )?;
+    }
+    Ok(home)
+}
 pub type Log = Arc<dyn Fn(&str) + Send + Sync>;
 
 struct Entry {
@@ -200,11 +254,20 @@ async fn session(
             }
         }
     };
+    let agent_home = match agent_home(&dir, agent) {
+        Ok(home) => home,
+        Err(error) => {
+            return Ending {
+                stopped: false,
+                why: format!("could not make the Agent's home: {error}"),
+            }
+        }
+    };
     let argv = (inner.wrap)(agent, inner.command.clone());
     let Some((program, rest)) = argv.split_first() else {
         return Ending {
             stopped: false,
-            why: "no command to run".into(),
+            why: "no sandbox to run it in".into(),
         };
     };
     let mut command = Command::new(program);
@@ -214,7 +277,9 @@ async fn session(
         // Only what a worker needs. Never a Provider's key: the supervisor holds
         // that (ADR 0042).
         .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", std::env::var("HOME").unwrap_or_default())
+        .env("HOME", &agent_home)
+        .env("XDG_CACHE_HOME", agent_home.join(".cache"))
+        .env("GIT_CONFIG_GLOBAL", agent_home.join(".gitconfig"))
         .env("TMPDIR", dir.join("tmp"))
         .env("VEELOE_AGENT_DIR", &dir)
         .env("VEELOE_AGENT_NAME", &agent.name)

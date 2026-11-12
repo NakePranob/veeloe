@@ -472,15 +472,19 @@ async fn run() -> Result<(), CliError> {
         println!("{text}");
         return Ok(());
     }
+    // A worker runs inside the Agent's sandbox, where `VEELOE_HOME` cannot be
+    // read: it must not touch it before it knows it is a worker (ADR 0069).
+    if command == Some("worker") {
+        return veeloe_runtime_worker::entry::run_stdio()
+            .await
+            .map_err(CliError::from);
+    }
     let home = runtime_home();
     std::fs::create_dir_all(&home)?;
     match command {
         None => supervisor(home).await.map_err(CliError::from),
         Some("pair") => pair(home, &args[1..]).await.map_err(CliError::from),
         Some("unpair") => unpair(home).map_err(CliError::from),
-        Some("worker") => veeloe_runtime_worker::entry::run_stdio()
-            .await
-            .map_err(CliError::from),
         Some("status") => {
             run_status(&home, &mut |line| println!("{line}"));
             Ok(())
@@ -1220,16 +1224,12 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let llm: Arc<dyn SupervisorLlm> = Arc::new(ProxyLlm { proxy });
 
     let weak = Arc::downgrade(&supervisor);
-    // The worker process itself is not wrapped: a Rust binary aborts under
-    // `sandbox-exec` on macOS ("failed to allocate a guard page"), so the
-    // sandbox is applied to every command the worker runs instead (ADR 0008).
-    // The egress it was started with goes with it, for its next connection.
-    let egress_proxy_url = egress_proxy.url.clone();
-    let wrap: veeloe_runtime_supervisor::workers::Wrap = Arc::new(move |_agent, mut command| {
-        command.push("--proxy".to_string());
-        command.push(egress_proxy_url.clone());
-        command
-    });
+    // The worker runs inside its Agent's sandbox, and every command it starts
+    // inherits it (ADR 0008, 0069). It reaches the network only through the
+    // Egress proxy. A worker that cannot be wrapped is not started: an empty
+    // argv ends its session before it runs.
+    let wrap =
+        veeloe_runtime_supervisor::workers::sandboxed(home.clone(), egress_proxy.url.clone());
     let workers = Workers::new(
         home.clone(),
         worker_command(),

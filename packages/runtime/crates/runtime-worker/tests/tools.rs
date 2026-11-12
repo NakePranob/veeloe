@@ -61,15 +61,7 @@ fn bash_tool(workdir: &Path) -> BashTool {
     env.insert("NODE_CHANNEL_SERIALIZATION_MODE".into(), "json".into());
     // One "second" is 20 ms here, so the 120 s default is 2.4 s and the 600 s
     // ceiling 12 s.
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
-    let sandbox = Sandbox::new(Policy::new(
-        workdir,
-        &workdir.join("tmp"),
-        Path::new("/bin"),
-        Vec::new(),
-        Path::new(&home),
-        workdir,
-    ));
+    let sandbox = Sandbox::new(Policy::new(workdir, &workdir.join("tmp"), Path::new("/bin")));
     BashTool::new(workdir, env, 20, sandbox)
 }
 

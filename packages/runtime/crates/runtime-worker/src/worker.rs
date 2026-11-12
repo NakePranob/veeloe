@@ -5,14 +5,14 @@
 //! ends when the supervisor does (ADR 0020, 0008).
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use tokio::sync::oneshot;
 use veeloe_plugin_api::{Cancel, ToolRegistry};
-use veeloe_runtime_core::sandbox::{Policy, Sandbox};
+use veeloe_runtime_core::sandbox::Sandbox;
 use veeloe_runtime_core::{
     AgentCore, AgentError, EventStore, FromWorker, LlmError, LlmHttpRequest, LlmHttpResponse,
     SupervisorLink, ToWorker,
@@ -43,42 +43,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// The rules every command this Agent runs is under: its own folder is the
-    /// only place it may write, the owner's home is not readable, and only the
-    /// Machine's Egress gets out (ADR 0008, 0029).
-    pub fn sandbox(&self) -> Sandbox {
-        let home = self
-            .env
-            .get("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("/"));
-        let bin = std::env::current_exe()
-            .ok()
-            .and_then(|exe| exe.parent().map(Path::to_path_buf))
-            .unwrap_or_else(|| PathBuf::from("/usr/bin"));
-        // `dir` is `<runtime_home>/agents/<id>`, so two levels up is the folder
-        // holding the Machine key and every other Agent's folder.
-        let runtime_home = self
-            .dir
-            .parent()
-            .and_then(Path::parent)
-            .unwrap_or(&self.dir);
-        let mut policy = Policy::new(
-            &self.dir.join("workdir"),
-            &self.dir.join("tmp"),
-            &bin,
-            self.egress.clone(),
-            &home,
-            runtime_home,
-        );
-        policy.proxy = self
-            .proxy
-            .as_deref()
-            .and_then(|url| url.rsplit_once(':'))
-            .and_then(|(_, port)| port.parse().ok());
-        Sandbox::new(policy)
-    }
-
     pub fn new(dir: impl Into<PathBuf>, name: impl Into<String>) -> Self {
         Self {
             dir: dir.into(),
@@ -177,7 +141,9 @@ impl Clone for Worker {
 impl Worker {
     pub fn new(config: Config, link: Arc<dyn SupervisorLink>) -> Result<Self, AgentError> {
         let workdir = config.dir.join("workdir");
-        let sandbox = config.sandbox();
+        // The supervisor started this worker inside the Agent's sandbox, and
+        // every command it runs inherits it (ADR 0069).
+        let sandbox = Sandbox::inherited();
         // A command reaches the network only through the proxy the supervisor
         // started; an inherited proxy variable could point somewhere else.
         let mut env = config.env.clone();

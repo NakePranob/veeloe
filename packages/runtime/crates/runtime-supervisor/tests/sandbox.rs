@@ -1,56 +1,16 @@
-//! The sandbox rules a worker's commands will run under (task 4.4 builds them).
+//! The sandbox an Agent's worker runs under, checked by running real commands
+//! inside it (ADR 0008, 0068, 0069): what a command can see and change, not
+//! what the profile says.
 
-use std::path::Path;
-
-use veeloe_runtime_core::sandbox::{bwrap_args, sandbox_exec_profile, Policy};
-
-fn policy(egress: &[&str]) -> Policy {
-    Policy::new(
-        Path::new("/Users/o/.veeloe/agents/a1/workdir"),
-        Path::new("/Users/o/.veeloe/agents/a1/tmp"),
-        Path::new("/Applications/Veeloe/bin"),
-        egress.iter().map(|domain| domain.to_string()).collect(),
-        Path::new("/Users/o"),
-        Path::new("/Users/o/.veeloe"),
-    )
-}
-
-#[test]
-fn the_profile_denies_by_default_and_opens_only_the_agents_own_folder() {
-    let profile = sandbox_exec_profile(&policy(&["api.anthropic.com"]));
-    assert!(profile.starts_with("(version 1)\n(deny default)\n"), "{profile}");
-    // The Agent's folder holds the Task log, the Workdir and the TMPDIR.
-    assert!(profile.contains("(allow file-write* (subpath \"/Users/o/.veeloe/agents/a1\"))"));
-    // The Runtime's folder and the owner's secrets are never read, whatever
-    // else says otherwise; the rest of the Machine stays readable.
-    assert!(profile.contains("(deny file-read* (subpath \"/Users/o/.veeloe\"))"));
-    assert!(profile.contains("(deny file-read* (subpath \"/Users/o/.ssh\"))"));
-    assert!(!profile.contains("(deny file-read* (subpath \"/Users/o\"))"));
-    // Nothing outside the folder is writable.
-    assert!(!profile.contains("(allow file-write* (subpath \"/usr\"))"));
-    // Writing to /dev/null is not a way out; every command may do it.
-    assert!(profile.contains("(allow file-write* (literal \"/dev/null\"))"));
-}
-
-#[test]
-fn the_only_way_out_is_the_local_proxy() {
-    // Seatbelt cannot match a domain, so a worker without a proxy gets no
-    // network at all, and one with a proxy reaches only that port.
-    let none = sandbox_exec_profile(&policy(&[]));
-    assert!(none.contains("(deny network*)"));
-    assert!(!none.contains("(allow network"));
-
-    let mut with_proxy = policy(&["api.anthropic.com"]);
-    with_proxy.proxy = Some(41_234);
-    let one = sandbox_exec_profile(&with_proxy);
-    assert!(one.contains("(deny network*)"));
-    assert!(one.contains("(allow network-outbound (remote ip \"localhost:41234\"))"));
-    assert!(!one.contains("api.anthropic.com"));
-}
+use veeloe_runtime_core::sandbox::{sandbox_exec_profile, Policy};
 
 #[test]
 fn a_quote_in_a_path_cannot_break_out_of_the_profile() {
-    let mut policy = policy(&[]);
+    let mut policy = Policy::new(
+        std::path::Path::new("/tmp/a1/workdir"),
+        std::path::Path::new("/tmp/a1/tmp"),
+        std::path::Path::new("/bin"),
+    );
     policy.folder = "/tmp/a\" (allow file-write* (subpath \"/\")".into();
     let profile = sandbox_exec_profile(&policy);
     assert!(profile.contains("\\\""), "{profile}");
@@ -58,108 +18,147 @@ fn a_quote_in_a_path_cannot_break_out_of_the_profile() {
     assert!(!profile.contains("(subpath \"/\")"));
 }
 
-#[test]
-fn the_linux_arguments_unshare_everything_and_bind_only_the_agents_folder() {
-    let args = bwrap_args(&policy(&["api.anthropic.com"]));
-    assert!(args.contains(&"--unshare-all".to_string()));
-    assert!(args.contains(&"--die-with-parent".to_string()));
-    let folder = "/Users/o/.veeloe/agents/a1";
-    let at = args.iter().position(|arg| arg == folder).expect("folder");
-    assert_eq!(args[at - 1], "--bind");
-    // A denied path is replaced by /dev/null, not left readable.
-    assert!(args.windows(3).any(|window| window
-        == ["--ro-bind".to_string(), "/dev/null".to_string(), "/Users/o/.ssh".to_string()]));
-}
-
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 mod running {
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
     use veeloe_runtime_core::sandbox::{Policy, Sandbox};
 
-    fn run(sandbox: &Sandbox, command: &str) -> std::process::Output {
-        run_in(sandbox, &sandbox.policy().workdir, command)
+    /// A stand-in `VEELOE_HOME` with one Agent's folder in it, a file of the
+    /// Runtime's own beside it, and another Agent's folder.
+    struct Home {
+        _root: TempDir,
+        root: PathBuf,
+        sandbox: Sandbox,
     }
 
-    fn run_in(sandbox: &Sandbox, dir: &str, command: &str) -> std::process::Output {
-        let argv = sandbox.wrap(&["/bin/bash".to_string(), "-c".to_string(), command.to_string()]);
+    fn home() -> Home {
+        let root = tempdir().expect("root");
+        let real = fs::canonicalize(root.path()).expect("real root");
+        let agent = real.join("agents/a1");
+        for sub in ["workdir", "tmp", ".home"] {
+            fs::create_dir_all(agent.join(sub)).expect("agent folder");
+        }
+        fs::create_dir_all(real.join("runtime")).expect("runtime");
+        fs::write(real.join("runtime/providers.json"), "secret").expect("providers");
+        fs::write(
+            agent.join(".home/.gitconfig"),
+            "[user]\n\tname = A1\n\temail = a1@agents.veeloe.invalid\n",
+        )
+        .expect("gitconfig");
+        fs::create_dir_all(real.join("agents/a2/workdir")).expect("other agent");
+        fs::write(real.join("agents/a2/workdir/notes.md"), "theirs").expect("notes");
+        let sandbox = Sandbox::new(Policy::new(
+            &agent.join("workdir"),
+            &agent.join("tmp"),
+            Path::new("/bin"),
+        ));
+        Home {
+            _root: root,
+            root: real,
+            sandbox,
+        }
+    }
+
+    fn run(home: &Home, command: &str) -> std::process::Output {
+        let policy = home.sandbox.policy().expect("rules");
+        let argv = home.sandbox.wrap(&[
+            "/bin/bash".to_string(),
+            "-c".to_string(),
+            command.to_string(),
+        ]);
+        // As a worker starts it: with the Agent's own home, not the owner's.
         Command::new(&argv[0])
             .args(&argv[1..])
-            .current_dir(dir)
+            .env("HOME", Path::new(&policy.folder).join(".home"))
+            .current_dir(&policy.workdir)
             .output()
-            .expect("run under sandbox-exec")
+            .expect("run under the sandbox")
+    }
+
+    fn refused(home: &Home, command: &str) {
+        let out = run(home, command);
+        assert!(
+            !out.status.success(),
+            "`{command}` was allowed: {}",
+            String::from_utf8_lossy(&out.stdout)
+        );
+    }
+
+    fn allowed(home: &Home, command: &str) -> String {
+        let out = run(home, command);
+        assert!(
+            out.status.success(),
+            "`{command}` was refused: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).to_string()
     }
 
     #[test]
     fn a_command_may_write_in_its_own_folder_and_nowhere_else() {
-        let root = tempdir().expect("root");
-        let workdir = root.path().join("workdir");
-        let tmp = root.path().join("tmp");
-        fs::create_dir_all(&workdir).expect("workdir");
-        fs::create_dir_all(&tmp).expect("tmp");
-        // Somewhere that is not the Agent's folder at all.
-        let elsewhere = tempdir().expect("elsewhere");
-        let outside = elsewhere.path().join("outside.txt");
-        let sandbox = Sandbox::new(Policy::new(
-            &workdir,
-            &tmp,
-            Path::new("/bin"),
-            Vec::new(),
-            root.path(),
-            root.path(),
-        ));
-
-        let inside = run(&sandbox, "echo hi > a.txt; cat a.txt");
-        assert!(
-            inside.status.success(),
-            "a write inside the folder was refused: {}",
-            String::from_utf8_lossy(&inside.stderr)
-        );
-        assert_eq!(
-            fs::read_to_string(workdir.join("a.txt")).expect("a.txt"),
-            "hi\n"
-        );
-
-        let in_tmp = run(&sandbox, &format!("echo hi > {}/b.txt", tmp.display()));
-        assert!(
-            in_tmp.status.success(),
-            "a write in the Agent's own tmp was refused: {}",
-            String::from_utf8_lossy(&in_tmp.stderr)
-        );
-
-        let refused = run(&sandbox, &format!("echo hi > {}", outside.display()));
-        assert!(
-            !refused.status.success(),
-            "a write outside the folder was allowed"
-        );
+        let home = home();
+        allowed(&home, "echo hi > a.txt && cat a.txt");
+        allowed(&home, "echo hi > ../tmp/b.txt");
+        let outside = home.root.join("runtime/written.txt");
+        refused(&home, &format!("echo hi > {}", outside.display()));
         assert!(!outside.exists(), "the file was written anyway");
     }
 
     #[test]
-    fn a_command_with_an_empty_egress_cannot_reach_a_domain() {
-        let root = tempdir().expect("root");
-        let workdir = root.path().join("workdir");
-        let tmp = root.path().join("tmp");
-        fs::create_dir_all(&workdir).expect("workdir");
-        fs::create_dir_all(&tmp).expect("tmp");
-        let sandbox = Sandbox::new(Policy::new(
-            &workdir,
-            &tmp,
-            Path::new("/bin"),
-            Vec::new(),
-            root.path(),
-            root.path(),
-        ));
-        // A connection to a port nothing listens on must fail for the network
-        // rule, not for the missing listener: the profile denies network first.
-        let out = run(&sandbox, "exec 3<>/dev/tcp/93.184.216.34/80 && echo opened");
-        assert!(
-            !out.status.success(),
-            "network was allowed with an empty egress: {}",
-            String::from_utf8_lossy(&out.stdout)
+    fn the_owners_home_is_not_readable_even_for_a_listing() {
+        let home = home();
+        // This test's own HOME is the owner's; the command is given the Agent's.
+        let owner = std::env::var("HOME").expect("HOME");
+        refused(&home, &format!("ls {owner}"));
+    }
+
+    #[test]
+    fn the_runtimes_folder_and_another_agents_folder_are_not_readable() {
+        let home = home();
+        refused(
+            &home,
+            &format!("cat {}", home.root.join("runtime/providers.json").display()),
         );
+        refused(
+            &home,
+            &format!(
+                "cat {}",
+                home.root.join("agents/a2/workdir/notes.md").display()
+            ),
+        );
+    }
+
+    #[test]
+    fn a_symlink_out_of_the_workdir_reads_nothing() {
+        let home = home();
+        let target = home.root.join("runtime/providers.json");
+        allowed(&home, &format!("ln -s {} link", target.display()));
+        refused(&home, "cat link");
+    }
+
+    #[test]
+    fn system_files_and_toolchains_still_work() {
+        let home = home();
+        allowed(&home, "cat /etc/hosts > /dev/null");
+        let version = allowed(&home, "git --version");
+        assert!(version.contains("git version"), "{version}");
+        allowed(&home, "python3 -c 'print(1)'");
+        // A commit takes its identity from the Agent's own home.
+        let log = allowed(
+            &home,
+            "git init -q repo && cd repo && touch a && git add a && git commit -qm first && git log --format=%ae",
+        );
+        assert_eq!(log.trim(), "a1@agents.veeloe.invalid");
+    }
+
+    #[test]
+    fn a_command_with_an_empty_egress_cannot_reach_a_domain() {
+        let home = home();
+        // The profile denies network before a listener is even looked for.
+        refused(&home, "exec 3<>/dev/tcp/93.184.216.34/80 && echo opened");
     }
 }

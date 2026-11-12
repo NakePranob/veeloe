@@ -59,8 +59,9 @@ pub struct BashTool {
     workdir: PathBuf,
     env: HashMap<String, String>,
     second_ms: u64,
-    /// The rules every command runs under. The worker itself cannot be wrapped
-    /// (a Rust binary aborts under `sandbox-exec`), so the command is (ADR 0008).
+    /// What a command is wrapped in. In a worker this adds nothing, because the
+    /// worker is already inside the Agent's sandbox and its commands inherit it
+    /// (ADR 0069); a test may still wrap each command itself.
     sandbox: Sandbox,
 }
 
