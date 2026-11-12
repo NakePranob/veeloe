@@ -38,7 +38,13 @@
 
 **Open:** Owner override ต่อ model ในหน้า Provider (งานถัดไป)
 
+### 6. อ่าน Memory ด้วยคำสั่งบน Machine ไม่ใช่หน้าใหม่ใน Controller
+
+**Decision:** `veeloe memory <agent>` พิมพ์ชื่อกับ id, ที่อยู่ไฟล์, จำนวนตัวอักษร และเนื้อหาที่ prompt ได้; รับได้ทั้ง id และชื่อ, ชื่อซ้ำให้ใช้ id, อ่าน Agent ในถังขยะได้, และไม่สร้าง Workdir
+
+**Why:** Memory อยู่บน Machine และคำสั่งเดิม (`status`, `logs`) เป็นที่ตรวจของบนเครื่องอยู่แล้ว; หน้าใหม่ใน Controller ต้องเพิ่ม protocol message ซึ่งเกินขอบเขตของ change นี้ (อยู่ใน Non-goals)
+
 ## Risks
 
-- Memory อาจมีคำสั่งที่ถูกวางยา; file tools และหน้า Task แสดงการแก้ไข แต่ยังไม่มี UI อ่าน Memory
+- Memory อาจมีคำสั่งที่ถูกวางยา; file tools และหน้า Task แสดงการแก้ไข และ `veeloe memory` ใช้ตรวจบน Machine ได้ แต่ Controller ยังไม่มีหน้าเฉพาะ (งานถัดไป)
 - 4,000 chars อาจไม่พอสำหรับบาง Agent; ยังตั้งต่อ Agent ไม่ได้

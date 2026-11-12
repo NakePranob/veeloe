@@ -2,7 +2,7 @@
 
 - [x] 1.1 เพิ่ม `logs.rs`: `record(home, level, event, fields)`, `record_at` สำหรับ test, `recent(home)`, `purge(home, keep=14)`; เขียน JSON lines ที่ `<home>/runtime/logs/<day>.log`
 - [x] 1.2 เพิ่ม `veeloe logs [--follow]` ใน CLI/help; อ่านไฟล์เรียงวันและ tail เมื่อ follow
-- [ ] 1.3 เรียก `record` ที่จุดสำคัญ: start, hub connected, pair, agent create/update/delete, task message (เฉพาะ id/agent/task/turn), turn done/error, provider error; ห้ามใส่ข้อความหรือชื่อไฟล์
+- [x] 1.3 เรียก `record` ที่จุดสำคัญ: start, hub connected, pair, agent create/update/delete, task message (เฉพาะ id/agent/task/turn), turn done/error, provider error; ห้ามใส่ข้อความหรือชื่อไฟล์
 - [x] 1.4 เพิ่ม test ว่า log มีเฉพาะ field ที่อนุญาต, rotation ลบไฟล์เก่า, `recent` เรียงวัน, และไม่มี content จาก task
 
 ## 2. Machine status

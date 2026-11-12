@@ -9,4 +9,4 @@
 
 - [x] 2.1 `cd controller && bun test ./src`
 - [x] 2.2 `bun run check:controller`
-- [ ] 2.3 เปิดหน้า My devices บน iOS/Android แล้ว rename จริงหนึ่งครั้ง; ปิดเปิดหน้าใหม่แล้วชื่อยังอยู่
+- [x] 2.3 เปิดหน้า My devices บน iOS/Android แล้ว rename จริงหนึ่งครั้ง; ปิดเปิดหน้าใหม่แล้วชื่อยังอยู่

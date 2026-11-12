@@ -27,7 +27,7 @@ Member ที่ทำ Pairing ได้ สร้าง Agent ได้ เพ�
 _Avoid_: Admin, root
 
 **Grant**:
-สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงาน และเปิดดู Task ของ Agent นั้นที่คนเริ่มเปิดให้เห็น), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, Egress, ใส่หรือเอา Agent ตัวนี้ออกจาก Project หรือ Team และตั้ง Agent ตัวนี้เป็น Entry ของ Team) นอก Project Turn ของคนที่มี Manage อ่านไฟล์บนเครื่องได้ทุกไฟล์ที่ไม่ใช่ไฟล์ลับ ส่วน Turn ของคนที่มีแค่ Use หรือ Approve อ่านได้แค่ Workdir กับ Library ส่วนสิทธิ์ต่อ Project มีสี่ระดับคือ View (เห็น Task และ wiki ของ Project), Ask (ถามได้), Use (สั่งงานและกด Stop) และ Manage (ให้สิทธิ์ใน Project จัดรายชื่อผู้ทำงาน และตั้งค่าของ Project) Owner มี Manage ของทุก Project ใน Project ใช้สิทธิ์ของ Project นอก Project ใช้สิทธิ์ของ Agent แต่ Approval ไปที่คนที่มี Approve ที่ Agent ตัวนั้นเสมอ ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
+สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงาน และเปิดดู Task ของ Agent นั้นที่คนเริ่มเปิดให้เห็น), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, Egress, ใส่หรือเอา Agent ตัวนี้ออกจาก Project หรือ Team และตั้ง Agent ตัวนี้เป็น Entry ของ Team) ทุก Turn อ่านไฟล์ได้แค่ Workdir, Project ที่ได้งาน และ Library ตามสิทธิ์เท่านั้น แม้เป็นคนที่มี Manage (ADR 0068) ส่วนสิทธิ์ต่อ Project มีสี่ระดับคือ View (เห็น Task และ wiki ของ Project), Ask (ถามได้), Use (สั่งงานและกด Stop) และ Manage (ให้สิทธิ์ใน Project จัดรายชื่อผู้ทำงาน และตั้งค่าของ Project) Owner มี Manage ของทุก Project ใน Project ใช้สิทธิ์ของ Project นอก Project ใช้สิทธิ์ของ Agent แต่ Approval ไปที่คนที่มี Approve ที่ Agent ตัวนั้นเสมอ ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
 _Avoid_: Role, permission, ACL
 
 **Controller**:
@@ -75,6 +75,10 @@ _Avoid_: Avatar, persona, mascot
 **Mood**:
 ท่าทางที่ Character กำลังแสดงอยู่ ได้มาจากสถานะของ Agent และเหตุการณ์ใน Task เช่น ยกมือตอนรอ Approval หรือดีใจตอน Task เสร็จ LLM ไม่ได้เป็นคนเลือก
 _Avoid_: Emotion, expression, animation
+
+**Sandbox**:
+ขอบเขตที่ OS บังคับ (macOS Seatbelt, Linux bubblewrap) ว่า Agent แตะไฟล์หรือเน็ตอะไรได้ ตาม ADR 0008 เป้าหมายคือครอบทั้ง worker; v0.1 บังคับกับทุกคำสั่งที่ worker เปิด และ tool ทุกตัวใช้ resolver path ชุดเดียวกัน Approval กับ Allowlist เป็นนโยบาย ไม่ใช่ sandbox และไม่ได้ให้สิทธิ์นอกขอบเขต
+_Avoid_: Allowlist, Approval, Permission
 
 **Workdir**:
 โฟลเดอร์บน Machine ที่ Agent ตัวหนึ่งเขียนไฟล์ได้ นอกโฟลเดอร์นี้เขียนไม่ได้ Runtime สร้างให้เองในโฟลเดอร์ของ Runtime และ Member เลือกที่อยู่เองไม่ได้ ถ้าจะทำงานกับ repo ที่มีอยู่แล้ว ให้ Agent clone เข้ามา Agent ที่อยู่ Project เดียวกันอ่าน Workdir ของกันได้เฉพาะตอนทำ Task ของ Project นั้น และเขียนของกันไม่ได้
@@ -131,6 +135,10 @@ _Avoid_: Run, step, iteration
 **Schedule**:
 ข้อความที่ Member ตั้งเวลาไว้และเซ็น ให้ Runtime เปิดเป็น Task ใหม่กับ Agent หรือกับผู้ทำงานใน Project ทุกรอบ ทำในนามของ Member ที่ตั้ง ตอนตั้งเลือกได้ว่าเรื่องที่ Agent บอกจะแจ้งแค่คนตั้ง หรือทุกคนที่มี Use ที่ Agent นั้น และถ้าไม่มีอะไรต้องบอก Agent จบ Turn แบบไม่แจ้งใคร Task ของรอบนั้นก็ไม่ขึ้นใน Inbox ถ้า Machine ปิดอยู่ตอนถึงเวลา รอบที่พลาดรันชดเชยครั้งเดียวตอนเครื่องกลับมา ไม่ว่าจะพลาดกี่รอบ และ Agent ได้รู้ว่ารอบนั้นควรรันตอนกี่โมง Schedule หยุดทันทีเมื่อกุญแจของ Controller ที่เซ็นมันถูกถอน ซึ่งรวมถึงตอนที่ Member คนนั้นถูกลบ
 _Avoid_: Heartbeat, cron, automation, routine, trigger
+
+**Trigger**:
+เหตุที่ทำให้ Agent เริ่ม Turn หนึ่งโดยไม่มี Member พิมพ์ข้อความใหม่ตอนนั้น ได้แก่ Schedule, Idle Work และ Watch ซึ่ง Member เซ็นไว้ล่วงหน้าและ Runtime เก็บบน Machine; supervisor แปลงเป็น trigger ภายในส่งให้ worker และ `turn.started` บันทึกชนิดกับเจ้าของไว้ (ADR 0067)
+_Avoid_: Event, heartbeat, cron
 
 **Idle Work**:
 งานในลิสต์ที่ Member เซ็นไว้ให้ Agent ตัวหนึ่งทำเอง เมื่อไม่มี Turn กำลังทำ คิวว่าง และเงียบครบเวลาที่ตั้ง ทำในนามของคนเซ็น ข้อความที่เข้ามาระหว่างนั้นต่อคิวตามปกติ ไม่ขัดงานกลางคัน และงานหนึ่งชิ้นมีเพดานเวลา

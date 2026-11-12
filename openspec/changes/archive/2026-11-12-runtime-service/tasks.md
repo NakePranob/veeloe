@@ -9,5 +9,5 @@
 ## 2. ตรวจ
 
 - [x] 2.1 `cd packages/runtime && cargo test -p veeloe-runtime-supervisor`
-- [ ] 2.2 `./dist/veeloe service install` บน macOS ที่ pair แล้ว; ปิด terminal แล้ว Runtime ยังทำงาน
-- [ ] 2.3 `./dist/veeloe service uninstall` แล้ว process หยุดและ plist/unit หาย
+- [x] 2.2 `./dist/veeloe service install` บน macOS ที่ pair แล้ว; ปิด terminal แล้ว Runtime ยังทำงาน
+- [x] 2.3 `./dist/veeloe service uninstall` แล้ว process หยุดและ plist/unit หาย

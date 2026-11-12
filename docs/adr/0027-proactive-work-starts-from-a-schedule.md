@@ -1,5 +1,7 @@
 # งานเชิงรุกเริ่มจาก Schedule ที่ Member ตั้งและเซ็น และทุกรอบเปิด Task ใหม่
 
+> **ADR 0067 เพิ่มเติม** รอบของ Schedule เข้า harness ด้วย trigger ภายในที่ supervisor สร้างจากข้อความที่เซ็นและเก็บไว้ ไม่ใช่การ replay ซองเดิม
+
 > **ADR 0064 เพิ่มเติม** Schedule ที่เปิดงานใน Project ต้องระบุผู้ทำงาน
 
 Agent เชิงรุกอย่าง OpenAI dots, Meta Muse, OpenClaw และ Hermes ทำงานเองได้โดยไม่ต้องมีคนพิมพ์ Veeloe เริ่มจาก Schedule ซึ่งเป็นข้อความที่ Member ตั้งเวลาไว้และเซ็น (ADR 0006) Runtime เปิดเป็น Task ใหม่กับ Agent หรือ Project ทุกรอบ Turn จึงยังเริ่มจากข้อความเหมือนเดิม และทำในนามของ Member ที่ตั้ง Schedule (ADR 0010) Grant กับ Approval ทำงานเหมือนเดิมทุกอย่าง และ Runtime ทำได้เองในเครื่องโดยไม่ต้องพึ่ง Hub ส่วน heartbeat แบบ OpenClaw ก็คือ Schedule ที่ข้อความบอกให้ Agent ไล่ดู checklist ของตัวเอง

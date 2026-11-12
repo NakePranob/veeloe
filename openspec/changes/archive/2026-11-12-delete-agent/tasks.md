@@ -24,4 +24,4 @@
 - [x] 4.2 `cd packages/runtime && cargo test -p veeloe-runtime-supervisor`
 - [x] 4.3 `cd controller && bun test ./src`
 - [x] 4.4 `bun run check:controller`
-- [ ] 4.5 ลบ Agent จริงบน iOS/Android; ตรวจว่าหายจากรายการ, Workdir ยังอยู่, Task เดิมเปิดได้
+- [x] 4.5 ลบ Agent จริงบน iOS/Android; ตรวจว่าหายจากรายการ, Workdir ยังอยู่, Task เดิมเปิดได้

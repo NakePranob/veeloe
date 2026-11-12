@@ -54,6 +54,31 @@ needs a migrated Postgres in `TEST_DB_DSN`, and skips without one unless
 Write tests where there is a rule or a security check, not for coverage
 (ADR 0022).
 
+## Local stack
+
+`bun run dev` brings up what the app needs on this machine, each part logged in
+`.dev/` (gitignored): Postgres (`docker compose`), the Hub API on `:8080`, the
+Rust Runtime for `VEELOE_HOME` (default `~/.veeloe`) and Metro on `:8081`.
+
+```bash
+bun run dev            # up; a part already listening is left alone
+bun run dev:status     # what is up, and on which port
+bun run dev:pair       # `veeloe pair`, for a Controller that is not paired yet
+bun run dev:link       # put `veeloe` on PATH (`~/.local/bin`) pointing at the dev build
+bun run dev:unpair     # `veeloe unpair`, to pair this Machine from scratch again
+bun run dev:reset-sim  # wipe the simulator app's database (backup in .dev/backup/), then re-pair
+bun run dev:restart    # restart the Runtime (e.g. after pairing rotated the Machine key)
+bun run dev:seed       # one Agent (qa-memory / Pang) with a MEMORY.md to look at
+bun run dev:down       # stop the three processes and Postgres
+bun run dev:ios        # e2e/ios-flow-harness.ts serve: temp home + fake Provider
+```
+
+`dev` needs `hub/.env` and a migrated database (`make migrate-up` in `hub/`,
+once). `dev:pair` runs in the foreground and prints the `veeloe://pair` link;
+a Machine that is already paired says so instead, which is what `veeloe unpair`
+is for. `dev:seed` writes `agents.json` and `agents/<id>/workdir/MEMORY.md`, so
+the Controller's Memory row has something to show without a Task.
+
 ## Git hooks
 
 Hooks live in `.githooks/`, not `.git/hooks/`, so they are versioned. Once per
