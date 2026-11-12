@@ -4,13 +4,13 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
-import { allowlistOf, useAgents } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
-import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents } from "../../../entities/task";
+import { allowlistOf, useAgents, useTrashedAgents, type AgentRow } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
+import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents, useTaskRow } from "../../../entities/task";
 import { MAX_ATTACHMENT_BYTES, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Button, Card, column, confirm, HeaderAction, Icon, Label, radius, space, Text, type, useColors } from "../../../shared/ui";
+import { Button, Card, column, confirm, HeaderAction, Icon, Label, Note, radius, space, Text, type, useColors } from "../../../shared/ui";
 import { contextUsageOf, items, type Item } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
@@ -107,7 +107,7 @@ function FileCard({ item, onOpen }: { item: Extract<Item, { kind: "file" }>; onO
 }
 
 // The one failure with a way out: the Turn stopped because today's token Budget ran out (`daily-budget`).
-function BudgetCard({ machine, agent }: { machine: string; agent: string }) {
+function BudgetCard({ machine, agent, readOnly }: { machine: string; agent: string; readOnly: boolean }) {
   const t = useT("task");
   return (
     <Card>
@@ -115,25 +115,48 @@ function BudgetCard({ machine, agent }: { machine: string; agent: string }) {
         {t("budget.out")}
       </Label>
       <Text>{t("budget.body", { machine })}</Text>
-      <View style={{ flexDirection: "row" }}>
-        <Button label={t("budget.add")} variant="primary" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent } })} />
-      </View>
+      {/* A deleted Agent has no settings page, so the way to add Budget goes with it. */}
+      {!readOnly && (
+        <View style={{ flexDirection: "row" }}>
+          <Button label={t("budget.add")} variant="primary" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent } })} />
+        </View>
+      )}
     </Card>
   );
 }
 
 // The Turn a restart cut off: the files are still there, and nothing runs again on its own (ADR 0033).
-function InterruptedCard({ machine, agentName, onContinue }: { machine: string; agentName: string; onContinue: () => void }) {
+function InterruptedCard({ machine, agentName, onContinue, readOnly }: { machine: string; agentName: string; onContinue: () => void; readOnly: boolean }) {
   const t = useT("task");
   return (
     <Card>
       <Label icon="offline">{t("interrupted.title", { machine })}</Label>
       <Text>{t("interrupted.body", { name: agentName })}</Text>
-      <View style={{ flexDirection: "row" }}>
-        <Button label={t("interrupted.continue")} variant="primary" onPress={onContinue} />
-      </View>
+      {/* Carry on sends a message, which a deleted Agent can no longer take. */}
+      {!readOnly && (
+        <View style={{ flexDirection: "row" }}>
+          <Button label={t("interrupted.continue")} variant="primary" onPress={onContinue} />
+        </View>
+      )}
     </Card>
   );
+}
+
+// A deleted Agent's Task still opens: the row keeps the Machine, so the log fills in from the Agent's event history.
+function placeholderAgent(id: string, machineId: string | undefined, name: string): AgentRow {
+  return {
+    id,
+    machine_id: machineId ?? "",
+    name,
+    provider: "",
+    model: "",
+    character: null,
+    budget: null,
+    usage_day: null,
+    usage_tokens: null,
+    allowlist: null,
+    approval_timeout_s: null,
+  };
 }
 
 // Laid out like Messages: your messages in accent bubbles on the right. The
@@ -145,8 +168,16 @@ export function TaskPage() {
   const colors = useColors();
   const database = useDatabase();
   const { task, agent: agentId } = useLocalSearchParams<{ task: string; agent: string }>();
-  const agent = useAgents()?.find((a) => a.id === agentId);
-  const machine = useMachines()?.find((m) => m.id === agent?.machine_id);
+  const agents = useAgents();
+  const trashedAgents = useTrashedAgents();
+  const found = agents?.find((a) => a.id === agentId);
+  // A deleted Agent still names its Tasks while it waits in the trash (`agent-trash`).
+  const gone = trashedAgents?.find((a) => a.id === agentId);
+  // Sending, Stop and settings need the Agent itself; the history does not.
+  const row = useTaskRow(task)?.[0];
+  const agent = found ?? placeholderAgent(agentId, gone?.machine_id ?? row?.machine_id, gone?.name ?? t("deletedAgent"));
+  const machine = useMachines()?.find((m) => m.id === agent.machine_id);
+  const readOnly = !found;
   const status = useMachineStatus(machine?.id ?? "");
   const link = useMachineLink();
   const events = useTaskEvents(task);
@@ -162,7 +193,9 @@ export function TaskPage() {
   const scroll = useRef<ScrollViewInstance>(null);
   const viewport = useRef(0);
 
-  if (!agent || !machine || !events || !pending) return <Stack.Screen options={{ title: t("title") }} />;
+  // Until both lists land, neither "an Agent" nor "a deleted Agent" is known yet:
+  // showing the deleted state here would flash a wrong name and no composer.
+  if (!agents || !trashedAgents || !machine || !events || !pending) return <Stack.Screen options={{ title: t("title") }} />;
   const { items: shown, working } = items(events, now);
   const message = text.trim();
   const latest = latestOf(events);
@@ -175,7 +208,7 @@ export function TaskPage() {
   const isStopping = stopAsked && busy && !status.stopError;
 
   async function send(text = message) {
-    if ((!text && attachments.length === 0) || !link || !machine || !agent) return;
+    if ((!text && attachments.length === 0) || !link || !machine || readOnly) return;
     const files = attachments;
     const words = text;
     Keyboard.dismiss();
@@ -210,7 +243,7 @@ export function TaskPage() {
 
   // Stop can cut work off halfway, so it asks first and says what stops (ADR 0017).
   async function stop() {
-    if (!link || !machine || !agent) return;
+    if (!link || !machine || readOnly) return;
     const ok = await confirm({ title: t("stop.title"), message: t("stop.message", { agent: agent.name }), action: t("stop.action"), cancel: t("stop.cancel"), destructive: true });
     if (!ok) return;
     Keyboard.dismiss();
@@ -235,7 +268,7 @@ export function TaskPage() {
         }}
       />
       {/* Other Tasks, a new Task and the settings all live on the Agent's page. */}
-      <HeaderAction label={t("agent")} icon="settings" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} />
+      {!readOnly && <HeaderAction label={t("agent")} icon="settings" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} />}
       <ScrollView
         ref={scroll}
         keyboardShouldPersistTaps="handled"
@@ -250,7 +283,7 @@ export function TaskPage() {
         // The end of the log rests clear of the fade.
         contentContainerStyle={[column, { padding: space.lg, paddingBottom: FADE, gap: space.lg }]}
       >
-        <LogHead agent={agent} machine={machine.name} events={events} online={status.online} />
+        <LogHead agent={agent} machine={machine.name} events={events} online={status.online} readOnly={readOnly} />
         {shown.length === 0 && pending.length === 0 && (
           <Text variant="subheadline" tone="secondary" style={{ textAlign: "center", marginTop: space.xl }}>
             {t("empty", { name: agent.name })}
@@ -270,8 +303,8 @@ export function TaskPage() {
               agentName={agent.name}
               allowlist={allowlistOf(agent) ?? []}
               // v0.1 Members in trust are all Owners, who may Approve and Manage every Agent; v0.3 reads Grants.
-              canAnswer
-              canManage
+              canAnswer={!readOnly}
+              canManage={!readOnly}
               online={status.online !== false && !!link}
               now={now}
               // Answering takes a fresh unlock in v0.3 (ADR 0012); the Controller already asks for it when it unlocks.
@@ -290,9 +323,9 @@ export function TaskPage() {
           ) : item.kind === "file" ? (
             <FileCard key={item.key} item={item} onOpen={() => (link && machine ? link.openFile(machine, task, agent.id, item.path, item.hash, item.name) : Promise.reject(new Error("hub.machine_offline")))} />
           ) : item.kind === "interrupted" ? (
-            <InterruptedCard key={item.key} machine={machine.name} agentName={agent.name} onContinue={() => send(t("interrupted.continueMessage"))} />
+            <InterruptedCard key={item.key} machine={machine.name} agentName={agent.name} readOnly={readOnly} onContinue={() => send(t("interrupted.continueMessage"))} />
           ) : item.code === "budget.exhausted" ? (
-            <BudgetCard key={item.key} machine={machine.name} agent={agent.id} />
+            <BudgetCard key={item.key} machine={machine.name} agent={agent.id} readOnly={readOnly} />
           ) : (
             <Problem key={item.key} code={item.code} />
           ),
@@ -330,71 +363,77 @@ export function TaskPage() {
       </ScrollView>
       <LogFade />
       {/* Clear of the home indicator, as in controller-prototype's TaskPage (insets.bottom under the Composer). */}
-      <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }]}>
-        <View style={{ position: "relative" }}>
-          {contextOpen && contextUsage && (
-            <View style={{ position: "absolute", bottom: "100%", left: "8%", right: "8%", paddingBottom: space.sm, zIndex: 20 }}>
-              <View style={{ borderRadius: radius.card, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, overflow: "hidden", backgroundColor: `${colors.surface}E6`, shadowColor: colors.label, shadowOpacity: 0.035, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-                <View style={{ padding: space.md, gap: space.xs }}>
-                  <Label icon="info">{t("context.title")}</Label>
-                  <ContextDetails usage={contextUsage} />
+      {readOnly ? (
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }}>
+          <Note icon="info">{t("readOnly")}</Note>
+        </View>
+      ) : (
+        <View style={[column, { paddingTop: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }]}>
+          <View style={{ position: "relative" }}>
+            {contextOpen && contextUsage && (
+              <View style={{ position: "absolute", bottom: "100%", left: "8%", right: "8%", paddingBottom: space.sm, zIndex: 20 }}>
+                <View style={{ borderRadius: radius.card, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, overflow: "hidden", backgroundColor: `${colors.surface}E6`, shadowColor: colors.label, shadowOpacity: 0.035, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+                  <View style={{ padding: space.md, gap: space.xs }}>
+                    <Label icon="info">{t("context.title")}</Label>
+                    <ContextDetails usage={contextUsage} />
+                  </View>
                 </View>
               </View>
+            )}
+            {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
+            <Card raised style={{ gap: space.xs, padding: space.sm }}>
+              {attachments.length > 0 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
+                  {attachments.map((file) => (
+                    <Pressable key={file.uri} accessibilityRole="button" onPress={() => setAttachments(attachments.filter((item) => item.uri !== file.uri))} style={{ flexDirection: "row", alignItems: "center", gap: space.xs, paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.lg, backgroundColor: colors.fill }}>
+                      <Icon name="attach" size="sm" color="secondaryLabel" />
+                      <Text variant="footnote">{file.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              <TextInput
+                ref={input}
+                aria-label={t("placeholder", { name: agent.name })}
+                placeholder={status.online === false ? t("offline") : busy ? t("queued", { name: agent.name }) : t("placeholder", { name: agent.name })}
+                placeholderTextColor={colors.tertiaryLabel}
+                value={text}
+                onChangeText={setText}
+                multiline
+                style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
+              />
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.sm }}>
+                <Pressable accessibilityRole="button" accessibilityLabel={t("attach")} hitSlop={8} onPress={() => void attach()}>
+                  <Icon name="attach" size="md" color="secondaryLabel" />
+                </Pressable>
+                <ContextMeter usage={contextUsage} onPress={() => setContextOpen(!contextOpen)} />
+                {/* A working Agent with nothing typed offers the brake instead of send (controller-prototype's Composer). */}
+                {busy && !message ? (
+                  <Button
+                    label={isStopping ? t("stop.stopping") : t("stop.button")}
+                    icon="stopped"
+                    variant="primary"
+                    disabled={status.online === false || !link || isStopping}
+                    onPress={() => void stop()}
+                  />
+                ) : (
+                  <Button label={t("send")} icon="send" variant="primary" disabled={(!message && attachments.length === 0) || !link} onPress={() => void send()} />
+                )}
+              </View>
+            </Card>
+          </View>
+          {status.stopError && (
+            <View style={{ paddingTop: space.xs }}>
+              <Problem code={status.stopError} />
             </View>
           )}
-          {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
-          <Card raised style={{ gap: space.xs, padding: space.sm }}>
-            {attachments.length > 0 && (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
-                {attachments.map((file) => (
-                  <Pressable key={file.uri} accessibilityRole="button" onPress={() => setAttachments(attachments.filter((item) => item.uri !== file.uri))} style={{ flexDirection: "row", alignItems: "center", gap: space.xs, paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.lg, backgroundColor: colors.fill }}>
-                    <Icon name="attach" size="sm" color="secondaryLabel" />
-                    <Text variant="footnote">{file.name}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-            <TextInput
-              ref={input}
-              aria-label={t("placeholder", { name: agent.name })}
-              placeholder={status.online === false ? t("offline") : busy ? t("queued", { name: agent.name }) : t("placeholder", { name: agent.name })}
-              placeholderTextColor={colors.tertiaryLabel}
-              value={text}
-              onChangeText={setText}
-              multiline
-              style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
-            />
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.sm }}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t("attach")} hitSlop={8} onPress={() => void attach()}>
-                <Icon name="attach" size="md" color="secondaryLabel" />
-              </Pressable>
-              <ContextMeter usage={contextUsage} onPress={() => setContextOpen(!contextOpen)} />
-              {/* A working Agent with nothing typed offers the brake instead of send (controller-prototype's Composer). */}
-              {busy && !message ? (
-                <Button
-                  label={isStopping ? t("stop.stopping") : t("stop.button")}
-                  icon="stopped"
-                  variant="primary"
-                  disabled={status.online === false || !link || isStopping}
-                  onPress={() => void stop()}
-                />
-              ) : (
-                <Button label={t("send")} icon="send" variant="primary" disabled={(!message && attachments.length === 0) || !link} onPress={() => void send()} />
-              )}
+          {sendProblem && (
+            <View style={{ paddingTop: space.xs }}>
+              <Problem code={sendProblem} />
             </View>
-          </Card>
+          )}
         </View>
-        {status.stopError && (
-          <View style={{ paddingTop: space.xs }}>
-            <Problem code={status.stopError} />
-          </View>
-        )}
-        {sendProblem && (
-          <View style={{ paddingTop: space.xs }}>
-            <Problem code={sendProblem} />
-          </View>
-        )}
-      </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

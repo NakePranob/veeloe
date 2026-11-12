@@ -126,6 +126,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
 
       <Section title="Agent">
         <Row icon="agent" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} />
+        <Row icon="memory" title="Memory" detail={t("memory.detail")} href={`/agents/${agent.id}/memory`} />
         <Field label={t("name")} value={name} onChangeText={setName} />
       </Section>
 

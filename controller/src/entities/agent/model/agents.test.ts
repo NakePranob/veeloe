@@ -103,3 +103,38 @@ test("an Agent the Machine no longer lists is removed here, while another Machin
   const ids = (await database.query<{ id: string; machine_id: string }>("SELECT id, machine_id FROM agent ORDER BY id")).map((row) => `${row.machine_id}:${row.id}`);
   expect(ids).toEqual(["machine-1:a2", "machine-2:a3"]);
 });
+
+const trashRow = (id: string) => database.query<Record<string, unknown>>("SELECT * FROM agent_trash WHERE id = ?", [id]).then((rows) => rows[0]);
+
+test("an Agent the Machine deleted moves to the trash, and a restore moves it back", async () => {
+  const entry = { ...agent, deletedAt: 1_800_000_000_000, restoreUntil: 1_802_592_000_000 };
+  await saveAgents(database, "machine-1", [agent]);
+  // Delete: the Machine no longer lists it as an Agent, only in its trash.
+  await saveAgents(database, "machine-1", [], [entry]);
+  expect(await row()).toBeUndefined();
+  expect(await trashRow("a1")).toMatchObject({ machine_id: "machine-1", name: "A", character: JSON.stringify(character), deleted_at: entry.deletedAt, restore_until: entry.restoreUntil });
+
+  // A Machine that does not say the Character (older than Characters) does not erase the one kept.
+  await saveAgents(database, "machine-1", [], [{ id: "a1", name: "A", provider: "main", model: "model-a", deletedAt: entry.deletedAt, restoreUntil: entry.restoreUntil }]);
+  expect(await trashRow("a1")).toMatchObject({ character: JSON.stringify(character) });
+
+  // Restore: it is an Agent again and the trash no longer has it.
+  await saveAgents(database, "machine-1", [agent], []);
+  expect(await row()).toMatchObject({ id: "a1" });
+  expect(await trashRow("a1")).toBeUndefined();
+});
+
+test("a Machine too old to keep deleted Agents clears its trash, and another Machine's trash stays", async () => {
+  const entry = { ...agent, deletedAt: 1, restoreUntil: 2 };
+  await saveAgents(database, "machine-1", [], [entry]);
+  await saveAgents(database, "machine-2", [], [{ ...entry, id: "a3" }]);
+  await saveAgents(database, "machine-1", [], undefined);
+  const ids = (await database.query<{ id: string; machine_id: string }>("SELECT id, machine_id FROM agent_trash ORDER BY id")).map((row) => `${row.machine_id}:${row.id}`);
+  expect(ids).toEqual(["machine-2:a3"]);
+});
+
+test("an answer that lists an Agent as in use takes it out of the trash", async () => {
+  await saveAgents(database, "machine-1", [], [{ ...agent, deletedAt: 1, restoreUntil: 2 }]);
+  await saveAgents(database, "machine-1", [agent], [{ ...agent, deletedAt: 1, restoreUntil: 2 }]);
+  expect(await trashRow("a1")).toBeUndefined();
+});

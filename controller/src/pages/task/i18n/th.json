@@ -1,6 +1,8 @@
 {
   "title": "Task",
   "agent": "ตั้งค่า Agent",
+  "deletedAgent": "Agent ที่ถูกลบแล้ว",
+  "readOnly": "Agent นี้ถูกลบแล้ว ประวัติ Task ยังอ่านได้ แต่ส่งข้อความใหม่ไม่ได้",
   "empty": "ส่งข้อความหา {{name}} เพื่อเริ่ม Task นี้",
   "working": "กำลังทำงาน…",
   "sending": "กำลังส่ง…",

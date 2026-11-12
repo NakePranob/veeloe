@@ -21,6 +21,8 @@ export type MachineStatus = {
   updateError: string | null;
   /** The code the last `agent.delete` came back with, if it failed. */
   deleteError: string | null;
+  /** The code the last `agent.restore` came back with, if it failed (`agent-trash`). */
+  restoreError: string | null;
   /** The code the last `task.stop` came back with, if it failed (`stop-and-restart`). */
   stopError: string | null;
   /** The code the last `provider.add` came back with, if it failed. */
@@ -33,7 +35,7 @@ export type MachineStatus = {
   budgetToday: { usedTokens: number; limitTokens: number } | null;
 };
 
-const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null, providerError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
+export const UNKNOWN_MACHINE_STATUS: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, restoreError: null, stopError: null, providerError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
 
 /** One page's usage request for one Machine: what it asked for, and how it went. */
 export type UsageStatus = {
@@ -53,9 +55,25 @@ export type UsageStatus = {
 
 const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, error: null, from: null, to: null, tasks: [], total: 0 };
 
+/** One Agent's Memory as the Machine last answered it; only held in memory (`agent-memory-page`). */
+export type MemoryStatus = {
+  request: string | null;
+  machine: string | null;
+  agent: string | null;
+  loading: boolean;
+  /** A code from the Hub or the Machine, such as `hub.machine_offline` or `agent.unknown`. */
+  error: string | null;
+  /** The last answer: the whole-file count and the text the next Turn's prompt gets. */
+  memory: { exists: boolean; chars: number; text: string } | null;
+  /** When that answer landed, so the page can say how fresh it is. */
+  fetchedAt: number | null;
+};
+
+export const UNKNOWN_MEMORY: MemoryStatus = { request: null, machine: null, agent: null, loading: false, error: null, memory: null, fetchedAt: null };
+
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "delete" | "stop" | "hello" | "status" | "provider" | "usage" | "download" | "other";
+type Kind = "create" | "update" | "delete" | "restore" | "stop" | "hello" | "status" | "provider" | "usage" | "memory" | "download" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -142,13 +160,17 @@ export function createMachineLinks({
   // A new object on every change, so React can tell that something moved.
   let allUsage: Record<string, UsageStatus> = {};
   const usageListeners = new Set<() => void>();
+  const memoryStatuses = new Map<string, MemoryStatus>();
+  // A new object on every change, so React can tell that something moved.
+  let allMemory: Record<string, MemoryStatus> = {};
+  const memoryListeners = new Set<() => void>();
   /** Which Machine an envelope went to, by its sig, so an answer about it finds its way back. */
   const sentTo = new Map<string, { machine: string; kind: Kind; request?: string }>();
   // The Hub does not say when a Machine comes back, so one that was offline is asked again, later each time.
   const retries = new Map<string, { timer: ReturnType<typeof setTimeout>; backoff: ReturnType<typeof createBackoff> }>();
 
   function setStatus(machine: string, change: Partial<MachineStatus>) {
-    statuses.set(machine, { ...(statuses.get(machine) ?? UNKNOWN), ...change });
+    statuses.set(machine, { ...(statuses.get(machine) ?? UNKNOWN_MACHINE_STATUS), ...change });
     all = Object.fromEntries(statuses);
     for (const listener of [...listeners]) listener();
   }
@@ -157,6 +179,23 @@ export function createMachineLinks({
     usageStatuses.set(machine, { ...(usageStatuses.get(machine) ?? UNKNOWN_USAGE), ...change });
     allUsage = Object.fromEntries(usageStatuses);
     for (const listener of [...usageListeners]) listener();
+  }
+
+  function setMemory(key: string, change: Partial<MemoryStatus>) {
+    memoryStatuses.set(key, { ...(memoryStatuses.get(key) ?? UNKNOWN_MEMORY), ...change });
+    allMemory = Object.fromEntries(memoryStatuses);
+    for (const listener of [...memoryListeners]) listener();
+  }
+
+  /** One Agent's Memory belongs to one Machine, so the key carries both. */
+  const memoryKey = (machine: string, agent: string) => `${machine}:${agent}`;
+
+  /** Land an error on the ask it belongs to; a different request id leaves the page alone. */
+  function failMemory(machine: string, request: string | undefined, code: string) {
+    if (!request) return;
+    for (const [key, status] of memoryStatuses) {
+      if (status.machine === machine && status.request === request) setMemory(key, { loading: false, error: code });
+    }
   }
 
   function sendTo(machine: Machine, kind: Kind, out: { type: string; task?: string; body: unknown }, request?: string) {
@@ -219,7 +258,7 @@ export function createMachineLinks({
         clearTimeout(retry.timer);
         retries.delete(machine.id);
       }
-      await saveAgents(database, machine.id, message.body.agents);
+      await saveAgents(database, machine.id, message.body.agents, message.body.trash);
       // A Machine older than `sandboxed-commands` says nothing of it, which is not the same as an empty Egress.
       if (message.body.egress) await saveEgress(database, machine.id, message.body.egress);
       setStatus(machine.id, { online: true, providers: message.body.providers });
@@ -248,6 +287,17 @@ export function createMachineLinks({
         total: message.body.agents.reduce((sum, agent) => sum + agent.days.reduce((all, day) => all + day.tokens, 0), 0),
         tasks: message.body.agents.flatMap((agent) => agent.tasks.map((task) => ({ agent: agent.agent, ...task }))),
       });
+    } else if (message.type === "memory.got") {
+      const key = memoryKey(machine.id, message.body.agent);
+      const current = memoryStatuses.get(key);
+      // Only the answer to this page's latest ask counts: a stale or misrouted one changes nothing.
+      if (!current || current.request !== message.body.request || current.agent !== message.body.agent) return;
+      setMemory(key, {
+        loading: false,
+        error: null,
+        memory: { exists: message.body.exists, chars: message.body.chars, text: message.body.text },
+        fetchedAt: Date.now(),
+      });
     } else if ((message.type === "task.event" || message.type === "task.events") && signed.task) {
       const events = message.type === "task.event" ? [message.body] : message.body.events;
       await saveTaskEvents(database, { task: signed.task, agent: message.body.agent, machine: machine.id }, events);
@@ -258,11 +308,14 @@ export function createMachineLinks({
       if (about?.kind === "create") setStatus(machine.id, { createError: message.body.code });
       else if (about?.kind === "update") setStatus(machine.id, { updateError: message.body.code });
       else if (about?.kind === "delete") setStatus(machine.id, { deleteError: message.body.code });
+      else if (about?.kind === "restore") setStatus(machine.id, { restoreError: message.body.code });
       else if (about?.kind === "stop") setStatus(machine.id, { stopError: message.body.code });
       else if (about?.kind === "provider") setStatus(machine.id, { providerError: message.body.code });
       else if (about?.kind === "usage") {
         const current = usageStatuses.get(about.machine);
         if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: message.body.code });
+      } else if (about?.kind === "memory") {
+        failMemory(about.machine, about.request, message.body.code);
       } else if (about?.kind === "download" && about.request) {
         settleDownload(about.request, new Error(message.body.code));
       } else await failPendingMessage(database, message.body.ref, message.body.code);
@@ -315,6 +368,10 @@ export function createMachineLinks({
           if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: error.code });
           return;
         }
+        if (about.kind === "memory") {
+          failMemory(about.machine, about.request, error.code);
+          return;
+        }
         if (about.kind === "download" && about.request) {
           settleDownload(about.request, new Error(error.code));
           return;
@@ -322,6 +379,7 @@ export function createMachineLinks({
         if (about.kind === "create") setStatus(about.machine, { createError: error.code });
         else if (about.kind === "update") setStatus(about.machine, { updateError: error.code });
         else if (about.kind === "delete") setStatus(about.machine, { deleteError: error.code });
+        else if (about.kind === "restore") setStatus(about.machine, { restoreError: error.code });
         else if (about.kind === "stop") setStatus(about.machine, { stopError: error.code });
         else if (about.kind === "provider") setStatus(about.machine, { providerError: error.code });
         else void failPendingMessage(database, error.ref!, error.code);
@@ -350,7 +408,7 @@ export function createMachineLinks({
       for (const [hubUrl, onHub] of byHub) if (!clients.has(hubUrl)) connect(hubUrl, onHub);
     },
 
-    status: (machine: string) => statuses.get(machine) ?? UNKNOWN,
+    status: (machine: string) => statuses.get(machine) ?? UNKNOWN_MACHINE_STATUS,
     statuses: () => all,
     subscribe(listener: () => void) {
       listeners.add(listener);
@@ -381,6 +439,30 @@ export function createMachineLinks({
       return () => void usageListeners.delete(listener);
     },
 
+    /**
+     * Asks a Machine for one Agent's Memory (`agent-memory-page`). The page keeps the answer and
+     * when it landed; an answer to an older request is dropped. Null when the Hub is not connected.
+     */
+    requestMemory(machine: Machine, agent: string) {
+      const key = memoryKey(machine.id, agent);
+      const current = memoryStatuses.get(key);
+      if (current?.loading) return current.request;
+      const request = newId();
+      setMemory(key, { request, machine: machine.id, agent, loading: true, error: null });
+      if (!sendTo(machine, "memory", { type: "memory.get", body: { request, agent } }, request)) {
+        setMemory(key, { request, machine: machine.id, agent, loading: false, error: "hub.machine_offline" });
+        return null;
+      }
+      return request;
+    },
+
+    memory: (machine: string, agent: string) => memoryStatuses.get(memoryKey(machine, agent)) ?? UNKNOWN_MEMORY,
+    memoryStatuses: () => allMemory,
+    subscribeMemory(listener: () => void) {
+      memoryListeners.add(listener);
+      return () => void memoryListeners.delete(listener);
+    },
+
     /** The new Agent's id, or null when the Machine's Hub is not connected and nothing went. The Machine keeps `character` with it. */
     createAgent(machine: Machine, agent: Omit<AgentCreateBody, "id">) {
       setStatus(machine.id, { createError: null });
@@ -401,6 +483,12 @@ export function createMachineLinks({
     deleteAgent(machine: Machine, id: string) {
       setStatus(machine.id, { deleteError: null });
       return sendTo(machine, "delete", { type: "agent.delete", body: { id } });
+    },
+
+    /** Bring back an Agent from the trash. The Machine answers with `agent.listed` (`agent-trash`). */
+    restoreAgent(machine: Machine, id: string) {
+      setStatus(machine.id, { restoreError: null });
+      return sendTo(machine, "restore", { type: "agent.restore", body: { id } });
     },
 
     /** Ask for version, features, disk and today's Budget when the Machine page opens. */

@@ -1,5 +1,6 @@
 import { addMachineI18n } from "../../pages/add-machine";
 import { agentCharacterI18n } from "../../pages/agent-character";
+import { agentMemoryI18n } from "../../pages/agent-memory";
 import { agentsI18n } from "../../pages/agents";
 import { allowlistI18n } from "../../pages/allowlist";
 import { createKeyI18n } from "../../pages/create-key";
@@ -25,6 +26,7 @@ const slices = {
   "agent-inbox": agentInboxI18n,
   "add-machine": addMachineI18n,
   "agent-character": agentCharacterI18n,
+  "agent-memory": agentMemoryI18n,
   agents: agentsI18n,
   allowlist: allowlistI18n,
   "create-key": createKeyI18n,

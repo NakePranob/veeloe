@@ -40,6 +40,8 @@ export {
   AgentIdSchema,
   AgentListBodySchema,
   AgentListedBodySchema,
+  AgentRestoreBodySchema,
+  AgentTrashEntrySchema,
   AgentUpdateBodySchema,
   AgentUsageBodySchema,
   MachineStatusBodySchema,
@@ -47,6 +49,8 @@ export {
   type AgentCreateBody,
   type AgentDeleteBody,
   type AgentListedBody,
+  type AgentRestoreBody,
+  type AgentTrashEntry,
   type AgentUpdateBody,
   type AgentUsageBody,
   type MachineStatusBody,
@@ -102,6 +106,13 @@ export {
   type UsageGetBody,
   type UsageListedBody,
 } from "./messages/usage";
+export {
+  MEMORY_TEXT_MAX,
+  MemoryGetBodySchema,
+  MemoryGotBodySchema,
+  type MemoryGetBody,
+  type MemoryGotBody,
+} from "./messages/memory";
 export {
   CertificateSchema,
   DeviceLinkSchema,

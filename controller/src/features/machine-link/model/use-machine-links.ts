@@ -5,7 +5,7 @@ import { useMachines } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";
 import { deviceName } from "../../../shared/device-name";
 import { keySession, useKeyStatus } from "../../../shared/keystore";
-import { createMachineLinks, type MachineLinks, type MachineStatus, type UsageStatus } from "./links";
+import { createMachineLinks, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, type MachineLinks, type MachineStatus, type MemoryStatus, type UsageStatus } from "./links";
 
 let current: MachineLinks | null = null;
 const changes = new Set<() => void>();
@@ -56,13 +56,11 @@ export function useMachineLink() {
   return useCurrent();
 }
 
-const UNKNOWN: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, stopError: null, providerError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
-
 export function useMachineStatus(machine: string): MachineStatus {
   const links = useCurrent();
   return useSyncExternalStore(
     (listener) => links?.subscribe(listener) ?? (() => {}),
-    () => links?.status(machine) ?? UNKNOWN,
+    () => links?.status(machine) ?? UNKNOWN_MACHINE_STATUS,
   );
 }
 
@@ -96,5 +94,14 @@ export function useUsageStatuses(): Record<string, UsageStatus> {
   return useSyncExternalStore(
     (listener) => links?.subscribeUsage(listener) ?? (() => {}),
     () => links?.usageStatuses() ?? NO_USAGES,
+  );
+}
+
+/** One Agent's Memory as its Machine last answered, for the Memory page (`agent-memory-page`). */
+export function useMemoryStatus(machine: string, agent: string): MemoryStatus {
+  const links = useCurrent();
+  return useSyncExternalStore(
+    (listener) => links?.subscribeMemory(listener) ?? (() => {}),
+    () => links?.memory(machine, agent) ?? UNKNOWN_MEMORY,
   );
 }

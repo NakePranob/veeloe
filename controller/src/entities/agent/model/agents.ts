@@ -1,4 +1,4 @@
-import type { Agent } from "@veeloe/protocol-ts";
+import type { Agent, AgentTrashEntry } from "@veeloe/protocol-ts";
 import type { Database, WriteTransaction } from "../../../shared/db";
 
 export const AGENT_TOPIC = "agent";
@@ -39,6 +39,23 @@ export function allowlistOf(row: Pick<AgentRow, "allowlist">): string[] | null {
 
 export const LIST_AGENTS = "SELECT * FROM agent ORDER BY name, id";
 
+/** An Agent the Machine deleted but has not purged, as it last said (`agent-trash`). */
+export type AgentTrashRow = {
+  id: string;
+  machine_id: string;
+  name: string;
+  provider: string;
+  model: string;
+  /** The Character as the Machine kept it, as JSON, or null from a Machine older than Characters. */
+  character: string | null;
+  /** Epoch milliseconds, from the Machine. */
+  deleted_at: number;
+  /** Epoch milliseconds, from the Machine: when it purges the row. */
+  restore_until: number;
+};
+
+export const LIST_TRASHED_AGENTS = "SELECT * FROM agent_trash ORDER BY deleted_at, id";
+
 /** The Agent's daily token Budget, todays tally: both from `daily-budget` (ADR 0043). */
 export type AgentUsage = { agent: string; day: string; tokens: number };
 
@@ -57,7 +74,7 @@ function writeUsage(transaction: WriteTransaction, { agent, day, tokens }: Agent
  * What a Machine said it has: add and update, then drop the Agents it no longer
  * lists for that Machine. A field the answer did not carry keeps what is kept.
  */
-export function saveAgents(database: Database, machineId: string, agents: Agent[]) {
+export function saveAgents(database: Database, machineId: string, agents: Agent[], trash?: AgentTrashEntry[]) {
   return database.write([AGENT_TOPIC], async (transaction) => {
     for (const agent of agents) {
       await transaction.run(
@@ -78,6 +95,32 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
     const active = agents.map((agent) => agent.id);
     if (active.length === 0) await transaction.run("DELETE FROM agent WHERE machine_id = ?", [machineId]);
     else await transaction.run(`DELETE FROM agent WHERE machine_id = ? AND id NOT IN (${active.map(() => "?").join(", ")})`, [machineId, ...active]);
+
+    // The trash of this Machine, as the answer said it. A Machine too old to keep
+    // deleted Agents sends no `trash` at all, and then it has none (`agent-trash`).
+    if (trash === undefined) {
+      await transaction.run("DELETE FROM agent_trash WHERE machine_id = ?", [machineId]);
+      return;
+    }
+    for (const entry of trash) {
+      await transaction.run(
+        `INSERT INTO agent_trash (id, machine_id, name, provider, model, character, deleted_at, restore_until) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           machine_id = excluded.machine_id,
+           name = excluded.name,
+           provider = excluded.provider,
+           model = excluded.model,
+           character = COALESCE(excluded.character, agent_trash.character),
+           deleted_at = excluded.deleted_at,
+           restore_until = excluded.restore_until`,
+        [entry.id, machineId, entry.name, entry.provider, entry.model, entry.character ? JSON.stringify(entry.character) : null, entry.deletedAt, entry.restoreUntil],
+      );
+    }
+    const trashed = trash.map((entry) => entry.id);
+    if (trashed.length === 0) await transaction.run("DELETE FROM agent_trash WHERE machine_id = ?", [machineId]);
+    else await transaction.run(`DELETE FROM agent_trash WHERE machine_id = ? AND id NOT IN (${trashed.map(() => "?").join(", ")})`, [machineId, ...trashed]);
+    // One id is in one list only: an Agent the Machine says is in use is not in its trash.
+    if (active.length > 0) await transaction.run(`DELETE FROM agent_trash WHERE id IN (${active.map(() => "?").join(", ")})`, active);
   });
 }
 

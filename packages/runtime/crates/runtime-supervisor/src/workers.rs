@@ -82,8 +82,12 @@ impl Workers {
         }
     }
 
-    /// Starts this Agent's worker unless it is already running.
+    /// Starts this Agent's worker unless it is already running. An Agent in the
+    /// trash gets none, even when boot asks for every Agent (`agent-trash`).
     pub fn start(&self, agent: &Agent) {
+        if agent.deleted() {
+            return;
+        }
         let mut running = self.inner.running.lock().expect("running");
         if running.contains_key(&agent.id) {
             return;

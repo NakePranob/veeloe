@@ -21,6 +21,7 @@ use veeloe_runtime_core::{
 use crate::llm::{AnthropicLlm, LlmTransport};
 use crate::tools::bash::BashTool;
 use crate::tools::files::FileTools;
+use crate::tools::memory::MemoryTool;
 
 /// Where a worker keeps everything it owns, and what it calls itself.
 #[derive(Debug, Clone)]
@@ -212,6 +213,7 @@ impl Worker {
             sandbox,
         )))?;
         tools.register(Arc::new(FileTools::new(&workdir, false)))?;
+        tools.register(Arc::new(MemoryTool::new(&workdir)))?;
 
         let transport = Arc::new(IpcTransport::new(Arc::clone(&link)));
         let llm = Arc::new(AnthropicLlm::new(

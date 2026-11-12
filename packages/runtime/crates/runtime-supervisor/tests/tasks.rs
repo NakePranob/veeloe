@@ -93,7 +93,9 @@ impl HubLinkSink for Slice {
         };
         let Some(outbox) = outbox else { return };
         let trusted: std::collections::HashSet<String> =
-            [to_base64url(&public_key_of(&CONTROLLER_SEED))].into_iter().collect();
+            [to_base64url(&public_key_of(&CONTROLLER_SEED))]
+                .into_iter()
+                .collect();
         let mut seen = self.seen.lock().expect("seen");
         let seen: &mut dyn veeloe_protocol::envelope::SeenSequences = &mut *seen;
         let Ok(verified) = verify(
@@ -159,13 +161,23 @@ fn worker_binary() -> Vec<String> {
             return vec![path.to_string_lossy().to_string(), "worker".to_string()];
         }
     }
-    let status = std::process::Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()))
-        .args(["build", "-p", "veeloe-runtime-supervisor", "--bin", "veeloe"])
-        .status()
-        .expect("build the worker");
+    let status =
+        std::process::Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()))
+            .args([
+                "build",
+                "-p",
+                "veeloe-runtime-supervisor",
+                "--bin",
+                "veeloe",
+            ])
+            .status()
+            .expect("build the worker");
     assert!(status.success(), "could not build veeloe");
     vec![
-        beside.expect("a target folder").to_string_lossy().to_string(),
+        beside
+            .expect("a target folder")
+            .to_string_lossy()
+            .to_string(),
         "worker".to_string(),
     ]
 }
@@ -199,9 +211,12 @@ impl Controller {
         let Frame::Known { value, .. } = parse_frame(&challenge) else {
             panic!("no challenge");
         };
-        let answer =
-            answer_challenge(hub_url, value["nonce"].as_str().expect("nonce"), &CONTROLLER_SEED)
-                .expect("answer");
+        let answer = answer_challenge(
+            hub_url,
+            value["nonce"].as_str().expect("nonce"),
+            &CONTROLLER_SEED,
+        )
+        .expect("answer");
         socket
             .send(Message::Text(answer.to_string().into()))
             .await
@@ -276,6 +291,7 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
             allowlist: Vec::new(),
             approval_timeout_s: 3_600,
             budget: None,
+            deleted_at: None,
         })
         .expect("agent");
 
@@ -313,7 +329,9 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
         },
         Arc::clone(&slice) as Arc<dyn HubLinkSink>,
     );
-    slice.workers.start(&slice.registry.get("a1").expect("get").expect("agent"));
+    slice
+        .workers
+        .start(&slice.registry.get("a1").expect("get").expect("agent"));
     assert!(until(|| slice.workers.is_ready("a1"), 10_000).await);
 
     let mut controller = Controller::connect(&hub.url).await;
@@ -344,12 +362,21 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
     }
     assert_eq!(
         kinds,
-        vec!["member.message", "turn.started", "llm.message", "turn.ended"]
+        vec![
+            "member.message",
+            "turn.started",
+            "llm.message",
+            "turn.ended"
+        ]
     );
 
     // A sync is answered with the events after a number.
     controller
-        .send("task.sync", Some("t1"), json!({ "agent": "a1", "after": 2 }))
+        .send(
+            "task.sync",
+            Some("t1"),
+            json!({ "agent": "a1", "after": 2 }),
+        )
         .await;
     let answer = controller.next().await;
     assert_eq!(answer["type"], "task.events");
@@ -368,7 +395,11 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
 
     // A Stop for a Turn that is not running comes back as an error, through the same route.
     controller
-        .send("task.stop", Some("t1"), json!({ "agent": "a1", "id": "s-1" }))
+        .send(
+            "task.stop",
+            Some("t1"),
+            json!({ "agent": "a1", "id": "s-1" }),
+        )
         .await;
     let answer = controller.next().await;
     assert_eq!(answer["type"], "error");
@@ -415,6 +446,7 @@ async fn an_approval_answer_reaches_the_worker_and_allow_always_grows_the_allowl
             allowlist: Vec::new(),
             approval_timeout_s: 3_600,
             budget: None,
+            deleted_at: None,
         })
         .expect("agent");
 

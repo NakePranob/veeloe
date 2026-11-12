@@ -1,6 +1,8 @@
 {
   "title": "Task",
   "agent": "Agent settings",
+  "deletedAgent": "Deleted Agent",
+  "readOnly": "This Agent was deleted. Its Task history stays readable, but nothing new can be sent.",
   "empty": "Send {{name}} a message to start this Task.",
   "working": "Working…",
   "sending": "Sending…",

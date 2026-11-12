@@ -197,6 +197,31 @@ test("deleting an Agent goes signed as agent.delete and its error is kept separa
   expect(links.status("machine-1").updateError).toBeNull();
 });
 
+test("restoring an Agent goes signed as agent.restore and its error is kept separately", async () => {
+  const { fake, links, machine } = await setup();
+  const sig = links.restoreAgent(machine, "a1");
+  await until(() => fake.hub.frames.length === 3);
+  const sent = fake.hub.frames.at(-1)!;
+  expect(sent.sig).toBe(sig!);
+  expect(JSON.parse(sent.signed)).toMatchObject({ type: "agent.restore", to: "machine-1", member, body: { id: "a1" } });
+  fake.push(signed("error", { code: "agent.unknown", ref: sent.sig }, { seq: 4 }));
+  await until(() => links.status("machine-1").restoreError === "agent.unknown");
+  expect(links.status("machine-1").deleteError).toBeNull();
+});
+
+test("an answer with a trash keeps deleted Agents here, and one without it clears the trash", async () => {
+  const { database, fake } = await setup();
+  const trash = [{ id: "a1", name: "Gone", provider: "main", model: "model-a", deletedAt: 1, restoreUntil: 2 }];
+  fake.push(signed("agent.listed", { agents: [], trash, providers: [] }));
+  await until(async () => (await database.query("SELECT * FROM agent_trash")).length === 1);
+  expect(await database.query("SELECT id, name FROM agent_trash")).toEqual([{ id: "a1", name: "Gone" }]);
+
+  // A Machine older than agent-trash says nothing of a trash, and has none.
+  fake.push(signed("agent.listed", { agents: [{ id: "a1", name: "Gone", provider: "main", model: "model-a" }], providers: [] }, { seq: 2 }));
+  await until(async () => (await database.query("SELECT * FROM agent")).length === 1);
+  expect(await database.query("SELECT * FROM agent_trash")).toEqual([]);
+});
+
 test("after a dropped connection it asks for each Task's events after the last one kept", async () => {
   const { database, fake } = await setup();
   fake.push(signed("task.event", { agent: "a1", seq: 1, kind: "member.message", at: 1, body: {} }, { seq: 2, task: "t1" }));
@@ -414,4 +439,51 @@ test("a push token goes to the Machine with the language, and unregister clears 
   expect(links.unregisterPush(machine)).not.toBeNull();
   await until(() => fake.hub.frames.length === 4);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "push.unregister", body: {} });
+});
+
+test("a memory request goes signed with its request id, and the answer keeps the whole-file count", async () => {
+  const { fake, machine, links } = await setup();
+  const request = links.requestMemory(machine, "a1");
+  expect(request).not.toBeNull();
+  expect(links.memory("machine-1", "a1")).toMatchObject({ machine: "machine-1", agent: "a1", request, loading: true, error: null, memory: null });
+  await until(() => fake.hub.frames.length === 3);
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({
+    type: "memory.get",
+    to: "machine-1",
+    member,
+    body: { request, agent: "a1" },
+  });
+
+  fake.push(signed("memory.got", { request, agent: "a1", exists: true, chars: 4_010, text: "a".repeat(4_000) }));
+  await until(() => links.memory("machine-1", "a1").loading === false);
+  const status = links.memory("machine-1", "a1");
+  expect(status.error).toBeNull();
+  expect(status.memory).toEqual({ exists: true, chars: 4_010, text: "a".repeat(4_000) });
+  expect(status.fetchedAt).toBeGreaterThan(0);
+});
+
+test("a memory answer for an older request or another Agent is dropped whole", async () => {
+  const { fake, machine, links } = await setup();
+  const request = links.requestMemory(machine, "a1")!;
+  await until(() => fake.hub.frames.length === 3);
+
+  fake.push(signed("memory.got", { request: "an-older-one", agent: "a1", exists: true, chars: 1, text: "x" }, { seq: 1 }));
+  fake.push(signed("memory.got", { request, agent: "a2", exists: true, chars: 1, text: "x" }, { seq: 2 }));
+  await Bun.sleep(100);
+  expect(links.memory("machine-1", "a1")).toMatchObject({ loading: true, memory: null, error: null });
+  expect(links.memory("machine-1", "a2")).toMatchObject({ request: null, memory: null });
+
+  fake.push(signed("memory.got", { request, agent: "a1", exists: false, chars: 0, text: "" }, { seq: 3 }));
+  await until(() => links.memory("machine-1", "a1").loading === false);
+  expect(links.memory("machine-1", "a1").memory).toEqual({ exists: false, chars: 0, text: "" });
+});
+
+test("a Machine's error about a memory request fails that request and leaves the page's other state alone", async () => {
+  const { fake, machine, links } = await setup();
+  links.requestMemory(machine, "a1");
+  await until(() => fake.hub.frames.length === 3);
+  fake.push(signed("error", { code: "agent.unknown", ref: fake.hub.frames.at(-1)!.sig }));
+  await until(() => links.memory("machine-1", "a1").error === "agent.unknown");
+  expect(links.memory("machine-1", "a1").loading).toBe(false);
+  expect(links.memory("machine-1", "a1").memory).toBeNull();
 });

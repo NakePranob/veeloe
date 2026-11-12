@@ -82,9 +82,23 @@
     "heading": "โซนอันตราย",
     "action": "ลบ Agent นี้",
     "title": "ลบ {{name}}?",
-    "body": "Agent จะหยุดและหายจากรายการนี้ Workdir กับประวัติ Task ยังอยู่บน Machine แต่ Agent จะไม่ตอบอีก",
+    "body": "Agent จะหยุดและย้ายไปอยู่ใน Agent ที่ถูกลบ Workdir กับประวัติ Task ยังอยู่บน Machine และกู้คืนได้ภายใน 30 วัน",
     "cancel": "ยกเลิก",
     "prompt": "ลบ {{name}}",
     "failed": "ลบ Agent นี้ไม่สำเร็จ"
+  },
+  "trash": {
+    "title": "Agent ที่ถูกลบ",
+    "footer": "กู้คืนได้ภายใน 30 วันหลังลบ หลังครบกำหนด Machine จะเอาออกจากรายการนี้ แต่ Workdir กับประวัติ Task ยังอยู่บนดิสก์ (ADR 0032)",
+    "days_one": "เหลือ {{count}} วัน",
+    "days_other": "เหลือ {{count}} วัน",
+    "restore": "กู้คืน",
+    "restoring": "กำลังกู้คืน",
+    "confirmTitle": "กู้คืน {{name}}?",
+    "confirmBody": "Agent จะกลับไปทำงานด้วย setting เดิม และ Task เดิมจะคุยต่อได้",
+    "failed": "กู้คืน Agent นี้ไม่สำเร็จ"
+  },
+  "memory": {
+    "detail": "อ่าน MEMORY.md ที่ Agent จดไว้"
   }
 }

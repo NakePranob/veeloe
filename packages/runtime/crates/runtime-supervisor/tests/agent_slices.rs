@@ -163,7 +163,14 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
     assert!(!body.to_string().contains("key"), "{body}");
 
     // Creating the same id again is refused rather than silently replaced.
-    dispatch(&machine, &outbox, &from(), "agent.create", &json!({ "id": "a1" })).await;
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.create",
+        &json!({ "id": "a1" }),
+    )
+    .await;
     {
         let sent = outbox.sent.lock().expect("sent");
         assert_eq!(sent.last().expect("reply").1, "error");
@@ -196,7 +203,8 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
 }
 
 #[tokio::test]
-async fn an_agent_can_be_deleted_while_its_workdir_stays() {
+async fn a_deleted_agent_waits_in_the_trash_and_can_be_restored() {
+    use veeloe_runtime_supervisor::agents::TRASH_DAYS;
     use veeloe_runtime_supervisor::agents::{agent_dir, Agent};
 
     let home = tempdir().expect("home");
@@ -218,6 +226,7 @@ async fn an_agent_can_be_deleted_while_its_workdir_stays() {
         allowlist: Vec::new(),
         approval_timeout_s: 3_600,
         budget: None,
+        deleted_at: None,
     };
     registry.add(&agent).expect("add");
     let dir = agent_dir(home.path(), "a1").expect("workdir");
@@ -236,12 +245,158 @@ async fn an_agent_can_be_deleted_while_its_workdir_stays() {
         budgets: None,
         http: &http,
     };
-    dispatch(&machine, &outbox, &from(), "agent.delete", &json!({ "id": "a1" })).await;
-    assert!(registry.get("a1").expect("registry").is_none());
-    assert!(dir.exists());
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.delete",
+        &json!({ "id": "a1" }),
+    )
+    .await;
     let (type_, body) = outbox.last();
     assert_eq!(type_, "agent.listed");
     assert_eq!(body["agents"], json!([]));
+    let deleted = registry.get("a1").expect("registry").expect("kept");
+    let deleted_at = deleted.deleted_at.expect("deletedAt");
+    assert_eq!(
+        body["trash"][0]["restoreUntil"],
+        json!(deleted_at + (TRASH_DAYS as i64) * 24 * 60 * 60 * 1_000)
+    );
+    assert!(dir.exists());
+
+    // Deleting again is not a second deletion: the 30 days do not move.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.delete",
+        &json!({ "id": "a1" }),
+    )
+    .await;
+    assert_eq!(
+        registry
+            .get("a1")
+            .expect("registry")
+            .expect("kept")
+            .deleted_at,
+        Some(deleted_at)
+    );
+
+    // Its settings cannot be changed while it waits.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.update",
+        &json!({ "id": "a1", "name": "Nope" }),
+    )
+    .await;
+    assert_eq!(outbox.last().1["code"], "agent.unknown");
+    assert_eq!(
+        registry.get("a1").expect("registry").expect("kept").name,
+        "Deployer"
+    );
+
+    // A message cannot reach it: there is no worker, and that is not an outage.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "task.message",
+        &json!({ "agent": "a1", "id": "m1", "text": "hi" }),
+    )
+    .await;
+    assert_eq!(outbox.last().1["code"], "agent.unknown");
+    let mut about = from();
+    about.task = Some("t1".into());
+    dispatch(
+        &machine,
+        &outbox,
+        &about,
+        "task.sync",
+        &json!({ "agent": "a1", "after": 0 }),
+    )
+    .await;
+    assert_eq!(outbox.last().1["code"], "agent.unknown");
+    dispatch(
+        &machine,
+        &outbox,
+        &about,
+        "task.stop",
+        &json!({ "agent": "a1" }),
+    )
+    .await;
+    assert_eq!(outbox.last().1["code"], "agent.unknown");
+
+    // Restore brings it back, with its settings and its folder.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.restore",
+        &json!({ "id": "a1" }),
+    )
+    .await;
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "agent.listed");
+    assert_eq!(body["agents"][0]["id"], "a1");
+    assert_eq!(body["agents"][0]["name"], "Deployer");
+    assert_eq!(body["trash"], json!([]));
+    assert!(registry
+        .get("a1")
+        .expect("registry")
+        .expect("back")
+        .deleted_at
+        .is_none());
+    assert!(dir.exists());
+
+    // Restoring again changes nothing and answers with the same list.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.restore",
+        &json!({ "id": "a1" }),
+    )
+    .await;
+    assert_eq!(outbox.last().0, "agent.listed");
+    assert_eq!(outbox.last().1["agents"][0]["id"], "a1");
+
+    // An id in the trash is still taken.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.delete",
+        &json!({ "id": "a1" }),
+    )
+    .await;
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.create",
+        &json!({ "id": "a1" }),
+    )
+    .await;
+    assert_eq!(outbox.last().1["code"], "agent.exists");
+
+    // Past the 30 days the row is gone before the restore can be answered.
+    registry.restore("a1").expect("restore for the test");
+    registry.soft_delete("a1", 1).expect("delete long ago");
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.restore",
+        &json!({ "id": "a1" }),
+    )
+    .await;
+    assert_eq!(outbox.last().1["code"], "agent.unknown");
+    assert!(registry.get("a1").expect("registry").is_none());
+    assert!(dir.exists());
+
+    workers.stop_all();
 }
 
 #[tokio::test]
@@ -297,4 +452,60 @@ async fn a_push_token_is_kept_for_the_controller_key_and_then_removed() {
     let (type_, _) = outbox.last();
     assert_eq!(type_, "push.unregistered");
     assert!(tokens.for_member("member-1").is_empty());
+}
+
+#[tokio::test]
+async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
+    use veeloe_runtime_supervisor::agents::Agent;
+    use veeloe_runtime_supervisor::usage::{Budgets, UsageStore};
+
+    let home = tempdir().expect("home");
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    let agent = |id: &str, budget: u64| Agent {
+        id: id.into(),
+        name: "Deployer".into(),
+        provider: "main".into(),
+        model: "model-a".into(),
+        character: None,
+        allowlist: Vec::new(),
+        approval_timeout_s: 3_600,
+        budget: Some(budget),
+        deleted_at: None,
+    };
+    registry.add(&agent("live", 5_000_000)).expect("add");
+    registry.add(&agent("gone", 7_000_000)).expect("add");
+    registry
+        .soft_delete("gone", veeloe_runtime_supervisor::usage::now_ms())
+        .expect("delete");
+
+    let store = UsageStore::open(&home.path().join("usage.db")).expect("store");
+    let budgets = Budgets::new(store);
+    let workers = Workers::new(
+        home.path().to_path_buf(),
+        vec!["/bin/true".into()],
+        Arc::new(Silent) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent: &str, _message: FromWorker| {}),
+        Arc::new(|_line: &str| {}),
+        Arc::new(|_agent, command| command),
+    );
+    let outbox = Recording::default();
+    let providers = providers();
+    let http = Models;
+    let machine = Machine {
+        registry: &registry,
+        workers: &workers,
+        routes: None,
+        secret_key: None,
+        uploads: None,
+        push_tokens: None,
+        providers: &providers,
+        egress: &[],
+        budgets: Some(&budgets),
+        http: &http,
+    };
+    dispatch(&machine, &outbox, &from(), "machine.status", &json!({})).await;
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "machine.status");
+    assert_eq!(body["budgetToday"]["limitTokens"], 5_000_000);
+    workers.stop_all();
 }

@@ -10,7 +10,7 @@ import { column, radius, space, type, useColors, type Colors } from "./theme";
 interface ScreenProps {
   title: string;
   // Goes on the header's right, such as a save or add action.
-  right?: { label: string; onPress: () => void; disabled?: boolean; icon?: IconName };
+  right?: { label: string; onPress: () => void; disabled?: boolean; icon?: IconName; variant?: "primary" | "chip" | "ghost" };
   children: ReactNode;
 }
 
@@ -57,6 +57,8 @@ interface RowProps {
   // Short text on the right, such as a count or a state.
   value?: string;
   icon?: IconName;
+  // A picture or Character on the left, in place of the icon.
+  leading?: ReactNode;
   iconColor?: keyof Colors;
   href?: string;
   onPress?: () => void;
@@ -67,11 +69,11 @@ interface RowProps {
 }
 
 // One line in a section. It opens something when it has an href or onPress.
-export function Row({ title, detail, value, icon, iconColor, href, onPress, destructive, mono, accessory }: RowProps) {
+export function Row({ title, detail, value, icon, leading, iconColor, href, onPress, destructive, mono, accessory }: RowProps) {
   const colors = useColors();
   const body = (pressed: boolean) => (
     <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 44, paddingHorizontal: space.sm, paddingVertical: space.sm, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: pressed ? colors.chip : "transparent" }}>
-      {icon && <Icon name={icon} size="md" color={iconColor ?? (destructive ? "red" : "secondaryLabel")} />}
+      {leading ?? (icon && <Icon name={icon} size="md" color={iconColor ?? (destructive ? "red" : "secondaryLabel")} />)}
       <View style={{ flex: 1, gap: 2 }}>
         <Text mono={mono} selectable={!href && !onPress} style={destructive ? { color: colors.red } : undefined}>
           {title}

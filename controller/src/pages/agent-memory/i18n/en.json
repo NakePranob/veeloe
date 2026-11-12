@@ -1,0 +1,20 @@
+{
+  "title": "Memory",
+  "refresh": "Reload",
+  "note": "Memory is the MEMORY.md the Agent writes itself, pinned into every Turn's prompt. This page is read-only and shows it as plain text, because its contents can be poisoned (ADR 0036).",
+  "needsOnline": "The Machine must be online to read its Memory.",
+  "loading": "Asking the Machine for Memory",
+  "heading": "The Agent's Memory",
+  "count": "{{chars}} characters (cap {{limit}})",
+  "capped": "The file is over the cap, so the Agent gets only the first {{limit}} characters plus a note to shorten it.",
+  "blank": "The file is empty: nothing has been written yet.",
+  "fetched": "As of {{when}}",
+  "empty": {
+    "title": "No Memory yet",
+    "body": "This Agent has never written a MEMORY.md in its Workdir."
+  },
+  "missing": {
+    "title": "This Agent is gone",
+    "body": "It may have been deleted, or it lives on a Machine this device is not linked to."
+  }
+}

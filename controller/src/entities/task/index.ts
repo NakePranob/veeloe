@@ -22,5 +22,5 @@ export {
   type TaskStatus,
   type TaskSummary,
 } from "./model/tasks";
-export { usePendingMessages, useTaskEvents, useTaskSummaries } from "./model/use-tasks";
+export { usePendingMessages, useTaskEvents, useTaskRow, useTaskSummaries } from "./model/use-tasks";
 export { TaskStatusLabel } from "./ui/TaskStatusLabel";

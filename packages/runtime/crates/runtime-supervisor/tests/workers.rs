@@ -27,6 +27,7 @@ fn agent() -> Agent {
         allowlist: Vec::new(),
         approval_timeout_s: 3_600,
         budget: None,
+        deleted_at: None,
     }
 }
 
@@ -143,12 +144,21 @@ fn worker_binary() -> Vec<String> {
     }
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
     let status = Command::new(cargo)
-        .args(["build", "-p", "veeloe-runtime-supervisor", "--bin", "veeloe"])
+        .args([
+            "build",
+            "-p",
+            "veeloe-runtime-supervisor",
+            "--bin",
+            "veeloe",
+        ])
         .status()
         .expect("build the worker");
     assert!(status.success(), "could not build veeloe");
     vec![
-        beside.expect("a target folder").to_string_lossy().to_string(),
+        beside
+            .expect("a target folder")
+            .to_string_lossy()
+            .to_string(),
         "worker".to_string(),
     ]
 }
@@ -210,11 +220,12 @@ async fn an_agent_is_created_and_its_worker_is_ready_and_runs_a_task() {
         }
     ));
 
-    let ended = |kind: &str| {
-        heard.lock().expect("heard").iter().any(|message| {
-            matches!(message, FromWorker::Event { event, .. } if event.kind == kind)
-        })
-    };
+    let ended =
+        |kind: &str| {
+            heard.lock().expect("heard").iter().any(
+                |message| matches!(message, FromWorker::Event { event, .. } if event.kind == kind),
+            )
+        };
     assert!(
         until(|| ended("turn.ended"), 10_000).await,
         "the Task never ended: {:?}",
@@ -233,7 +244,12 @@ async fn an_agent_is_created_and_its_worker_is_ready_and_runs_a_task() {
         .collect();
     assert_eq!(
         kinds,
-        vec!["member.message", "turn.started", "llm.message", "turn.ended"]
+        vec![
+            "member.message",
+            "turn.started",
+            "llm.message",
+            "turn.ended"
+        ]
     );
     assert_eq!(
         events

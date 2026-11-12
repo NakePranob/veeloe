@@ -53,6 +53,10 @@ export type AgentUpdateBody = z.infer<typeof AgentUpdateBodySchema>;
 export const AgentDeleteBodySchema = z.looseObject({ id });
 export type AgentDeleteBody = z.infer<typeof AgentDeleteBodySchema>;
 
+/** Controller → Machine: bring back an Agent it deleted, before the Machine purges it (`agent-trash`). */
+export const AgentRestoreBodySchema = z.looseObject({ id });
+export type AgentRestoreBody = z.infer<typeof AgentRestoreBodySchema>;
+
 /** Controller → Machine: what is on this Machine. */
 export const AgentListBodySchema = z.looseObject({});
 
@@ -72,6 +76,16 @@ const AgentSchema = z.looseObject({
   usage: usage.optional(),
 });
 export type Agent = z.infer<typeof AgentSchema>;
+
+/**
+ * An Agent the Machine still holds after a delete (`agent-trash`): everything an Agent has,
+ * plus when it was deleted and when the Machine will purge it. Both are epoch milliseconds.
+ */
+export const AgentTrashEntrySchema = AgentSchema.extend({
+  deletedAt: z.number().int().nonnegative(),
+  restoreUntil: z.number().int().nonnegative(),
+});
+export type AgentTrashEntry = z.infer<typeof AgentTrashEntrySchema>;
 
 /** Machine → Member: how today's tokens stand for one Agent, after every answer that was counted. */
 export const AgentUsageBodySchema = z.looseObject({ agent: id, day, tokens: z.number().int().min(0), budget });
@@ -97,6 +111,8 @@ export type ProviderInfo = z.infer<typeof ProviderSchema>;
 /** Machine → Member: the answer to both requests above. */
 export const AgentListedBodySchema = z.looseObject({
   agents: z.array(AgentSchema),
+  /** Agents the Machine deleted and has not purged yet. Absent from a Machine older than `agent-trash`. */
+  trash: z.array(AgentTrashEntrySchema).optional(),
   providers: z.array(ProviderSchema),
   /** The Machine's Egress (`sandboxed-commands`). Absent from a Machine older than that. */
   egress: EgressSchema.optional(),

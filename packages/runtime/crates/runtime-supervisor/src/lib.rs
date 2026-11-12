@@ -20,5 +20,6 @@ pub mod usage;
 pub mod workers;
 pub mod llm;
 pub mod logs;
+pub mod memory;
 pub mod models;
 pub mod status;

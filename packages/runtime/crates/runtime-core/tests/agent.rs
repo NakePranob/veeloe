@@ -3,6 +3,7 @@
 //! Allowlist must behave the way the log already says they do.
 
 use std::collections::VecDeque;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -187,6 +188,7 @@ struct Setup {
     timeout_ms: Option<u64>,
     gated: bool,
     context_window: Option<usize>,
+    workdir: Option<PathBuf>,
 }
 
 impl Default for Setup {
@@ -198,6 +200,7 @@ impl Default for Setup {
             timeout_ms: None,
             gated: false,
             context_window: None,
+            workdir: None,
         }
     }
 }
@@ -228,6 +231,10 @@ fn setup(setup: Setup) -> Harness {
     if !setup.allowlist.is_empty() {
         core.set_allowlist(setup.allowlist.clone());
     }
+    let core = match setup.workdir {
+        Some(dir) => core.with_workdir(dir),
+        None => core,
+    };
     let core = match setup.context_window {
         Some(tokens) => core.with_context_window(tokens),
         None => core,
@@ -423,6 +430,151 @@ async fn a_message_during_a_turn_waits_and_then_becomes_the_next_turn() {
         events.iter().filter(|event| event.kind == "turn.ended").count(),
         3
     );
+    assert_eq!(harness.llm.requests().len(), 3);
+}
+
+#[tokio::test]
+async fn every_turn_is_told_where_memory_lives_and_gets_its_text() {
+    let dir = tempdir().expect("workdir");
+    std::fs::write(dir.path().join("MEMORY.md"), "owner likes tea").expect("memory");
+    let harness = setup(Setup {
+        replies: vec![Ok(text("done"))],
+        workdir: Some(dir.path().to_path_buf()),
+        ..Setup::default()
+    });
+    harness.core.receive(message("hi")).expect("receive");
+    harness.core.idle().await;
+
+    let system = &harness.llm.requests()[0].system;
+    assert!(system.contains("MEMORY.md at the root"), "{system}");
+    assert!(system.contains("owner likes tea"), "{system}");
+}
+
+#[tokio::test]
+async fn a_turn_without_a_memory_file_still_names_it() {
+    let dir = tempdir().expect("workdir");
+    let harness = setup(Setup {
+        replies: vec![Ok(text("done"))],
+        workdir: Some(dir.path().to_path_buf()),
+        ..Setup::default()
+    });
+    harness.core.receive(message("hi")).expect("receive");
+    harness.core.idle().await;
+
+    let system = &harness.llm.requests()[0].system;
+    assert!(system.contains("MEMORY.md at the root"), "{system}");
+    assert!(!system.contains("MEMORY.md as it is now"), "{system}");
+}
+
+#[tokio::test]
+async fn before_compaction_the_turn_saves_memory_and_still_summarizes() {
+    let dir = tempdir().expect("workdir");
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(text("owner name: Nek")),
+            Ok(text("the summary")),
+            Ok(text("done")),
+        ],
+        workdir: Some(dir.path().to_path_buf()),
+        context_window: Some(20),
+        ..Setup::default()
+    });
+    // 120 characters is roughly 40 tokens, past 70% of a 20-token window.
+    harness
+        .core
+        .receive(message(&"x".repeat(120)))
+        .expect("receive");
+    harness.core.idle().await;
+
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("MEMORY.md")).expect("memory"),
+        "owner name: Nek"
+    );
+    // One silent flush, one summary, then the answer.
+    assert_eq!(harness.llm.requests().len(), 3);
+    let kinds: Vec<String> = harness
+        .link
+        .take()
+        .into_iter()
+        .filter_map(|message| match message {
+            FromWorker::Event { event, .. } => Some(event.kind),
+            _ => None,
+        })
+        .collect();
+    let saved = kinds.iter().position(|kind| kind == "memory.saved").expect("saved");
+    let compacted = kinds
+        .iter()
+        .position(|kind| kind == "context.compacted")
+        .expect("compacted");
+    assert!(saved < compacted, "{kinds:?}");
+}
+
+#[tokio::test]
+async fn a_flush_that_writes_an_essay_is_cut_to_its_budget() {
+    let dir = tempdir().expect("workdir");
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(text(&"a".repeat(5_000))),
+            Ok(text("the summary")),
+            Ok(text("done")),
+        ],
+        workdir: Some(dir.path().to_path_buf()),
+        context_window: Some(20),
+        ..Setup::default()
+    });
+    harness
+        .core
+        .receive(message(&"x".repeat(120)))
+        .expect("receive");
+    harness.core.idle().await;
+
+    let memory = std::fs::read_to_string(dir.path().join("MEMORY.md")).expect("memory");
+    assert_eq!(memory.chars().count(), 400);
+}
+
+#[tokio::test]
+async fn a_flush_that_says_nothing_is_not_a_reason_to_skip_compaction() {
+    let dir = tempdir().expect("workdir");
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(text("NO_REPLY")),
+            Ok(text("the summary")),
+            Ok(text("done")),
+        ],
+        workdir: Some(dir.path().to_path_buf()),
+        context_window: Some(20),
+        ..Setup::default()
+    });
+    harness
+        .core
+        .receive(message(&"x".repeat(120)))
+        .expect("receive");
+    harness.core.idle().await;
+
+    assert!(!dir.path().join("MEMORY.md").exists());
+    assert_eq!(harness.llm.requests().len(), 3);
+}
+
+#[tokio::test]
+async fn a_failed_flush_does_not_fail_the_turn() {
+    let dir = tempdir().expect("workdir");
+    let harness = setup(Setup {
+        replies: vec![
+            Err(LlmError::Failed("provider.unreachable".into())),
+            Ok(text("the summary")),
+            Ok(text("done")),
+        ],
+        workdir: Some(dir.path().to_path_buf()),
+        context_window: Some(20),
+        ..Setup::default()
+    });
+    harness
+        .core
+        .receive(message(&"x".repeat(120)))
+        .expect("receive");
+    harness.core.idle().await;
+
+    assert!(!dir.path().join("MEMORY.md").exists());
     assert_eq!(harness.llm.requests().len(), 3);
 }
 

@@ -64,11 +64,7 @@ pub struct MachineOutbox {
 }
 
 impl MachineOutbox {
-    pub fn new(
-        home: &Path,
-        secret_key: &[u8; 32],
-        hub: HubSender,
-    ) -> Result<Self, TrustError> {
+    pub fn new(home: &Path, secret_key: &[u8; 32], hub: HubSender) -> Result<Self, TrustError> {
         Ok(Self {
             machine_key: to_base64url(&public_key_of(secret_key)),
             signer: Signer::new(secret_key),
@@ -104,33 +100,41 @@ impl Outbox for MachineOutbox {
 /// What the Controller sees of this Machine's Agents. Never a Provider's URL or
 /// key, only its name.
 pub fn agents_listed(registry: &AgentRegistry, providers: &[Value], egress: &[String]) -> Value {
-    let agents: Vec<Value> = registry
-        .all()
-        .unwrap_or_default()
-        .into_iter()
-        .map(|agent| {
-            let mut value = json!({
-                "id": agent.id,
-                "name": agent.name,
-                "provider": agent.provider,
-                "model": agent.model,
-                "allowlist": agent.allowlist,
-                "approvalTimeoutS": agent.approval_timeout_s,
-            });
-            if let Some(character) = agent.character {
-                value["character"] = character;
+    let mut agents: Vec<Value> = Vec::new();
+    let mut trash: Vec<Value> = Vec::new();
+    for agent in registry.all().unwrap_or_default() {
+        let mut value = json!({
+            "id": agent.id,
+            "name": agent.name,
+            "provider": agent.provider,
+            "model": agent.model,
+            "allowlist": agent.allowlist,
+            "approvalTimeoutS": agent.approval_timeout_s,
+        });
+        if let Some(character) = &agent.character {
+            value["character"] = character.clone();
+        }
+        if let Some(budget) = agent.budget {
+            value["budget"] = json!(budget);
+        }
+        // A deleted Agent keeps every field it had, so the Controller can show it
+        // in the trash and bring it back (`agent-trash`).
+        match (agent.deleted_at, agent.restore_until()) {
+            (Some(deleted_at), Some(restore_until)) => {
+                value["deletedAt"] = json!(deleted_at);
+                value["restoreUntil"] = json!(restore_until);
+                trash.push(value);
             }
-            if let Some(budget) = agent.budget {
-                value["budget"] = json!(budget);
-            }
-            value
-        })
-        .collect();
-    json!({ "agents": agents, "providers": providers, "egress": egress })
+            _ => agents.push(value),
+        }
+    }
+    json!({ "agents": agents, "trash": trash, "providers": providers, "egress": egress })
 }
 
 fn agent_of(body: &Value) -> &str {
-    body.get("agent").and_then(Value::as_str).unwrap_or_default()
+    body.get("agent")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
 }
 
 /// What a slice may read on this Machine. Borrowed, so nothing is copied per
@@ -162,6 +166,18 @@ pub async fn dispatch(
     let registry = machine.registry;
     let workers = machine.workers;
     let listed = || async {
+        // A list is the only clock the trash needs: no timer, and a Machine that
+        // was off past the 30 days purges as soon as it is asked (`agent-trash`).
+        if let Ok(purged) = registry.purge_expired(crate::usage::now_ms()) {
+            if purged > 0 {
+                let _ = crate::logs::record(
+                    registry.home(),
+                    "warn",
+                    "agent.purge",
+                    json!({ "agents": purged }),
+                );
+            }
+        }
         agents_listed(
             registry,
             &models::info(machine.providers, machine.http).await,
@@ -200,12 +216,7 @@ pub async fn dispatch(
             return outbox.error(from, "push.unavailable");
         };
         match tokens.unregister(device) {
-            Ok(_) => outbox.to_member(
-                &from.member,
-                "push.unregistered",
-                json!({}),
-                None,
-            ),
+            Ok(_) => outbox.to_member(&from.member, "push.unregistered", json!({}), None),
             Err(_) => outbox.error(from, "push.invalid"),
         }
         return;
@@ -229,11 +240,15 @@ pub async fn dispatch(
             Ok(key) => key,
             Err(_) => return outbox.error(from, "provider.invalid"),
         };
-        let preset = body.get("preset").and_then(Value::as_str).map(str::to_string);
-        let (auth, _) = match crate::models::detect_auth(url, &key, preset.as_deref(), machine.http).await {
-            Ok(found) => found,
-            Err(code) => return outbox.error(from, code),
-        };
+        let preset = body
+            .get("preset")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let (auth, _) =
+            match crate::models::detect_auth(url, &key, preset.as_deref(), machine.http).await {
+                Ok(found) => found,
+                Err(code) => return outbox.error(from, code),
+            };
         let mut providers = machine.providers.to_vec();
         if providers.iter().any(|provider| provider.name == name) {
             return outbox.error(from, "provider.exists");
@@ -333,7 +348,13 @@ pub async fn dispatch(
         return;
     }
     if type_ == "machine.status" {
-        let agents = registry.all().unwrap_or_default();
+        // A deleted Agent's Budget is not part of today's limit (`agent-trash`).
+        let agents: Vec<crate::agents::Agent> = registry
+            .all()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|agent| !agent.deleted())
+            .collect();
         let today = crate::usage::budget_day(crate::usage::now_ms());
         let (used, limit) = machine.budgets.map_or((0, 0), |budgets| {
             let ids: Vec<String> = agents.iter().map(|agent| agent.id.clone()).collect();
@@ -399,6 +420,33 @@ pub async fn dispatch(
         );
         return;
     }
+    if type_ == "memory.get" {
+        let Some(id) = body.get("agent").and_then(Value::as_str) else {
+            return outbox.error(from, "agent.unknown");
+        };
+        if registry.get(id).ok().flatten().is_none() {
+            return outbox.error(from, "agent.unknown");
+        }
+        // Read-only: the Workdir is not created, and an Agent in the trash reads
+        // like `veeloe memory` reads it (`agent-memory-page`).
+        let Ok(dir) = crate::agents::agent_root(registry.home(), id) else {
+            return outbox.error(from, "agent.unknown");
+        };
+        let memory = veeloe_runtime_core::memory::read_memory(&dir.join("workdir"));
+        outbox.to_member(
+            &from.member,
+            "memory.got",
+            json!({
+                "request": body.get("request").and_then(Value::as_str).unwrap_or_default(),
+                "agent": id,
+                "exists": memory.exists,
+                "chars": memory.chars,
+                "text": memory.text,
+            }),
+            None,
+        );
+        return;
+    }
     if type_ == "agent.list" {
         outbox.to_member(&from.member, "agent.listed", listed().await, None);
         return;
@@ -407,12 +455,16 @@ pub async fn dispatch(
         let Some(id) = body.get("id").and_then(Value::as_str) else {
             return outbox.error(from, "agent.unknown");
         };
-        if registry.get(id).ok().flatten().is_none() {
+        let Some(existing) = registry.get(id).ok().flatten() else {
             return outbox.error(from, "agent.unknown");
+        };
+        // Deleting twice is not a second deletion: it must not move the 30 days.
+        if existing.deleted() {
+            return outbox.to_member(&from.member, "agent.listed", listed().await, None);
         }
         // Stop the worker first: the registry entry is what starts a new one.
         workers.stop(id);
-        if registry.remove(id).is_err() {
+        if registry.soft_delete(id, crate::usage::now_ms()).is_err() {
             return outbox.error(from, "agent.unknown");
         }
         if let Some(routes) = machine.routes {
@@ -421,7 +473,35 @@ pub async fn dispatch(
         let _ = crate::logs::record(
             registry.home(),
             "info",
-            "agent.delete",
+            "agent.trash",
+            json!({ "agent": id }),
+        );
+        outbox.to_member(&from.member, "agent.listed", listed().await, None);
+        return;
+    }
+    if type_ == "agent.restore" {
+        let Some(id) = body.get("id").and_then(Value::as_str) else {
+            return outbox.error(from, "agent.unknown");
+        };
+        let _ = registry.purge_expired(crate::usage::now_ms());
+        let Some(existing) = registry.get(id).ok().flatten() else {
+            return outbox.error(from, "agent.unknown");
+        };
+        // Restoring an Agent that is not in the trash says so by doing nothing;
+        // a Controller that retries after a lost answer gets the same list.
+        if !existing.deleted() {
+            return outbox.to_member(&from.member, "agent.listed", listed().await, None);
+        }
+        if registry.restore(id).is_err() {
+            return outbox.error(from, "agent.unknown");
+        }
+        if let Ok(Some(agent)) = registry.get(id) {
+            workers.start(&agent);
+        }
+        let _ = crate::logs::record(
+            registry.home(),
+            "info",
+            "agent.restore",
             json!({ "agent": id }),
         );
         outbox.to_member(&from.member, "agent.listed", listed().await, None);
@@ -435,6 +515,10 @@ pub async fn dispatch(
         if type_ == "agent.create" && existing.is_some() {
             return outbox.error(from, "agent.exists");
         }
+        // Settings of an Agent in the trash stay as they were until it is restored.
+        if type_ == "agent.update" && existing.as_ref().is_some_and(|agent| agent.deleted()) {
+            return outbox.error(from, "agent.unknown");
+        }
         let base = existing.unwrap_or_else(|| crate::agents::Agent {
             id: id.to_string(),
             name: id.to_string(),
@@ -444,6 +528,7 @@ pub async fn dispatch(
             allowlist: Vec::new(),
             approval_timeout_s: 3_600,
             budget: None,
+            deleted_at: None,
         });
         let text = |name: &str, fallback: &str| {
             body.get(name)
@@ -472,6 +557,7 @@ pub async fn dispatch(
                 .and_then(Value::as_u64)
                 .unwrap_or(base.approval_timeout_s),
             budget: body.get("budget").and_then(Value::as_u64).or(base.budget),
+            deleted_at: base.deleted_at,
         };
         // A new Agent must name a Provider on this Machine and a model that
         // Provider lists; an update may move either, so both are checked again.
@@ -506,7 +592,11 @@ pub async fn dispatch(
         let _ = crate::logs::record(
             registry.home(),
             "info",
-            if type_ == "agent.create" { "agent.create" } else { "agent.update" },
+            if type_ == "agent.create" {
+                "agent.create"
+            } else {
+                "agent.update"
+            },
             json!({ "agent": id }),
         );
         outbox.to_member(&from.member, "agent.listed", listed().await, None);
@@ -532,6 +622,10 @@ pub async fn dispatch(
     let Ok(Some(agent)) = registry.get(agent_of(body)) else {
         return outbox.error(from, "agent.unknown");
     };
+    // An Agent in the trash has no worker, and saying so is not an outage.
+    if agent.deleted() {
+        return outbox.error(from, "agent.unknown");
+    }
     let Some(task) = from.task.clone() else {
         return outbox.error(from, "task.unknown");
     };

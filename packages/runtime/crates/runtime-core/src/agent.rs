@@ -30,7 +30,15 @@ pub const MAX_ROUNDS: usize = 50;
 
 /// The tools that read and write the Workdir: the sandbox holds them, never the
 /// Allowlist (`file-tools`, ADR 0030).
-const FILE_TOOL_NAMES: [&str; 6] = ["read", "write", "edit", "glob", "grep", "send_file"];
+const FILE_TOOL_NAMES: [&str; 7] = [
+    "read",
+    "write",
+    "edit",
+    "glob",
+    "grep",
+    "send_file",
+    "memory",
+];
 
 /// How long one Approval waits for an answer before it counts as denied
 /// (ADR 0030 proposes an hour).
@@ -353,9 +361,18 @@ impl AgentCore {
             self.state.name.read().expect("name")
         );
         if let Some(workdir) = self.state.workdir.lock().expect("workdir").as_ref() {
+            // Name the file and where it lives on every Turn, even before it exists:
+            // without this the model invents its own notes (a `memory/` folder), and
+            // none of that is pinned into the next Turn (ADR 0036).
+            system.push_str(
+                "\n\nMemory: keep what every Task needs in MEMORY.md at the root of your Workdir, \
+                 writing it with the `memory` tool; use scope \"today\" for notes that are not for \
+                 every Task. MEMORY.md is pinned into every new Turn, capped at 4,000 characters, \
+                 so keep it short and current.",
+            );
             let memory = crate::memory::memory_prompt(workdir);
             if !memory.is_empty() {
-                system.push_str("\n\nMEMORY.md, notes you keep for every Task:\n");
+                system.push_str("\n\nMEMORY.md as it is now:\n");
                 system.push_str(&memory);
             }
         }
@@ -553,7 +570,7 @@ async fn run_turn(
     let rounds = state.max_rounds.load(Ordering::SeqCst);
     for _ in 0..rounds {
         let mut events = state.store.lock().expect("store").events(&task, 0)?;
-        if let Some(summary) = compact_if_needed(&state, &task, &events).await {
+        if let Some(summary) = compact_if_needed(&state, &task, &starter, &events).await {
             if state
                 .append(
                     &task,
@@ -751,6 +768,7 @@ struct Compacted {
 async fn compact_if_needed(
     state: &Arc<State>,
     task: &str,
+    starter: &str,
     events: &[TaskEvent],
 ) -> Option<Compacted> {
     // A tool round is not a safe split: its call would lose its result.
@@ -777,6 +795,14 @@ async fn compact_if_needed(
     if transcript.is_empty() {
         return None;
     }
+    // The one moment context is about to be lost: ask what belongs in Memory and
+    // write it ourselves. One flush per compaction, and never one that blocks the
+    // Turn (ADR 0017).
+    if !flushed_since_compaction(events) {
+        if let Some(chars) = flush_memory(state, task, &transcript).await {
+            let _ = state.append(task, starter, "memory.saved", json!({ "chars": chars }), None);
+        }
+    }
     let request = LlmRequest {
         task: task.to_string(),
         system: "You compact an AI Agent's Task history. Keep the goal, decisions, files changed, approvals, and work still pending. Do not invent facts. Return only the summary.".into(),
@@ -799,6 +825,57 @@ async fn compact_if_needed(
         tokens_before: before,
         tokens_after: after,
     })
+}
+
+/// Whether this compaction window already saved Memory. A summary that failed
+/// leaves the window open, and the next loop must not append the same notes twice.
+fn flushed_since_compaction(events: &[TaskEvent]) -> bool {
+    events
+        .iter()
+        .rev()
+        .take_while(|event| event.kind != "context.compacted")
+        .any(|event| event.kind == "memory.saved")
+}
+
+/// How much one flush may add: the model is asked for a short note, and code keeps
+/// it short even when the model writes an essay.
+const FLUSH_MAX_CHARS: usize = 400;
+
+/// Ask the model what must survive this Task, and write its answer into
+/// `MEMORY.md` ourselves: the model owns the words, the Runtime owns the file and
+/// the cap. `NO_REPLY`, an empty answer, a Provider failure or a write that would
+/// pass the cap all mean "nothing saved", never a failed Turn.
+async fn flush_memory(state: &Arc<State>, task: &str, transcript: &str) -> Option<usize> {
+    let workdir = state.workdir.lock().expect("workdir").clone()?;
+    let current = crate::memory::memory_prompt(&workdir);
+    let mut asked = String::from(
+        "What, from this Task, must every later Task know? Reply with only the new Markdown to          keep, at most 400 characters, or NO_REPLY when nothing qualifies. Never repeat what          MEMORY.md already says.",
+    );
+    if !current.is_empty() {
+        asked.push_str("\n\nMEMORY.md now:\n");
+        asked.push_str(&current);
+    }
+    asked.push_str("\n\nTask so far:\n");
+    asked.push_str(transcript);
+    let request = LlmRequest {
+        task: task.to_string(),
+        system: "You keep the durable memory of an AI Agent on its owner's own machine. Durable                  means agreements, stable preferences, and facts the owner already told the Agent;                  not progress, tool output, or anything only this Task needs."
+            .into(),
+        messages: vec![LlmMessage {
+            role: "user".into(),
+            content: vec![json!({ "type": "text", "text": asked })],
+        }],
+        tools: Vec::new(),
+    };
+    let reply = state.llm.send(request, &Cancel::new()).await.ok()?;
+    let answer = text_content(&reply.content).trim().to_string();
+    let first = answer.lines().next().unwrap_or_default().trim();
+    if answer.is_empty() || first.eq_ignore_ascii_case("NO_REPLY") {
+        return None;
+    }
+    // The prompt asks for 400 characters; take exactly that even when it forgets.
+    let answer: String = answer.chars().take(FLUSH_MAX_CHARS).collect();
+    crate::memory::write_memory(&workdir, &answer, crate::memory::Mode::Append).ok()
 }
 
 fn rough_tokens(messages: &[LlmMessage]) -> usize {
@@ -1028,4 +1105,33 @@ fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|elapsed| elapsed.as_millis() as i64)
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn event(seq: i64, kind: &str) -> TaskEvent {
+        TaskEvent {
+            seq,
+            kind: kind.into(),
+            at: 0,
+            body: json!({}),
+        }
+    }
+
+    #[test]
+    fn a_flush_counts_only_until_the_compaction_it_precedes() {
+        assert!(!flushed_since_compaction(&[event(1, "member.message")]));
+        assert!(flushed_since_compaction(&[event(2, "memory.saved")]));
+        // The last compaction closed that window; a later one flushes again.
+        assert!(!flushed_since_compaction(&[
+            event(2, "memory.saved"),
+            event(3, "context.compacted")
+        ]));
+        assert!(flushed_since_compaction(&[
+            event(3, "context.compacted"),
+            event(4, "memory.saved")
+        ]));
+    }
 }

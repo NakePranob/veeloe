@@ -16,6 +16,7 @@ fn agent(provider: &str, model: &str) -> Agent {
         allowlist: Vec::new(),
         approval_timeout_s: 3_600,
         budget: None,
+        deleted_at: None,
     }
 }
 
@@ -39,7 +40,10 @@ fn a_task_keeps_the_provider_and_model_it_started_on() {
     let first = routes
         .route(&agent("main", "model-a"), Some("task-1"), &[main.clone()])
         .expect("route");
-    assert_eq!((first.0.name.as_str(), first.1.as_str()), ("main", "model-a"));
+    assert_eq!(
+        (first.0.name.as_str(), first.1.as_str()),
+        ("main", "model-a")
+    );
 
     // The Agent moves; the Task that already ran does not.
     let updated = agent("second", "model-b");
@@ -61,7 +65,10 @@ fn a_task_keeps_the_provider_and_model_it_started_on() {
     let none = routes
         .route(&updated, None, &[main, second])
         .expect("route");
-    assert_eq!((none.0.name.as_str(), none.1.as_str()), ("second", "model-b"));
+    assert_eq!(
+        (none.0.name.as_str(), none.1.as_str()),
+        ("second", "model-b")
+    );
 }
 
 #[test]
@@ -88,7 +95,11 @@ fn a_pin_survives_a_restart_and_moves_when_its_provider_is_gone() {
 
     // The pinned Provider goes, so the Task moves to the Agent's current one.
     let moved = routes
-        .route(&agent("second", "model-b"), Some("task-1"), &[second.clone()])
+        .route(
+            &agent("second", "model-b"),
+            Some("task-1"),
+            &[second.clone()],
+        )
         .expect("route");
     assert_eq!(
         (moved.0.name.as_str(), moved.1.as_str()),

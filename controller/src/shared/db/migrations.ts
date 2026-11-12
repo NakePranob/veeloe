@@ -76,4 +76,16 @@ export const MIGRATIONS = [
   // The last envelope number from each sender, so a replay after a restart is still refused
   // (`protocol-envelope`; the Runtime keeps its own in a file).
   `CREATE TABLE seen_sequence (sender_key TEXT PRIMARY KEY NOT NULL, seq INTEGER NOT NULL)`,
+  // Agents deleted on the Machine that are still restorable, as `agent.listed` said (`agent-trash`).
+  `CREATE TABLE agent_trash (
+    id TEXT PRIMARY KEY NOT NULL,
+    machine_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    deleted_at INTEGER NOT NULL,
+    restore_until INTEGER NOT NULL
+  )`,
+  // The deleted Agent's Character, as JSON, so the trash still shows who it was (`agent-trash`).
+  `ALTER TABLE agent_trash ADD COLUMN character TEXT`,
 ] as const;

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { parseMessage } from ".";
-import { AgentListedBodySchema, AgentUpdateBodySchema, AgentUsageBodySchema } from "./agent";
+import { AgentListedBodySchema, AgentTrashEntrySchema, AgentUpdateBodySchema, AgentUsageBodySchema } from "./agent";
 
 const update = (body: unknown) => AgentUpdateBodySchema.safeParse(body);
 
@@ -19,6 +19,16 @@ test("an Agent may carry a Budget and today's usage, and a listed Agent from a M
   expect(AgentListedBodySchema.safeParse({ agents: [agent], providers: [] }).success).toBe(true);
   expect(AgentListedBodySchema.safeParse({ agents: [{ ...agent, budget: 10_000_000, usage: { day: "2026-11-06", tokens: 2400 } }], providers: [] }).success).toBe(true);
   expect(AgentListedBodySchema.safeParse({ agents: [{ ...agent, usage: { day: "6 November", tokens: 1 } }], providers: [] }).success).toBe(false);
+});
+
+test("a Machine may list the Agents it deleted, with when it deleted them and when it purges them", () => {
+  const agent = { id: "a1", name: "A", provider: "main", model: "model-a" };
+  const entry = { ...agent, deletedAt: 1_794_000_000_000, restoreUntil: 1_796_592_000_000 };
+  expect(AgentTrashEntrySchema.safeParse(entry).success).toBe(true);
+  expect(AgentListedBodySchema.safeParse({ agents: [], trash: [entry], providers: [] }).success).toBe(true);
+  expect(AgentListedBodySchema.safeParse({ agents: [agent], providers: [] }).success).toBe(true);
+  expect(AgentTrashEntrySchema.safeParse({ ...agent, deletedAt: 1_794_000_000_000 }).success).toBe(false);
+  expect(AgentTrashEntrySchema.safeParse({ ...agent, deletedAt: -1, restoreUntil: 1_796_592_000_000 }).success).toBe(false);
 });
 
 test("agent.usage is a message this build reads, with the Agent, the day, its tokens and its Budget", () => {

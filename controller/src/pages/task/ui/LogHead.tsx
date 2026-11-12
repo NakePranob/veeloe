@@ -9,20 +9,23 @@ import { motion, space, Text } from "../../../shared/ui";
 
 // The top of the log, as in controller-prototype's TaskPage: the Agent's Character doing what this
 // Task is doing, and under it the Machine and when the Task started.
-export function LogHead({ agent, machine, events, online }: { agent: AgentRow; machine: string; events: TaskEventRow[]; online: boolean | null }) {
+export function LogHead({ agent, machine, events, online, readOnly }: { agent: AgentRow; machine: string; events: TaskEventRow[]; online: boolean | null; readOnly?: boolean }) {
   const t = useT("task");
   const language = useLanguage();
   const now = useNow();
+  const character = (
+    <Character look={lookOfJson(agent.character)} mood={moodOf(events, online)} size={56} backdrop="background" />
+  );
   return (
     <View style={{ alignItems: "center", gap: space.xs, paddingBottom: space.sm }}>
-      {/* Tapping the Agent's Character opens the Agent, as the settings button does. */}
-      <Pressable role="button" aria-label={t("openAgent", { name: agent.name })} hitSlop={space.xs} onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })}>
-        {({ pressed }) => (
-          <View style={{ transform: [{ scale: pressed ? motion.press : 1 }] }}>
-            <Character look={lookOfJson(agent.character)} mood={moodOf(events, online)} size={56} backdrop="background" />
-          </View>
-        )}
-      </Pressable>
+      {/* Tapping the Agent's Character opens the Agent, as the settings button does; a deleted Agent has no page. */}
+      {readOnly ? (
+        character
+      ) : (
+        <Pressable role="button" aria-label={t("openAgent", { name: agent.name })} hitSlop={space.xs} onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })}>
+          {({ pressed }) => <View style={{ transform: [{ scale: pressed ? motion.press : 1 }] }}>{character}</View>}
+        </Pressable>
+      )}
       <Text variant="caption" tone="secondary">
         {events[0] ? t("started", { machine, when: when(events[0].at, language, now) }) : t("notStarted", { machine })}
       </Text>

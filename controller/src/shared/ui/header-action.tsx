@@ -10,15 +10,17 @@ interface Props {
   icon?: IconName;
   disabled?: boolean;
   placement?: "left" | "right";
+  // How our own header button looks; iOS draws the platform's toolbar item instead.
+  variant?: "primary" | "chip" | "ghost";
 }
 
 // Stack.Toolbar has no web side, and web draws its own header, so there the button is ours.
 // Setting an option outlives the component, so leaving takes the button with it.
-function WebHeaderAction({ label, onPress, icon, disabled, placement = "right" }: Props) {
+function WebHeaderAction({ label, onPress, icon, disabled, placement = "right", variant }: Props) {
   const navigation = useNavigation();
   const option = placement === "left" ? "headerLeft" : "headerRight";
   useEffect(() => () => navigation.setOptions({ [option]: undefined }), [navigation, option]);
-  return <Stack.Screen options={{ [option]: () => <Button label={label} icon={icon} disabled={disabled} variant={icon || placement === "left" ? "chip" : "primary"} onPress={onPress} /> }} />;
+  return <Stack.Screen options={{ [option]: () => <Button label={label} icon={icon} disabled={disabled} variant={variant ?? (icon || placement === "left" ? "chip" : "primary")} onPress={onPress} /> }} />;
 }
 
 // A button in the header is the platform's own, the same as the back button beside it.

@@ -1,10 +1,11 @@
 import type { z } from "zod";
 import type { SignedPart } from "../envelope/schema";
-import { AgentCreateBodySchema, AgentDeleteBodySchema, AgentListBodySchema, AgentListedBodySchema, AgentUpdateBodySchema, AgentUsageBodySchema, MachineStatusBodySchema } from "./agent";
+import { AgentCreateBodySchema, AgentDeleteBodySchema, AgentListBodySchema, AgentListedBodySchema, AgentRestoreBodySchema, AgentUpdateBodySchema, AgentUsageBodySchema, MachineStatusBodySchema } from "./agent";
 import { ApprovalAnswerBodySchema } from "./approval";
 import { EgressSetBodySchema } from "./egress";
 import { ErrorBodySchema } from "./error";
 import { DeviceHandoffBodySchema, DeviceLinkedBodySchema } from "./linking";
+import { MemoryGetBodySchema, MemoryGotBodySchema } from "./memory";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
 import { ProviderAddBodySchema } from "./provider";
 import { PushRegisterBodySchema, PushRegisteredBodySchema, PushUnregisterBodySchema, PushUnregisteredBodySchema } from "./push";
@@ -20,6 +21,7 @@ const known = {
   "agent.listed": AgentListedBodySchema,
   "agent.update": AgentUpdateBodySchema,
   "agent.delete": AgentDeleteBodySchema,
+  "agent.restore": AgentRestoreBodySchema,
   "agent.usage": AgentUsageBodySchema,
   "machine.status": MachineStatusBodySchema,
   "provider.add": ProviderAddBodySchema,
@@ -36,6 +38,8 @@ const known = {
   "task.listed": TaskListedBodySchema,
   "usage.list": UsageGetBodySchema,
   "usage.listed": UsageListedBodySchema,
+  "memory.get": MemoryGetBodySchema,
+  "memory.got": MemoryGotBodySchema,
   "device.handoff": DeviceHandoffBodySchema,
   "device.linked": DeviceLinkedBodySchema,
   "push.register": PushRegisterBodySchema,

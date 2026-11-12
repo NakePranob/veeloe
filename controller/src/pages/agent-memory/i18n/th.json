@@ -1,0 +1,20 @@
+{
+  "title": "Memory",
+  "refresh": "โหลดใหม่",
+  "note": "Memory คือ MEMORY.md ที่ Agent เขียนเองและ Runtime ใส่ใน prompt ทุก Turn หน้านี้อ่านอย่างเดียวและแสดงเป็นข้อความล้วน เพราะเนื้อหาอาจถูกวางยา (ADR 0036)",
+  "needsOnline": "Machine ต้องออนไลน์ก่อนจึงจะอ่าน Memory ได้",
+  "loading": "กำลังขอ Memory จาก Machine",
+  "heading": "Memory ของ Agent",
+  "count": "{{chars}} ตัวอักษร (เพดาน {{limit}})",
+  "capped": "ไฟล์ยาวเกินเพดาน ระบบจึงให้ Agent แค่ {{limit}} ตัวแรกพร้อมข้อความให้ย่อ",
+  "blank": "ไฟล์ว่าง ยังไม่มีอะไรถูกจด",
+  "fetched": "ได้เมื่อ {{when}}",
+  "empty": {
+    "title": "ยังไม่มี Memory",
+    "body": "Agent นี้ยังไม่เคยเขียน MEMORY.md ใน Workdir ของตัวเอง"
+  },
+  "missing": {
+    "title": "ไม่พบ Agent นี้",
+    "body": "Agent อาจถูกลบ หรืออยู่บน Machine ที่ยังไม่ได้ผูกกับเครื่องนี้"
+  }
+}

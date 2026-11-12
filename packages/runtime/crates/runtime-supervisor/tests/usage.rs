@@ -1,8 +1,8 @@
 //! The daily Budget and its tally, ported from
 //! `packages/runtime-legacy/src/supervisor/{usage/store,budget}`.
 
-use tempfile::tempdir;
 use std::fs;
+use tempfile::tempdir;
 use veeloe_runtime_supervisor::agents::Agent;
 use veeloe_runtime_supervisor::usage::{
     budget_day_with_offset, shift_day, Budgets, UsageStore, DEFAULT_BUDGET,
@@ -18,6 +18,7 @@ fn agent(budget: Option<u64>) -> Agent {
         allowlist: Vec::new(),
         approval_timeout_s: 3_600,
         budget,
+        deleted_at: None,
     }
 }
 
@@ -53,22 +54,13 @@ fn tokens_are_tallied_per_agent_and_day_and_the_other_day_reads_zero() {
     let after = budgets.add(&a1, MORNING, "t1", 15).expect("add");
     assert_eq!(after.tokens, 15);
     assert_eq!(budgets.add(&a1, MORNING, "t1", 5).expect("add").tokens, 20);
-    assert_eq!(
-        budgets
-            .add(&a1, MORNING, "t2", 7)
-            .expect("add")
-            .tokens,
-        27
-    );
+    assert_eq!(budgets.add(&a1, MORNING, "t2", 7).expect("add").tokens, 27);
     // Another Agent is its own tally.
     let other = Agent {
         id: "a2".into(),
         ..agent(None)
     };
-    assert_eq!(
-        budgets.usage_of(&other, MORNING).expect("usage").tokens,
-        0
-    );
+    assert_eq!(budgets.usage_of(&other, MORNING).expect("usage").tokens, 0);
     // A day later the same Agent starts again from zero.
     assert_eq!(
         budgets
@@ -104,7 +96,9 @@ fn a_range_keeps_the_days_it_has_and_the_biggest_tasks_first() {
     let a1 = agent(None);
     store.add(&a1.id, "2026-11-04", "task", "old", 10).unwrap();
     store.add(&a1.id, "2026-11-06", "task", "new", 30).unwrap();
-    store.add(&a1.id, "2026-11-06", "task", "middle", 20).unwrap();
+    store
+        .add(&a1.id, "2026-11-06", "task", "middle", 20)
+        .unwrap();
     for i in 0..25 {
         store
             .add(&a1.id, "2026-11-06", "task", &format!("small-{i}"), 1)

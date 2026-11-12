@@ -10,7 +10,8 @@ interface Props {
   onPress: () => void;
   // primary: the ink pill, one per view, for the action the screen is for.
   // chip: a quiet grey pill for everything beside it.
-  variant?: "primary" | "chip";
+  // ghost: no background at rest, for a header action that is only an icon.
+  variant?: "primary" | "chip" | "ghost";
   // With an icon the button is a circle showing only the icon, such as send.
   icon?: IconName;
   // Dimmed to a chip and inert, for an action not ready yet (send with nothing typed).
@@ -25,7 +26,8 @@ export function Button({ label, onPress, variant = "chip", icon, disabled }: Pro
   const press = (to: number) =>
     Animated.timing(scale, { toValue: to, duration: motion.duration.quick, easing: motion.easeOut, useNativeDriver: process.env.EXPO_OS !== "web" }).start();
   const primary = variant === "primary" && !disabled;
-  const ink = primary ? "onAccent" : disabled ? "tertiaryLabel" : "label";
+  const ghost = variant === "ghost";
+  const ink = primary ? "onAccent" : disabled ? "tertiaryLabel" : ghost ? "accent" : "label";
   return (
     <Pressable
       role="button"
@@ -37,29 +39,33 @@ export function Button({ label, onPress, variant = "chip", icon, disabled }: Pro
       onPressOut={() => press(1)}
       hitSlop={space.xs}
     >
-      {({ pressed }) => (
-        <Animated.View
-          style={{
-            transform: [{ scale }],
-            // 36 plus hit slop clears the 44pt target.
-            minHeight: 36,
-            minWidth: 36,
-            paddingHorizontal: icon ? 0 : space.lg,
-            borderRadius: radius.pill,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: primary ? colors.accent : pressed ? colors.chipPressed : colors.chip,
-          }}
-        >
-          {icon ? (
-            <Icon name={icon} size="md" color={ink} weight="semibold" />
-          ) : (
-            <Text variant="subheadline" strong style={{ color: colors[ink] }}>
-              {label}
-            </Text>
-          )}
-        </Animated.View>
-      )}
+      {({ pressed }) => {
+        // A ghost button has nothing behind it until it is pressed.
+        const background = primary ? colors.accent : pressed ? colors.chipPressed : ghost ? "transparent" : colors.chip;
+        return (
+          <Animated.View
+            style={{
+              transform: [{ scale }],
+              // 36 plus hit slop clears the 44pt target.
+              minHeight: 36,
+              minWidth: 36,
+              paddingHorizontal: icon ? 0 : space.lg,
+              borderRadius: radius.pill,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: background,
+            }}
+          >
+            {icon ? (
+              <Icon name={icon} size="md" color={ink} weight="semibold" />
+            ) : (
+              <Text variant="subheadline" strong style={{ color: colors[ink] }}>
+                {label}
+              </Text>
+            )}
+          </Animated.View>
+        );
+      }}
     </Pressable>
   );
 }

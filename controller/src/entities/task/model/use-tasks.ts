@@ -1,5 +1,5 @@
 import { useLiveQuery } from "../../../shared/db";
-import { LIST_TASK_SUMMARIES, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskSummary } from "./tasks";
+import { LIST_TASK_SUMMARIES, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskRow, type TaskSummary } from "./tasks";
 
 const TOPICS = [TASK_TOPIC];
 
@@ -10,6 +10,11 @@ export function useTaskSummaries() {
 
 export function useTaskEvents(taskId: string) {
   return useLiveQuery<TaskEventRow>("SELECT * FROM task_event WHERE task_id = ? ORDER BY seq", [taskId], TOPICS);
+}
+
+/** The Task's own row, which still names its Machine after the Agent is gone. */
+export function useTaskRow(taskId: string) {
+  return useLiveQuery<TaskRow>("SELECT * FROM task WHERE id = ?", [taskId], TOPICS);
 }
 
 export function usePendingMessages(taskId: string) {

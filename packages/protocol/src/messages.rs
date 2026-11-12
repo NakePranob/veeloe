@@ -9,6 +9,7 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "agent.create" => object.map(is_agent_create).unwrap_or(false),
         "agent.update" => object.map(is_agent_update).unwrap_or(false),
         "agent.delete" => object.map(is_agent_delete).unwrap_or(false),
+        "agent.restore" => object.map(is_agent_restore).unwrap_or(false),
         "agent.list" => object.is_some(),
         "agent.listed" => object.map(is_agent_listed).unwrap_or(false),
         "agent.usage" => object.map(is_agent_usage).unwrap_or(false),
@@ -28,6 +29,8 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "error" => object.map(is_error).unwrap_or(false),
         "usage.list" => object.map(is_usage_list).unwrap_or(false),
         "usage.listed" => object.map(is_usage_listed).unwrap_or(false),
+        "memory.get" => object.map(is_memory_get).unwrap_or(false),
+        "memory.got" => object.map(is_memory_got).unwrap_or(false),
         "pairing.claim" => object.map(is_pairing_claim).unwrap_or(false),
         "pairing.done" => object.map(is_pairing_done).unwrap_or(false),
         "device.handoff" => object.map(is_device_handoff).unwrap_or(false),
@@ -144,7 +147,10 @@ fn is_usage(value: &Value) -> bool {
         return false;
     };
     text(object.get("day")).map(is_day).unwrap_or(false)
-        && object.get("tokens").map(is_non_negative_int).unwrap_or(false)
+        && object
+            .get("tokens")
+            .map(is_non_negative_int)
+            .unwrap_or(false)
 }
 
 fn is_agent(value: &Value) -> bool {
@@ -305,10 +311,17 @@ fn is_agent_delete(object: &Map<String, Value>) -> bool {
     text(object.get("id")).map(is_agent_id).unwrap_or(false)
 }
 
+fn is_agent_restore(object: &Map<String, Value>) -> bool {
+    text(object.get("id")).map(is_agent_id).unwrap_or(false)
+}
+
 fn is_machine_status(object: &Map<String, Value>) -> bool {
     text(object.get("version")).is_some()
         && object.get("features").and_then(Value::as_array).is_some()
-        && object.get("diskFreeBytes").and_then(Value::as_u64).is_some()
+        && object
+            .get("diskFreeBytes")
+            .and_then(Value::as_u64)
+            .is_some()
         && object.get("lastError").is_some()
 }
 
@@ -316,8 +329,12 @@ fn is_provider_add(object: &Map<String, Value>) -> bool {
     let Some(name) = text(object.get("name")) else {
         return false;
     };
-    name.as_bytes().first().is_some_and(|first| first.is_ascii_lowercase())
-        && name.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    name.as_bytes()
+        .first()
+        .is_some_and(|first| first.is_ascii_lowercase())
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
         && name.len() <= 32
         && text(object.get("url"))
             .and_then(|url| url::Url::parse(url).ok())
@@ -328,7 +345,10 @@ fn is_provider_add(object: &Map<String, Value>) -> bool {
 fn is_file_chunk(object: &Map<String, Value>) -> bool {
     text(object.get("file")).is_some_and(|file| !file.is_empty() && file.len() <= 128)
         && object.get("index").and_then(Value::as_u64).is_some()
-        && object.get("total").and_then(Value::as_u64).is_some_and(|total| total > 0)
+        && object
+            .get("total")
+            .and_then(Value::as_u64)
+            .is_some_and(|total| total > 0)
         && non_empty(object.get("data"))
 }
 
@@ -363,6 +383,14 @@ fn is_agent_listed(object: &Map<String, Value>) -> bool {
     if !agents.iter().all(is_agent) {
         return false;
     }
+    if let Some(trash) = object.get("trash") {
+        let Some(trash) = trash.as_array() else {
+            return false;
+        };
+        if !trash.iter().all(is_agent_trash_entry) {
+            return false;
+        }
+    }
     let Some(providers) = object.get("providers").and_then(Value::as_array) else {
         return false;
     };
@@ -377,10 +405,28 @@ fn is_agent_listed(object: &Map<String, Value>) -> bool {
     true
 }
 
+fn is_agent_trash_entry(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    is_agent(value)
+        && object
+            .get("deletedAt")
+            .map(is_non_negative_int)
+            .unwrap_or(false)
+        && object
+            .get("restoreUntil")
+            .map(is_non_negative_int)
+            .unwrap_or(false)
+}
+
 fn is_agent_usage(object: &Map<String, Value>) -> bool {
     text(object.get("agent")).map(is_agent_id).unwrap_or(false)
         && text(object.get("day")).map(is_day).unwrap_or(false)
-        && object.get("tokens").map(is_non_negative_int).unwrap_or(false)
+        && object
+            .get("tokens")
+            .map(is_non_negative_int)
+            .unwrap_or(false)
         && object.get("budget").map(is_budget).unwrap_or(false)
 }
 
@@ -418,7 +464,10 @@ fn is_task_stop(object: &Map<String, Value>) -> bool {
 
 fn is_task_sync(object: &Map<String, Value>) -> bool {
     text(object.get("agent")).map(is_agent_id).unwrap_or(false)
-        && object.get("after").map(is_non_negative_int).unwrap_or(false)
+        && object
+            .get("after")
+            .map(is_non_negative_int)
+            .unwrap_or(false)
 }
 
 fn is_task_events(object: &Map<String, Value>) -> bool {
@@ -442,7 +491,10 @@ fn is_task_listed(object: &Map<String, Value>) -> bool {
                             .map(|id| (1..=64).contains(&chars(id)))
                             .unwrap_or(false)
                             && text(task.get("agent")).map(is_agent_id).unwrap_or(false)
-                            && task.get("updated").map(is_non_negative_int).unwrap_or(false)
+                            && task
+                                .get("updated")
+                                .map(is_non_negative_int)
+                                .unwrap_or(false)
                     })
                     .unwrap_or(false)
             })
@@ -462,10 +514,7 @@ fn is_egress_domain(value: &str) -> bool {
     let Some(last) = labels.last() else {
         return false;
     };
-    if last.len() < 2
-        || last.len() > 63
-        || !last.bytes().all(|byte| byte.is_ascii_lowercase())
-    {
+    if last.len() < 2 || last.len() > 63 || !last.bytes().all(|byte| byte.is_ascii_lowercase()) {
         return false;
     }
     labels.iter().all(|label| {
@@ -509,9 +558,7 @@ fn is_error_code(value: &str) -> bool {
     value.split('.').all(|segment| {
         let mut bytes = segment.bytes();
         matches!(bytes.next(), Some(byte) if byte.is_ascii_lowercase())
-            && bytes.all(|byte| {
-                byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
-            })
+            && bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
     })
 }
 
@@ -523,11 +570,10 @@ fn is_error(object: &Map<String, Value>) -> bool {
         let Some(params) = params.as_object() else {
             return false;
         };
-        if !params.values().all(|value| {
-            value.is_string()
-                || value.is_number()
-                || value.is_boolean()
-        }) {
+        if !params
+            .values()
+            .all(|value| value.is_string() || value.is_number() || value.is_boolean())
+        {
             return false;
         }
     }
@@ -597,7 +643,10 @@ fn is_usage_agent(value: &Value) -> bool {
                             })
                     })
                     .unwrap_or(false)
-                    && source.get("tokens").map(is_non_negative_int).unwrap_or(false)
+                    && source
+                        .get("tokens")
+                        .map(is_non_negative_int)
+                        .unwrap_or(false)
             })
             .unwrap_or(false)
     })
@@ -607,7 +656,10 @@ fn is_usage_list(object: &Map<String, Value>) -> bool {
     text(object.get("request"))
         .map(|request| (1..=64).contains(&chars(request)))
         .unwrap_or(false)
-        && object.get("days").map(|days| days.as_i64().is_some()).unwrap_or(false)
+        && object
+            .get("days")
+            .map(|days| days.as_i64().is_some())
+            .unwrap_or(false)
         && object
             .get("agent")
             .map(|agent| text(Some(agent)).map(is_agent_id).unwrap_or(false))
@@ -635,6 +687,48 @@ fn is_usage_listed(object: &Map<String, Value>) -> bool {
         .and_then(Value::as_array)
         .map(|agents| agents.iter().all(is_usage_agent))
         .unwrap_or(false)
+}
+
+/// The cap plus the notice `runtime-core` appends when the file is longer, so a Memory answer
+/// never grows with the file (`agent-memory-page`). Counted in Unicode scalars; the TypeScript
+/// bound counts UTF-16 units, so the two differ only for astral-plane characters.
+const MEMORY_TEXT_MAX: usize = 4_200;
+
+fn is_memory_get(object: &Map<String, Value>) -> bool {
+    text(object.get("request"))
+        .map(|request| (1..=64).contains(&chars(request)))
+        .unwrap_or(false)
+        && object
+            .get("agent")
+            .and_then(|agent| text(Some(agent)))
+            .map(is_agent_id)
+            .unwrap_or(false)
+}
+
+fn is_memory_got(object: &Map<String, Value>) -> bool {
+    let request_ok = text(object.get("request"))
+        .map(|request| (1..=64).contains(&chars(request)))
+        .unwrap_or(false);
+    let agent_ok = object
+        .get("agent")
+        .and_then(|agent| text(Some(agent)))
+        .map(is_agent_id)
+        .unwrap_or(false);
+    let Some(exists) = object.get("exists").and_then(Value::as_bool) else {
+        return false;
+    };
+    let Some(count) = object.get("chars").and_then(Value::as_i64) else {
+        return false;
+    };
+    let Some(body) = text(object.get("text")) else {
+        return false;
+    };
+    // A missing file has no text and no characters; an empty file is `exists` with zero.
+    request_ok
+        && agent_ok
+        && count >= 0
+        && chars(body) <= MEMORY_TEXT_MAX
+        && (exists || (count == 0 && body.is_empty()))
 }
 
 fn is_pairing_claim(object: &Map<String, Value>) -> bool {

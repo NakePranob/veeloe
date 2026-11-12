@@ -20,6 +20,7 @@ use veeloe_runtime_supervisor::help::{help_for, USAGE};
 use veeloe_runtime_supervisor::hub_link::{HubLink, HubLinkOptions, HubLinkSink, HubSender};
 use veeloe_runtime_supervisor::llm::{HttpClient, LlmProxy};
 use veeloe_runtime_supervisor::logs;
+use veeloe_runtime_supervisor::memory;
 use veeloe_runtime_supervisor::models;
 use veeloe_runtime_supervisor::pair::{run_pair, PairOptions, PairResult};
 use veeloe_runtime_supervisor::providers::{load_providers, upstream_headers};
@@ -141,12 +142,43 @@ struct Supervisor {
 /// The counters a connection reads before it trusts anything.
 type MemorySeen = veeloe_protocol::envelope::MemorySeenSequences;
 
+/// The one line a Turn's end may leave in the log: identifiers and codes, and
+/// never the reason's own wording when it is not a code (ADR 0052).
+fn turn_log(agent: &str, message: &FromWorker) -> Option<(&'static str, Value)> {
+    let FromWorker::Event { task, event, .. } = message else {
+        return None;
+    };
+    if event.kind != "turn.ended" {
+        return None;
+    }
+    let reason = event
+        .body
+        .get("reason")
+        .and_then(Value::as_str)
+        .unwrap_or("ended");
+    let mut fields = json!({ "agent": agent, "task": task, "reason": reason });
+    if let Some(code) = event.body.get("code").and_then(Value::as_str) {
+        fields["code"] = json!(code);
+    }
+    let level = if reason == "error" { "error" } else { "info" };
+    Some((level, fields))
+}
+
 impl Supervisor {
     fn deliver(&self, agent: &str, message: FromWorker) {
+        self.log_turn(agent, &message);
         self.notify(agent, &message);
         let outbox = self.outbox.lock().expect("outbox");
         if let Some(outbox) = outbox.as_ref() {
             forward(outbox.as_ref(), agent, message);
+        }
+    }
+
+    /// A Turn's end is written without its text: the reason and the error code
+    /// are what tell a stuck Task from a finished one (ADR 0052).
+    fn log_turn(&self, agent: &str, message: &FromWorker) {
+        if let Some((level, fields)) = turn_log(agent, message) {
+            let _ = logs::record(&self.home, level, "turn.ended", fields);
         }
     }
 
@@ -174,7 +206,11 @@ impl Supervisor {
                     .iter()
                     .flat_map(|member| self.push_tokens.for_member(member))
                     .collect::<Vec<_>>();
-                (veeloe_runtime_supervisor::push::PushKind::Approval, approval, tokens)
+                (
+                    veeloe_runtime_supervisor::push::PushKind::Approval,
+                    approval,
+                    tokens,
+                )
             }
             "turn.ended" => (
                 veeloe_runtime_supervisor::push::PushKind::TurnEnded,
@@ -221,9 +257,29 @@ impl HubLinkSink for Supervisor {
 
     fn on_ready(&self, machine: &str) {
         *self.machine.lock().expect("machine") = Some(machine.to_string());
-        let _ = logs::record(&self.home, "info", "hub.connected", json!({ "machine": machine }));
+        let _ = logs::record(
+            &self.home,
+            "info",
+            "hub.connected",
+            json!({ "machine": machine }),
+        );
         println!("connected as machine {machine}");
         if let Some(workers) = self.workers.get() {
+            // The trash is cleared on the clock the Machine has now, then only
+            // Agents in use get a worker (`agent-trash`).
+            if let Ok(purged) = self
+                .registry
+                .purge_expired(veeloe_runtime_supervisor::usage::now_ms())
+            {
+                if purged > 0 {
+                    let _ = logs::record(
+                        &self.home,
+                        "warn",
+                        "agent.purge",
+                        json!({ "agents": purged }),
+                    );
+                }
+            }
             for agent in self.registry.all().unwrap_or_default() {
                 workers.start(&agent);
             }
@@ -310,7 +366,9 @@ impl HubLinkSink for Supervisor {
         // Off the link's own task: a Provider's models come over the wire, and
         // the next envelope must not wait for them.
         tokio::spawn(async move {
-            let Some(workers) = me.workers.get() else { return };
+            let Some(workers) = me.workers.get() else {
+                return;
+            };
             // Providers are a file the owner changes with the CLI while this
             // supervisor runs, so each message reads them again (ADR 0042).
             let providers = load_providers(&me.home).unwrap_or_default();
@@ -335,11 +393,10 @@ impl HubLinkSink for Supervisor {
             return;
         }
         let mut held = self.trust.lock().expect("trust");
-        let next = veeloe_runtime_supervisor::trust::apply_certificates(
-            &held,
-            &certificates,
-            &|line| println!("{line}"),
-        );
+        let next =
+            veeloe_runtime_supervisor::trust::apply_certificates(&held, &certificates, &|line| {
+                println!("{line}")
+            });
         if next == *held {
             return;
         }
@@ -428,11 +485,26 @@ async fn run() -> Result<(), CliError> {
             run_status(&home, &mut |line| println!("{line}"));
             Ok(())
         }
-        Some("logs") => logs::run(&home, args.iter().any(|arg| arg == "--follow")).map_err(CliError::from),
+        Some("logs") => {
+            logs::run(&home, args.iter().any(|arg| arg == "--follow")).map_err(CliError::from)
+        }
+        Some("memory") => match args.get(1) {
+            Some(query) => {
+                memory::run(&home, query, &mut |line| println!("{line}")).map_err(|error| {
+                    CliError {
+                        message: error.to_string(),
+                        code: if error.is_usage() { 2 } else { 1 },
+                    }
+                })
+            }
+            None => Err(CliError::usage("which Agent? veeloe memory <agent>")),
+        },
         Some("service") => match args.get(1).map(String::as_str) {
             Some("install") => service::install(&home).map_err(CliError::from),
             Some("uninstall") => service::uninstall(&home).map_err(CliError::from),
-            _ => Err(CliError::usage("not a service command: see veeloe help service")),
+            _ => Err(CliError::usage(
+                "not a service command: see veeloe help service",
+            )),
         },
         Some("provider") => {
             match args.get(1).map(String::as_str) {
@@ -465,7 +537,9 @@ fn unpair(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let answer = ask_line(
         "This Machine will stop trusting every Controller and get a new key. Continue? [y/N] ",
     )?;
-    let yes = answer.map(|answer| answer.to_lowercase() == "y").unwrap_or(false);
+    let yes = answer
+        .map(|answer| answer.to_lowercase() == "y")
+        .unwrap_or(false);
     if !yes {
         println!("nothing was changed");
         std::process::exit(1);
@@ -660,7 +734,10 @@ fn pick_with_arrows(
 
 /// A Provider's name: lower-case letters, digits and dashes, up to 32 (legacy
 /// `checkName`).
-fn provider_name(name: &str, providers: &[veeloe_runtime_supervisor::providers::Provider]) -> Result<String, String> {
+fn provider_name(
+    name: &str,
+    providers: &[veeloe_runtime_supervisor::providers::Provider],
+) -> Result<String, String> {
     let allowed = !name.is_empty()
         && name.len() <= 32
         && name.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
@@ -742,7 +819,11 @@ async fn pair(home: PathBuf, args: &[String]) -> Result<(), Box<dyn std::error::
     });
     let mut options = PairOptions::new(&home, hub);
     options.ttl_seconds = PAIRING_TTL_SECONDS;
-    match run_pair(options, log).await? {
+    let outcome = run_pair(options, log).await?;
+    if outcome == PairResult::Paired {
+        let _ = logs::record(&home, "info", "pair", json!({}));
+    }
+    match outcome {
         PairResult::Paired => Ok(()),
         PairResult::AlreadyPaired => Ok(()),
         PairResult::Expired => std::process::exit(1),
@@ -797,7 +878,8 @@ async fn provider(home: PathBuf, args: &[String]) -> Result<(), Box<dyn std::err
                     .map(|(_, label, _, _)| label.to_string())
                     .chain(std::iter::once("Custom (enter a URL)".to_string()))
                     .collect();
-                let Some(picked) = pick_with_arrows("Which Provider do you want to add?", &labels)? else {
+                let Some(picked) = pick_with_arrows("Which Provider do you want to add?", &labels)?
+                else {
                     return Err("cancelled, nothing was saved".into());
                 };
                 preset = PRESETS.get(picked).map(|(id, _, _, _)| id.to_string());
@@ -927,7 +1009,9 @@ async fn provider(home: PathBuf, args: &[String]) -> Result<(), Box<dyn std::err
                     .iter()
                     .map(|provider| format!("{}  {}", provider.name, provider.url))
                     .collect();
-                let Some(picked) = pick_with_arrows("Which Provider do you want to remove?", &labels)? else {
+                let Some(picked) =
+                    pick_with_arrows("Which Provider do you want to remove?", &labels)?
+                else {
                     return Err("cancelled, nothing was removed".into());
                 };
                 name = Some(providers[picked].name.clone());
@@ -941,7 +1025,7 @@ async fn provider(home: PathBuf, args: &[String]) -> Result<(), Box<dyn std::err
                 .map(|registry| registry.all().unwrap_or_default())
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|agent| agent.provider == name)
+                .filter(|agent| !agent.deleted() && agent.provider == name)
                 .map(|agent| agent.name)
                 .collect();
             if users.is_empty() {
@@ -1005,10 +1089,14 @@ async fn first_run(home: &Path) -> Result<bool, Box<dyn std::error::Error>> {
         Some(hub) => normalize_hub_url(&hub).map_err(|error| error.to_string())?,
         None => {
             let Some(answer) = ask_line("Hub URL (wss://... from the Veeloe app): ")? else {
-                return Err("no Hub URL was given. Run veeloe again, or veeloe pair --hub <url>".into());
+                return Err(
+                    "no Hub URL was given. Run veeloe again, or veeloe pair --hub <url>".into(),
+                );
             };
             if answer.is_empty() {
-                return Err("no Hub URL was given. Run veeloe again, or veeloe pair --hub <url>".into());
+                return Err(
+                    "no Hub URL was given. Run veeloe again, or veeloe pair --hub <url>".into(),
+                );
             }
             let hub = normalize_hub_url(&answer).map_err(|error| error.to_string())?;
             veeloe_runtime_supervisor::trust::save_hub_url(home, &hub)?;
@@ -1060,8 +1148,12 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     routes.prune(&agent_ids)?;
 
     let http: Arc<dyn HttpClient> = Arc::new(ReqwestClient::new());
-    let push_tokens = Arc::new(veeloe_runtime_supervisor::push_tokens::PushTokens::open(&home)?);
-    let push = Arc::new(veeloe_runtime_supervisor::push::ExpoPush::new(Arc::clone(&http)));
+    let push_tokens = Arc::new(veeloe_runtime_supervisor::push_tokens::PushTokens::open(
+        &home,
+    )?);
+    let push = Arc::new(veeloe_runtime_supervisor::push::ExpoPush::new(Arc::clone(
+        &http,
+    )));
     let supervisor = Arc::new_cyclic(|me| Supervisor {
         home: home.clone(),
         registry,
@@ -1091,6 +1183,9 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
             let Ok(Some(agent)) = allow_routing.registry.get(agent) else {
                 return false;
             };
+            if agent.deleted() {
+                return false;
+            }
             !allow_budgets
                 .exhausted(&agent, veeloe_runtime_supervisor::usage::now_ms())
                 .unwrap_or(true)
@@ -1235,7 +1330,11 @@ impl veeloe_runtime_supervisor::llm::HttpClient for ReqwestClient {
         for (name, value) in headers {
             request = request.header(name, value);
         }
-        let answer = request.body(body).send().await.map_err(|error| error.to_string())?;
+        let answer = request
+            .body(body)
+            .send()
+            .await
+            .map_err(|error| error.to_string())?;
         let status = answer.status().as_u16();
         let headers = answer
             .headers()
@@ -1258,7 +1357,7 @@ impl veeloe_runtime_supervisor::llm::HttpClient for ReqwestClient {
 
 #[cfg(test)]
 mod tests {
-    use super::{hub_argument, pick_key, Pick};
+    use super::{hub_argument, pick_key, turn_log, Pick};
 
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(|arg| arg.to_string()).collect()
@@ -1295,5 +1394,58 @@ mod tests {
         assert!(matches!(pick_key("\u{1b}", 0, 3), Pick::Cancel));
         assert!(matches!(pick_key("\u{3}", 0, 3), Pick::Cancel));
         assert!(matches!(pick_key("q", 0, 3), Pick::Cancel));
+    }
+
+    fn event(kind: &str, body: serde_json::Value) -> veeloe_runtime_core::FromWorker {
+        veeloe_runtime_core::FromWorker::Event {
+            task: "task-1".into(),
+            starter: "member-1".into(),
+            event: veeloe_runtime_core::TaskEvent {
+                seq: 7,
+                kind: kind.into(),
+                at: 1_700_000_000,
+                body,
+            },
+        }
+    }
+
+    #[test]
+    fn a_turn_end_logs_its_ids_and_codes_and_nothing_else() {
+        let (level, fields) = turn_log(
+            "helper",
+            &event(
+                "turn.ended",
+                serde_json::json!({
+                    "reason": "error",
+                    "code": "provider.failed",
+                    "text": "a Task line that must never be logged",
+                    "file": "secret.txt"
+                }),
+            ),
+        )
+        .expect("a turn end is logged");
+        assert_eq!(level, "error");
+        assert_eq!(
+            fields,
+            serde_json::json!({
+                "agent": "helper",
+                "task": "task-1",
+                "reason": "error",
+                "code": "provider.failed"
+            })
+        );
+    }
+
+    #[test]
+    fn other_worker_events_and_a_finished_turn_are_not_logged_as_errors() {
+        assert!(turn_log("helper", &event("turn.started", serde_json::json!({}))).is_none());
+        let (level, fields) = turn_log(
+            "helper",
+            &event("turn.ended", serde_json::json!({ "reason": "stop" })),
+        )
+        .expect("a stopped turn is logged");
+        assert_eq!(level, "info");
+        assert_eq!(fields["reason"], "stop");
+        assert!(fields.get("code").is_none());
     }
 }

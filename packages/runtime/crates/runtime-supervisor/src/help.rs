@@ -3,9 +3,9 @@
 //! the Controller's).
 
 pub const USAGE: &str =
-    "usage: veeloe [pair | unpair | status | logs | provider add|list|remove | service install|uninstall | help <command>]";
+    "usage: veeloe [pair | unpair | status | logs | memory | provider add|list|remove | service install|uninstall | help <command>]";
 
-const COMMANDS: [(&str, &str); 7] = [
+const COMMANDS: [(&str, &str); 8] = [
     (
         "start",
         "veeloe
@@ -77,6 +77,16 @@ veeloe service uninstall
   veeloe logs                         print the recent log
   veeloe logs --follow                print new lines until Ctrl-C",
     ),
+    (
+        "memory",
+        "veeloe memory <agent>
+  Show the Memory (`MEMORY.md` at the Agent's Workdir root) that its next Turn
+  sees, capped at 4,000 characters. Read-only: it never creates a Workdir or an
+  empty file.
+
+  veeloe memory Pang                   by name (refused if two Agents share it)
+  veeloe memory 6f1c2a9e               by id",
+    ),
 ];
 
 /// The help of one command, or of all of them. `None` for a command there is
@@ -109,7 +119,7 @@ mod tests {
     fn all_of_them_names_every_command_and_points_at_one_command_help() {
         let all = help_for(None).expect("all");
         assert!(all.starts_with("Veeloe Runtime: your Agents, on this Machine."));
-        for command in ["start", "pair", "unpair", "status", "logs", "provider", "service"] {
+        for command in ["start", "pair", "unpair", "status", "logs", "memory", "provider", "service"] {
             assert!(help_for(Some(command)).is_some(), "{command}");
         }
         assert!(all.ends_with("More on one command: veeloe help <command>"));
