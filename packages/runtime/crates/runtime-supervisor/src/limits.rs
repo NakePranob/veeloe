@@ -1,7 +1,22 @@
-//! What one worker may use (issue #47). macOS has no cgroups, so the OS caps
-//! the worker's CPU time with `RLIMIT_CPU` (ADR 0069) and the supervisor ends
-//! it when its resident memory passes the limit. Linux is unchanged: its cgroup
-//! scope is a later ticket.
+//! What one worker may use (issues #47, #48). Every system caps the worker's CPU
+//! time with `RLIMIT_CPU` (ADR 0069) and the supervisor ends it when its
+//! resident memory passes the limit. On Linux with a user systemd session the
+//! kernel does the capping instead, through a cgroup scope (`crate::cgroup`);
+//! both stay in place there, the scope as the real ceiling and these as the
+//! backstop for a Machine without one.
+//!
+//! The keys of `limits` in `config.json`, all optional:
+//!
+//! | key | default | what it caps |
+//! |---|---|---|
+//! | `cpuSeconds` | 1800 | CPU time, through `RLIMIT_CPU` |
+//! | `memoryMb` | 4096 | resident memory: `MemoryMax` in the cgroup, the watch otherwise |
+//! | `cpuPercent` | 200 | `CPUQuota` in the cgroup (a rate: 200 = two cores) |
+//! | `tasks` | 512 | `TasksMax` in the cgroup: the worker and its processes |
+//!
+//! A value that cannot be read, or is outside what the OS takes, falls back to
+//! its default with one `limits.invalid` warning and never keeps the Runtime
+//! from starting.
 //!
 //! `RLIMIT_CPU` counts CPU seconds, not elapsed time: a worker that waits on
 //! the network all day never reaches it, which is intended.
@@ -12,26 +27,43 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-/// How long one worker may burn CPU, and how much resident memory it and the
-/// commands under it may hold.
+/// How long one worker may burn CPU, how much resident memory it and the
+/// commands under it may hold, how much CPU it may use at once, and how many
+/// processes it may have.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     pub cpu_seconds: u64,
     pub memory_mb: u64,
+    /// The `CPUQuota` a Linux cgroup scope is given: a rate in percent of one
+    /// core, so 200 is two cores (`RLIMIT_CPU` has no such shape).
+    pub cpu_percent: u64,
+    /// The `TasksMax` a Linux cgroup scope is given: the worker and every
+    /// process it starts.
+    pub tasks: u64,
 }
 
 pub const DEFAULT_CPU_SECONDS: u64 = 1_800;
 pub const DEFAULT_MEMORY_MB: u64 = 4_096;
+pub const DEFAULT_CPU_PERCENT: u64 = 200;
+pub const DEFAULT_TASKS: u64 = 512;
 /// The most CPU time one worker may be given. A week is far more than any Turn
 /// needs, and far below `RLIM_INFINITY`, so `setrlimit` is never handed a value
 /// the OS would refuse; anything above it falls back to the default.
 pub const MAX_CPU_SECONDS: u64 = 7 * 24 * 60 * 60;
+/// The most CPU a scope may be given, in percent of one core: 64 cores' worth.
+/// Anything above it falls back to the default rather than failing the scope.
+pub const MAX_CPU_PERCENT: u64 = 6_400;
+/// The most processes a scope may be given. Far above any Turn's needs and far
+/// below the kernel's own `pids.max` ceiling.
+pub const MAX_TASKS: u64 = 65_536;
 
 impl Default for Limits {
     fn default() -> Self {
         Self {
             cpu_seconds: DEFAULT_CPU_SECONDS,
             memory_mb: DEFAULT_MEMORY_MB,
+            cpu_percent: DEFAULT_CPU_PERCENT,
+            tasks: DEFAULT_TASKS,
         }
     }
 }
@@ -92,6 +124,22 @@ pub fn read(config: Option<&Value>) -> (Limits, Vec<&'static str>) {
             _ => invalid.push("memoryMb"),
         },
     }
+    match named.get("cpuPercent") {
+        None => {}
+        Some(value) => match value.as_u64() {
+            Some(percent) if percent > 0 && percent <= MAX_CPU_PERCENT => {
+                limits.cpu_percent = percent;
+            }
+            _ => invalid.push("cpuPercent"),
+        },
+    }
+    match named.get("tasks") {
+        None => {}
+        Some(value) => match value.as_u64() {
+            Some(tasks) if tasks > 0 && tasks <= MAX_TASKS => limits.tasks = tasks,
+            _ => invalid.push("tasks"),
+        },
+    }
     (limits, invalid)
 }
 
@@ -117,6 +165,12 @@ pub enum Cut {
 /// made is not reported as a limit the Runtime hit. `burned_nanos` is `None`
 /// when the OS could not say. A kill this Runtime made for memory is not the
 /// CPU's, so it answers nothing.
+///
+/// Under a cgroup scope the process this Runtime waits on is `systemd-run`,
+/// which may report a failed scope — and a kill from the cgroup's own OOM — as
+/// an exit code instead of a signal. An exit code names no limit here: only a
+/// signal does, so such a kill can only be reported as a plain end. A non-zero
+/// exit is never mislabelled as the CPU's.
 pub fn breach(
     status: &ExitStatus,
     killed_for_memory: bool,
@@ -156,8 +210,9 @@ fn signal_of(_status: &ExitStatus) -> Option<i32> {
 
 /// The Worker counts this limit as CPU seconds: soft is what the config says,
 /// hard is a minute more, so the worker sees `SIGXCPU` and has a chance to end
-/// before the OS kills it outright.
-#[cfg(target_os = "macos")]
+/// before the OS kills it outright. Linux keeps it beside its cgroup scope,
+/// where it is the backstop for a scope that could not be made.
+#[cfg(unix)]
 pub fn capping_cpu_time(command: &mut tokio::process::Command, cpu_seconds: u64) {
     let soft = cpu_seconds as libc::rlim_t;
     let hard = cpu_seconds.saturating_add(60) as libc::rlim_t;
@@ -182,6 +237,37 @@ pub fn resident_bytes(pid: u32) -> Option<u64> {
     task_info(pid).map(|info| info.pti_resident_size)
 }
 
+/// One worker's resident memory on Linux, from `/proc/<pid>/statm`: its second
+/// number is the resident pages, which the page size turns into bytes.
+#[cfg(target_os = "linux")]
+pub fn resident_bytes(pid: u32) -> Option<u64> {
+    resident_bytes_in(Path::new(PROC), pid)
+}
+
+/// The same reading, taken from `root` instead of `/proc`, so a test can stand
+/// a fake `/proc` in for the real one (ADR 0022).
+#[cfg(target_os = "linux")]
+pub(crate) fn resident_bytes_in(root: &Path, pid: u32) -> Option<u64> {
+    let text = std::fs::read_to_string(root.join(pid.to_string()).join("statm")).ok()?;
+    let pages: u64 = text.split_whitespace().nth(1)?.parse().ok()?;
+    Some(pages.saturating_mul(page_size()))
+}
+
+/// Where Linux keeps the running processes.
+#[cfg(target_os = "linux")]
+const PROC: &str = "/proc";
+
+/// The bytes in one page of memory, which `/proc` counts in.
+#[cfg(target_os = "linux")]
+fn page_size() -> u64 {
+    let size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+    if size > 0 {
+        size as u64
+    } else {
+        4_096
+    }
+}
+
 /// The CPU time a process has burned so far, in nanoseconds, as the OS reports
 /// it (`pti_total_user` + `pti_total_system`, both in nanoseconds).
 #[cfg(target_os = "macos")]
@@ -189,7 +275,58 @@ pub fn cpu_nanos(pid: u32) -> Option<u64> {
     task_info(pid).map(|info| info.pti_total_user.saturating_add(info.pti_total_system))
 }
 
-#[cfg(not(target_os = "macos"))]
+/// The same on Linux, from `/proc/<pid>/stat`: `utime` and `stime` are the
+/// process's own CPU time in clock ticks, so a `SIGKILL` can still be told
+/// apart from the CPU limit (issue #47).
+#[cfg(target_os = "linux")]
+pub fn cpu_nanos(pid: u32) -> Option<u64> {
+    cpu_nanos_in(Path::new(PROC), pid)
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn cpu_nanos_in(root: &Path, pid: u32) -> Option<u64> {
+    let fields = stat_fields(root, pid)?;
+    let user: u64 = fields.get(11)?.parse().ok()?;
+    let system: u64 = fields.get(12)?.parse().ok()?;
+    let ticks = user.saturating_add(system);
+    let per_second = clock_ticks();
+    Some(ticks.saturating_mul(1_000_000_000) / per_second)
+}
+
+/// How many clock ticks `/proc` counts CPU time in.
+#[cfg(target_os = "linux")]
+fn clock_ticks() -> u64 {
+    let ticks = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
+    if ticks > 0 {
+        ticks as u64
+    } else {
+        100
+    }
+}
+
+/// The fields of `/proc/<pid>/stat` after the program's name. The name is in
+/// parentheses and may hold spaces and parentheses of its own, so the split
+/// starts at the last one; the rest are `state`, `ppid`, … (proc(5)).
+#[cfg(target_os = "linux")]
+fn stat_fields(root: &Path, pid: u32) -> Option<Vec<String>> {
+    let text = std::fs::read_to_string(root.join(pid.to_string()).join("stat")).ok()?;
+    let rest = text.rsplit_once(')')?.1;
+    Some(rest.split_whitespace().map(str::to_string).collect())
+}
+
+/// The process that started `pid`, from `/proc/<pid>/stat`.
+#[cfg(target_os = "linux")]
+fn parent_of(root: &Path, pid: u32) -> Option<u32> {
+    // Read on its own rather than through `stat_fields`: the tree is walked for
+    // every process on the Machine, every two seconds, so this one allocates
+    // nothing it does not need.
+    let text = std::fs::read_to_string(root.join(pid.to_string()).join("stat")).ok()?;
+    let mut fields = text.rsplit_once(')')?.1.split_whitespace();
+    fields.next()?; // the state
+    fields.next()?.parse().ok()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn cpu_nanos(_pid: u32) -> Option<u64> {
     None
 }
@@ -211,10 +348,17 @@ fn task_info(pid: u32) -> Option<libc::proc_taskinfo> {
 }
 
 /// Ends a worker and every process below it. A worker's commands are its
-/// children and outlive it on macOS, so killing only the worker would leave the
-/// runaway command behind.
-#[cfg(target_os = "macos")]
+/// children and outlive it, so killing only the worker would leave the runaway
+/// command behind. On Linux this also matters when the worker was opened
+/// through `systemd-run`, which is the process this Runtime holds: the worker
+/// is below it, and killing the wrapper alone would leave the worker running.
+#[cfg(unix)]
 pub fn kill_tree(pid: u32) {
+    // `kill(0, …)` is every process in this group, which is the supervisor
+    // itself: a child whose pid was never read is not killed at all.
+    if pid == 0 {
+        return;
+    }
     kill_tree_with(pid, descendants, kill);
 }
 
@@ -225,7 +369,7 @@ pub fn kill_tree(pid: u32) {
 /// between the first look and now. Every look is a snapshot: a grandchild that
 /// starts after the last one escapes, and a pid in it may be reused before the
 /// kill reaches it. That race is narrowed, not closed.
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 pub(crate) fn kill_tree_with<D, K>(pid: u32, descendants_of: D, kill: K)
 where
     D: Fn(u32) -> Vec<u32>,
@@ -244,7 +388,7 @@ where
         killed.push(pid);
         kill(pid);
     }
-    // Best effort once the worker is gone: macOS reparents its children as it
+    // Best effort once the worker is gone: the OS reparents its children as it
     // exits, so this usually finds none, and it costs nothing when it does.
     for child in descendants_of(pid) {
         if child != pid && !killed.contains(&child) {
@@ -253,7 +397,7 @@ where
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(unix))]
 pub fn kill_tree(pid: u32) {
     kill(pid);
 }
@@ -266,8 +410,18 @@ fn kill(pid: u32) {
 
 /// Every process below `pid`, found through the OS rather than guessed from a
 /// process group a command could leave.
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 pub(crate) fn descendants(pid: u32) -> Vec<u32> {
+    descendants_with(pid, children_of)
+}
+
+/// The walk `descendants` makes, made a function of one OS call so a test can
+/// stand a fake process tree in for the real one.
+#[cfg(unix)]
+pub(crate) fn descendants_with<C>(pid: u32, children_of: C) -> Vec<u32>
+where
+    C: Fn(u32) -> Vec<u32>,
+{
     let mut all = Vec::new();
     let mut frontier = vec![pid];
     while let Some(parent) = frontier.pop() {
@@ -279,6 +433,28 @@ pub(crate) fn descendants(pid: u32) -> Vec<u32> {
         }
     }
     all
+}
+
+/// Every process whose parent is `pid`, read from `/proc`: a scan of the whole
+/// table, because the kernel offers no cheaper list outside `/proc/<pid>/task`
+/// (which needs CONFIG_PROC_CHILDREN).
+#[cfg(target_os = "linux")]
+fn children_of(pid: u32) -> Vec<u32> {
+    children_in(Path::new(PROC), pid)
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn children_in(root: &Path, pid: u32) -> Vec<u32> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut children: Vec<u32> = entries
+        .flatten()
+        .filter_map(|entry| entry.file_name().to_str()?.parse::<u32>().ok())
+        .filter(|candidate| parent_of(root, *candidate) == Some(pid))
+        .collect();
+    children.sort_unstable();
+    children
 }
 
 #[cfg(target_os = "macos")]
@@ -329,7 +505,12 @@ mod tests {
             home.path().join("config.json"),
             json!({
                 "hubUrl": "wss://hub.test",
-                "limits": { "cpuSeconds": 120, "memoryMb": 512 },
+                "limits": {
+                    "cpuSeconds": 120,
+                    "memoryMb": 512,
+                    "cpuPercent": 150,
+                    "tasks": 64,
+                },
             })
             .to_string(),
         )
@@ -338,9 +519,13 @@ mod tests {
             load(home.path()),
             Limits {
                 cpu_seconds: 120,
-                memory_mb: 512
+                memory_mb: 512,
+                cpu_percent: 150,
+                tasks: 64,
             }
         );
+        assert_eq!(Limits::default().cpu_percent, DEFAULT_CPU_PERCENT);
+        assert_eq!(Limits::default().tasks, DEFAULT_TASKS);
     }
 
     #[test]
@@ -353,6 +538,14 @@ mod tests {
             (
                 json!({ "cpuSeconds": "soon", "memoryMb": true }),
                 vec!["cpuSeconds", "memoryMb"],
+            ),
+            (
+                json!({ "cpuPercent": 0, "tasks": 0 }),
+                vec!["cpuPercent", "tasks"],
+            ),
+            (
+                json!({ "cpuPercent": MAX_CPU_PERCENT + 1, "tasks": "many" }),
+                vec!["cpuPercent", "tasks"],
             ),
             (json!("lots"), vec!["limits"]),
         ] {
@@ -424,6 +617,13 @@ mod tests {
             breach(&status(libc::SIGTERM), false, burned(soft), soft),
             None
         );
+        // `systemd-run` may report a scope's end as an exit code rather than a
+        // signal, so the code is never read as one of our limits (issue #48).
+        assert_eq!(
+            breach(&ExitStatus::from_raw(1 << 8), false, burned(soft), soft),
+            None,
+            "an exit code names no limit"
+        );
         assert_eq!(breach(&status(0), false, burned(soft), soft), None);
     }
 
@@ -463,7 +663,7 @@ mod tests {
         assert!(invalid.is_empty(), "{invalid:?}");
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     #[test]
     fn a_workers_commands_are_killed_before_the_worker() {
         use std::cell::RefCell;
@@ -484,8 +684,82 @@ mod tests {
         );
     }
 
+    /// A pid this Runtime never read is not `kill(0)`, which is every process
+    /// in this group — the supervisor itself.
+    #[cfg(unix)]
+    #[test]
+    fn a_pid_that_was_never_read_is_not_killed() {
+        kill_tree(0);
+    }
+
+    /// Writes one process into a fake `/proc`: its parent, its own CPU time in
+    /// clock ticks, and its resident pages. The name holds spaces and
+    /// parentheses, as a real one may.
+    #[cfg(target_os = "linux")]
+    fn write_proc_process(root: &Path, pid: u32, ppid: u32, ticks: (u64, u64), pages: u64) {
+        let dir = root.join(pid.to_string());
+        std::fs::create_dir_all(&dir).expect("process dir");
+        std::fs::write(
+            dir.join("stat"),
+            format!(
+                "{pid} (a worker (with parens)) S {ppid} 0 0 0 0 0 0 0 0 0 {} {} 0 0",
+                ticks.0, ticks.1
+            ),
+        )
+        .expect("stat");
+        std::fs::write(dir.join("statm"), format!("1000 {pages} 10 1 0 20 0")).expect("statm");
+    }
+
+    /// The readings a Linux Machine uses (issue #48): resident pages from
+    /// `statm`, CPU ticks from `stat`, and the process tree from every
+    /// process's parent. A fake `/proc` stands in for the real one.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_memory_cpu_and_process_tree_are_read_from_proc() {
+        let root = tempdir().expect("proc");
+        write_proc_process(root.path(), 100, 1, (3, 2), 25);
+        write_proc_process(root.path(), 101, 100, (0, 0), 4);
+        write_proc_process(root.path(), 102, 101, (0, 0), 1);
+        write_proc_process(root.path(), 103, 1, (0, 0), 1);
+
+        assert_eq!(
+            resident_bytes_in(root.path(), 100),
+            Some(25 * page_size()),
+            "resident pages become bytes"
+        );
+        assert_eq!(resident_bytes_in(root.path(), 999), None);
+
+        assert_eq!(children_in(root.path(), 100), vec![101]);
+        assert_eq!(
+            descendants_with(100, |pid| children_in(root.path(), pid)),
+            vec![101, 102],
+            "the worker's commands and theirs, and nothing else"
+        );
+
+        assert_eq!(
+            cpu_nanos_in(root.path(), 100),
+            Some(5 * 1_000_000_000 / clock_ticks()),
+            "utime and stime, in nanoseconds"
+        );
+        assert_eq!(cpu_nanos_in(root.path(), 999), None);
+    }
+
+    /// The real `/proc` says something about a process that is really here.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_live_process_reads_its_own_memory_and_time() {
+        let pid = std::process::id();
+        let bytes = resident_bytes(pid).expect("the kernel reports this process");
+        assert!(bytes > 0, "a running process holds some memory");
+        assert!(
+            cpu_nanos(pid).is_some(),
+            "the kernel reports this process's CPU time"
+        );
+    }
+
     /// The reading the classifier trusts: this process's own CPU time, from the
-    /// same call the RSS monitor makes.
+    /// same call the RSS monitor makes. macOS only: `/proc` counts CPU in clock
+    /// ticks, so a test this short may legitimately have burned none of them.
     #[cfg(target_os = "macos")]
     #[test]
     fn the_cpu_a_process_burned_is_read_from_the_os() {
@@ -494,7 +768,7 @@ mod tests {
     }
 
     /// The real thing: a busy child with `RLIMIT_CPU` is stopped by the OS.
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     #[tokio::test]
     async fn a_busy_child_is_stopped_by_its_cpu_limit() {
         use std::process::Stdio;
@@ -519,8 +793,42 @@ mod tests {
         );
     }
 
-    /// A command a worker starts is the worker's child, and on macOS it would
-    /// outlive the worker if only the worker were killed.
+    /// The real `/proc` answers the same question as the fake one: a child this
+    /// test started is found below it, which is what the watch walks so a
+    /// command's memory counts against its worker (issue #48).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_real_child_is_found_below_its_parent_in_proc() {
+        use std::time::{Duration, Instant};
+
+        let mut child = std::process::Command::new("/bin/sh")
+            .args(["-c", "sleep 30 & sleep 30"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("a worker with commands");
+        let end = Instant::now() + Duration::from_secs(5);
+        let mut found = Vec::new();
+        while Instant::now() < end {
+            found = descendants(child.id());
+            if !found.is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        kill_tree(child.id());
+        let _ = child.wait();
+        assert!(
+            !found.is_empty(),
+            "the command below the worker was not found in /proc"
+        );
+    }
+
+    /// A command a worker starts is the worker's child, and it would outlive
+    /// the worker if only the worker were killed. macOS only: a container's
+    /// PID 1 need not reap what the kill orphans, so the waits there would see
+    /// zombies rather than gone processes.
     #[cfg(target_os = "macos")]
     #[test]
     fn killing_a_workers_tree_takes_its_commands_with_it() {

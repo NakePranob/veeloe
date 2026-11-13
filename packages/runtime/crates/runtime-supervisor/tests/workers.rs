@@ -4,7 +4,7 @@
 
 mod support;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -1228,6 +1228,7 @@ async fn a_workers_commands_inherit_the_cpu_limit_from_config() {
     workers.limiting(Limits {
         cpu_seconds: 1_234,
         memory_mb: 4_096,
+        ..Limits::default()
     });
 
     workers.start(&agent);
@@ -1509,4 +1510,126 @@ async fn a_worker_over_its_memory_limit_is_killed_and_its_turn_is_interrupted() 
         .expect("a closed Turn");
     assert_eq!(ended.body["reason"], json!("interrupted"));
     workers.stop_all();
+}
+
+/// Issue #48: a Machine with no user systemd — every container, and every Mac —
+/// still opens its workers, and the Runtime log says the cgroup is not in use
+/// once, not once per Agent. The answer is injected so the test says the same
+/// thing on a Machine that does have systemd.
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn without_a_cgroup_every_worker_runs_and_the_fallback_is_said_once() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut second = agent();
+    second.id = "a2".into();
+    second.name = "Builder".into();
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent()).expect("add");
+    registry.add(&second).expect("add");
+
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(CannedLlm {
+            requests: Mutex::new(Vec::new()),
+        }) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent, _message| {}),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        Arc::new(|_agent, command| command),
+    );
+    workers.probing_cgroup(Arc::new(|| false));
+    workers.start(&agent());
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the worker never said ready without a cgroup: {:?}",
+        lines.lock().expect("lines")
+    );
+    workers.start(&second);
+    assert!(
+        until(|| workers.is_ready("a2"), 10_000).await,
+        "the second worker never said ready without a cgroup: {:?}",
+        lines.lock().expect("lines")
+    );
+    workers.stop_all();
+
+    let said: Vec<serde_json::Value> = logs::recent(&home_path)
+        .expect("logs")
+        .iter()
+        .map(|line| serde_json::from_str(line).expect("json"))
+        .filter(|value: &serde_json::Value| value["event"] == "worker.cgroup_unavailable")
+        .collect();
+    assert_eq!(said.len(), 1, "said {said:?}");
+    assert_eq!(said[0]["level"], "warn");
+    assert_eq!(
+        said[0]["fields"],
+        json!({ "reason": "no_systemd" }),
+        "the event names why, and no Agent and no path"
+    );
+}
+
+/// Issue #48 (review): a scope that opens and then fails before the worker says
+/// Ready — `systemd-run` spawned, its scope refused — must not be tried again
+/// on every restart. The scope is dropped, the log says once why, and the
+/// restart path opens the worker with the plain argv. The probe and the scope
+/// argv are injected, so the fallback is checked on any system.
+#[tokio::test]
+async fn a_scope_that_fails_before_ready_is_not_tried_again() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let agent = agent();
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(CannedLlm {
+            requests: Mutex::new(Vec::new()),
+        }) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent, _message| {}),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        Arc::new(|_agent, command| command),
+    );
+    // A Machine that says it has a scope, whose scopes exit before the worker
+    // could ever say Ready. The counter proves the scope is built only once.
+    workers.probing_cgroup(Arc::new(|| true));
+    let scopes = Arc::new(AtomicUsize::new(0));
+    let counting = Arc::clone(&scopes);
+    workers.scoping_cgroup(Arc::new(move |_scope, _worker| {
+        counting.fetch_add(1, Ordering::SeqCst);
+        vec!["/bin/sh".into(), "-c".into(), "exit 1".into()]
+    }));
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the worker was never started plainly after its scope failed: {:?} {:?}",
+        lines.lock().expect("lines"),
+        logs::recent(&home_path)
+    );
+    workers.stop_all();
+
+    assert_eq!(
+        scopes.load(Ordering::SeqCst),
+        1,
+        "the scope was tried again after it failed"
+    );
+    let said: Vec<serde_json::Value> = logs::recent(&home_path)
+        .expect("logs")
+        .iter()
+        .map(|line| serde_json::from_str(line).expect("json"))
+        .filter(|value: &serde_json::Value| value["event"] == "worker.cgroup_unavailable")
+        .collect();
+    assert_eq!(said.len(), 1, "said {said:?}");
+    assert_eq!(said[0]["level"], "warn");
+    assert_eq!(
+        said[0]["fields"],
+        json!({ "reason": "scope_failed" }),
+        "the event names why the scope was dropped"
+    );
 }
