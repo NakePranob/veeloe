@@ -14,5 +14,5 @@
 ## 3. ตรวจ
 
 - [x] 3.1 `cargo test --workspace -- --test-threads=1` ผ่านบน macOS
-- [ ] 3.2 Linux CI ผ่าน — รัน `cargo test --workspace -- --test-threads=1` ใน privileged Ubuntu 24.04 (Docker) ผ่านแล้ว; e2e ฝั่ง Linux ยังรอ CI
-- [ ] 3.3 e2e ผ่านทั้งสองระบบ — macOS ผ่าน (`bun test` 16 tests); Linux e2e รอ CI
+- [x] 3.2 Linux CI ผ่าน — privileged Ubuntu 24.04 (Docker) ผ่าน และ CI `Runtime and Protocol (Rust)` เขียว
+- [x] 3.3 e2e ผ่านทั้งสองระบบ — macOS 16/16 และ CI job `e2e` บน Linux เขียว
