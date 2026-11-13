@@ -212,7 +212,11 @@ test("an Agent runs commands in its sandbox and cannot get out of it", async () 
   expect((await run("curl -sS -m 10 -o /dev/null https://example.com")).failed).toBe(true);
 }, 240_000);
 
-test("a domain the owner adds to the Egress opens at once for every Agent, and closes when taken out", async () => {
+// macOS only for now: on Linux `bwrap --unshare-all` gives every command an
+// empty network namespace and the supervisor's proxy is not wired into it yet
+// (ADR 0008; the Linux egress path is still open work on issue #32). The test
+// above already proves nothing gets out there, so there is no Egress to open.
+test.skipIf(process.platform !== "darwin")("a domain the owner adds to the Egress opens at once for every Agent, and closes when taken out", async () => {
   c.send("egress.set", { egress: ["example.com"] });
   await c.waitFor((m) => m.type === "agent.listed" && m.body.egress?.includes("example.com") === true);
   for (const agent of ["agent-a", "agent-b"]) expect(await run("curl -sS -m 20 -o /dev/null -w '%{http_code}' https://example.com", agent)).toEqual({ output: "200\nexit code: 0", failed: false });

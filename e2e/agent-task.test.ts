@@ -85,12 +85,14 @@ function controller() {
       if (found) return found;
       await Bun.sleep(20);
     }
-    throw new Error(`nothing matched; got ${inbox.map((m) => m.type).join(", ")}`);
+    throw new Error(
+      `nothing matched; got ${inbox
+        .map((m) => (m.type === "task.event" ? `task.event:${(m.body as { kind?: string; seq?: number }).kind}@${(m.body as { seq?: number }).seq}` : m.type))
+        .join(", ")}`,
+    );
   };
   return { client, ready: ready.promise, inbox, send, waitFor };
 }
-
-const turnEnded = (task: string, n: number) => (m: KnownMessage & { task?: string }) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended" && m.body.seq === n;
 
 test("an Agent is made, answers twice in one Task with the whole conversation, and a late Controller catches up", async () => {
   const first = controller();
@@ -100,9 +102,15 @@ test("an Agent is made, answers twice in one Task with the whole conversation, a
   expect(listed.body).toMatchObject({ agents: [{ id: "agent-e2e", name: "Deployer", provider: "main", model: "model-a" }], providers: [{ name: "main" }] });
 
   first.send("task.message", { agent: "agent-e2e", id: "m1", text: "สวัสดี" }, "task-e2e");
-  await first.waitFor(turnEnded("task-e2e", 4));
+  const ends = () =>
+    first.inbox.filter((m) => m.type === "task.event" && m.task === "task-e2e" && (m.body as { kind?: string }).kind === "turn.ended").length;
+  // A Turn ends at whatever seq the context-meter events give it; the count is
+  // the fact this test is about, not a fixed number (ADR 0036).
+  await first.waitFor(() => ends() >= 1);
+  const firstEnd = first.inbox.find((m) => m.type === "task.event" && m.task === "task-e2e" && (m.body as { kind?: string }).kind === "turn.ended");
+  const after = (firstEnd?.body as { seq: number }).seq;
   first.send("task.message", { agent: "agent-e2e", id: "m2", text: "อีกข้อ" }, "task-e2e");
-  await first.waitFor(turnEnded("task-e2e", 8));
+  await first.waitFor(() => ends() >= 2);
 
   const second = provider.requests.filter((r) => r.path === "/v1/messages").at(-1)!.body as { model: string; messages: unknown[] };
   expect(second.model).toBe("model-a");
@@ -112,9 +120,9 @@ test("an Agent is made, answers twice in one Task with the whole conversation, a
 
   const late = controller();
   await late.ready;
-  late.send("task.sync", { agent: "agent-e2e", after: 4 }, "task-e2e");
+  late.send("task.sync", { agent: "agent-e2e", after }, "task-e2e");
   const page = await late.waitFor((m) => m.type === "task.events");
-  expect(page.type === "task.events" && page.body.events.map((e) => e.kind)).toEqual(["member.message", "turn.started", "llm.message", "turn.ended"]);
+  expect(page.type === "task.events" && page.body.events.map((e) => e.kind).filter((kind) => kind !== "context.usage")).toEqual(["member.message", "turn.started", "llm.message", "turn.ended"]);
   late.client.stop();
 }, 60_000);
 

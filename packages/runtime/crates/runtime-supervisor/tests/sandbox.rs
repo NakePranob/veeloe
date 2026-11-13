@@ -166,6 +166,22 @@ mod running {
         refused(&home, "exec 3<>/dev/tcp/93.184.216.34/80 && echo opened");
     }
 
+    /// A Stop or a timeout ends a command with a signal, so the command it
+    /// started must be signalled too. Everything outside this sandbox — the
+    /// supervisor, another Agent — must not be.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_command_can_stop_its_own_child_but_not_the_supervisor() {
+        let home = home();
+        allowed(
+            &home,
+            "sleep 30 & child=$!; kill $child 2>/dev/null; wait $child 2>/dev/null; echo stopped",
+        );
+        // This test process is outside the rules, as the supervisor is.
+        let supervisor = std::process::id();
+        refused(&home, &format!("kill -0 {supervisor}"));
+    }
+
     /// Issue #37: the rules name one system service at a time, so a lookup that
     /// is not named is refused. The check is the request's answer, not the
     /// profile's text.

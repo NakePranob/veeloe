@@ -124,6 +124,10 @@ impl Policy {
 pub fn sandbox_exec_profile(policy: &Policy) -> String {
     let mut profile = String::from("(version 1)\n(deny default)\n");
     profile.push_str("(allow process*)\n(allow sysctl-read)\n");
+    // A Stop, a timeout or a cancel ends the command by signal. Only what this
+    // sandbox started can be signalled: the supervisor and another Agent are
+    // outside it (ADR 0008, 0017, 0069).
+    profile.push_str("(allow signal (target same-sandbox))\n");
     // Named one by one: what is not here is refused, and the refusal is what
     // the Runtime log shows when a tool needs a service a Task cannot run
     // without (issue #37). An empty list says nothing at all, because
