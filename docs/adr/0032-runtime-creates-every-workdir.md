@@ -2,6 +2,8 @@
 
 > **ADR 0064 แก้บางส่วน** คำว่าพนักงานร่วม Project ในเรื่องการอ่าน Workdir หมายถึงพนักงานร่วม Team ระหว่างทำ Task ของ Team นั้น
 
+> **ADR 0069 แก้บางส่วน** Task log ไม่อยู่ในโฟลเดอร์ของ Agent แล้ว: supervisor เขียนที่ `<VEELOE_HOME>/task-logs/<agent-id>/tasks.db` และ worker เปิดไฟล์นั้นไม่ได้เลย อ่านกับเขียนผ่าน IPC (ADR 0020) เพราะเมื่อ sandbox ครอบทั้ง worker ทุกคำสั่งที่มันรันได้สิทธิ์เขียนเท่ากับตัว worker เอง
+
 sandbox ปล่อยให้ Agent เขียนอะไรก็ได้ใน Workdir (ADR 0008) ถ้า Member เลือก path เองได้ตามแผนเดิม จะหลุด sandbox ได้หลายทาง ตั้ง Workdir เป็น `$HOME` แล้ว Agent เขียน `~/.zshrc` หรือ `~/Library/LaunchAgents` ซึ่งรันนอก sandbox ตอนเจ้าของเปิดเทอร์มินัลหรือ login ครั้งต่อไป ตั้งให้ครอบไฟล์ของ Runtime แล้ว Agent แก้รายชื่อกุญแจที่ไว้ใจหรือเปลี่ยน binary ได้ ตั้งสอง Agent ให้ซ้อนกันแล้วกฎคนเขียนคนเดียวของ ADR 0011 หลุด และ Agent ตัวหนึ่งอ่าน Workdir ของอีกตัวได้ เราจึงให้ Runtime สร้าง Workdir เองที่ `<VEELOE_HOME>/agents/<agent-id>/workdir` โดย `VEELOE_HOME` เป็นโฟลเดอร์ของ Runtime ที่มีอยู่แล้ว (ค่าเริ่มต้น `~/.veeloe`) Member เลือกที่อยู่เองไม่ได้ ถ้าจะทำงานกับ repo ที่มีอยู่แล้ว ให้ Agent clone เข้ามา แล้วส่งงานกลับด้วย git แบบเดียวกับ Agent ที่ทำงานร่วมกันนอก Project หรือใช้ repo ของ Project (ADR 0047)
 
 ```
@@ -11,14 +13,14 @@ sandbox ปล่อยให้ Agent เขียนอะไรก็ได�
 ├── bin/                 binary ที่ updater เปลี่ยน (ADR 0009)
 ├── libraries/<id>/      Library (ADR 0037)
 ├── projects/<id>/       repo, worktree และโฟลเดอร์ของ Task ของ Project (ADR 0047)
+├── task-logs/<agent-id>/  Task log ที่ supervisor เขียนคนเดียว (ADR 0020, 0069)
 └── agents/<agent-id>/
     ├── workdir/         Workdir ซึ่งมี MEMORY.md อยู่ที่ root (ADR 0036)
     ├── skills/          Skill ที่ Member ติดตั้ง Agent อ่านได้อย่างเดียว (ADR 0038)
-    ├── tasks.db         SQLite ของ worker (ADR 0020)
     └── tmp/             TMPDIR ของ worker (ADR 0008)
 ```
 
-สิทธิ์แบบเจ้าของเข้าได้คนเดียวของ `~/.veeloe` กัน Agent ไม่ได้ เพราะ worker ใช้ OS user เดียวกับเจ้าของเครื่อง (ADR 0020) sandbox ของ worker จึงต้องห้ามทั้งอ่านและเขียนทุกอย่างใน `~/.veeloe` ยกเว้นโฟลเดอร์ของ Agent ตัวนั้น ซึ่งในนั้น `skills/` อ่านได้อย่างเดียว ยกเว้นการอ่าน Workdir ของพนักงานร่วม Project ระหว่างทำ Task ของ Project (ADR 0026) ยกเว้น Library ที่ได้สิทธิ์อ่านหรือเขียน (ADR 0037) และยกเว้น repo, worktree หรือโฟลเดอร์ของ Task ที่ Turn นั้นทำงานอยู่ (ADR 0047) `tasks.db` กับ `tmp/` อยู่ข้าง Workdir ไม่ได้อยู่ข้างใน เพื่อไม่ให้ `git clean` หรือ `rm -rf *` ใน Workdir ลบประวัติ Task ทิ้งโดยไม่ตั้งใจ ชื่อโฟลเดอร์ใช้ id ของ Agent จึงเปลี่ยนชื่อ Agent ได้โดยไม่ต้องย้ายโฟลเดอร์
+สิทธิ์แบบเจ้าของเข้าได้คนเดียวของ `~/.veeloe` กัน Agent ไม่ได้ เพราะ worker ใช้ OS user เดียวกับเจ้าของเครื่อง (ADR 0020) sandbox ของ worker จึงต้องห้ามทั้งอ่านและเขียนทุกอย่างใน `~/.veeloe` ยกเว้นโฟลเดอร์ของ Agent ตัวนั้น ซึ่งในนั้น `skills/` อ่านได้อย่างเดียว ยกเว้นการอ่าน Workdir ของพนักงานร่วม Project ระหว่างทำ Task ของ Project (ADR 0026) ยกเว้น Library ที่ได้สิทธิ์อ่านหรือเขียน (ADR 0037) และยกเว้น repo, worktree หรือโฟลเดอร์ของ Task ที่ Turn นั้นทำงานอยู่ (ADR 0047) `tmp/` อยู่ข้าง Workdir ไม่ได้อยู่ข้างใน เพื่อไม่ให้ `git clean` หรือ `rm -rf *` ใน Workdir ลบของที่ Runtime ต้องใช้ทิ้งโดยไม่ตั้งใจ ส่วน Task log อยู่นอกขอบเขตที่ Agent มองเห็นทั้งหมด (ADR 0069) ชื่อโฟลเดอร์ใช้ id ของ Agent จึงเปลี่ยนชื่อ Agent ได้โดยไม่ต้องย้ายโฟลเดอร์
 
 ## Considered Options
 

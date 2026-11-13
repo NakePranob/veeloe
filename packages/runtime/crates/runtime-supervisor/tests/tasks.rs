@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
-use support::{until, TestHub};
+use support::{until, worker_binary, TestHub};
 use tempfile::tempdir;
 use tokio_tungstenite::tungstenite::Message;
 use veeloe_protocol::base64url::to_base64url;
@@ -148,38 +148,6 @@ impl Slice {
             forward(outbox.as_ref(), agent, message);
         }
     }
-}
-
-fn worker_binary() -> Vec<String> {
-    let beside = std::env::current_exe()
-        .expect("current exe")
-        .parent()
-        .and_then(|deps| deps.parent())
-        .map(|debug| debug.join("veeloe"));
-    if let Some(path) = beside.as_ref() {
-        if path.is_file() {
-            return vec![path.to_string_lossy().to_string(), "worker".to_string()];
-        }
-    }
-    let status =
-        std::process::Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()))
-            .args([
-                "build",
-                "-p",
-                "veeloe-runtime-supervisor",
-                "--bin",
-                "veeloe",
-            ])
-            .status()
-            .expect("build the worker");
-    assert!(status.success(), "could not build veeloe");
-    vec![
-        beside
-            .expect("a target folder")
-            .to_string_lossy()
-            .to_string(),
-        "worker".to_string(),
-    ]
 }
 
 fn prepare(home: &Path) {

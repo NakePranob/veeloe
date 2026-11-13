@@ -2,6 +2,7 @@
 //! lifecycle (ADR 0020, 0042). The port fills this in one service at a time.
 
 pub mod agents;
+pub mod denials;
 pub mod providers;
 pub mod egress;
 pub mod help;
@@ -13,6 +14,7 @@ pub mod push;
 pub mod push_tokens;
 pub mod service;
 pub mod tasks;
+pub mod toolchain;
 pub mod uploads;
 pub mod task_routes;
 pub mod trust;
@@ -23,3 +25,4 @@ pub mod logs;
 pub mod memory;
 pub mod models;
 pub mod status;
+pub mod task_log;

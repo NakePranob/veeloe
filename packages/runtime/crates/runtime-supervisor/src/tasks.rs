@@ -845,7 +845,12 @@ pub fn forward(outbox: &dyn Outbox, agent: &str, message: FromWorker) {
                 );
             }
         }
-        FromWorker::Ready | FromWorker::LlmRequest { .. } => {}
+        // The log requests are answered where the log is written; the worker's
+        // own frames never reach this far.
+        FromWorker::Ready
+        | FromWorker::LlmRequest { .. }
+        | FromWorker::LogAppend { .. }
+        | FromWorker::LogRead { .. } => {}
     }
 }
 

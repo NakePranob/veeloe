@@ -7,7 +7,7 @@
 ## Requirements
 
 ### Requirement: Task เป็น event log ที่ต่อท้ายอย่างเดียว
-worker SHALL เก็บทุก Task ของ Agent เป็นลำดับของ event ในฐานข้อมูลของ Agent ตัวนั้น แต่ละ event SHALL มีเลขลำดับภายใน Task ที่เริ่มที่ 1 และเพิ่มทีละ 1 event MUST NOT ถูกแก้หรือลบ event ของ v0.1 SHALL มีข้อความของ Member พร้อมชื่อ Member, การเริ่ม Turn, ผลจาก LLM ตามที่ได้รับทุกตัวอักษรรวมถึง thinking block, การเรียก tool กับผลของ tool และการจบ Turn พร้อมเหตุผล ฐานข้อมูล SHALL อยู่ข้าง Workdir ไม่ใช่ข้างใน (ADR 0032)
+supervisor SHALL เก็บทุก Task ของ Agent เป็นลำดับของ event ในฐานข้อมูลของ Agent ตัวนั้น และ SHALL เป็นผู้เดียวที่เขียน event ลงฐานข้อมูล worker SHALL ส่ง event ให้ supervisor ทาง IPC และ MUST NOT เขียนฐานข้อมูลเอง แต่ละ event SHALL มีเลขลำดับภายใน Task ที่เริ่มที่ 1 และเพิ่มทีละ 1 event MUST NOT ถูกแก้หรือลบ event ของ v0.1 SHALL มีข้อความของ Member พร้อมชื่อ Member, การเริ่ม Turn, ผลจาก LLM ตามที่ได้รับทุกตัวอักษรรวมถึง thinking block, การเรียก tool กับผลของ tool และการจบ Turn พร้อมเหตุผล ฐานข้อมูล SHALL อยู่นอกโฟลเดอร์ที่ sandbox เปิดให้ Agent เขียน และไม่อยู่ใน Workdir (ADR 0018, 0032) สำหรับ Agent ที่มีฐานข้อมูลอยู่ก่อนการย้ายเจ้าของผู้เขียน supervisor SHALL ทำให้ประวัติเดิมต่อเนื่องได้โดย Owner ไม่ต้องทำอะไร
 
 #### Scenario: Turn ที่จบปกติ
 - **WHEN** Owner ส่งข้อความแล้ว LLM ตอบ
@@ -16,6 +16,10 @@ worker SHALL เก็บทุก Task ของ Agent เป็นลำดั
 #### Scenario: เริ่มใหม่
 - **WHEN** worker เริ่มใหม่
 - **THEN** event เดิมทุกตัวยังอยู่ด้วยเลขเดิม
+
+#### Scenario: worker ตายกลาง Turn
+- **WHEN** worker ตายหลัง supervisor บันทึก event ของ Turn แล้ว
+- **THEN** event ที่บันทึกแล้วยังอยู่ใน log หลังเปิด worker ใหม่
 
 ### Requirement: Owner เริ่มและคุยต่อใน Task ได้
 ข้อความถึง Agent SHALL ระบุรหัสข้อความ, รหัส Task และข้อความ ข้อความแรกของรหัส Task ใหม่ SHALL เริ่ม Task ใหม่ และข้อความต่อมาใน Task เดิม SHALL ต่อจากบทสนทนาเดิม ข้อความที่มีรหัสข้อความซ้ำ SHALL NOT ถูกเพิ่มซ้ำ Turn SHALL ทำในนามของ Member ที่ส่งข้อความนั้น
@@ -79,7 +83,6 @@ Task log SHALL มี event kind ใหม่สองตัวคือ `approv
 #### Scenario: เริ่มใหม่แล้วยังอยู่
 - **WHEN** worker เริ่มใหม่หลังขอ Approval
 - **THEN** event ทั้งสองตัวยังอยู่ด้วยเลขเดิม
-
 
 ### Requirement: event ของการหยุดและของ Turn ที่ถูกขัดจังหวะอยู่ใน log แบบต่อท้ายอย่างเดียว
 Task log SHALL มี event kind ใหม่ `turn.stopped` ที่ `body` มี `{ member }` ผู้สั่งหยุด และ `turn.interrupted` ที่ `body` มี `{ reason }` (v0.1 คือ `restart`) event ทั้งสอง SHALL ถูกเขียนก่อน `turn.ended` ของ Turn นั้นเสมอ `turn.ended` SHALL มี `reason` ที่เป็น `done`, `error`, `stopped` หรือ `interrupted` และ event ทุกตัว MUST NOT ถูกแก้หรือลบ

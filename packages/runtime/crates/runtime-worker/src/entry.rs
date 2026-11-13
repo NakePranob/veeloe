@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
-use tokio::io::AsyncBufReadExt;
 use veeloe_runtime_core::{FromWorker, SupervisorLink, ToWorker};
 use crate::worker::{Config, Worker};
 
@@ -81,15 +80,45 @@ pub async fn run_stdio() -> Result<(), Box<dyn std::error::Error>> {
     config.env = env;
     config.egress = egress;
     config.proxy = proxy;
-    let worker = Worker::new(config, Arc::new(StdioLink { writing: Mutex::new(()) }))?;
-    worker.start()?;
+    let worker = Arc::new(Worker::new(
+        config,
+        Arc::new(StdioLink {
+            writing: Mutex::new(()),
+        }),
+    )?);
 
-    let mut lines = tokio::io::BufReader::new(tokio::io::stdin()).lines();
-    while let Some(line) = lines.next_line().await? {
-        if line.trim().is_empty() {
-            continue;
+    // Reading happens on its own thread: the worker blocks on the supervisor's
+    // answer to each log write and read, and that answer arrives on the same
+    // stdin. A loop that both read and waited would wait forever.
+    let (sending, mut messages) = tokio::sync::mpsc::unbounded_channel();
+    let replying = Arc::clone(&worker);
+    std::thread::spawn(move || {
+        let stdin = std::io::stdin();
+        for line in std::io::BufRead::lines(stdin.lock()) {
+            let Ok(line) = line else { break };
+            if line.trim().is_empty() {
+                continue;
+            }
+            let Ok(message) = serde_json::from_str::<ToWorker>(&line) else {
+                // The supervisor writes these frames, so one this side cannot
+                // read is its bug, not a reason to end the Agent. Nothing of
+                // the frame is repeated: it can carry a Task's words. The
+                // supervisor inherits this process's stderr, so the line is
+                // visible in the Runtime log.
+                eprintln!("veeloe: worker skipped one unreadable frame from the supervisor");
+                continue;
+            };
+            if replying.reply(&message) {
+                continue;
+            }
+            if sending.send(message).is_err() {
+                break;
+            }
         }
-        let message: ToWorker = serde_json::from_str(&line)?;
+    });
+
+    worker.start()?;
+    while let Some(message) = messages.recv().await {
         worker.receive(message)?;
     }
     Ok(())

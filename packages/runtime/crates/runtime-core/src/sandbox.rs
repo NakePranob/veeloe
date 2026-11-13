@@ -10,8 +10,10 @@ use std::path::Path;
 /// What one Agent may touch. Every field is absolute.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Policy {
-    /// The Agent's own folder: the only place it may write. It holds the Task
-    /// log, the Workdir, the TMPDIR and the Agent's own home.
+    /// The Agent's own folder: the only place it may write. It holds the
+    /// Workdir, the TMPDIR and the Agent's own home. The Task log is **not**
+    /// here: the supervisor keeps it at `<home>/task-logs/<id>`, outside what a
+    /// command inside this folder can write (ADR 0069).
     pub folder: String,
     /// Where a command starts.
     pub workdir: String,
@@ -35,6 +37,11 @@ const MACOS_READ: &[&str] = &[
     "/Library/Apple",
     "/Library/Preferences",
     "/Library/Developer/CommandLineTools",
+    // The vendor installers, python.org among them, put a toolchain here and
+    // the binary it installs links against it. Which layout a Machine has is
+    // not the Agent's problem.
+    "/Library/Frameworks",
+    "/Library/Python",
     "/private/etc",
     "/private/var/db/dyld",
     "/private/var/db/timezone",
@@ -47,6 +54,48 @@ const MACOS_READ: &[&str] = &[
 /// The same on Linux, as read-only binds. A path a distro does not have is
 /// skipped (`--ro-bind-try`).
 const LINUX_READ: &[&str] = &["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/opt"];
+
+/// The macOS system services a worker may look up, each named one by one, with
+/// where the need comes from (ADR 0069). A blanket `(allow mach-lookup)` is a
+/// way out of every file rule: a service accepts requests a path cannot.
+///
+/// A name is only here when a worker or a toolchain asked for it under the
+/// narrowed profile (issue #37); a missing name is added from the Runtime log,
+/// one at a time, never by opening the profile again.
+///
+/// What is deliberately **not** here, although the toolchains ask:
+/// `com.apple.lsd.modifydb` (it writes the Launch Services database, a way out
+/// of the file rules), `com.apple.bsd.dirhelper` (it hands out the owner's
+/// per-user folders) and `com.apple.diagnosticd` (it files crash reports that
+/// carry the owner's paths). Chromium's services are **not** in this change
+/// either: a headless browser needs its own measured list, and guessing one
+/// here would be the allow-all with extra steps.
+const MACOS_SERVICES: &[(&str, Reason)] = &[
+    // Every toolchain writes its diagnostics through `os_log`; without this the
+    // messages vanish, and a broken tool looks like a silent one.
+    ("com.apple.logd", Reason::Os),
+    // libsystem registers each process with the notification centre while it
+    // starts. `bash`, `git`, `bun` and `python3` all ask before they run, so
+    // denying it leaves a refusal on every command for nothing.
+    ("com.apple.system.notification_center", Reason::Os),
+    // Every process asks who it is running as while it starts; `bash` and
+    // `git` do it before they read a single file.
+    ("com.apple.system.opendirectoryd.libinfo", Reason::Os),
+    // `git` checks group membership to decide who owns a repository, so a
+    // checkout it is allowed to read is not refused as someone else's.
+    ("com.apple.system.opendirectoryd.membership", Reason::Toolchain),
+];
+
+/// Where an allowed service is needed, so the next person can tell a
+/// requirement from an accident (issue #37). Only two sources exist today: the
+/// OS the process runs on, and a toolchain a Task cannot be done without.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reason {
+    /// A toolchain a Task cannot be done without: `git`, `node`, `bun`, `python3`.
+    Toolchain,
+    /// What the OS itself needs under the rules, for the process to run at all.
+    Os,
+}
 
 impl Policy {
     /// `workdir` and `tmp` sit in the Agent's folder, which is their parent.
@@ -74,7 +123,18 @@ impl Policy {
 /// exactly what the Policy names.
 pub fn sandbox_exec_profile(policy: &Policy) -> String {
     let mut profile = String::from("(version 1)\n(deny default)\n");
-    profile.push_str("(allow process*)\n(allow sysctl-read)\n(allow mach-lookup)\n");
+    profile.push_str("(allow process*)\n(allow sysctl-read)\n");
+    // Named one by one: what is not here is refused, and the refusal is what
+    // the Runtime log shows when a tool needs a service a Task cannot run
+    // without (issue #37). An empty list says nothing at all, because
+    // `(allow mach-lookup)` with no name allows every service on the Machine.
+    if !MACOS_SERVICES.is_empty() {
+        profile.push_str("(allow mach-lookup\n");
+        for (service, _) in MACOS_SERVICES {
+            profile.push_str(&format!("  (global-name {})\n", quote(service)));
+        }
+        profile.push_str(")\n");
+    }
     // Walking a path needs its metadata; this gives no file's contents and no
     // folder's listing.
     profile.push_str("(allow file-read-metadata)\n");
@@ -136,6 +196,13 @@ pub fn bwrap_args(policy: &Policy) -> Vec<String> {
 /// The real path, or the one given when it does not exist yet.
 fn real(path: &Path) -> std::path::PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// The services the profile allows, with the reason each is there. A test picks
+/// a name to ask for that the list does not hold, so the refusal it checks is
+/// the profile's and not a service that happens to be absent (issue #37).
+pub fn allowed_services() -> &'static [(&'static str, Reason)] {
+    MACOS_SERVICES
 }
 
 /// An SBPL string literal: quotes and backslashes escaped, everything else as is.

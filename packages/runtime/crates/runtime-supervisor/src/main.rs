@@ -1242,7 +1242,28 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(|line| println!("{line}")),
         wrap,
     );
+    // Which toolchains a worker cannot run, checked under the same rules and
+    // recorded at Runtime log level when it opens. It never stops a worker or
+    // ends a Turn: the report is what the Owner fixes the Machine with (#35).
+    {
+        let home = home.clone();
+        let proxy_url = egress_proxy.url.clone();
+        workers.checking_toolchains(Arc::new(move |agent, bin| {
+            let policy = veeloe_runtime_supervisor::workers::rules(&home, agent, bin, &proxy_url)?;
+            Some(veeloe_runtime_supervisor::toolchain::check(
+                &policy,
+                &std::env::var("PATH").unwrap_or_default(),
+            ))
+        }));
+    }
     let _ = supervisor.workers.set(workers);
+    // The sandbox keeps no log of its own that a process can read: a refusal
+    // goes to the system log, and this reader turns one into a Runtime log line
+    // naming the service, so a missing name is added from evidence (issue #37).
+    let denials = supervisor
+        .workers
+        .get()
+        .and_then(|workers| workers.watching_denials());
 
     let link = HubLink::start(
         HubLinkOptions {
@@ -1263,6 +1284,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(workers) = supervisor.workers.get() {
         workers.stop_all();
     }
+    drop(denials);
     Ok(())
 }
 

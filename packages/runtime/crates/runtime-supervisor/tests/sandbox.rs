@@ -51,6 +51,10 @@ mod running {
         .expect("gitconfig");
         fs::create_dir_all(real.join("agents/a2/workdir")).expect("other agent");
         fs::write(real.join("agents/a2/workdir/notes.md"), "theirs").expect("notes");
+        // The Task log of the Agent, beside its folder and never inside it: the
+        // supervisor is its only writer (ADR 0069).
+        fs::create_dir_all(real.join("task-logs/a1")).expect("task log folder");
+        fs::write(real.join("task-logs/a1/tasks.db"), "event log\n").expect("task log");
         let sandbox = Sandbox::new(Policy::new(
             &agent.join("workdir"),
             &agent.join("tmp"),
@@ -160,5 +164,71 @@ mod running {
         let home = home();
         // The profile denies network before a listener is even looked for.
         refused(&home, "exec 3<>/dev/tcp/93.184.216.34/80 && echo opened");
+    }
+
+    /// Issue #37: the rules name one system service at a time, so a lookup that
+    /// is not named is refused. The check is the request's answer, not the
+    /// profile's text.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_service_the_rules_do_not_name_is_refused() {
+        let home = home();
+        // A service every Mac runs and the list does not name: if it ever comes
+        // onto the list, this test has to pick another one.
+        let service = "com.apple.SecurityServer";
+        assert!(
+            !veeloe_runtime_core::sandbox::allowed_services()
+                .iter()
+                .any(|(name, _)| *name == service),
+            "{service} is on the allowed list now; the test needs one that is not"
+        );
+        let workdir = home.sandbox.policy().expect("rules").workdir.clone();
+        // `bootstrap_look_up` is what every mach lookup goes through; asking it
+        // from inside the rules is the same request a tool would make.
+        fs::write(
+            Path::new(&workdir).join("lookup.py"),
+            format!(
+                "import ctypes, sys\n\
+                 lib = ctypes.CDLL('/usr/lib/libSystem.B.dylib')\n\
+                 bp = ctypes.c_uint.in_dll(lib, 'bootstrap_port')\n\
+                 port = ctypes.c_uint(0)\n\
+                 rc = lib.bootstrap_look_up(ctypes.c_uint(bp.value), ctypes.c_char_p(b'{service}'), ctypes.byref(port))\n\
+                 sys.exit(0 if rc == 0 else 1)\n"
+            ),
+        )
+        .expect("lookup script");
+
+        // Outside the rules the same request is answered, so a refusal below is
+        // the sandbox's and not the service being absent.
+        let outside = Command::new("python3")
+            .arg("lookup.py")
+            .current_dir(&workdir)
+            .output()
+            .expect("run outside");
+        assert!(
+            outside.status.success(),
+            "the service was absent outside the sandbox too: {}",
+            String::from_utf8_lossy(&outside.stderr)
+        );
+        refused(&home, "python3 lookup.py");
+    }
+
+    /// The Task log is not in the folder a command may write, so every command
+    /// — not just some tool's own check — is refused it (ADR 0069).
+    #[test]
+    fn a_command_cannot_read_write_or_delete_the_task_log() {
+        let home = home();
+        let log = home.root.join("task-logs/a1/tasks.db");
+        refused(&home, &format!("cat {}", log.display()));
+        refused(&home, &format!("echo hacked >> {}", log.display()));
+        refused(&home, &format!("rm {}", log.display()));
+        // Not even a hard link into the Workdir: it would share the log's inode
+        // and leave a path rule with nothing to match on.
+        refused(&home, &format!("ln {} link-to-log", log.display()));
+        assert!(!home.root.join("agents/a1/workdir/link-to-log").exists());
+        assert_eq!(
+            fs::read_to_string(&log).expect("the log is still there"),
+            "event log\n"
+        );
     }
 }
