@@ -1141,7 +1141,16 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // proxy steps around the ranges already reserved for Agents, so its port is
     // never one a command may bind (ADR 0069).
     let reserved = veeloe_runtime_supervisor::ports::Ports::open(&home)
-        .map_err(|error| format!("cannot read the Agents' ports: {error}"))?;
+        .map_err(|error| format!("cannot open the Agents' ports folder: {error}"))?;
+    // A corrupt `ports.json` is read as empty, not a reason to refuse to start:
+    // every Agent would go down with one bad file. The Runtime log already
+    // holds the reason; this is the line the operator sees.
+    if let Some(reason) = reserved.warning() {
+        eprintln!(
+            "veeloe: the Agents' ports file could not be read, so none are reserved: {reason}"
+        );
+        eprintln!("veeloe: the next Agent that starts writes a fresh one.");
+    }
     // On Linux the proxy also answers on a Unix socket in the Runtime's folder:
     // a worker's network namespace has no route to this process, so that file
     // is bound into it and is the only way out (ADR 0069). macOS keeps the TCP

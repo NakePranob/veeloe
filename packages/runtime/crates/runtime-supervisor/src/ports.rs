@@ -12,12 +12,16 @@
 //! service.
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::fs::File;
+use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::io::AsRawFd;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde_json::{Map, Value};
 
 use crate::json_file::{read_json_file, write_json_file, JsonFileError};
+use crate::logs;
 use crate::trust::{supervisor_dir, TrustError};
 
 /// How many ports an Agent gets: enough for a dev server, a database and a
@@ -34,10 +38,65 @@ const STEP: u16 = 10;
 
 const FILE: &str = "ports.json";
 
-/// One allocation at a time across the process: two workers that start together
-/// must not both read the file, both find the same free range and both keep it.
-/// The lock is held across the read and the write, which is the whole point.
+/// Beside the file it guards: the lock lives as long as this process holds it,
+/// and the file itself is never read.
+const LOCK: &str = "ports.lock";
+
+/// One allocation at a time across the process, so two workers that start
+/// together in one supervisor do not both read the file, both find the same
+/// free range and both keep it. Another supervisor is kept out by the OS lock
+/// below, which is held across the read and the write.
 static ALLOCATING: Mutex<()> = Mutex::new(());
+
+/// The OS lock that keeps two supervisors apart. The mutex only orders the
+/// threads of this process; a restart that starts the new supervisor before the
+/// old one has closed its files, or a supervisor started by hand beside the
+/// service, would otherwise read the file at the same moment and hand out the
+/// same range. `flock` is released by the kernel when the file closes, however
+/// the process ends.
+struct AllocationLock {
+    file: File,
+}
+
+impl AllocationLock {
+    fn take(dir: &Path) -> Result<Self, PortsError> {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .mode(0o600)
+            .open(dir.join(LOCK))
+            .map_err(|error| {
+                PortsError::File(format!("cannot open {}: {error}", dir.join(LOCK).display()))
+            })?;
+        loop {
+            // `LOCK_EX` waits, so a second supervisor allocates after the first
+            // has written, not beside it.
+            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } == 0 {
+                return Ok(Self { file });
+            }
+            let error = std::io::Error::last_os_error();
+            if error.kind() == std::io::ErrorKind::Interrupted {
+                continue;
+            }
+            return Err(PortsError::File(format!(
+                "cannot lock {}: {error}",
+                dir.join(LOCK).display()
+            )));
+        }
+    }
+}
+
+impl Drop for AllocationLock {
+    fn drop(&mut self) {
+        // Closing the file would release the lock too; saying so first keeps
+        // the intent visible next to the `take` that made it.
+        unsafe {
+            libc::flock(self.file.as_raw_fd(), libc::LOCK_UN);
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum PortsError {
@@ -91,19 +150,35 @@ impl Range {
 
 /// The reserved ranges, as `ports.json` holds them: one first port per Agent.
 pub struct Ports {
-    home: std::path::PathBuf,
+    home: PathBuf,
     assigned: BTreeMap<String, u16>,
+    /// Why the file could not be read, when it exists and is corrupt: the
+    /// supervisor starts with no reservations rather than not at all, and the
+    /// next allocation rewrites the file.
+    unreadable: Option<String>,
 }
 
 impl Ports {
-    /// What the file holds now. A file that cannot be read or parsed is an
-    /// error, never an empty answer: an Agent that silently lost its range
-    /// would lose its services with it.
+    /// What the file holds now. A file that cannot be read or parsed is
+    /// reported at Runtime log level and read as empty: refusing to start would
+    /// take every Agent down with one bad file, and the next allocation writes
+    /// a fresh one (issue #42).
     pub fn open(home: &Path) -> Result<Self, PortsError> {
-        Ok(Self {
+        let dir = supervisor_dir(home)?;
+        let (assigned, unreadable) = load(&dir);
+        let ports = Self {
             home: home.to_path_buf(),
-            assigned: load(home)?,
-        })
+            assigned,
+            unreadable,
+        };
+        note_unreadable(home, ports.unreadable.as_deref());
+        Ok(ports)
+    }
+
+    /// Why the file was read as empty, if it was. The caller prints it; the
+    /// Runtime log already holds it.
+    pub fn warning(&self) -> Option<&str> {
+        self.unreadable.as_deref()
     }
 
     /// Whether a port is inside some Agent's range.
@@ -120,18 +195,52 @@ impl Ports {
     /// The answer is the same on every call and after a restart, because the
     /// first answer is the one in the file.
     pub fn range(&self, agent: &str, exclude: Option<u16>) -> Result<Range, PortsError> {
-        let _allocating = ALLOCATING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _allocating = ALLOCATING
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let dir = supervisor_dir(&self.home)?;
+        let _locked = AllocationLock::take(&dir)?;
         // Read again under the lock: another `Ports` may have written a range
         // since this one was opened.
-        let mut assigned = load(&self.home)?;
+        let (mut assigned, unreadable) = load(&dir);
+        // The file went bad after `open`, or this handle never saw it: same
+        // answer, same warning.
+        note_unreadable(&self.home, unreadable.as_deref());
         if let Some(start) = assigned.get(agent) {
             return Ok(Range { start: *start });
         }
         let start = first_free(&assigned, exclude).ok_or(PortsError::Exhausted)?;
         assigned.insert(agent.to_string(), start);
-        save(&self.home, &assigned)?;
+        save(&dir, &assigned)?;
         Ok(Range { start })
     }
+
+    /// The range this Agent already has in the file, or `None` when none is
+    /// reserved. Unlike [`Ports::range`] this never allocates or writes: the
+    /// worker reads back what `rules()` just reserved, and a second write would
+    /// be a second chance to lose it.
+    pub fn existing(&self, agent: &str) -> Option<Range> {
+        let dir = supervisor_dir(&self.home).ok()?;
+        let (assigned, unreadable) = load(&dir);
+        note_unreadable(&self.home, unreadable.as_deref());
+        assigned
+            .get(agent)
+            .map(|start| Range { start: *start })
+    }
+}
+
+/// Report a file that was read as empty, at Runtime log level. Content-free:
+/// the path and the parser's words, never a Task's.
+fn note_unreadable(home: &Path, reason: Option<&str>) {
+    let Some(reason) = reason else {
+        return;
+    };
+    let _ = logs::record(
+        home,
+        "warn",
+        "runtime.ports_unreadable",
+        serde_json::json!({ "reason": reason }),
+    );
 }
 
 /// The lowest range that overlaps no reservation and covers no excluded port.
@@ -150,14 +259,25 @@ fn first_free(assigned: &BTreeMap<String, u16>, exclude: Option<u16>) -> Option<
     None
 }
 
-fn load(home: &Path) -> Result<BTreeMap<String, u16>, PortsError> {
-    let file = supervisor_dir(home)?.join(FILE);
-    let Some(value) = read_json_file(&file)? else {
-        return Ok(BTreeMap::new());
+/// The reservations in `dir`, and why they were read as none when the file is
+/// there but unusable. A missing file is simply no reservations yet.
+fn load(dir: &Path) -> (BTreeMap<String, u16>, Option<String>) {
+    let file = dir.join(FILE);
+    let value = match read_json_file(&file) {
+        Ok(Some(value)) => value,
+        Ok(None) => return (BTreeMap::new(), None),
+        Err(error) => return (BTreeMap::new(), Some(error.to_string())),
     };
     let mut assigned: BTreeMap<String, u16> = BTreeMap::new();
     let Some(entries) = value.as_object() else {
-        return Ok(assigned);
+        // A file of the wrong shape is the same accident as an unparseable one.
+        return (
+            assigned,
+            Some(format!(
+                "{} does not hold one port per Agent",
+                file.display()
+            )),
+        );
     };
     for (agent, start) in entries {
         let Some(start) = start.as_u64().and_then(|port| u16::try_from(port).ok()) else {
@@ -174,18 +294,15 @@ fn load(home: &Path) -> Result<BTreeMap<String, u16>, PortsError> {
         }
         assigned.insert(agent.clone(), start);
     }
-    Ok(assigned)
+    (assigned, None)
 }
 
-fn save(home: &Path, assigned: &BTreeMap<String, u16>) -> Result<(), PortsError> {
+fn save(dir: &Path, assigned: &BTreeMap<String, u16>) -> Result<(), PortsError> {
     let mut entries = Map::new();
     for (agent, start) in assigned {
         entries.insert(agent.clone(), Value::from(*start));
     }
-    write_json_file(
-        &supervisor_dir(home)?.join(FILE),
-        &Value::Object(entries),
-    )?;
+    write_json_file(&dir.join(FILE), &Value::Object(entries))?;
     Ok(())
 }
 
@@ -290,5 +407,88 @@ mod tests {
         .expect("ports.json");
         let range = range_of(home.path(), "a1", None);
         assert!(range.start() >= FIRST, "{range:?}");
+    }
+
+    /// Issue #42: one bad file must not take every Agent down. The supervisor
+    /// reads nothing, says so at Runtime log level, and the next allocation
+    /// writes a file that reads again.
+    #[test]
+    fn a_corrupt_file_is_reported_and_rewritten_by_the_next_allocation() {
+        let home = tempdir().expect("home");
+        std::fs::create_dir_all(home.path().join("runtime")).expect("runtime");
+        std::fs::write(home.path().join("runtime/ports.json"), "{not json").expect("ports.json");
+        let ports = Ports::open(home.path()).expect("the supervisor still starts");
+        assert!(ports.warning().is_some(), "the corruption went unreported");
+        let range = ports.range("a1", None).expect("range");
+        assert_eq!(range.start(), FIRST);
+        // The file is whole again, so the next start keeps this range.
+        let file = std::fs::read_to_string(home.path().join("runtime/ports.json"))
+            .expect("ports.json");
+        let value: Value = serde_json::from_str(&file).expect("rewritten json");
+        assert_eq!(
+            value.get("a1").and_then(Value::as_u64),
+            Some(u64::from(FIRST))
+        );
+        // And the Runtime log holds the warning, not just the return value.
+        let logged = logs::recent(home.path()).expect("logs");
+        assert!(
+            logged.iter().any(|line| line.contains("runtime.ports_unreadable")),
+            "{logged:?}"
+        );
+        // The same range is handed back after the rewrite.
+        let reopened = Ports::open(home.path()).expect("ports");
+        assert_eq!(reopened.existing("a1"), Some(range));
+    }
+
+    /// Issue #42: reading back the range a worker was wrapped with must not
+    /// allocate or write. A second write is a second chance to lose it.
+    #[test]
+    fn existing_reads_without_allocating() {
+        let home = tempdir().expect("home");
+        let ports = Ports::open(home.path()).expect("ports");
+        assert_eq!(ports.existing("a1"), None);
+        assert!(
+            !home.path().join("runtime/ports.json").exists(),
+            "a read wrote the file"
+        );
+        let reserved = ports.range("a1", None).expect("range");
+        assert_eq!(ports.existing("a1"), Some(reserved));
+        assert_eq!(ports.existing("a2"), None);
+    }
+
+    /// Issue #42: the in-process mutex cannot order two supervisors. A second
+    /// handle to the lock file must wait for the first, which is what keeps a
+    /// restart from handing the same range out twice.
+    #[test]
+    fn an_allocation_waits_for_the_os_lock_held_through_another_handle() {
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let home = tempdir().expect("home");
+        let dir = home.path().join("runtime");
+        std::fs::create_dir_all(&dir).expect("runtime");
+        let held = AllocationLock::take(&dir).expect("lock");
+        let path = home.path().to_path_buf();
+        let (sent, received) = mpsc::channel();
+        let allocating = std::thread::spawn(move || {
+            let range = Ports::open(&path).expect("ports").range("a1", None);
+            sent.send(range.is_ok()).expect("send");
+        });
+        assert!(
+            received
+                .recv_timeout(Duration::from_millis(200))
+                .is_err(),
+            "the allocation did not wait for the OS lock"
+        );
+        drop(held);
+        assert!(
+            received
+                .recv_timeout(Duration::from_secs(5))
+                .expect("the allocation finished once the lock was free"),
+            "the allocation failed"
+        );
+        allocating.join().expect("thread");
+        let ports = Ports::open(home.path()).expect("ports");
+        assert!(ports.existing("a1").is_some());
     }
 }
