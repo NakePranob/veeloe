@@ -45,8 +45,11 @@ mock.module("expo-file-system", () => ({
   File: FakeFile,
 }));
 mock.module("react-native", () => ({ Linking: { openURL: async () => {} } }));
+console.log("links.test: importing the machine model");
 const { egressOf, saveMachine } = await import("../../../entities/machine/model/machines");
+console.log("links.test: importing links");
 const { createMachineLinks } = await import("./links");
+console.log("links.test: ready");
 
 // TEST-ONLY KEYS.
 const controllerSeed = new Uint8Array(32).fill(0x44);
