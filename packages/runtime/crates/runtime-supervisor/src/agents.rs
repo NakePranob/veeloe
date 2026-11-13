@@ -225,11 +225,33 @@ impl AgentRegistry {
     }
 
     fn save(&self, agents: &[Agent]) -> Result<(), AgentError> {
-        write_json_file(
-            &self.file,
-            &serde_json::to_value(agents).unwrap_or(Value::Array(Vec::new())),
-        )?;
+        let mut rows: Vec<Value> = serde_json::to_value(agents)
+            .ok()
+            .and_then(|value| value.as_array().cloned())
+            .unwrap_or_default();
+        // A row this build cannot parse is not ours to delete. Another version
+        // of the Runtime may have written it, and the migration and every other
+        // whole-file write used to drop it because `all()` had already filtered
+        // it out (issue #43 review). Kept verbatim, after ours.
+        rows.extend(self.unreadable_rows()?);
+        write_json_file(&self.file, &Value::Array(rows))?;
         Ok(())
+    }
+
+    /// The rows of `agents.json` that `Agent` cannot read, as they were written.
+    fn unreadable_rows(&self) -> Result<Vec<Value>, AgentError> {
+        let Some(value) = read_json_file(&self.file)? else {
+            return Ok(Vec::new());
+        };
+        Ok(value
+            .as_array()
+            .map(|rows| {
+                rows.iter()
+                    .filter(|row| serde_json::from_value::<Agent>((*row).clone()).is_err())
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 }
 

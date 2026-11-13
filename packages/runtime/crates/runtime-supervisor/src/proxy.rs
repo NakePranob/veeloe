@@ -73,29 +73,30 @@ pub fn socket_path(home: &Path, agent: &str) -> PathBuf {
     home.join("runtime").join("egress").join(format!("{agent}.sock"))
 }
 
-/// Starts the proxy on a free loopback port. It runs until the process ends.
-pub async fn start(egress: Arc<Egress>, agent: &str) -> std::io::Result<Proxy> {
-    start_avoiding(egress, agent, &|_| false).await
+/// The one Machine-wide socket a Runtime before #43 listened on. It is only
+/// read to remove it: no Agent's proxy answers there (ADR 0069, issue #43).
+fn stale_machine_socket(home: &Path) -> PathBuf {
+    home.join("runtime").join("egress.sock")
 }
 
-/// Starts the proxy on a free loopback port that `avoid` accepts. The Agent
-/// ranges are reserved before the proxy opens, and a port inside a range is a
-/// port a command may bind, so the proxy steps out of their way instead of
-/// taking one that was already given away (ADR 0069).
-pub async fn start_avoiding(
-    egress: Arc<Egress>,
-    agent: &str,
-    avoid: &(dyn Fn(u16) -> bool + Send + Sync),
-) -> std::io::Result<Proxy> {
-    start_with_socket(egress, agent, avoid, None).await
+/// Starts the proxy on a free loopback port. Tests only: the supervisor starts
+/// listeners through [`Proxies::ensure`], so an Agent always has its own list
+/// and no caller can open a Machine-wide proxy again (issue #43 review).
+#[cfg(test)]
+async fn start(egress: Arc<Egress>, agent: &str) -> std::io::Result<Proxy> {
+    start_with_socket(egress, agent, &|_| false, None).await
 }
 
 /// Starts one Agent's proxy on a free loopback port and, when `socket` names a
 /// path, on that Unix socket too, so its Linux worker can reach it from inside
 /// its own network namespace (ADR 0069). Both listeners go through one `serve`,
 /// so an Egress check is never weaker on one of them, and both answer with this
-/// Agent's list only.
-pub async fn start_with_socket(
+/// Agent's list only. Private: only [`Proxies::ensure`] opens one, and it picks
+/// a port outside the Agents' ranges (issue #43 review). The Agent ranges are
+/// reserved before the proxy opens, and a port inside a range is a port a
+/// command may bind, so `avoid` steps out of their way instead of taking one
+/// that was already given away (ADR 0069).
+async fn start_with_socket(
     egress: Arc<Egress>,
     agent: &str,
     avoid: &(dyn Fn(u16) -> bool + Send + Sync),
@@ -196,6 +197,11 @@ pub struct Proxies {
 
 impl Proxies {
     pub fn new(home: PathBuf, egress: Arc<Egress>) -> Self {
+        // A Runtime from before #43 listened on one socket for the whole
+        // Machine. An upgrade keeps the file a killed one left behind, and
+        // nothing answers on it any more: remove it once, here, so a Linux
+        // Agent is never handed a dead listener. Absent is the normal case.
+        let _ = std::fs::remove_file(stale_machine_socket(&home));
         Self {
             home,
             egress,
@@ -637,5 +643,26 @@ mod tests {
         proxies.stop("a1");
         assert_eq!(proxies.get("a1"), None);
         assert_eq!(proxies.get("a2"), Some(two));
+    }
+
+    /// Issue #43 review: the one Machine-wide socket a Runtime from before the
+    /// split listened on is removed when the supervisor opens its proxies, so a
+    /// Linux Agent is not handed a listener nothing answers on. Each Agent's
+    /// own socket is not touched.
+    #[test]
+    fn a_socket_from_before_the_split_is_removed_and_agent_sockets_are_kept() {
+        let home = tempfile::tempdir().expect("home");
+        let runtime = home.path().join("runtime");
+        std::fs::create_dir_all(runtime.join("egress")).expect("runtime");
+        let stale = runtime.join("egress.sock");
+        std::fs::write(&stale, b"").expect("the pre-#43 socket");
+        let kept = socket_path(home.path(), "a1");
+        std::fs::write(&kept, b"").expect("an Agent's socket");
+
+        let egress = Arc::new(Egress::open(home.path()).expect("egress"));
+        let _proxies = Proxies::new(home.path().to_path_buf(), egress);
+
+        assert!(!stale.exists(), "the pre-#43 socket was left in place");
+        assert!(kept.exists(), "an Agent's own socket was removed");
     }
 }

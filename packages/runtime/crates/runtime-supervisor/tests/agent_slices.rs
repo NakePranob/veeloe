@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use serde_json::{json, Value};
 use tempfile::tempdir;
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse};
-use veeloe_runtime_supervisor::agents::AgentRegistry;
+use veeloe_runtime_supervisor::agents::{Agent, AgentRegistry};
 use veeloe_runtime_supervisor::egress::Egress;
 use veeloe_runtime_supervisor::trust::{Owner, Trust};
 use veeloe_runtime_supervisor::llm::{HttpAnswer, HttpClient};
@@ -680,6 +680,92 @@ async fn egress_set_checks_manage_and_touches_only_the_agent_it_names() {
     )
     .await;
     assert_eq!(outbox.last().1["code"], "egress.forbidden");
+
+    workers.stop_all();
+}
+
+/// Issue #43 review: an `agent` that is present but not a string names no
+/// Agent, so it must not read as "no Agent" and broadcast; and a list with an
+/// entry that is not a domain must not be narrowed to the entries that happen
+/// to be strings. Both are refused whole, and no Agent's list moves.
+#[tokio::test]
+async fn a_malformed_egress_request_is_refused_and_changes_no_agent() {
+    let home = tempdir().expect("home");
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    for id in ["a1", "a2"] {
+        registry
+            .add(&Agent {
+                id: id.into(),
+                name: id.into(),
+                provider: "main".into(),
+                model: "model-a".into(),
+                character: None,
+                allowlist: Vec::new(),
+                egress: vec!["keep.example.com".into()],
+                approval_timeout_s: 3_600,
+                budget: None,
+                deleted_at: None,
+            })
+            .expect("add");
+    }
+    let workers = Workers::new(
+        home.path().to_path_buf(),
+        vec!["/bin/true".into()],
+        Arc::new(Silent) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent: &str, _message: FromWorker| {}),
+        Arc::new(|_line: &str| {}),
+        Arc::new(|_agent, command| command),
+    );
+    let egress = Egress::open(home.path()).expect("egress");
+    let trust = owners();
+    let outbox = Recording::default();
+    let providers = providers();
+    let http = Models;
+    let machine = Machine {
+        registry: &registry,
+        workers: &workers,
+        routes: None,
+        secret_key: None,
+        uploads: None,
+        push_tokens: None,
+        providers: &providers,
+        egress: Some(&egress),
+        trust: Some(&trust),
+        proxies: None,
+        budgets: None,
+        http: &http,
+    };
+
+    let unchanged = || {
+        for id in ["a1", "a2"] {
+            assert_eq!(
+                egress.current(id),
+                vec!["keep.example.com".to_string()],
+                "the in-memory list of {id} moved"
+            );
+            assert_eq!(
+                registry.get(id).expect("get").expect("agent").egress,
+                vec!["keep.example.com".to_string()],
+                "the kept list of {id} moved"
+            );
+        }
+    };
+
+    for body in [
+        // Present but not a string: not "no Agent".
+        json!({ "agent": null, "egress": ["github.com"] }),
+        json!({ "agent": 7, "egress": ["github.com"] }),
+        json!({ "agent": { "id": "a1" }, "egress": ["github.com"] }),
+        // An entry that is not a domain: not a list to shorten.
+        json!({ "egress": ["github.com", 123] }),
+        json!({ "agent": "a1", "egress": ["github.com", null] }),
+    ] {
+        dispatch(&machine, &outbox, &from(), "egress.set", &body).await;
+        let (type_, reply) = outbox.last();
+        assert_eq!(type_, "error", "{body} was answered with {reply}");
+        assert_eq!(reply["code"], "egress.invalid_domain", "{body}");
+        unchanged();
+    }
 
     workers.stop_all();
 }

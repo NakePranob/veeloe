@@ -181,3 +181,47 @@ fn a_file_that_is_not_a_list_opens_nothing() {
     assert!(egress.current("a1").is_empty());
     assert!(load_egress(home.path()).expect("load").is_empty());
 }
+
+/// Issue #43 review: a row this build cannot read is not an Agent it may
+/// delete. The migration writes the whole file, so it must carry that row
+/// through untouched; so must an ordinary write after it.
+#[test]
+fn a_row_this_build_cannot_read_survives_a_whole_file_write() {
+    let home = tempdir().expect("home");
+    let registry = two_agents(home.path());
+    let file = home.path().join("runtime/agents.json");
+    let mut rows: Vec<serde_json::Value> =
+        serde_json::from_str(&fs::read_to_string(&file).expect("agents.json")).expect("json");
+    // No `provider` and no `model`: another Runtime's row, which this build's
+    // `Agent` cannot parse.
+    let future = serde_json::json!({ "id": "future", "name": "From another Runtime" });
+    rows.push(future.clone());
+    fs::write(&file, serde_json::to_string(&rows).expect("json")).expect("agents.json");
+    fs::write(
+        home.path().join("runtime/egress.json"),
+        r#"["github.com"]"#,
+    )
+    .expect("old egress.json");
+
+    // The migration copies the old list to every Agent it understands.
+    let egress = Egress::open(home.path()).expect("open");
+    assert_eq!(egress.current("a1"), domains(&["github.com"]));
+    assert_eq!(egress.current("a2"), domains(&["github.com"]));
+    assert!(egress.current("future").is_empty());
+
+    let after: Vec<serde_json::Value> =
+        serde_json::from_str(&fs::read_to_string(&file).expect("agents.json")).expect("json");
+    assert_eq!(after.len(), 3, "the migration deleted a row: {after:?}");
+    assert!(
+        after.iter().any(|row| *row == future),
+        "the row this build cannot read was rewritten: {after:?}"
+    );
+
+    // Any later write of the whole file keeps it too, so creating an Agent
+    // does not lose the other version's row either.
+    registry.add(&agent("a3")).expect("a3");
+    let after: Vec<serde_json::Value> =
+        serde_json::from_str(&fs::read_to_string(&file).expect("agents.json")).expect("json");
+    assert_eq!(after.len(), 4, "a write deleted a row: {after:?}");
+    assert!(after.iter().any(|row| *row == future), "{after:?}");
+}
