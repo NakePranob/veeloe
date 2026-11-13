@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -23,12 +23,18 @@ use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, TaskEvent
 
 use crate::agents::{agent_dir, Agent};
 use crate::hub_link::random;
+use crate::limits::{Limits, ResidentMemory};
 use crate::task_log::TaskLogs;
 use crate::toolchain::{Report, Reported};
 
 /// A worker that lived this long counts as having started fine, so its next
 /// crash waits the shortest time again.
 const HEALTHY: Duration = Duration::from_secs(60);
+
+/// How often a worker's memory is read (issue #47). Two seconds is enough to
+/// catch a runaway before the Mac swaps itself to a stop, and cheap enough for
+/// every Agent to have one.
+const MEMORY_POLL: Duration = Duration::from_secs(2);
 
 /// The supervisor's answer to one LLM request. The key stays here (ADR 0042).
 #[async_trait]
@@ -178,6 +184,12 @@ struct Inner {
     /// the system log can be tied back to the work that caused it (issue #37).
     pids: Mutex<HashMap<String, u32>>,
     reported: Reported,
+    /// What one worker may use (issue #47). The default is what a Machine
+    /// without a `limits` in its config gets.
+    limits: Mutex<Limits>,
+    /// How this Runtime reads a process's memory. Real `proc_pidinfo` on macOS;
+    /// a test replaces it so a limit can be crossed without a memory hog.
+    memory: Mutex<Option<ResidentMemory>>,
     running: Mutex<HashMap<String, Entry>>,
     stopping: AtomicBool,
     /// The Task logs, which only this process writes (ADR 0069).
@@ -226,6 +238,8 @@ impl Workers {
                 turn_events: Mutex::new(None),
                 pids: Mutex::new(HashMap::new()),
                 reported: Reported::default(),
+                limits: Mutex::new(Limits::default()),
+                memory: Mutex::new(system_memory()),
                 running: Mutex::new(HashMap::new()),
                 stopping: AtomicBool::new(false),
                 logs,
@@ -237,6 +251,19 @@ impl Workers {
     /// level (issue #35). Without it a worker still starts; nothing is reported.
     pub fn checking_toolchains(&self, check: Toolchains) {
         *self.inner.toolchains.lock().expect("toolchains") = Some(check);
+    }
+
+    /// Cap what one worker may use: CPU time in the OS, and resident memory in
+    /// this supervisor's own watch (issue #47). A worker over its memory limit
+    /// is ended and started again like any other crash.
+    pub fn limiting(&self, limits: Limits) {
+        *self.inner.limits.lock().expect("limits") = limits;
+    }
+
+    /// Read a process's memory instead of asking the OS, so a test decides when
+    /// the limit is crossed (issue #47).
+    pub fn reading_memory(&self, reader: ResidentMemory) {
+        *self.inner.memory.lock().expect("memory") = Some(reader);
     }
 
     /// Follow a worker session's end, so an Approval its Turn was waiting on is
@@ -479,6 +506,12 @@ async fn session(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
+    // A worker that burns CPU for longer than the Owner allows is cut by the
+    // OS itself, with no code of ours in the way (issue #47). macOS only:
+    // Linux is capped by a cgroup in a later ticket (ADR 0069).
+    let limits = *inner.limits.lock().expect("limits");
+    #[cfg(target_os = "macos")]
+    crate::limits::capping_cpu_time(&mut command, limits.cpu_seconds);
     let mut child: Child = match command.spawn() {
         Ok(child) => child,
         Err(error) => {
@@ -494,6 +527,28 @@ async fn session(
         .lock()
         .expect("pids")
         .insert(agent.id.clone(), pid);
+    // The memory the worker and its commands hold is watched beside it, and a
+    // reading over the limit ends it the way a crash would: the restart path
+    // opens a new worker, which closes the Turn that was running as
+    // interrupted (ADR 0033). A test's reader stands in for the OS.
+    let killed_for_memory = Arc::new(AtomicBool::new(false));
+    // What the watch last saw of the worker's CPU time, in nanoseconds, so a
+    // `SIGKILL` can be told apart from the CPU limit (issue #47). Zero means
+    // the OS never said.
+    let burned_cpu = Arc::new(AtomicU64::new(0));
+    let memory = inner.memory.lock().expect("memory").clone();
+    let memory_watch = match (memory, pid) {
+        (Some(read), pid) if pid != 0 => Some(watching_memory(
+            Arc::clone(inner),
+            agent.id.clone(),
+            pid,
+            limits,
+            read,
+            Arc::clone(&killed_for_memory),
+            Arc::clone(&burned_cpu),
+        )),
+        _ => None,
+    };
     // The toolchains are checked beside the worker, not before it: a machine
     // whose `bun` is broken must still open a worker and end a Turn (issue #35).
     report_toolchains(inner, agent);
@@ -590,14 +645,56 @@ async fn session(
                     }
                 }
                 Ok(None) | Err(_) => {
-                    let _ = child.wait().await;
-                    break Ending { stopped: false, why: "it ended".into() };
+                    let status = child.wait().await.ok();
+                    let killed_for_memory = killed_for_memory.load(Ordering::SeqCst);
+                    let burned = burned_cpu.load(Ordering::SeqCst);
+                    // The OS cut it, or this Runtime did for memory. Either way
+                    // the Owner is told which limit, with codes only (ADR 0052).
+                    // A signal that is not provably ours names no limit.
+                    let cut = status
+                        .as_ref()
+                        .and_then(|status| {
+                            crate::limits::breach(
+                                status,
+                                killed_for_memory,
+                                (burned > 0).then_some(burned),
+                                limits.cpu_seconds,
+                            )
+                        });
+                    let why = match cut {
+                        Some(crate::limits::Cut::Limit { limit, signal }) => {
+                            let _ = crate::logs::record(
+                                &inner.home,
+                                "warn",
+                                "worker.limit",
+                                serde_json::json!({
+                                    "agent": &agent.id,
+                                    "limit": limit,
+                                    "signal": signal,
+                                }),
+                            );
+                            format!("its {limit} limit ({signal})")
+                        }
+                        Some(crate::limits::Cut::Signal { signal }) => {
+                            let _ = crate::logs::record(
+                                &inner.home,
+                                "warn",
+                                "worker.limit",
+                                serde_json::json!({ "agent": &agent.id, "signal": signal }),
+                            );
+                            format!("the signal {signal}")
+                        }
+                        None if killed_for_memory => "its memory limit".to_string(),
+                        None => "it ended".to_string(),
+                    };
+                    break Ending { stopped: false, why };
                 }
             },
         }
     };
 
     let _ = ready.send(false);
+    drop(memory_watch);
     inner.pids.lock().expect("pids").remove(&agent.id);
     // A message that never reached the worker is reported, not lost quietly.
     for lost in waiting.drain(..) {
@@ -650,6 +747,96 @@ async fn write(stdin: &mut ChildStdin, message: &ToWorker) {
     };
     let _ = stdin.write_all(format!("{text}\n").as_bytes()).await;
     let _ = stdin.flush().await;
+}
+
+/// The reader the Runtime uses in real life: `proc_pidinfo` on macOS, which has
+/// no cgroups. Elsewhere there is no watch in this ticket (ADR 0069).
+fn system_memory() -> Option<ResidentMemory> {
+    #[cfg(target_os = "macos")]
+    {
+        Some(Arc::new(crate::limits::resident_bytes))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
+    }
+}
+
+/// What the worker and every command under it hold resident, in bytes. The
+/// worker's own RSS is not the whole story: a build started by a Task is its
+/// child, and that is usually what fills the memory.
+fn resident_total(read: &ResidentMemory, pid: u32) -> Option<u64> {
+    let mut pids = vec![pid];
+    #[cfg(target_os = "macos")]
+    pids.extend(crate::limits::descendants(pid));
+    let mut total = None;
+    for pid in pids {
+        if let Some(bytes) = read(pid) {
+            total = Some(total.unwrap_or(0u64).saturating_add(bytes));
+        }
+    }
+    total
+}
+
+/// Watch one worker's memory until it ends. Over the limit, the Runtime records
+/// which Agent crossed which limit, ends the worker and its commands, and lets
+/// the usual restart path start a new one (issue #47). Nothing of the worker's
+/// own content reaches the log through here.
+fn watching_memory(
+    inner: Arc<Inner>,
+    agent: String,
+    pid: u32,
+    limits: Limits,
+    read: ResidentMemory,
+    killed_for_memory: Arc<AtomicBool>,
+    burned_cpu: Arc<AtomicU64>,
+) -> MemoryWatch {
+    let limit = limits.memory_mb.saturating_mul(1024 * 1024);
+    let watching = tokio::spawn(async move {
+        let mut every = tokio::time::interval(MEMORY_POLL);
+        every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            every.tick().await;
+            // The CPU time so far, read beside the memory so one look costs two
+            // system calls. The last look before the worker dies is within one
+            // poll of what it really burned.
+            if let Some(nanos) = crate::limits::cpu_nanos(pid) {
+                burned_cpu.store(nanos, Ordering::SeqCst);
+            }
+            let Some(bytes) = resident_total(&read, pid) else {
+                continue;
+            };
+            if bytes <= limit {
+                continue;
+            }
+            // The flag first, so the session's own end does not name the CPU
+            // for a kill this watch made.
+            killed_for_memory.store(true, Ordering::SeqCst);
+            let _ = crate::logs::record(
+                &inner.home,
+                "warn",
+                "worker.limit",
+                serde_json::json!({ "agent": &agent, "limit": crate::limits::MEMORY }),
+            );
+            (inner.log)(&format!(
+                "worker of agent {agent} passed {} MB of memory; stopping it",
+                limits.memory_mb
+            ));
+            crate::limits::kill_tree(pid);
+            return;
+        }
+    });
+    MemoryWatch(watching)
+}
+
+/// One session's memory watch, ended when the session is, even when the session
+/// future is dropped instead of returned (the supervisor is stopping).
+struct MemoryWatch(tokio::task::JoinHandle<()>);
+
+impl Drop for MemoryWatch {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 /// Start the check in the background and write what it finds, or nothing when
