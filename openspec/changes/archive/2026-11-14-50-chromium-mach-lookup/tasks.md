@@ -22,7 +22,7 @@ denial ที่เหลือ (`com.apple.diagnosticd`, `windowserver.active`,
 
 - [x] 2.1 test macOS-only เปิด browser จริง (skip ถ้าไม่มี) และตรวจ DOM/ภาพ
 - [x] 2.2 อัปเดต ADR/ข้อความที่บอกว่า Chromium ยังไม่อยู่
-- [ ] 2.3 cargo test + CI ผ่าน
+- [x] 2.3 cargo test + CI ผ่าน — sandbox 13/13 พร้อม browser, CI run 43478058510 เขียวทุก job
 
 test ใช้ `VEELOE_TEST_BROWSER` ชี้ไปที่ `chrome-headless-shell`; ไม่ได้ตั้งค่าจะ
 skip พร้อมข้อความ. ตัว test คัดลอก browser เข้าโฟลเดอร์ของ Agent (sandbox ไม่เคย
