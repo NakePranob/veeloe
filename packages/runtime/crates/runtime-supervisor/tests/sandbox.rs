@@ -51,6 +51,10 @@ mod running {
         .expect("gitconfig");
         fs::create_dir_all(real.join("agents/a2/workdir")).expect("other agent");
         fs::write(real.join("agents/a2/workdir/notes.md"), "theirs").expect("notes");
+        // The Task log of the Agent, beside its folder and never inside it: the
+        // supervisor is its only writer (ADR 0069).
+        fs::create_dir_all(real.join("task-logs/a1")).expect("task log folder");
+        fs::write(real.join("task-logs/a1/tasks.db"), "event log\n").expect("task log");
         let sandbox = Sandbox::new(Policy::new(
             &agent.join("workdir"),
             &agent.join("tmp"),
@@ -207,5 +211,24 @@ mod running {
             String::from_utf8_lossy(&outside.stderr)
         );
         refused(&home, "python3 lookup.py");
+    }
+
+    /// The Task log is not in the folder a command may write, so every command
+    /// — not just some tool's own check — is refused it (ADR 0069).
+    #[test]
+    fn a_command_cannot_read_write_or_delete_the_task_log() {
+        let home = home();
+        let log = home.root.join("task-logs/a1/tasks.db");
+        refused(&home, &format!("cat {}", log.display()));
+        refused(&home, &format!("echo hacked >> {}", log.display()));
+        refused(&home, &format!("rm {}", log.display()));
+        // Not even a hard link into the Workdir: it would share the log's inode
+        // and leave a path rule with nothing to match on.
+        refused(&home, &format!("ln {} link-to-log", log.display()));
+        assert!(!home.root.join("agents/a1/workdir/link-to-log").exists());
+        assert_eq!(
+            fs::read_to_string(&log).expect("the log is still there"),
+            "event log\n"
+        );
     }
 }

@@ -663,3 +663,325 @@ async fn a_toolchain_that_cannot_run_is_reported_and_the_worker_still_turns() {
     );
     workers.stop_all();
 }
+/// What one Turn's tools answered: `(tool_use id, content, is_error)`.
+fn tool_results(heard: &Arc<Mutex<Vec<FromWorker>>>) -> Vec<(String, String, bool)> {
+    heard
+        .lock()
+        .expect("heard")
+        .iter()
+        .filter_map(|message| match message {
+            FromWorker::Event { event, .. } if event.kind == "tool.result" => {
+                Some(event.body["content"].as_array().cloned().unwrap_or_default())
+            }
+            _ => None,
+        })
+        .flatten()
+        .map(|block| {
+            (
+                block["tool_use_id"].as_str().unwrap_or_default().to_string(),
+                block["content"].to_string(),
+                block["is_error"].as_bool().unwrap_or(false),
+            )
+        })
+        .collect()
+}
+
+/// Answers the first request with a command and the file tools aimed at the
+/// Task log, and the second with the end of the Turn.
+struct TrespassLlm {
+    log: String,
+    requests: Mutex<usize>,
+}
+
+#[async_trait]
+impl SupervisorLlm for TrespassLlm {
+    async fn answer(&self, _agent: &str, _request: LlmHttpRequest) -> LlmHttpResponse {
+        let first = {
+            let mut seen = self.requests.lock().expect("requests");
+            *seen += 1;
+            *seen == 1
+        };
+        let body = if first {
+            json!({
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    { "type": "tool_use", "id": "t-bash", "name": "bash", "input": { "command": format!("cp /etc/hosts {}", self.log) } },
+                    { "type": "tool_use", "id": "t-write", "name": "write", "input": { "path": self.log, "content": "hacked" } },
+                    { "type": "tool_use", "id": "t-memory", "name": "memory", "input": { "text": "hacked" } },
+                ],
+                "stop_reason": "tool_use",
+            })
+        } else {
+            json!({
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "done" }],
+                "stop_reason": "end_turn",
+            })
+        };
+        LlmHttpResponse {
+            status: 200,
+            headers: vec![("content-type".into(), "application/json".into())],
+            body: body.to_string(),
+        }
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn a_command_and_the_file_tools_cannot_reach_the_task_log() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut agent = agent();
+    agent.allowlist = vec!["cp".into()];
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let log = veeloe_runtime_supervisor::task_log::path(&home_path, "a1");
+    let dir = agent_dir(&home_path, "a1").expect("dir");
+    // The memory tool names only MEMORY.md, so a link there is the one way it
+    // could be aimed at the log.
+    std::os::unix::fs::symlink(&log, dir.join("workdir/MEMORY.md")).expect("symlink");
+
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(TrespassLlm {
+            log: log.to_string_lossy().to_string(),
+            requests: Mutex::new(0),
+        }) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+    );
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the sandboxed worker never said ready: {:?}",
+        lines.lock().expect("lines")
+    );
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    let ended = || {
+        heard.lock().expect("heard").iter().any(
+            |message| matches!(message, FromWorker::Event { event, .. } if event.kind == "turn.ended"),
+        )
+    };
+    assert!(
+        until(ended, 20_000).await,
+        "the Turn never ended: {:?} {:?}",
+        heard.lock().expect("heard"),
+        lines.lock().expect("lines")
+    );
+    workers.stop_all();
+
+    // Every way of writing the file the tools have was refused, with the
+    // refusal the model saw, before anything reached the log.
+    let results = tool_results(&heard);
+    for id in ["t-bash", "t-write", "t-memory"] {
+        let (_, content, is_error) = results
+            .iter()
+            .find(|(seen, _, _)| seen == id)
+            .unwrap_or_else(|| panic!("no result for {id}: {results:?}"));
+        assert!(is_error, "{id} was allowed: {content}");
+    }
+    let log_events = veeloe_runtime_core::EventStore::open(&log)
+        .expect("the supervisor's log")
+        .events("t1", 0)
+        .expect("events");
+    // The file the command and the tools aimed at is still the log: one Task,
+    // and the Turn that ran after the attempts is in it.
+    let kinds: Vec<&str> = log_events
+        .iter()
+        .filter(|event| event.kind != "context.usage")
+        .map(|event| event.kind.as_str())
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![
+            "member.message",
+            "turn.started",
+            "llm.message",
+            "tool.result",
+            "llm.message",
+            "turn.ended",
+        ],
+        "{log_events:?}"
+    );
+}
+
+/// Answers at once with a long command, so the Turn is running when the worker
+/// is stopped.
+struct SlowLlm;
+
+#[async_trait]
+impl SupervisorLlm for SlowLlm {
+    async fn answer(&self, _agent: &str, _request: LlmHttpRequest) -> LlmHttpResponse {
+        LlmHttpResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: json!({
+                "content": [{ "type": "tool_use", "id": "t-slow", "name": "bash", "input": { "command": "sleep 5" } }],
+                "stop_reason": "tool_use",
+            })
+            .to_string(),
+        }
+    }
+}
+
+#[tokio::test]
+async fn the_events_of_a_running_turn_outlive_the_worker_that_ran_it() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut agent = agent();
+    agent.allowlist = vec!["sleep".into()];
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(SlowLlm) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(|_line| {}),
+        // This Turn needs no sandbox: what is checked is the log's owner.
+        Arc::new(|_agent, command| command),
+    );
+
+    workers.start(&agent);
+    assert!(until(|| workers.is_ready("a1"), 10_000).await);
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    let running = || {
+        heard.lock().expect("heard").iter().any(
+            |message| matches!(message, FromWorker::Event { event, .. } if event.kind == "llm.message"),
+        )
+    };
+    assert!(until(running, 10_000).await, "the Turn never started");
+
+    // The worker dies in the middle of its Turn, as a crash would.
+    workers.stop("a1");
+    let log = veeloe_runtime_supervisor::task_log::path(&home_path, "a1");
+    let before = veeloe_runtime_core::EventStore::open(&log)
+        .expect("the supervisor's log")
+        .events("t1", 0)
+        .expect("events");
+    let kinds: Vec<&str> = before.iter().map(|event| event.kind.as_str()).collect();
+    assert!(kinds.contains(&"member.message"), "{kinds:?}");
+    assert!(kinds.contains(&"turn.started"), "{kinds:?}");
+    assert!(kinds.contains(&"llm.message"), "{kinds:?}");
+    assert!(!kinds.contains(&"turn.ended"), "the Turn had not ended: {kinds:?}");
+
+    // A new worker reads that history and closes the Turn it finds open.
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the second worker never started"
+    );
+    let after = veeloe_runtime_core::EventStore::open(&log)
+        .expect("the supervisor's log")
+        .events("t1", 0)
+        .expect("events");
+    let kinds: Vec<&str> = after.iter().map(|event| event.kind.as_str()).collect();
+    assert!(kinds.contains(&"turn.interrupted"), "{kinds:?}");
+    let ended = after
+        .iter()
+        .find(|event| event.kind == "turn.ended")
+        .expect("a closed Turn");
+    assert_eq!(ended.body["reason"], json!("interrupted"));
+    workers.stop_all();
+}
+
+#[tokio::test]
+async fn an_existing_log_keeps_its_history_after_the_move() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let agent = agent();
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    // An Agent from before the update: its log is in its writable folder.
+    agent_dir(&home_path, "a1").expect("agent folder");
+    let old = home_path.join("agents/a1/tasks.db");
+    {
+        let mut store = veeloe_runtime_core::EventStore::open(&old).expect("old log");
+        store.create_task("t-old", "m_owner").expect("task");
+        store
+            .append(
+                "t-old",
+                "member.message",
+                &json!({ "member": "m_owner", "id": "m-old", "text": "yesterday" }),
+                Some("m-old"),
+            )
+            .expect("event");
+    }
+
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(CannedLlm {
+            requests: Mutex::new(Vec::new()),
+        }) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(|_line| {}),
+        Arc::new(|_agent, command| command),
+    );
+
+    workers.start(&agent);
+    assert!(until(|| workers.is_ready("a1"), 10_000).await);
+    assert!(workers.send(
+        "a1",
+        ToWorker::List {
+            member: "m_owner".into(),
+        }
+    ));
+    let listed = || {
+        heard.lock().expect("heard").iter().any(|message| {
+            matches!(message, FromWorker::Tasks { tasks, .. } if tasks.iter().any(|task| task.id == "t-old"))
+        })
+    };
+    assert!(
+        until(listed, 10_000).await,
+        "the old Task is gone: {:?}",
+        heard.lock().expect("heard")
+    );
+    workers.stop_all();
+
+    // Nothing the Owner had to do: the file moved, and only the log moved.
+    assert!(!old.exists(), "the old log is still in the writable folder");
+    assert!(veeloe_runtime_supervisor::task_log::path(&home_path, "a1").is_file());
+}

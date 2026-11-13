@@ -21,7 +21,7 @@ use veeloe_plugin_api::{Cancel, PluginError, ToolError, ToolRegistry};
 use veeloe_protocol::{matches_allowlist, split_command};
 
 use crate::conversation::conversation;
-use crate::event_store::{EventStore, StoreError, TaskEvent};
+use crate::event_store::{EventLog, EventStore, StoreError, TaskEvent};
 use crate::ipc::{ApprovalDecision, FromWorker, SupervisorLink, ToWorker};
 use crate::ports::{Llm, LlmError, LlmMessage, LlmRequest};
 
@@ -84,7 +84,8 @@ struct Answer {
 struct State {
     name: RwLock<String>,
     workdir: Mutex<Option<PathBuf>>,
-    store: Mutex<EventStore>,
+    /// The Task log, written and read through one owner (ADR 0020, 0069).
+    log: Arc<dyn EventLog>,
     llm: Arc<dyn Llm>,
     tools: Arc<ToolRegistry>,
     link: Arc<dyn SupervisorLink>,
@@ -112,16 +113,17 @@ impl State {
         body: Value,
         message_id: Option<&str>,
     ) -> Result<TaskEvent, AgentError> {
-        let event = {
-            let mut store = self.store.lock().expect("store");
-            store.append(task, kind, &body, message_id)?
-        };
+        let event = self.log().record(task, starter, kind, &body, message_id)?;
         self.link.send(FromWorker::Event {
             task: task.to_string(),
             starter: starter.to_string(),
             event: event.clone(),
         });
         Ok(event)
+    }
+
+    fn log(&self) -> Arc<dyn EventLog> {
+        Arc::clone(&self.log)
     }
 
     fn allowlist(&self) -> Vec<String> {
@@ -145,11 +147,24 @@ impl AgentCore {
         tools: ToolRegistry,
         link: Arc<dyn SupervisorLink>,
     ) -> Self {
+        let log: Arc<dyn EventLog> = Arc::new(Mutex::new(store));
+        Self::over_log(name, log, llm, tools, link)
+    }
+
+    /// An Agent whose log lives elsewhere: a worker's handle on the supervisor's
+    /// log, which is the only writer (ADR 0020, 0069).
+    pub fn over_log(
+        name: impl Into<String>,
+        log: Arc<dyn EventLog>,
+        llm: Arc<dyn Llm>,
+        tools: ToolRegistry,
+        link: Arc<dyn SupervisorLink>,
+    ) -> Self {
         Self {
             state: Arc::new(State {
                 name: RwLock::new(name.into()),
                 workdir: Mutex::new(None),
-                store: Mutex::new(store),
+                log,
                 llm,
                 tools: Arc::new(tools),
                 link,
@@ -206,7 +221,7 @@ impl AgentCore {
     }
 
     pub fn events(&self, task: &str) -> Result<Vec<TaskEvent>, AgentError> {
-        Ok(self.state.store.lock().expect("store").events(task, 0)?)
+        Ok(self.state.log().events(task, 0)?)
     }
 
     /// Everything the supervisor says to this worker, synchronous up to the
@@ -244,6 +259,10 @@ impl AgentCore {
             }
             // An LLM answer belongs to the worker's IPC loop, not to the Agent.
             ToWorker::LlmResponse { .. } => Ok(()),
+            // So does the supervisor's word on the log it owns.
+            ToWorker::LogAppended { .. }
+            | ToWorker::LogFailed { .. }
+            | ToWorker::LogAnswer { .. } => Ok(()),
             ToWorker::Sync {
                 task,
                 after,
@@ -261,12 +280,7 @@ impl AgentCore {
     }
 
     fn list(&self, member: &str) -> Result<(), AgentError> {
-        let tasks = self
-            .state
-            .store
-            .lock()
-            .expect("store")
-            .tasks_started_by(member)?;
+        let tasks = self.state.log().tasks_started_by(member)?;
         self.state.link.send(FromWorker::Tasks {
             member: member.to_string(),
             tasks,
@@ -281,7 +295,7 @@ impl AgentCore {
         member: &str,
         reference: &str,
     ) -> Result<(), AgentError> {
-        let starter = self.state.store.lock().expect("store").starter_of(task)?;
+        let starter = self.state.log().starter_of(task)?;
         if let Some(starter) = starter.as_deref() {
             if starter != member {
                 return self.refuse(member, reference, "task.not_found", Some(task));
@@ -290,12 +304,7 @@ impl AgentCore {
         if starter.is_none() {
             return self.refuse(member, reference, "task.not_found", Some(task));
         }
-        let events = self
-            .state
-            .store
-            .lock()
-            .expect("store")
-            .events(task, after)?;
+        let events = self.state.log().events(task, after)?;
         self.state.link.send(FromWorker::Events {
             task: task.to_string(),
             member: member.to_string(),
@@ -313,13 +322,13 @@ impl AgentCore {
         reference: &str,
         from_queue: bool,
     ) -> Result<(), AgentError> {
-        let starter = self.state.store.lock().expect("store").starter_of(task)?;
+        let starter = self.state.log().starter_of(task)?;
         if let Some(starter) = starter.as_deref() {
             if starter != member {
                 return self.refuse(member, reference, "task.not_found", Some(task));
             }
         }
-        if self.state.store.lock().expect("store").has_message(id)? {
+        if self.state.log().has_message(id)? {
             return Ok(()); // a resend: it is in the log already
         }
         if !from_queue
@@ -340,11 +349,7 @@ impl AgentCore {
                 });
             return Ok(());
         }
-        let fresh = starter.is_none();
         let owner = starter.unwrap_or_else(|| member.to_string());
-        if fresh {
-            self.state.store.lock().expect("store").create_task(task, &owner)?;
-        }
         self.state.append(
             task,
             &owner,
@@ -437,7 +442,7 @@ impl AgentCore {
         {
             return Ok(());
         }
-        let starter = self.state.store.lock().expect("store").starter_of(task)?;
+        let starter = self.state.log().starter_of(task)?;
         if let Some(starter) = starter.as_deref() {
             if starter != member {
                 return self.refuse(member, reference, "task.not_found", Some(task));
@@ -536,9 +541,9 @@ impl AgentCore {
     /// interrupted, and nothing is made to run again (ADR 0033). Called once, as
     /// the worker starts.
     pub fn close_open_turns(&self) -> Result<(), AgentError> {
-        let open = self.state.store.lock().expect("store").open_turns()?;
+        let open = self.state.log().open_turns()?;
         for task in open {
-            let Some(starter) = self.state.store.lock().expect("store").starter_of(&task)? else {
+            let Some(starter) = self.state.log().starter_of(&task)? else {
                 continue;
             };
             self.state.append(
@@ -569,7 +574,7 @@ async fn run_turn(
 ) -> Result<(), AgentError> {
     let rounds = state.max_rounds.load(Ordering::SeqCst);
     for _ in 0..rounds {
-        let mut events = state.store.lock().expect("store").events(&task, 0)?;
+        let mut events = state.log().events(&task, 0)?;
         if let Some(summary) = compact_if_needed(&state, &task, &starter, &events).await {
             if state
                 .append(
@@ -586,7 +591,7 @@ async fn run_turn(
                 )
                 .is_ok()
             {
-                events = state.store.lock().expect("store").events(&task, 0)?;
+                events = state.log().events(&task, 0)?;
             }
         }
         let request = LlmRequest {

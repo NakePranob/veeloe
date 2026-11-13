@@ -2,8 +2,13 @@
 //!
 //! The schema matches `packages/runtime-legacy/src/worker/adapters/sqlite-store.ts`
 //! exactly, so a Task log written by the Bun runtime opens here unchanged.
+//!
+//! Only the supervisor opens the file. A worker reaches the log through
+//! [`EventLog`], which it implements over IPC, so the log is not a file any
+//! command or tool of an Agent can see, let alone open for writing (ADR 0069).
 
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{params, Connection, OptionalExtension};
@@ -59,6 +64,66 @@ pub enum StoreError {
     Sqlite(#[from] rusqlite::Error),
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
+    /// The supervisor could not write, or did not answer: the caller sees a
+    /// refusal rather than an event that is not in the log.
+    #[error("log: {0}")]
+    Refused(String),
+}
+
+/// The log as the core needs it: the one write and the reads a Turn makes.
+///
+/// The supervisor owns the only implementation that writes (ADR 0020, 0069); a
+/// worker gets one over IPC, and tests use the store itself ([`Mutex<EventStore>`]).
+pub trait EventLog: Send + Sync {
+    /// Appends one event, creating the Task's row on its first event.
+    fn record(
+        &self,
+        task: &str,
+        starter: &str,
+        kind: &str,
+        body: &Value,
+        message_id: Option<&str>,
+    ) -> Result<TaskEvent, StoreError>;
+    fn starter_of(&self, task: &str) -> Result<Option<String>, StoreError>;
+    fn has_message(&self, message_id: &str) -> Result<bool, StoreError>;
+    fn events(&self, task: &str, after: i64) -> Result<Vec<TaskEvent>, StoreError>;
+    fn tasks_started_by(&self, member: &str) -> Result<Vec<TaskSummary>, StoreError>;
+    fn open_turns(&self) -> Result<Vec<String>, StoreError>;
+}
+
+impl<C: Clock + Send> EventLog for Mutex<EventStore<C>> {
+    fn record(
+        &self,
+        task: &str,
+        starter: &str,
+        kind: &str,
+        body: &Value,
+        message_id: Option<&str>,
+    ) -> Result<TaskEvent, StoreError> {
+        let mut store = self.lock().expect("store");
+        store.ensure_task(task, starter)?;
+        store.append(task, kind, body, message_id)
+    }
+
+    fn starter_of(&self, task: &str) -> Result<Option<String>, StoreError> {
+        self.lock().expect("store").starter_of(task)
+    }
+
+    fn has_message(&self, message_id: &str) -> Result<bool, StoreError> {
+        self.lock().expect("store").has_message(message_id)
+    }
+
+    fn events(&self, task: &str, after: i64) -> Result<Vec<TaskEvent>, StoreError> {
+        self.lock().expect("store").events(task, after)
+    }
+
+    fn tasks_started_by(&self, member: &str) -> Result<Vec<TaskSummary>, StoreError> {
+        self.lock().expect("store").tasks_started_by(member)
+    }
+
+    fn open_turns(&self) -> Result<Vec<String>, StoreError> {
+        self.lock().expect("store").open_turns()
+    }
 }
 
 pub struct EventStore<C: Clock = SystemClock> {
@@ -83,6 +148,17 @@ impl<C: Clock> EventStore<C> {
     pub fn create_task(&self, task: &str, starter: &str) -> Result<(), StoreError> {
         self.conn.execute(
             "INSERT INTO task (id, starter, created_at) VALUES (?1, ?2, ?3)",
+            params![task, starter, self.clock.now()],
+        )?;
+        Ok(())
+    }
+
+    /// Creates the Task's row unless it is there already. The first event of a
+    /// Task carries its starter, so the writer must not fail on a Task it has
+    /// already seen.
+    pub fn ensure_task(&self, task: &str, starter: &str) -> Result<(), StoreError> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO task (id, starter, created_at) VALUES (?1, ?2, ?3)",
             params![task, starter, self.clock.now()],
         )?;
         Ok(())
