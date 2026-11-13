@@ -14,4 +14,4 @@
 ## 3. ตรวจ
 
 - [x] 3.1 cargo test workspace + bun run check + e2e ผ่านบน macOS
-- [ ] 3.2 Linux CI ผ่าน — Docker บนเครื่องนี้เริ่มไม่ขึ้นเพราะดิสก์เต็ม (ดูรายงาน) ให้ CI `ubuntu-latest` เป็นผู้ยืนยัน
+- [x] 3.2 Linux CI ผ่าน — CI run 43420890592 เขียวทุก job (Runtime Rust, e2e, macOS, Hub, Types and structure)
