@@ -13,6 +13,9 @@ jobs:
   structure:
     name: Types and structure
     runs-on: ubuntu-latest
+    # A hung test used to hold this job for GitHub's six-hour ceiling. Fail and
+    # say which package, rather than look busy all afternoon.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -27,7 +30,13 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: bun run typecheck
       - name: Unit tests (Protocol, Controller, Controller prototype)
-        run: bun run test
+        # `bun run test` is the same three commands; split here so a hang names
+        # the package it is in and a timeout turns it into a failure.
+        run: |
+          set -x
+          (cd packages/protocol-ts && timeout 120 bun test)
+          (cd controller-prototype && timeout 180 bun test)
+          (cd controller && timeout 300 bun test ./src ./scripts)
       - name: Steiger (Controller prototype, Feature-Sliced Design)
         run: bun run check:prototype
       - name: Steiger and i18n keys (Controller)
