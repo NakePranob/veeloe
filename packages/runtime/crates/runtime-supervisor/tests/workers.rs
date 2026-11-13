@@ -13,9 +13,11 @@ use support::worker_binary;
 use tempfile::tempdir;
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, ToWorker};
 use veeloe_runtime_supervisor::agents::{agent_dir, Agent, AgentRegistry};
+use veeloe_runtime_supervisor::logs;
 use veeloe_runtime_supervisor::providers::{
     load_providers, save_providers, upstream_headers, Auth, Provider,
 };
+use veeloe_runtime_supervisor::toolchain::{Outcome, Report};
 use veeloe_runtime_supervisor::workers::{sandboxed, SupervisorLlm, Workers};
 
 fn agent() -> Agent {
@@ -401,6 +403,102 @@ async fn a_sandboxed_worker_runs_a_turn_and_its_tools_stay_in_the_agents_folder(
     assert!(dir.join(".home/.gitconfig").is_file());
 }
 
+/// Issue #35: a Machine whose toolchain cannot run is told to the Owner when
+/// the worker opens, and the worker runs a Turn anyway.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn a_toolchain_that_cannot_run_is_reported_and_the_worker_still_turns() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let agent = agent();
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let llm = Arc::new(CannedLlm {
+        requests: Mutex::new(Vec::new()),
+    });
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::clone(&llm) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        // No proxy listens here: this Turn needs no network.
+        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+    );
+    // What a Machine without `bun` under its rules would answer.
+    workers.checking_toolchains(Arc::new(|_agent, _bin| {
+        Some(vec![
+            Report {
+                tool: "git".into(),
+                outcome: Outcome::Ok,
+            },
+            Report {
+                tool: "bun".into(),
+                outcome: Outcome::Missing,
+            },
+        ])
+    }));
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "a missing toolchain stopped the worker: {:?}",
+        lines.lock().expect("lines")
+    );
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    let ended = || {
+        heard.lock().expect("heard").iter().any(
+            |message| matches!(message, FromWorker::Event { event, .. } if event.kind == "turn.ended"),
+        )
+    };
+    assert!(
+        until(ended, 20_000).await,
+        "a missing toolchain ended the Turn: {:?} {:?}",
+        heard.lock().expect("heard"),
+        lines.lock().expect("lines")
+    );
+
+    // The Runtime log holds the report: names and results, never a path.
+    let report = || -> Option<String> {
+        logs::recent(&home_path)
+            .ok()?
+            .into_iter()
+            .find(|line| line.contains("toolchain.check"))
+    };
+    assert!(
+        until(|| report().is_some(), 10_000).await,
+        "no toolchain report: {:?}",
+        logs::recent(&home_path)
+    );
+    let line = report().expect("report");
+    let value: serde_json::Value = serde_json::from_str(&line).expect("json");
+    assert_eq!(value["fields"]["agent"], "a1");
+    assert_eq!(
+        value["fields"]["tools"],
+        json!({ "git": "ok", "bun": "missing" })
+    );
+    assert!(
+        !line.contains(home_path.to_str().expect("home")),
+        "the report carries the Agent's folder: {line}"
+    );
+    workers.stop_all();
+}
 /// What one Turn's tools answered: `(tool_use id, content, is_error)`.
 fn tool_results(heard: &Arc<Mutex<Vec<FromWorker>>>) -> Vec<(String, String, bool)> {
     heard

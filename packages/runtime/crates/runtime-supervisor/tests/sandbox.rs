@@ -175,6 +175,10 @@ mod running {
         refused(&home, &format!("cat {}", log.display()));
         refused(&home, &format!("echo hacked >> {}", log.display()));
         refused(&home, &format!("rm {}", log.display()));
+        // Not even a hard link into the Workdir: it would share the log's inode
+        // and leave a path rule with nothing to match on.
+        refused(&home, &format!("ln {} link-to-log", log.display()));
+        assert!(!home.root.join("agents/a1/workdir/link-to-log").exists());
         assert_eq!(
             fs::read_to_string(&log).expect("the log is still there"),
             "event log\n"
