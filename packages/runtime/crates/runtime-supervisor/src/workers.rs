@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -532,6 +532,10 @@ async fn session(
     // opens a new worker, which closes the Turn that was running as
     // interrupted (ADR 0033). A test's reader stands in for the OS.
     let killed_for_memory = Arc::new(AtomicBool::new(false));
+    // What the watch last saw of the worker's CPU time, in nanoseconds, so a
+    // `SIGKILL` can be told apart from the CPU limit (issue #47). Zero means
+    // the OS never said.
+    let burned_cpu = Arc::new(AtomicU64::new(0));
     let memory = inner.memory.lock().expect("memory").clone();
     let memory_watch = match (memory, pid) {
         (Some(read), pid) if pid != 0 => Some(watching_memory(
@@ -541,6 +545,7 @@ async fn session(
             limits,
             read,
             Arc::clone(&killed_for_memory),
+            Arc::clone(&burned_cpu),
         )),
         _ => None,
     };
@@ -642,13 +647,22 @@ async fn session(
                 Ok(None) | Err(_) => {
                     let status = child.wait().await.ok();
                     let killed_for_memory = killed_for_memory.load(Ordering::SeqCst);
+                    let burned = burned_cpu.load(Ordering::SeqCst);
                     // The OS cut it, or this Runtime did for memory. Either way
                     // the Owner is told which limit, with codes only (ADR 0052).
+                    // A signal that is not provably ours names no limit.
                     let cut = status
                         .as_ref()
-                        .and_then(|status| crate::limits::breach(status, killed_for_memory));
+                        .and_then(|status| {
+                            crate::limits::breach(
+                                status,
+                                killed_for_memory,
+                                (burned > 0).then_some(burned),
+                                limits.cpu_seconds,
+                            )
+                        });
                     let why = match cut {
-                        Some((limit, signal)) => {
+                        Some(crate::limits::Cut::Limit { limit, signal }) => {
                             let _ = crate::logs::record(
                                 &inner.home,
                                 "warn",
@@ -660,6 +674,15 @@ async fn session(
                                 }),
                             );
                             format!("its {limit} limit ({signal})")
+                        }
+                        Some(crate::limits::Cut::Signal { signal }) => {
+                            let _ = crate::logs::record(
+                                &inner.home,
+                                "warn",
+                                "worker.limit",
+                                serde_json::json!({ "agent": &agent.id, "signal": signal }),
+                            );
+                            format!("the signal {signal}")
                         }
                         None if killed_for_memory => "its memory limit".to_string(),
                         None => "it ended".to_string(),
@@ -766,6 +789,7 @@ fn watching_memory(
     limits: Limits,
     read: ResidentMemory,
     killed_for_memory: Arc<AtomicBool>,
+    burned_cpu: Arc<AtomicU64>,
 ) -> MemoryWatch {
     let limit = limits.memory_mb.saturating_mul(1024 * 1024);
     let watching = tokio::spawn(async move {
@@ -773,6 +797,12 @@ fn watching_memory(
         every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             every.tick().await;
+            // The CPU time so far, read beside the memory so one look costs two
+            // system calls. The last look before the worker dies is within one
+            // poll of what it really burned.
+            if let Some(nanos) = crate::limits::cpu_nanos(pid) {
+                burned_cpu.store(nanos, Ordering::SeqCst);
+            }
             let Some(bytes) = resident_total(&read, pid) else {
                 continue;
             };

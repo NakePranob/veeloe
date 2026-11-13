@@ -22,6 +22,10 @@ pub struct Limits {
 
 pub const DEFAULT_CPU_SECONDS: u64 = 1_800;
 pub const DEFAULT_MEMORY_MB: u64 = 4_096;
+/// The most CPU time one worker may be given. A week is far more than any Turn
+/// needs, and far below `RLIM_INFINITY`, so `setrlimit` is never handed a value
+/// the OS would refuse; anything above it falls back to the default.
+pub const MAX_CPU_SECONDS: u64 = 7 * 24 * 60 * 60;
 
 impl Default for Limits {
     fn default() -> Self {
@@ -75,7 +79,9 @@ pub fn read(config: Option<&Value>) -> (Limits, Vec<&'static str>) {
     match named.get("cpuSeconds") {
         None => {}
         Some(value) => match value.as_u64() {
-            Some(seconds) if seconds > 0 => limits.cpu_seconds = seconds,
+            Some(seconds) if seconds > 0 && seconds <= MAX_CPU_SECONDS => {
+                limits.cpu_seconds = seconds;
+            }
             _ => invalid.push("cpuSeconds"),
         },
     }
@@ -89,19 +95,50 @@ pub fn read(config: Option<&Value>) -> (Limits, Vec<&'static str>) {
     (limits, invalid)
 }
 
-/// The limit and the signal that ended a worker, when the OS cut it. The soft
-/// `RLIMIT_CPU` arrives as `SIGXCPU`, and the hard one as `SIGKILL`. A kill
-/// this Runtime made for memory is not the CPU's, so it answers nothing.
+/// What ended a worker, as far as this Runtime can tell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cut {
+    /// The OS cut it at one of the limits this Runtime set.
+    Limit {
+        limit: &'static str,
+        signal: &'static str,
+    },
+    /// A signal ended it while it was under every limit, so nothing of ours
+    /// did: a `kill -9` from the Owner, or Jetsam.
+    Signal { signal: &'static str },
+}
+
+/// The limit and signal that ended a worker, when the OS cut it. The soft
+/// `RLIMIT_CPU` arrives as `SIGXCPU`, and the hard one as `SIGKILL` — but any
+/// `kill -9` or Jetsam is a `SIGKILL` too, so that one only names the CPU when
+/// the worker had already burned the CPU time its soft limit allows
+/// (`burned_nanos`, the last reading of `pti_total_user` + `pti_total_system`).
+/// Under the limit the signal is named and no limit is, so a kill the Owner
+/// made is not reported as a limit the Runtime hit. `burned_nanos` is `None`
+/// when the OS could not say. A kill this Runtime made for memory is not the
+/// CPU's, so it answers nothing.
 pub fn breach(
     status: &ExitStatus,
     killed_for_memory: bool,
-) -> Option<(&'static str, &'static str)> {
+    burned_nanos: Option<u64>,
+    soft_seconds: u64,
+) -> Option<Cut> {
     if killed_for_memory {
         return None;
     }
+    let reached_soft = burned_nanos
+        .map(|burned| burned >= soft_seconds.saturating_mul(1_000_000_000))
+        .unwrap_or(false);
     match signal_of(status)? {
-        libc::SIGXCPU => Some((CPU, "SIGXCPU")),
-        libc::SIGKILL => Some((CPU, "SIGKILL")),
+        libc::SIGXCPU => Some(Cut::Limit {
+            limit: CPU,
+            signal: "SIGXCPU",
+        }),
+        libc::SIGKILL if reached_soft => Some(Cut::Limit {
+            limit: CPU,
+            signal: "SIGKILL",
+        }),
+        libc::SIGKILL => Some(Cut::Signal { signal: "SIGKILL" }),
         _ => None,
     }
 }
@@ -142,6 +179,23 @@ pub fn capping_cpu_time(command: &mut tokio::process::Command, cpu_seconds: u64)
 /// One worker's resident memory, as the OS reports it (`proc_pidinfo`).
 #[cfg(target_os = "macos")]
 pub fn resident_bytes(pid: u32) -> Option<u64> {
+    task_info(pid).map(|info| info.pti_resident_size)
+}
+
+/// The CPU time a process has burned so far, in nanoseconds, as the OS reports
+/// it (`pti_total_user` + `pti_total_system`, both in nanoseconds).
+#[cfg(target_os = "macos")]
+pub fn cpu_nanos(pid: u32) -> Option<u64> {
+    task_info(pid).map(|info| info.pti_total_user.saturating_add(info.pti_total_system))
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn cpu_nanos(_pid: u32) -> Option<u64> {
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn task_info(pid: u32) -> Option<libc::proc_taskinfo> {
     let mut info: libc::proc_taskinfo = unsafe { std::mem::zeroed() };
     let size = std::mem::size_of::<libc::proc_taskinfo>() as libc::c_int;
     let read = unsafe {
@@ -153,7 +207,7 @@ pub fn resident_bytes(pid: u32) -> Option<u64> {
             size,
         )
     };
-    (read == size).then_some(info.pti_resident_size)
+    (read == size).then_some(info)
 }
 
 /// Ends a worker and every process below it. A worker's commands are its
@@ -161,10 +215,41 @@ pub fn resident_bytes(pid: u32) -> Option<u64> {
 /// runaway command behind.
 #[cfg(target_os = "macos")]
 pub fn kill_tree(pid: u32) {
-    let children = descendants(pid);
-    kill(pid);
-    for child in children {
-        kill(child);
+    kill_tree_with(pid, descendants, kill);
+}
+
+/// The order `kill_tree` works in, made a function of the two OS calls so a
+/// test can stand a fake process tree in for the real one. Commands die before
+/// the worker, so nothing below it starts another command once it is gone, and
+/// the list is looked at once more while it is alive to catch what it started
+/// between the first look and now. Every look is a snapshot: a grandchild that
+/// starts after the last one escapes, and a pid in it may be reused before the
+/// kill reaches it. That race is narrowed, not closed.
+#[cfg(target_os = "macos")]
+pub(crate) fn kill_tree_with<D, K>(pid: u32, descendants_of: D, kill: K)
+where
+    D: Fn(u32) -> Vec<u32>,
+    K: Fn(u32),
+{
+    let mut killed: Vec<u32> = Vec::new();
+    for _ in 0..2 {
+        for child in descendants_of(pid) {
+            if child != pid && !killed.contains(&child) {
+                killed.push(child);
+                kill(child);
+            }
+        }
+    }
+    if !killed.contains(&pid) {
+        killed.push(pid);
+        kill(pid);
+    }
+    // Best effort once the worker is gone: macOS reparents its children as it
+    // exits, so this usually finds none, and it costs nothing when it does.
+    for child in descendants_of(pid) {
+        if child != pid && !killed.contains(&child) {
+            kill(child);
+        }
     }
 }
 
@@ -302,18 +387,110 @@ mod tests {
     #[test]
     fn the_os_cut_is_named_only_when_it_is_the_cpus() {
         let status = |signal: i32| ExitStatus::from_raw(signal);
+        let soft = 120;
+        // Injected totals: no process is really killed to check the rule.
+        let burned = |seconds: u64| Some(seconds * 1_000_000_000);
         assert_eq!(
-            breach(&status(libc::SIGXCPU), false),
-            Some((CPU, "SIGXCPU"))
+            breach(&status(libc::SIGXCPU), false, None, soft),
+            Some(Cut::Limit {
+                limit: CPU,
+                signal: "SIGXCPU"
+            })
         );
         assert_eq!(
-            breach(&status(libc::SIGKILL), false),
-            Some((CPU, "SIGKILL")),
-            "the hard RLIMIT_CPU is a SIGKILL"
+            breach(&status(libc::SIGKILL), false, burned(soft + 60), soft),
+            Some(Cut::Limit {
+                limit: CPU,
+                signal: "SIGKILL"
+            }),
+            "the hard RLIMIT_CPU is a SIGKILL, and the soft limit was used"
         );
-        assert_eq!(breach(&status(libc::SIGKILL), true), None);
-        assert_eq!(breach(&status(libc::SIGTERM), false), None);
-        assert_eq!(breach(&status(0), false), None);
+        assert_eq!(
+            breach(&status(libc::SIGKILL), false, burned(soft - 1), soft),
+            Some(Cut::Signal { signal: "SIGKILL" }),
+            "a kill -9 under the limit is not the CPU's"
+        );
+        assert_eq!(
+            breach(&status(libc::SIGKILL), false, None, soft),
+            Some(Cut::Signal { signal: "SIGKILL" }),
+            "a SIGKILL nobody can attribute to the CPU names no limit"
+        );
+        assert_eq!(
+            breach(&status(libc::SIGKILL), true, burned(soft * 2), soft),
+            None,
+            "a kill this Runtime made for memory is not the CPU's"
+        );
+        assert_eq!(
+            breach(&status(libc::SIGTERM), false, burned(soft), soft),
+            None
+        );
+        assert_eq!(breach(&status(0), false, burned(soft), soft), None);
+    }
+
+    #[test]
+    fn an_absurd_cpu_limit_falls_back_to_the_default() {
+        let home = tempdir().expect("home");
+        std::fs::write(
+            home.path().join("config.json"),
+            json!({ "limits": { "cpuSeconds": u64::MAX } }).to_string(),
+        )
+        .expect("config");
+        assert_eq!(
+            load(home.path()),
+            Limits::default(),
+            "a CPU limit setrlimit would refuse falls back"
+        );
+        let warnings: Vec<Value> = crate::logs::recent(home.path())
+            .expect("logs")
+            .iter()
+            .map(|line| serde_json::from_str(line).expect("json"))
+            .filter(|value: &Value| value["event"] == "limits.invalid")
+            .collect();
+        assert_eq!(warnings.len(), 1, "{warnings:?}");
+        assert_eq!(warnings[0]["level"], "warn");
+        assert_eq!(warnings[0]["fields"]["field"], "cpuSeconds");
+        // The largest sensible value is still read, not refused.
+        let (limits, invalid) = read(Some(
+            &json!({ "limits": { "cpuSeconds": MAX_CPU_SECONDS } }),
+        ));
+        assert_eq!(
+            limits,
+            Limits {
+                cpu_seconds: MAX_CPU_SECONDS,
+                ..Limits::default()
+            }
+        );
+        assert!(invalid.is_empty(), "{invalid:?}");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_workers_commands_are_killed_before_the_worker() {
+        use std::cell::RefCell;
+
+        // Three looks: the snapshot, the second look while the worker is alive
+        // (which catches 12), and the one after it died (which catches 13).
+        let looks = RefCell::new(vec![vec![10, 11], vec![11, 12], vec![12, 13]]);
+        let ended = RefCell::new(Vec::new());
+        kill_tree_with(
+            7,
+            |_pid| looks.borrow_mut().remove(0),
+            |pid| ended.borrow_mut().push(pid),
+        );
+        assert_eq!(
+            *ended.borrow(),
+            vec![10, 11, 12, 7, 13],
+            "commands first, the worker next, and no pid twice"
+        );
+    }
+
+    /// The reading the classifier trusts: this process's own CPU time, from the
+    /// same call the RSS monitor makes.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_cpu_a_process_burned_is_read_from_the_os() {
+        let burned = cpu_nanos(std::process::id()).expect("the OS reports its own CPU time");
+        assert!(burned > 0, "a running process has burned some CPU");
     }
 
     /// The real thing: a busy child with `RLIMIT_CPU` is stopped by the OS.
