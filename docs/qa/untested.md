@@ -49,9 +49,9 @@
 
 ### 6. mach-lookup ของ Chromium / headless browser
 
-- สถานะ: **ยังไม่ implement** — รายชื่อ service ของ Chromium ยังไม่อยู่ใน profile
-- ตรวจ: เปิด headless browser ใน sandbox ได้, screenshot หน้าเว็บ, ไม่มี denial ที่จำเป็น
-- ต้องมี: Chromium/Playwright ที่ติดตั้งในเครื่องทดสอบ
+- สถานะ: implement สำหรับ `chrome-headless-shell` แล้ว (#50) — mach rendezvous เฉพาะ namespace ของ Chrome/Chromium วัดบน macOS 27 (build 156) เปิดหน้าและอ่าน DOM/ถ่ายภาพได้
+- ยังไม่ทดสอบ: Chromium build อื่นที่อาจใช้ชื่อ/บริการต่าง, full `Google Chrome.app` (ต้องใช้ GUI session จึงไม่เปิด), และเครื่องที่ไม่มี browser ใน CI
+- ตรวจ: `VEELOE_TEST_BROWSER=<chrome-headless-shell> cargo test -p veeloe-runtime-supervisor --test sandbox`
 
 ### 7. service ของเจ้าของเครื่องในช่วง port ของ Agent
 
