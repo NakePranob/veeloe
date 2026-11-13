@@ -23,6 +23,7 @@ use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, ToWorker}
 
 use crate::agents::{agent_dir, Agent};
 use crate::hub_link::random;
+use crate::toolchain::{Report, Reported};
 
 /// A worker that lived this long counts as having started fine, so its next
 /// crash waits the shortest time again.
@@ -38,6 +39,11 @@ pub type OnMessage = Arc<dyn Fn(&str, FromWorker) + Send + Sync>;
 /// Wraps the worker's own argv in the rules it must run under. An empty argv
 /// means it may not run, and its session ends before it starts.
 pub type Wrap = Arc<dyn Fn(&Agent, Vec<String>) -> Vec<String> + Send + Sync>;
+/// Reports the toolchains this Agent's worker cannot run, as it opens. `None`
+/// when the Runtime has no check to make for it. What comes back is written at
+/// Runtime log level; nothing waits for it and nothing fails because of it
+/// (issue #35).
+pub type Toolchains = Arc<dyn Fn(&Agent, &Path) -> Option<Vec<Report>> + Send + Sync>;
 
 /// The Wrap a Runtime uses: each worker inside its own Agent's sandbox, which
 /// every command it starts inherits, reaching the network only through the
@@ -45,30 +51,44 @@ pub type Wrap = Arc<dyn Fn(&Agent, Vec<String>) -> Vec<String> + Send + Sync>;
 /// or an Agent whose folder cannot be made, no worker runs.
 pub fn sandboxed(home: PathBuf, proxy_url: String) -> Wrap {
     Arc::new(move |agent, mut command| {
-        if !sandbox::AVAILABLE {
-            return Vec::new();
-        }
         // The folder of the program the worker runs, which must be readable to
         // start it: the `veeloe` binary itself in a release.
-        let Some(bin) = command
-            .first()
-            .and_then(|program| Path::new(program).parent())
-            .map(Path::to_path_buf)
-        else {
+        let Some(bin) = program_dir(&command) else {
             return Vec::new();
         };
-        let Ok(dir) = agent_dir(&home, &agent.id) else {
+        let Some(policy) = rules(&home, agent, &bin, &proxy_url) else {
             return Vec::new();
         };
-        let mut policy = Policy::new(&dir.join("workdir"), &dir.join("tmp"), &bin);
-        policy.proxy = proxy_url
-            .trim_end_matches('/')
-            .rsplit_once(':')
-            .and_then(|(_, port)| port.parse().ok());
         command.push("--proxy".to_string());
         command.push(proxy_url.clone());
         Sandbox::new(policy).wrap(&command)
     })
+}
+
+/// The rules one Agent's worker runs under, started from `bin` (ADR 0008,
+/// 0069): its own folder to write in, the program's folder to read, and the one
+/// way out. `None` when this system has no sandbox, or the Agent has no folder
+/// it can be given: then nothing of that Agent runs.
+pub fn rules(home: &Path, agent: &Agent, bin: &Path, proxy_url: &str) -> Option<Policy> {
+    if !sandbox::AVAILABLE {
+        return None;
+    }
+    let dir = agent_dir(home, &agent.id).ok()?;
+    let mut policy = Policy::new(&dir.join("workdir"), &dir.join("tmp"), bin);
+    policy.proxy = proxy_url
+        .trim_end_matches('/')
+        .rsplit_once(':')
+        .and_then(|(_, port)| port.parse().ok());
+    Some(policy)
+}
+
+/// The folder the program in `command` lives in, which must be readable for it
+/// to start at all.
+fn program_dir(command: &[String]) -> Option<PathBuf> {
+    command
+        .first()
+        .and_then(|program| Path::new(program).parent())
+        .map(Path::to_path_buf)
 }
 
 /// The Agent's own home, `<agent>/.home`: where `$HOME`, caches and its git
@@ -105,6 +125,8 @@ struct Inner {
     on_message: OnMessage,
     log: Log,
     wrap: Wrap,
+    toolchains: Mutex<Option<Toolchains>>,
+    reported: Reported,
     running: Mutex<HashMap<String, Entry>>,
     stopping: AtomicBool,
 }
@@ -130,10 +152,18 @@ impl Workers {
                 on_message,
                 log,
                 wrap,
+                toolchains: Mutex::new(None),
+                reported: Reported::default(),
                 running: Mutex::new(HashMap::new()),
                 stopping: AtomicBool::new(false),
             }),
         }
+    }
+
+    /// Report the toolchains a worker cannot run as it opens, at Runtime log
+    /// level (issue #35). Without it a worker still starts; nothing is reported.
+    pub fn checking_toolchains(&self, check: Toolchains) {
+        *self.inner.toolchains.lock().expect("toolchains") = Some(check);
     }
 
     /// Starts this Agent's worker unless it is already running. An Agent in the
@@ -304,6 +334,9 @@ async fn session(
             }
         }
     };
+    // The toolchains are checked beside the worker, not before it: a machine
+    // whose `bun` is broken must still open a worker and end a Turn (issue #35).
+    report_toolchains(inner, agent);
     let mut writing = child.stdin.take().expect("stdin is piped");
     let mut lines = BufReader::new(child.stdout.take().expect("stdout is piped")).lines();
     let mut is_ready = false;
@@ -415,4 +448,21 @@ async fn write(stdin: &mut ChildStdin, message: &ToWorker) {
     };
     let _ = stdin.write_all(format!("{text}\n").as_bytes()).await;
     let _ = stdin.flush().await;
+}
+
+/// Start the check in the background and write what it finds, or nothing when
+/// this Runtime has no check or no rules to check under. Its own thread, because
+/// a tool that hangs is bounded by a timeout, not by the worker's readiness.
+fn report_toolchains(inner: &Arc<Inner>, agent: &Agent) {
+    let check = inner.toolchains.lock().expect("toolchains").clone();
+    let (Some(check), Some(bin)) = (check, program_dir(&inner.command)) else {
+        return;
+    };
+    let inner = Arc::clone(inner);
+    let agent = agent.clone();
+    tokio::task::spawn_blocking(move || {
+        if let Some(reports) = check(&agent, &bin) {
+            inner.reported.record(&inner.home, &agent.id, &reports);
+        }
+    });
 }
