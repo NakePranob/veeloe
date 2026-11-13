@@ -131,6 +131,20 @@ mod running {
             .expect("run under the sandbox")
     }
 
+    /// Runs a program directly under the rules, with no shell around it.
+    #[cfg(target_os = "macos")]
+    fn run_argv(home: &Home, argv: &[String]) -> std::process::Output {
+        let policy = &home.policy;
+        let argv = Sandbox::new(policy.clone()).wrap(argv);
+        Command::new(&argv[0])
+            .args(&argv[1..])
+            .env("HOME", Path::new(&policy.folder).join(".home"))
+            .current_dir(&policy.workdir)
+            .stdin(Stdio::null())
+            .output()
+            .expect("run under the sandbox")
+    }
+
     fn refused(home: &Home, command: &str) {
         let out = run(home, command);
         assert!(
@@ -164,6 +178,102 @@ mod running {
     fn the_owners_home_is_not_readable_even_for_a_listing() {
         let home = home();
         // This test's own HOME is the owner's; the command is given the Agent's.
+        let owner = std::env::var("HOME").expect("HOME");
+        refused(&home, &format!("ls {owner}"));
+    }
+
+    /// Issue #50: an Agent opens a page in a headless browser and reads its DOM
+    /// under the rules, and the owner's home stays unreadable in the same run.
+    ///
+    /// The browser is `chrome-headless-shell`, named by `VEELOE_TEST_BROWSER`:
+    /// the full Chrome app registers with Launch Services and opens a real
+    /// window, so it asks for the owner's GUI session, which stays refused
+    /// (ADR 0069). The test copies the browser into the Agent's own folder —
+    /// where a tool the Agent may run lives — and the sandbox still never reads
+    /// the developer's cache or home. Skips, rather than fails, on a Machine
+    /// (and on a CI runner) that has no such browser.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_headless_browser_opens_a_page_inside_the_rules() {
+        let home = home();
+        let Ok(source) = std::env::var("VEELOE_TEST_BROWSER") else {
+            eprintln!("skipping: VEELOE_TEST_BROWSER is not set to a chrome-headless-shell binary");
+            return;
+        };
+        let source = PathBuf::from(source);
+        assert!(source.is_file(), "not a browser: {}", source.display());
+        // The browser needs the resources beside it, so the whole folder is
+        // installed. `cp -c` clones instead of copying on APFS; a plain copy
+        // still works where cloning is not available.
+        let installed = Path::new(&home.policy.folder).join("browser");
+        let folder = source.parent().expect("the browser's folder");
+        let cloned = Command::new("cp")
+            .arg("-cR")
+            .arg(folder)
+            .arg(&installed)
+            .status()
+            .expect("cp");
+        if !cloned.success() {
+            let copied = Command::new("cp")
+                .arg("-R")
+                .arg(folder)
+                .arg(&installed)
+                .status()
+                .expect("cp");
+            assert!(copied.success(), "could not install the browser");
+        }
+        let browser = installed.join(source.file_name().expect("the binary's name"));
+        let profile = Path::new(&home.policy.folder).join(".home/browser");
+        let out = run_argv(
+            &home,
+            &[
+                browser.to_string_lossy().to_string(),
+                // Chrome's own sandbox cannot nest inside Seatbelt, so it is
+                // turned off here: the profile above is the one enforced.
+                "--no-sandbox".into(),
+                "--disable-gpu".into(),
+                "--no-first-run".into(),
+                "--no-default-browser-check".into(),
+                format!("--user-data-dir={}", profile.display()),
+                "--dump-dom".into(),
+                "data:text/html,<h1>veeloe</h1>".into(),
+            ],
+        );
+        assert!(
+            out.status.success(),
+            "the browser was refused: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let dom = String::from_utf8_lossy(&out.stdout);
+        assert!(dom.contains("veeloe"), "the page did not open: {dom}");
+        // A screenshot is the other half of "it can look at a page": the same
+        // binary writes one into the Agent's folder.
+        let shot = Path::new(&home.policy.folder).join("page.png");
+        let out = run_argv(
+            &home,
+            &[
+                browser.to_string_lossy().to_string(),
+                "--no-sandbox".into(),
+                "--disable-gpu".into(),
+                "--no-first-run".into(),
+                "--no-default-browser-check".into(),
+                format!("--user-data-dir={}", profile.display()),
+                format!("--screenshot={}", shot.display()),
+                "data:text/html,<h1>veeloe</h1>".into(),
+            ],
+        );
+        assert!(
+            out.status.success(),
+            "screenshot failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            std::fs::metadata(&shot).map(|meta| meta.len() > 0).unwrap_or(false),
+            "no screenshot was written"
+        );
+        // The browser used its own profile, and the owner's home is still
+        // refused by the same rules.
+        assert!(profile.is_dir(), "the browser did not use its own profile");
         let owner = std::env::var("HOME").expect("HOME");
         refused(&home, &format!("ls {owner}"));
     }

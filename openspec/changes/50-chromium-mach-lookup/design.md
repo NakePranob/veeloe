@@ -10,7 +10,7 @@
 
 **เหตุผลกำกับ:** เพิ่ม variant `Reason::Browser` และคอมเมนต์ว่ามาจาก Chromium/headless ไม่ใช่ OS
 
-**ทดสอบ:** macOS-only test ที่หั่น browser จาก env/ตำแหน่งมาตรฐาน; ถ้าไม่มีให้ skip พร้อมเหตุผล ไม่ทำให้ CI แดง; test ตรวจว่าได้ DOM/ภาพ และไม่มี denial ที่ทำให้ล้ม
+**ทดสอบ:** macOS-only test ที่หา browser จาก env; ถ้าไม่มีให้ skip พร้อมเหตุผล ไม่ทำให้ CI แดง; test ตรวจว่าได้ DOM, เขียน screenshot ได้, และ owner home ยังถูกปฏิเสธในกฎเดียวกัน
 
 **ไม่ถอยกลับ:** ไม่มี `(allow mach-lookup)` เปิดทั้งหมด; service ที่ยังไม่รู้ให้เพิ่มจาก log ทีละตัว
 

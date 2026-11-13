@@ -5,7 +5,7 @@ issue #50: Agent รัน headless browser ใน sandbox ยังไม่ไ
 ## What Changes
 
 - วัด service ที่ Chrome/Playwright Chromium ต้องใช้บน macOS 27 จากการรันจริงใน sandbox
-- เพิ่ม service เหล่านั้นเข้า `MACOS_SERVICES` ทีละตัวพร้อมเหตุผล (`browser`)
+- เพิ่มสิ่งที่ขาดเข้า profile ตามชนิด: ชื่อ literal ใน `MACOS_SERVICES` และชื่อที่มี pid ต่อท้ายใน `BROWSER_RENDEZVOUS` (regex) พร้อมเหตุผล `browser`
 - test ที่เปิด headless browser จริงใน sandbox แล้ว print DOM/screenshot; ข้ามถ้าเครื่องไม่มี browser
 - แก้เอกสาร/ADR ที่บอกว่า Chromium ยังไม่อยู่ในรายการ
 
