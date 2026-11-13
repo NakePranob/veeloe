@@ -45,9 +45,12 @@ CI runs both, plus `go test -race ./...` in `hub/` and `bun run test:e2e`, which
 sends signed envelopes through a real relay, runs the compiled `veeloe` against a
 stand-in Provider, and needs Go. `veeloe` runs every Agent's worker in the OS
 sandbox (ADR 0008): nothing to install on macOS, and on Linux it needs
-`bubblewrap`, `socat` and `ripgrep`, with unprivileged user namespaces allowed
-(`sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` on Ubuntu
-24.04), for `test:e2e` and for the Runtime's own binary tests in `check`. Its
+`bubblewrap` and `ripgrep`, with unprivileged user namespaces allowed. On
+Ubuntu 24.04 install the bwrap-only AppArmor profile
+(`/usr/share/apparmor/extra-profiles/bwrap-userns-restrict`) instead of turning
+the protection off for the whole machine
+(`kernel.apparmor_restrict_unprivileged_userns=0`), for `test:e2e` and for the
+Runtime's own binary tests in `check`. Its
 sandbox e2e also reaches `example.com`, so it needs the internet. The e2e's Pairing test also
 needs a migrated Postgres in `TEST_DB_DSN`, and skips without one unless
 `REQUIRE_TEST_DB` is set, as it is in CI.
