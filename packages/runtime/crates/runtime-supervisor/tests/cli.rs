@@ -299,3 +299,48 @@ fn without_a_terminal_the_missing_flag_is_named_and_no_preset_url_can_be_overrid
         "{stderr}"
     );
 }
+
+/// The one failed preflight the compiled binary can be made to reach without a
+/// hook into its Probe: Linux without `bwrap` on `PATH`. It must name the
+/// package, exit non-zero, and leave no supervisor behind — no pid file and no
+/// Hub link, which would otherwise keep the process running until Ctrl-C.
+///
+/// The other OS states are unit tests in `runtime-core/src/preflight.rs`, where
+/// the Probe is a table instead of this Machine.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_linux_without_bwrap_says_what_is_missing_and_starts_nothing() {
+    use std::process::Stdio;
+    use std::time::{Duration, Instant};
+
+    let home = tempdir().expect("home");
+    paired_home(home.path());
+    let mut child = Command::new(env!("CARGO_BIN_EXE_veeloe"))
+        .env("VEELOE_HOME", home.path())
+        .env("PATH", "")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("run veeloe");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        if child.try_wait().expect("wait").is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("veeloe kept running on a Machine without bwrap");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let output = child.wait_with_output().expect("output");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("bwrap is not on PATH"), "{stderr}");
+    assert!(stderr.contains("bubblewrap"), "{stderr}");
+    assert!(
+        !home.path().join("runtime/supervisor.pid").exists(),
+        "a supervisor that cannot sandbox must not write its pid file"
+    );
+}
