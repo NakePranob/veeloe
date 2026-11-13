@@ -246,6 +246,31 @@ mod running {
         );
         let dom = String::from_utf8_lossy(&out.stdout);
         assert!(dom.contains("veeloe"), "the page did not open: {dom}");
+        // A screenshot is the other half of "it can look at a page": the same
+        // binary writes one into the Agent's folder.
+        let shot = Path::new(&home.policy.folder).join("page.png");
+        let out = run_argv(
+            &home,
+            &[
+                browser.to_string_lossy().to_string(),
+                "--no-sandbox".into(),
+                "--disable-gpu".into(),
+                "--no-first-run".into(),
+                "--no-default-browser-check".into(),
+                format!("--user-data-dir={}", profile.display()),
+                format!("--screenshot={}", shot.display()),
+                "data:text/html,<h1>veeloe</h1>".into(),
+            ],
+        );
+        assert!(
+            out.status.success(),
+            "screenshot failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            std::fs::metadata(&shot).map(|meta| meta.len() > 0).unwrap_or(false),
+            "no screenshot was written"
+        );
         // The browser used its own profile, and the owner's home is still
         // refused by the same rules.
         assert!(profile.is_dir(), "the browser did not use its own profile");

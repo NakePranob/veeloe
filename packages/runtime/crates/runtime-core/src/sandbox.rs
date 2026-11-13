@@ -107,7 +107,11 @@ const MACOS_SERVICES: &[(&str, Reason)] = &[
 /// The browser puts its own pid in the name
 /// (`<bundle>.MachPortRendezvousServer.<pid>`), so it cannot be written as a
 /// literal service name; the profile matches only that shape, under the two
-/// bundles' own namespaces. Nothing else on the Machine is reachable by it.
+/// bundles' own namespaces. The rules are profile-wide, so every sandboxed
+/// command gets this name shape (not only the browser), and the Mach namespace
+/// is machine-wide: another sandboxed process can squat a same-shape name of a
+/// different instance. The names are pid-suffixed and guessable, so this is a
+/// narrow cross-instance channel, not a claim that nothing else is reachable.
 ///
 /// Measured on macOS 27 with `chrome-headless-shell` 156 under this profile
 /// (issue #50): with these two rules the browser prints a page's DOM, and every
@@ -194,7 +198,7 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
             .map(|(prefix, _)| prefix.replace('.', "\\."))
             .collect::<Vec<_>>()
             .join("|");
-        let name = format!("(global-name-regex #\"^({names})\\.MachPortRendezvousServer\\.\")");
+        let name = format!("(global-name-regex #\"^({names})\\.MachPortRendezvousServer\\.[0-9]+$\")");
         profile.push_str(&format!("(allow mach-register {name})\n"));
         profile.push_str(&format!("(allow mach-lookup {name})\n"));
     }
@@ -287,6 +291,8 @@ fn real(path: &Path) -> std::path::PathBuf {
 /// The services the profile allows, with the reason each is there. A test picks
 /// a name to ask for that the list does not hold, so the refusal it checks is
 /// the profile's and not a service that happens to be absent (issue #37).
+/// The literal service names only; the browser's pid-suffixed rendezvous names
+/// live in [`BROWSER_RENDEZVOUS`] and are not part of this list.
 pub fn allowed_services() -> &'static [(&'static str, Reason)] {
     MACOS_SERVICES
 }
