@@ -80,6 +80,14 @@ pub fn rules(home: &Path, agent: &Agent, bin: &Path, proxy_url: &str) -> Option<
         .trim_end_matches('/')
         .rsplit_once(':')
         .and_then(|(_, port)| port.parse().ok());
+    // The Agent's own localhost, from the range the supervisor reserved for it
+    // and kept outside its folder (ADR 0069). The toolchain check runs under
+    // these rules too, so it sees what the worker sees. A range that cannot be
+    // read leaves the Agent without ports, never without a worker.
+    policy.ports = crate::ports::Ports::open(home)
+        .and_then(|ports| ports.range(&agent.id, policy.proxy))
+        .map(|range| range.ports())
+        .unwrap_or_default();
     Some(policy)
 }
 
@@ -336,6 +344,20 @@ async fn session(
             why: "no sandbox to run it in".into(),
         };
     };
+    // The port range the wrap just reserved for this Agent, read back from the
+    // file so a restart hands out the same one (ADR 0069). Every command sees
+    // `PORT` and the whole list, so a dev server started by a Task keeps its
+    // address across Turns and finds the database beside it.
+    let ports = crate::ports::Ports::open(&inner.home)
+        .and_then(|ports| ports.range(&agent.id, None))
+        .map_err(|error| {
+            (inner.log)(&format!(
+                "agent {} runs without localhost ports: {error}",
+                agent.id
+            ));
+            error
+        })
+        .ok();
     let mut command = Command::new(program);
     command.args(rest);
     command
@@ -356,7 +378,13 @@ async fn session(
         .env(
             "VEELOE_AGENT_APPROVAL_TIMEOUT_S",
             agent.approval_timeout_s.to_string(),
-        )
+        );
+    if let Some(ports) = &ports {
+        command
+            .env("PORT", ports.start().to_string())
+            .env("VEELOE_PORTS", ports.listed());
+    }
+    command
         .current_dir(dir.join("workdir"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

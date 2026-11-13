@@ -65,6 +65,12 @@ pub struct BashTool {
     sandbox: Sandbox,
 }
 
+/// The names a command sees although they carry the Runtime's prefix. The
+/// supervisor's own channels stay hidden; the ports this Agent may open are
+/// the Task's to use, so a dev server started by a command finds them (ADR
+/// 0069).
+const COMMAND_ENV: &[&str] = &["VEELOE_PORTS"];
+
 impl BashTool {
     /// `second_ms` is how long one "second" of the timeout really is: 1000 in
     /// production, and 20 in tests so the 120 s default does not take 120 s.
@@ -76,7 +82,10 @@ impl BashTool {
     ) -> Self {
         let env = env
             .into_iter()
-            .filter(|(name, _)| !name.starts_with("NODE_CHANNEL") && !name.starts_with("VEELOE_"))
+            .filter(|(name, _)| {
+                !name.starts_with("NODE_CHANNEL")
+                    && (!name.starts_with("VEELOE_") || COMMAND_ENV.contains(&name.as_str()))
+            })
             .collect();
         Self {
             workdir: workdir.as_ref().to_path_buf(),

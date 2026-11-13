@@ -1137,8 +1137,16 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let _ = logs::record(&home, "info", "runtime.start", json!({}));
     let egress = Arc::new(Egress::open(&home)?);
     // Every command reaches the network only through this proxy, which checks
-    // the Egress on each connection; Seatbelt cannot match a domain itself.
-    let egress_proxy = veeloe_runtime_supervisor::proxy::start(Arc::clone(&egress)).await?;
+    // the Egress on each connection; Seatbelt cannot match a domain itself. The
+    // proxy steps around the ranges already reserved for Agents, so its port is
+    // never one a command may bind (ADR 0069).
+    let reserved = veeloe_runtime_supervisor::ports::Ports::open(&home)
+        .map_err(|error| format!("cannot read the Agents' ports: {error}"))?;
+    let egress_proxy = veeloe_runtime_supervisor::proxy::start_avoiding(
+        Arc::clone(&egress),
+        &|port| reserved.is_taken(port),
+    )
+    .await?;
     let budgets = Arc::new(veeloe_runtime_supervisor::usage::Budgets::new(
         UsageStore::open(&supervisor_dir(&home)?.join("usage.db"))?,
     ));

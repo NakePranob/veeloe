@@ -21,18 +21,22 @@ fn a_quote_in_a_path_cannot_break_out_of_the_profile() {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod running {
     use std::fs;
+    use std::net::{TcpListener, TcpStream};
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
     use tempfile::{tempdir, TempDir};
     use veeloe_runtime_core::sandbox::{Policy, Sandbox};
 
+    /// The ports of one range, as the supervisor reserves them.
+    const PORTS: u16 = 10;
+
     /// A stand-in `VEELOE_HOME` with one Agent's folder in it, a file of the
     /// Runtime's own beside it, and another Agent's folder.
     struct Home {
         _root: TempDir,
         root: PathBuf,
-        sandbox: Sandbox,
+        policy: Policy,
     }
 
     fn home() -> Home {
@@ -55,21 +59,54 @@ mod running {
         // supervisor is its only writer (ADR 0069).
         fs::create_dir_all(real.join("task-logs/a1")).expect("task log folder");
         fs::write(real.join("task-logs/a1/tasks.db"), "event log\n").expect("task log");
-        let sandbox = Sandbox::new(Policy::new(
+        let policy = Policy::new(
             &agent.join("workdir"),
             &agent.join("tmp"),
             Path::new("/bin"),
-        ));
+        );
         Home {
             _root: root,
             root: real,
-            sandbox,
+            policy,
         }
     }
 
+    /// The same home, with the range an Agent would be given (ADR 0069).
+    fn with_ports(mut home: Home, start: u16) -> Home {
+        home.policy.ports = (start..start + PORTS).collect();
+        home
+    }
+
+    /// Ten loopback ports nothing on this Machine is listening on, so a test
+    /// binds a real one instead of hoping a number is free.
+    fn free_range() -> u16 {
+        free_range_avoiding(0)
+    }
+
+    /// The same, with one port no range may cover: a service of the Machine's
+    /// the test opened first.
+    fn free_range_avoiding(avoid: u16) -> u16 {
+        for start in (20000u16..=59990).step_by(10) {
+            if (start..start + PORTS).contains(&avoid) {
+                continue;
+            }
+            let listening: Option<Vec<TcpListener>> = (start..start + PORTS)
+                .map(|port| TcpListener::bind(("127.0.0.1", port)).ok())
+                .collect();
+            if listening.is_some() {
+                return start;
+            }
+        }
+        panic!("no free range of ten loopback ports");
+    }
+
+    fn write_script(home: &Home, name: &str, text: &str) {
+        fs::write(Path::new(&home.policy.workdir).join(name), text).expect("script");
+    }
+
     fn run(home: &Home, command: &str) -> std::process::Output {
-        let policy = home.sandbox.policy().expect("rules");
-        let argv = home.sandbox.wrap(&[
+        let policy = &home.policy;
+        let argv = Sandbox::new(policy.clone()).wrap(&[
             "/bin/bash".to_string(),
             "-c".to_string(),
             command.to_string(),
@@ -166,6 +203,68 @@ mod running {
         refused(&home, "exec 3<>/dev/tcp/93.184.216.34/80 && echo opened");
     }
 
+    /// Issue #42: a command runs a service on a port of its own and reaches it,
+    /// which is what a dev server, a database and the tests beside them need.
+    #[test]
+    fn a_command_can_bind_and_reach_a_port_of_its_own() {
+        let home = with_ports(home(), free_range());
+        let port = home.policy.ports[0];
+        write_script(
+            &home,
+            "serve.py",
+            &[
+                "import socket, sys",
+                "port = int(sys.argv[1])",
+                "server = socket.socket()",
+                "server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)",
+                "server.bind((\"127.0.0.1\", port))",
+                "server.listen(1)",
+                // A listener's backlog answers the connect, so one command can
+                // bind a port and reach it without a second thread.
+                "client = socket.create_connection((\"127.0.0.1\", port), timeout=2)",
+                "client.sendall(b\"ping\")",
+                "conn, _ = server.accept()",
+                "print(\"served\", conn.recv(4).decode())",
+                "conn.close()",
+            ]
+            .join("\n"),
+        );
+        let answer = allowed(&home, &format!("python3 serve.py {port}"));
+        assert!(answer.contains("served ping"), "{answer}");
+    }
+
+    /// Issue #42: the same command cannot reach a service of the Machine's on a
+    /// port outside the range. The listener is this test's own, as the owner's
+    /// database or another program is (ADR 0069).
+    #[test]
+    fn a_command_cannot_reach_a_host_service_outside_its_range() {
+        let listening = TcpListener::bind("127.0.0.1:0").expect("host service");
+        let port = listening.local_addr().expect("address").port();
+        let home = with_ports(home(), free_range_avoiding(port));
+        assert!(
+            !home.policy.ports.contains(&port),
+            "the host service is inside the Agent's range"
+        );
+        // Outside the rules the same address answers, so the refusal below is
+        // the sandbox's and not a port that happens to be shut.
+        TcpStream::connect(("127.0.0.1", port)).expect("reachable outside the rules");
+        listening.accept().expect("the connection outside");
+        refused(
+            &home,
+            &format!(
+                "python3 -c 'import socket; socket.create_connection((\"127.0.0.1\", {port}), timeout=2)'"
+            ),
+        );
+        // Nothing reached the listener from inside the rules.
+        listening
+            .set_nonblocking(true)
+            .expect("non-blocking listener");
+        assert!(
+            listening.accept().is_err(),
+            "the sandbox reached a host service on port {port}"
+        );
+    }
+
     /// A Stop or a timeout ends a command with a signal, so the command it
     /// started must be signalled too. Everything outside this sandbox — the
     /// supervisor, another Agent — must not be.
@@ -198,7 +297,7 @@ mod running {
                 .any(|(name, _)| *name == service),
             "{service} is on the allowed list now; the test needs one that is not"
         );
-        let workdir = home.sandbox.policy().expect("rules").workdir.clone();
+        let workdir = home.policy.workdir.clone();
         // `bootstrap_look_up` is what every mach lookup goes through; asking it
         // from inside the rules is the same request a tool would make.
         fs::write(

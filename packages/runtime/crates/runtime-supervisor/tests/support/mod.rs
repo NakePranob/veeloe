@@ -63,9 +63,25 @@ impl ModelsStub {
             while !stopping.load(Ordering::Relaxed) {
                 match listener.accept() {
                     Ok((mut socket, _)) => {
+                        // A request head can arrive in more than one read, and the
+                        // key is not always in the first one: read until the head
+                        // ends, or the stub answers a request it never saw.
+                        let mut request = Vec::new();
                         let mut buffer = [0u8; 4096];
-                        let read = socket.read(&mut buffer).unwrap_or(0);
-                        let request = String::from_utf8_lossy(&buffer[..read]).to_lowercase();
+                        let deadline = Instant::now() + Duration::from_secs(2);
+                        while !request.windows(4).any(|window| window == b"\r\n\r\n")
+                            && Instant::now() < deadline
+                        {
+                            match socket.read(&mut buffer) {
+                                Ok(0) => break,
+                                Ok(read) => request.extend_from_slice(&buffer[..read]),
+                                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                                    std::thread::sleep(Duration::from_millis(5));
+                                }
+                                Err(_) => break,
+                            }
+                        }
+                        let request = String::from_utf8_lossy(&request).to_lowercase();
                         let refused = request.contains("x-api-key: wrong")
                             || request.contains("authorization: bearer wrong");
                         let (status, body) = if refused {

@@ -25,6 +25,11 @@ pub struct Policy {
     /// the proxy is what checks the Egress. Without one, nothing gets out: a
     /// domain list the kernel cannot check is not a rule (ADR 0008, 0029).
     pub proxy: Option<u16>,
+    /// The localhost ports this Agent owns and no other Agent does. macOS has
+    /// no network namespace to give a worker, so its localhost is a range: the
+    /// profile allows these ports in and out, and nothing else on the Machine
+    /// (ADR 0069). Empty means the Agent may listen on nothing.
+    pub ports: Vec<u16>,
 }
 
 /// What a program on macOS needs to read to run at all, and the toolchains in
@@ -115,6 +120,7 @@ impl Policy {
             tmp: tmp.to_string_lossy().to_string(),
             bin: bin.to_string_lossy().to_string(),
             proxy: None,
+            ports: Vec::new(),
         }
     }
 }
@@ -160,6 +166,22 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
     // Every command needs to be able to throw output away.
     profile.push_str("(allow file-write* (literal \"/dev/null\"))\n");
     profile.push_str("(deny network*)\n");
+    // The Agent's own localhost, one port at a time: a dev server, a database
+    // and a cache it starts are reachable to it and to nothing else. `local`
+    // is a bind, `remote` is a connect; a host service on any other port is
+    // refused by the deny above (ADR 0069).
+    if !policy.ports.is_empty() {
+        profile.push_str("(allow network-inbound\n");
+        for port in &policy.ports {
+            profile.push_str(&format!("  (local ip \"localhost:{port}\")\n"));
+        }
+        profile.push_str(")\n");
+        profile.push_str("(allow network-outbound\n");
+        for port in &policy.ports {
+            profile.push_str(&format!("  (remote ip \"localhost:{port}\")\n"));
+        }
+        profile.push_str(")\n");
+    }
     // Seatbelt cannot match a domain, so the only way out is the local proxy;
     // the proxy is what checks the Egress (ADR 0008, 0029).
     if let Some(port) = policy.proxy {
