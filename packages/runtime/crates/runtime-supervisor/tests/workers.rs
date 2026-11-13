@@ -527,6 +527,181 @@ struct ToolchainLlm {
     requests: Mutex<usize>,
 }
 
+/// Issue #42: the worker knows the Agent's port range, and a command it runs
+/// sees it and can serve on it. The check is the command's own output, not the
+/// environment the supervisor meant to set (ADR 0022).
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn a_command_sees_the_agents_ports_and_can_serve_on_them() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut agent = agent();
+    agent.allowlist = vec!["printf".into(), "python3".into()];
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+    // The range the supervisor would have reserved, written down before the
+    // worker opens: a free one, so this test binds a real port.
+    let start = free_range();
+    std::fs::create_dir_all(home_path.join("runtime")).expect("runtime");
+    std::fs::write(
+        home_path.join("runtime/ports.json"),
+        format!(r#"{{"a1":{start}}}"#),
+    )
+    .expect("ports.json");
+    let listed = (start..start + 10)
+        .map(|port| port.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(PortsLlm {
+            requests: Mutex::new(0),
+        }) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        // Nothing listens on the proxy's port here: the range is its own.
+        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+    );
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the sandboxed worker never said ready: {:?}",
+        lines.lock().expect("lines")
+    );
+    let say = |id: &str| {
+        assert!(workers.send(
+            "a1",
+            ToWorker::Message {
+                task: id.into(),
+                id: format!("m-{id}"),
+                member: "m_owner".into(),
+                text: "go".into(),
+                reference: format!("sig-{id}"),
+            }
+        ));
+    };
+    let answered = |tool: &str| {
+        tool_results(&heard)
+            .iter()
+            .any(|(seen, _, _)| seen == tool)
+    };
+
+    say("t1");
+    assert!(
+        until(|| answered("t-ports-1"), 20_000).await,
+        "the Turn never ran the command: {:?} {:?}",
+        heard.lock().expect("heard"),
+        lines.lock().expect("lines")
+    );
+    workers.stop_all();
+    let first = content_of(&heard, "t-ports-1");
+    assert!(!first.1, "the command was refused: {}", first.0);
+    assert!(first.0.contains(&format!("port={start}")), "{}", first.0);
+    assert!(first.0.contains(&format!("ports={listed}")), "{}", first.0);
+    // The profile the worker runs under allows the port, so the command bound
+    // it and reached it.
+    assert!(first.0.contains("reachable"), "{}", first.0);
+    assert!(first.0.contains("exit code: 0"), "{}", first.0);
+
+    // The same Agent again, as after a restart: the range it was given is the
+    // one it comes back with, so a service it started keeps its address.
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the second worker never said ready: {:?}",
+        lines.lock().expect("lines")
+    );
+    say("t2");
+    assert!(
+        until(|| answered("t-ports-3"), 20_000).await,
+        "the second Turn never ran the command: {:?}",
+        heard.lock().expect("heard")
+    );
+    workers.stop_all();
+    let again = content_of(&heard, "t-ports-3");
+    assert!(!again.1, "the command was refused: {}", again.0);
+    assert!(again.0.contains(&format!("port={start}")), "{}", again.0);
+    assert!(again.0.contains(&format!("ports={listed}")), "{}", again.0);
+}
+
+/// The content of one tool result, and whether the tool was refused.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn content_of(heard: &Arc<Mutex<Vec<FromWorker>>>, id: &str) -> (String, bool) {
+    let results = tool_results(heard);
+    let (_, content, is_error) = results
+        .iter()
+        .find(|(seen, _, _)| seen == id)
+        .unwrap_or_else(|| panic!("no result for {id}: {results:?}"));
+    (content.clone(), *is_error)
+}
+
+/// Ten loopback ports nothing on this Machine is listening on.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn free_range() -> u16 {
+    for start in (20000u16..=59990).step_by(10) {
+        let listening: Option<Vec<std::net::TcpListener>> = (start..start + 10)
+            .map(|port| std::net::TcpListener::bind(("127.0.0.1", port)).ok())
+            .collect();
+        if listening.is_some() {
+            return start;
+        }
+    }
+    panic!("no free range of ten loopback ports");
+}
+
+/// Asks for the Agent's ports on every odd request and ends the Turn on every
+/// even one, so each worker gets one Turn that runs a command.
+struct PortsLlm {
+    requests: Mutex<usize>,
+}
+
+#[async_trait]
+impl SupervisorLlm for PortsLlm {
+    async fn answer(&self, _agent: &str, _request: LlmHttpRequest) -> LlmHttpResponse {
+        let seen = {
+            let mut seen = self.requests.lock().expect("requests");
+            *seen += 1;
+            *seen
+        };
+        let body = if seen % 2 == 1 {
+            json!({
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_use",
+                    "id": format!("t-ports-{seen}"),
+                    "name": "bash",
+                    "input": { "command": "printf 'port=%s\\n' \"$PORT\"\nprintf 'ports=%s\\n' \"$VEELOE_PORTS\"\npython3 -c 'import os,socket;s=socket.socket();s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind((\"127.0.0.1\",int(os.environ[\"PORT\"])));s.listen(1);c=socket.create_connection((\"127.0.0.1\",int(os.environ[\"PORT\"])),timeout=2);print(\"reachable\")'" }
+                }],
+                "stop_reason": "tool_use",
+            })
+        } else {
+            json!({
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "done" }],
+                "stop_reason": "end_turn",
+            })
+        };
+        LlmHttpResponse {
+            status: 200,
+            headers: vec![("content-type".into(), "application/json".into())],
+            body: body.to_string(),
+        }
+    }
+}
+
 #[async_trait]
 impl SupervisorLlm for ToolchainLlm {
     async fn answer(&self, _agent: &str, _request: LlmHttpRequest) -> LlmHttpResponse {

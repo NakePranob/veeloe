@@ -26,23 +26,45 @@ pub struct Proxy {
 
 /// Starts the proxy on a free loopback port. It runs until the process ends.
 pub async fn start(egress: Arc<Egress>) -> std::io::Result<Proxy> {
-    let listener = TcpListener::bind("127.0.0.1:0").await?;
-    let port = listener.local_addr()?.port();
-    tokio::spawn(async move {
-        loop {
-            let Ok((client, _)) = listener.accept().await else {
-                break;
-            };
-            let egress = Arc::clone(&egress);
-            tokio::spawn(async move {
-                let _ = serve(client, egress).await;
-            });
+    start_avoiding(egress, &|_| false).await
+}
+
+/// Starts the proxy on a free loopback port that `avoid` accepts. The Agent
+/// ranges are reserved before the proxy opens, and a port inside a range is a
+/// port a command may bind, so the proxy steps out of their way instead of
+/// taking one that was already given away (ADR 0069).
+pub async fn start_avoiding(
+    egress: Arc<Egress>,
+    avoid: &(dyn Fn(u16) -> bool + Send + Sync),
+) -> std::io::Result<Proxy> {
+    for _ in 0..16 {
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let port = listener.local_addr()?.port();
+        if avoid(port) {
+            // Dropping the listener closes it, so the next try binds anew.
+            drop(listener);
+            continue;
         }
-    });
-    Ok(Proxy {
-        url: format!("http://127.0.0.1:{port}"),
-        port,
-    })
+        tokio::spawn(async move {
+            loop {
+                let Ok((client, _)) = listener.accept().await else {
+                    break;
+                };
+                let egress = Arc::clone(&egress);
+                tokio::spawn(async move {
+                    let _ = serve(client, egress).await;
+                });
+            }
+        });
+        return Ok(Proxy {
+            url: format!("http://127.0.0.1:{port}"),
+            port,
+        });
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AddrNotAvailable,
+        "no free loopback port outside the Agents' ranges",
+    ))
 }
 
 /// One client: read its CONNECT, check the host, then copy bytes both ways.
