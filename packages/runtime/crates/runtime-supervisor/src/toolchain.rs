@@ -84,6 +84,12 @@ fn run(policy: &Policy, path: &str, tool: &str) -> Outcome {
     let Some((program, rest)) = argv.split_first() else {
         return Outcome::Missing;
     };
+    // The wrapper is not run with the worker's `PATH`: on Linux it is a bare
+    // `bwrap`, and the check gives the command the worker's `PATH`, which need
+    // not carry it. Find it the way the supervisor itself was started.
+    let Some(program) = absolute(program) else {
+        return Outcome::Missing;
+    };
     let mut command = Command::new(program);
     command
         .args(rest)
@@ -124,6 +130,27 @@ fn run(policy: &Policy, path: &str, tool: &str) -> Outcome {
         }
         std::thread::sleep(POLL);
     }
+}
+
+/// `program` as an absolute path: itself when it already is one, otherwise the
+/// first executable of that name on the supervisor's own `PATH`.
+fn absolute(program: &str) -> Option<std::path::PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = Path::new(program);
+    if path.is_absolute() {
+        return Some(path.to_path_buf());
+    }
+    std::env::var("PATH").ok()?.split(':').find_map(|dir| {
+        if dir.is_empty() {
+            return None;
+        }
+        let candidate = Path::new(dir).join(program);
+        let executable = std::fs::metadata(&candidate)
+            .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false);
+        executable.then_some(candidate)
+    })
 }
 
 /// Whether `tool` is an executable file in one of `path`'s folders. The
