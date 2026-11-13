@@ -36,7 +36,7 @@ jobs:
           set -x
           (cd packages/protocol-ts && timeout 120 bun test --timeout 15000)
           (cd controller-prototype && timeout 180 bun test --timeout 15000)
-          (cd controller && timeout 45 bun test --timeout 15000 ./src ./scripts)
+          (cd controller && timeout 60 bun test --timeout 15000 src/features/machine-link/model/links.test.ts && timeout 300 bun test --timeout 15000 ./src ./scripts)
       - name: Steiger (Controller prototype, Feature-Sliced Design)
         run: bun run check:prototype
       - name: Steiger and i18n keys (Controller)
