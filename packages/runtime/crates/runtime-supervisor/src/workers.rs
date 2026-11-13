@@ -126,6 +126,9 @@ struct Inner {
     log: Log,
     wrap: Wrap,
     toolchains: Mutex<Option<Toolchains>>,
+    /// The process id of each Agent's running worker, so a sandbox refusal in
+    /// the system log can be tied back to the work that caused it (issue #37).
+    pids: Mutex<HashMap<String, u32>>,
     reported: Reported,
     running: Mutex<HashMap<String, Entry>>,
     stopping: AtomicBool,
@@ -153,6 +156,7 @@ impl Workers {
                 log,
                 wrap,
                 toolchains: Mutex::new(None),
+                pids: Mutex::new(HashMap::new()),
                 reported: Reported::default(),
                 running: Mutex::new(HashMap::new()),
                 stopping: AtomicBool::new(false),
@@ -164,6 +168,24 @@ impl Workers {
     /// level (issue #35). Without it a worker still starts; nothing is reported.
     pub fn checking_toolchains(&self, check: Toolchains) {
         *self.inner.toolchains.lock().expect("toolchains") = Some(check);
+    }
+
+    /// Follow the macOS sandbox's own record, so a service the profile does not
+    /// name shows up as a Runtime log line instead of a silent failure (issue
+    /// #37). The handle must stay alive with the Runtime; dropping it stops the
+    /// reader. `None` on a system whose sandbox keeps no such log.
+    pub fn watching_denials(&self) -> Option<crate::denials::Denials> {
+        let inner = Arc::clone(&self.inner);
+        let running: crate::denials::Running = Arc::new(move || {
+            inner
+                .pids
+                .lock()
+                .expect("pids")
+                .iter()
+                .map(|(agent, pid)| (*pid, agent.clone()))
+                .collect()
+        });
+        crate::denials::Denials::start(self.inner.home.clone(), running)
     }
 
     /// Starts this Agent's worker unless it is already running. An Agent in the
@@ -334,6 +356,12 @@ async fn session(
             }
         }
     };
+    let pid = child.id().unwrap_or_default();
+    inner
+        .pids
+        .lock()
+        .expect("pids")
+        .insert(agent.id.clone(), pid);
     // The toolchains are checked beside the worker, not before it: a machine
     // whose `bun` is broken must still open a worker and end a Turn (issue #35).
     report_toolchains(inner, agent);
@@ -397,6 +425,7 @@ async fn session(
     };
 
     let _ = ready.send(false);
+    inner.pids.lock().expect("pids").remove(&agent.id);
     // A message that never reached the worker is reported, not lost quietly.
     for lost in waiting.drain(..) {
         if let Some((member, reference, task)) = failed(&lost) {

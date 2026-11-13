@@ -25,11 +25,11 @@
 
 ## 4. mach-lookup เป็นรายชื่อ (#37)
 
-- [ ] 4.1 profile ไม่มี `(allow mach-lookup)` แบบเปิดทั้งหมด และมีรายชื่อ service ที่ระบุเป็นตัว ๆ พร้อมเหตุผลว่ามาจาก worker, toolchain หรือ OS
-- [ ] 4.2 worker ยังขึ้น ready และรันหนึ่ง Turn ที่ใช้ `git` กับ `bun` ได้ใต้รายชื่อใหม่
-- [ ] 4.3 คำขอไป service ที่ไม่อยู่ในรายชื่อถูกปฏิเสธและเห็นได้ใน Runtime log
-- [ ] 4.4 test ตรวจพฤติกรรม ไม่ตรวจข้อความของ profile และผ่านบน macOS ใน CI
-- [ ] 4.5 ระบุชัดว่า mach-lookup ของ Chromium ยังไม่อยู่ในชิ้นนี้
+- [x] 4.1 profile ไม่มี `(allow mach-lookup)` แบบเปิดทั้งหมด และมีรายชื่อ service ที่ระบุเป็นตัว ๆ พร้อมเหตุผลว่ามาจาก worker, toolchain หรือ OS
+- [x] 4.2 worker ยังขึ้น ready และรันหนึ่ง Turn ที่ใช้ `git` กับ `bun` ได้ใต้รายชื่อใหม่
+- [x] 4.3 คำขอไป service ที่ไม่อยู่ในรายชื่อถูกปฏิเสธและเห็นได้ใน Runtime log
+- [x] 4.4 test ตรวจพฤติกรรม ไม่ตรวจข้อความของ profile และผ่านบน macOS ใน CI
+- [x] 4.5 ระบุชัดว่า mach-lookup ของ Chromium ยังไม่อยู่ในชิ้นนี้
 
 ## 5. ปิด change
 

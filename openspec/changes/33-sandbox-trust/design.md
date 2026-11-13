@@ -36,6 +36,10 @@
 
 **mach-lookup เป็นรายชื่อขั้นต่ำ:** เริ่มจาก service ที่ worker, `git`, `bun` และ `node` ต้องใช้จริง แล้วเพิ่มเป็นรายตัวเมื่อ Runtime log แสดงว่าถูกปฏิเสธ ไม่มี service ใดถูกเพิ่มโดยไม่มีหลักฐาน
 
+รายการที่วัดบน macOS 27 แล้วและเหตุผลของแต่ละตัว: `com.apple.logd` (OS — ทุก toolchain เขียน log ผ่านที่นี่), `com.apple.system.notification_center` (OS — libsystem ลงทะเบียนโปรเซสตอนเริ่ม, `bash`/`git`/`bun`/`python3` ขอกันทุกตัว), `com.apple.system.opendirectoryd.libinfo` (OS — ทุกโปรเซสถามว่าตัวเองเป็นใครก่อนอ่านไฟล์) และ `com.apple.system.opendirectoryd.membership` (toolchain — `git` ใช้ตัดสินว่า repo เป็นของใคร) ที่จงใจ**ไม่**ใส่แม้ toolchain จะขอ: `com.apple.lsd.modifydb` (เขียนฐานข้อมูล Launch Services ซึ่งเป็นทางออกนอกกรอบไฟล์), `com.apple.bsd.dirhelper` (แจกโฟลเดอร์ per-user ของเจ้าของเครื่อง) และ `com.apple.diagnosticd` (ส่ง crash report ที่มี path ของเจ้าของ) ส่วน service ของ Chromium **ยังไม่อยู่ในชิ้นนี้** เพราะยังไม่ได้วัด และการเดารายการให้ browser คือ allow-all ที่เปลี่ยนชื่อ
+
+**การปฏิเสธต้องเห็นได้:** `sandbox-exec` ไม่เขียน denial ลง stderr ของโปรเซส มันเขียนลง system log เป็น `Sandbox: <โปรเซส>(<pid>) deny(1) mach-lookup <service>` supervisor จึงตาม log นั้น (`denials.rs`) แล้วเขียน Runtime log บรรทัด `sandbox.denied` ที่มีชื่อ service กับชื่อโปรเซสเท่านั้น (ไม่มี path หรือเนื้อหาไฟล์) และเขียน service หนึ่งครั้งเดียวต่อการรันหนึ่งครั้ง โปรเซสที่ถูกปฏิเสธผูกกลับไปยัง Agent ได้จาก pid ของ worker ที่ supervisor รู้อยู่แล้ว; ตัวที่จบไปก่อนมีชื่อ tool อยู่ในรายการที่ Runtime เริ่มเอง จึงยังขึ้นเป็นบรรทัดได้แต่ไม่มีชื่อ Agent การปฏิเสธของแอปอื่นบนเครื่องไม่ถูกบันทึก เพราะเป็น sandbox ของมันเอง
+
 **CI macOS job แยกและเบา:** `runtime-macos` รันเฉพาะ test ของ Runtime ที่ต้องมี `sandbox-exec` จริง ไม่พึ่ง Docker, Postgres หรือเครือข่าย และไม่ถูกข้ามเมื่อเครื่องขาดของ
 
 ## Risks / Trade-offs
