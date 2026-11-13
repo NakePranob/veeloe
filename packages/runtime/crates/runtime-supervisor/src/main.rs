@@ -13,6 +13,7 @@ use veeloe_protocol::envelope::{verify, Route};
 use veeloe_protocol::hub_auth::normalize_hub_url;
 use veeloe_protocol::pairing::PAIRING_TTL_SECONDS;
 use veeloe_runtime_core::ipc::LlmHttpRequest;
+use veeloe_runtime_core::preflight;
 use veeloe_runtime_core::{FromWorker, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
 use veeloe_runtime_supervisor::approval::Approvals;
@@ -1104,6 +1105,10 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     }
     let hub = load_hub_url(&home).ok_or("no Hub URL: run veeloe pair --hub <url>")?;
     let hub = normalize_hub_url(&hub).map_err(|_| "the Hub URL is not a websocket URL")?;
+    // A Machine that cannot make the sandbox gets no Hub link and no worker:
+    // say what is missing, and how to fix it, before anything starts (issue
+    // #46). `worker` mode is already inside the sandbox, so it never checks.
+    preflight::check_this_system().map_err(CliError::from)?;
     let secret_key = load_or_create_machine_key(&home)?;
     let registry = AgentRegistry::open(&home)?;
     let trust = load_trust(&home)?;
