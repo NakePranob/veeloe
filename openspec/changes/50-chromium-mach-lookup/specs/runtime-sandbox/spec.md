@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: macOS เปิดเฉพาะ system service ที่ worker ต้องใช้
-profile ของ macOS SHALL ระบุ `mach-lookup` เป็นรายชื่อ service ที่ worker, toolchain และ headless browser ต้องใช้จริง MUST NOT เปิดทุก service ด้วย `(allow mach-lookup)` แบบไม่มีรายชื่อ คำขอไป service ที่ไม่อยู่ในรายชื่อ SHALL ถูกปฏิเสธและ SHALL เห็นได้ใน Runtime log รายชื่อที่อนุญาต SHALL มีเหตุผลกำกับว่ามาจาก worker, toolchain, OS หรือ browser service ของ headless browser ที่วัดแล้ว SHALL อยู่ในรายชื่อ; service ที่ยังไม่รู้ MUST NOT ถูกเพิ่มโดยเดา
+profile ของ macOS SHALL ระบุ `mach-lookup` เป็นรายชื่อ service ที่ worker, toolchain และ headless browser ต้องใช้จริง MUST NOT เปิดทุก service ด้วย `(allow mach-lookup)` แบบไม่มีรายชื่อ คำขอไป service ที่ไม่อยู่ในรายชื่อ SHALL ถูกปฏิเสธและ SHALL เห็นได้ใน Runtime log รายชื่อที่อนุญาต SHALL มีเหตุผลกำกับว่ามาจาก worker, toolchain, OS หรือ browser service ของ headless browser ที่วัดแล้ว SHALL อยู่ในรายชื่อ; service ที่ยังไม่รู้ MUST NOT ถูกเพิ่มโดยเดา ชื่อ Mach ที่ browser ลงทะเบียนเองและมี pid อยู่ด้วย SHALL ระบุเป็น regex เฉพาะ namespace ของ browser แทนการเปิดทุกชื่อ และ MAY อนุญาต `mach-register` เฉพาะชื่อนั้น
 
 #### Scenario: service ที่อนุญาต
 - **WHEN** worker รันหนึ่ง Turn ที่ใช้ `git` และ `bun` ใต้รายชื่อใหม่

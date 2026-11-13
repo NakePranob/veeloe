@@ -83,9 +83,10 @@ const LINUX_READ: &[&str] = &["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc",
 /// `com.apple.lsd.modifydb` (it writes the Launch Services database, a way out
 /// of the file rules), `com.apple.bsd.dirhelper` (it hands out the owner's
 /// per-user folders) and `com.apple.diagnosticd` (it files crash reports that
-/// carry the owner's paths). Chromium's services are **not** in this change
-/// either: a headless browser needs its own measured list, and guessing one
-/// here would be the allow-all with extra steps.
+/// carry the owner's paths).
+///
+/// A headless browser needed no system service of the owner's session: it
+/// runs with its own Mach name only, see [`BROWSER_RENDEZVOUS`] (issue #50).
 const MACOS_SERVICES: &[(&str, Reason)] = &[
     // Every toolchain writes its diagnostics through `os_log`; without this the
     // messages vanish, and a broken tool looks like a silent one.
@@ -102,15 +103,41 @@ const MACOS_SERVICES: &[(&str, Reason)] = &[
     ("com.apple.system.opendirectoryd.membership", Reason::Toolchain),
 ];
 
+/// The one Mach name a headless browser registers for the processes it starts.
+/// The browser puts its own pid in the name
+/// (`<bundle>.MachPortRendezvousServer.<pid>`), so it cannot be written as a
+/// literal service name; the profile matches only that shape, under the two
+/// bundles' own namespaces. Nothing else on the Machine is reachable by it.
+///
+/// Measured on macOS 27 with `chrome-headless-shell` 156 under this profile
+/// (issue #50): with these two rules the browser prints a page's DOM, and every
+/// `com.apple.*` lookup it still makes (`diagnosticd`, `windowserver.active`,
+/// `tccd.system`, `pasteboard.1`) is refused and not needed for that. The full
+/// `/Applications/Google Chrome.app` does not run headless here: it registers
+/// with Launch Services and opens a real window, so it asks for the owner's
+/// `windowserver.active`, `CARenderServer`, `windowmanager.server` and
+/// `tccd.system` — services of the owner's GUI session, which stay refused
+/// (ADR 0069). An Agent's browser therefore lives in the Agent's own folder,
+/// not in `/Applications`.
+const BROWSER_RENDEZVOUS: &[(&str, Reason)] = &[
+    ("com.google.Chrome", Reason::Browser),
+    ("org.chromium.Chromium", Reason::Browser),
+];
+
 /// Where an allowed service is needed, so the next person can tell a
-/// requirement from an accident (issue #37). Only two sources exist today: the
-/// OS the process runs on, and a toolchain a Task cannot be done without.
+/// requirement from an accident (issue #37). Three sources exist today: the OS
+/// the process runs on, a toolchain a Task cannot be done without, and a
+/// headless browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Reason {
     /// A toolchain a Task cannot be done without: `git`, `node`, `bun`, `python3`.
     Toolchain,
     /// What the OS itself needs under the rules, for the process to run at all.
     Os,
+    /// A Mach name a browser registers and looks up for its own child
+    /// processes, measured from the system log under this profile rather than
+    /// guessed (issue #50).
+    Browser,
 }
 
 impl Policy {
@@ -156,6 +183,20 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
             profile.push_str(&format!("  (global-name {})\n", quote(service)));
         }
         profile.push_str(")\n");
+    }
+    // The browser's own rendezvous name, the one thing a headless browser
+    // cannot run without: it registers the name for its children and the
+    // children look it up. Matched by shape because the pid is in it, and only
+    // within the browsers' own namespaces (issue #50).
+    if !BROWSER_RENDEZVOUS.is_empty() {
+        let names = BROWSER_RENDEZVOUS
+            .iter()
+            .map(|(prefix, _)| prefix.replace('.', "\\."))
+            .collect::<Vec<_>>()
+            .join("|");
+        let name = format!("(global-name-regex #\"^({names})\\.MachPortRendezvousServer\\.\")");
+        profile.push_str(&format!("(allow mach-register {name})\n"));
+        profile.push_str(&format!("(allow mach-lookup {name})\n"));
     }
     // Walking a path needs its metadata; this gives no file's contents and no
     // folder's listing.
