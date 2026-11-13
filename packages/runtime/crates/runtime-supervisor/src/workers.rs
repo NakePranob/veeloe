@@ -47,31 +47,36 @@ pub type Wrap = Arc<dyn Fn(&Agent, Vec<String>) -> Vec<String> + Send + Sync>;
 pub type Toolchains = Arc<dyn Fn(&Agent, &Path) -> Option<Vec<Report>> + Send + Sync>;
 
 /// The Wrap a Runtime uses: each worker inside its own Agent's sandbox, which
-/// every command it starts inherits, reaching the network only through the
-/// Egress proxy at `proxy_url` (ADR 0008, 0069). On a system with no sandbox,
-/// or an Agent whose folder cannot be made, no worker runs.
-pub fn sandboxed(home: PathBuf, proxy_url: String) -> Wrap {
+/// every command it starts inherits, reaching the network only through that
+/// Agent's own Egress proxy (ADR 0008, 0029, 0069). On a system with no
+/// sandbox, or an Agent whose folder or proxy cannot be made, no worker runs.
+pub fn sandboxed(home: PathBuf, proxies: Arc<crate::proxy::Proxies>) -> Wrap {
     Arc::new(move |agent, mut command| {
         // The folder of the program the worker runs, which must be readable to
         // start it: the `veeloe` binary itself in a release.
         let Some(bin) = program_dir(&command) else {
             return Vec::new();
         };
-        let Some(policy) = rules(&home, agent, &bin, &proxy_url) else {
+        // No listener means no way out, so there is no worker to start: another
+        // Agent's proxy is never a fallback (ADR 0029, issue #43).
+        let Some(proxy) = proxies.get(&agent.id) else {
             return Vec::new();
         };
-        // How the worker finds the proxy. macOS reaches it over loopback, on
-        // the one port the profile allows out. Linux has no route to the
-        // supervisor, only the socket bound into its namespace, and the worker
-        // runs a bridge from its own loopback to that socket so every command
-        // can keep using an ordinary `http://127.0.0.1:<port>` proxy URL
-        // (ADR 0069).
+        let Some(policy) = rules(&home, agent, &bin, &proxy, &proxies.ports()) else {
+            return Vec::new();
+        };
+        // How the worker finds its own proxy. macOS reaches it over loopback,
+        // on the one port the profile allows out. Linux has no route to the
+        // supervisor, only this Agent's socket bound into its namespace, and
+        // the worker runs a bridge from its own loopback to that socket so
+        // every command can keep using an ordinary `http://127.0.0.1:<port>`
+        // proxy URL (ADR 0069).
         if cfg!(target_os = "linux") {
             command.push("--proxy-unix".to_string());
             command.push(sandbox::PROXY_SOCKET.to_string());
         } else {
             command.push("--proxy".to_string());
-            command.push(proxy_url.clone());
+            command.push(proxy.url);
         }
         Sandbox::new(policy).wrap(&command)
     })
@@ -79,31 +84,38 @@ pub fn sandboxed(home: PathBuf, proxy_url: String) -> Wrap {
 
 /// The rules one Agent's worker runs under, started from `bin` (ADR 0008,
 /// 0069): its own folder to write in, the program's folder to read, and the one
-/// way out. `None` when this system has no sandbox, or the Agent has no folder
-/// it can be given: then nothing of that Agent runs.
-pub fn rules(home: &Path, agent: &Agent, bin: &Path, proxy_url: &str) -> Option<Policy> {
+/// way out, which is its own proxy. `proxy_ports` are every proxy on the
+/// Machine, so the range this Agent may bind never covers one. `None` when this
+/// system has no sandbox, or the Agent has no folder it can be given: then
+/// nothing of that Agent runs.
+pub fn rules(
+    home: &Path,
+    agent: &Agent,
+    bin: &Path,
+    proxy: &crate::proxy::ProxyView,
+    proxy_ports: &[u16],
+) -> Option<Policy> {
     if !sandbox::AVAILABLE {
         return None;
     }
     let dir = agent_dir(home, &agent.id).ok()?;
     let mut policy = Policy::new(&dir.join("workdir"), &dir.join("tmp"), bin);
-    policy.proxy = proxy_url
-        .trim_end_matches('/')
-        .rsplit_once(':')
-        .and_then(|(_, port)| port.parse().ok());
-    // The one way out on Linux is this socket, bound into the namespace at a
-    // fixed path (ADR 0069). A system without one never reads it.
-    policy.proxy_socket = Some(
-        crate::proxy::socket_path(home)
-            .to_string_lossy()
-            .to_string(),
-    );
+    // The one way out on macOS: this Agent's own TCP listener, and no other.
+    policy.proxy = Some(proxy.port);
+    // The one way out on Linux: this Agent's socket, bound into its namespace
+    // at a fixed path (ADR 0069). A system without one never reads it.
+    policy.proxy_socket = proxy
+        .socket
+        .as_ref()
+        .map(|path| path.to_string_lossy().to_string());
     // The Agent's own localhost, from the range the supervisor reserved for it
     // and kept outside its folder (ADR 0069). The toolchain check runs under
     // these rules too, so it sees what the worker sees. A range that cannot be
     // read leaves the Agent without ports, never without a worker.
     policy.ports = crate::ports::Ports::open(home)
-        .and_then(|ports| ports.range(&agent.id, policy.proxy))
+        .and_then(|ports| {
+            ports.range_avoiding(&agent.id, &|port| proxy_ports.contains(&port))
+        })
         .map(|range| range.ports())
         .unwrap_or_default();
     Some(policy)
@@ -366,7 +378,7 @@ async fn session(
     // file so a restart hands out the same one (ADR 0069). Every command sees
     // `PORT` and the whole list, so a dev server started by a Task keeps its
     // address across Turns and finds the database beside it. This reads only:
-    // `rules()` is the one place that allocates, with the proxy's port
+    // `rules()` is the one place that allocates, with every proxy's port
     // excluded, so a second allocation here could only reserve a worse range.
     let ports = match crate::ports::Ports::open(&inner.home) {
         Ok(ports) => ports.existing(&agent.id),

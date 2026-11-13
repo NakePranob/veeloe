@@ -189,6 +189,13 @@ fn is_agent(value: &Value) -> bool {
             return false;
         }
     }
+    // Each Agent's own way out (ADR 0029, issue #43). A Machine older than that
+    // sends none.
+    if let Some(egress) = object.get("egress") {
+        if !is_egress(egress) {
+            return false;
+        }
+    }
     true
 }
 
@@ -548,7 +555,13 @@ fn is_egress(value: &Value) -> bool {
 }
 
 fn is_egress_set(object: &Map<String, Value>) -> bool {
-    object.get("egress").map(is_egress).unwrap_or(false)
+    // `agent` is optional (issue #43): without it the list is every Agent's, as
+    // it was before; with it, only that Agent's, and it must be a folder name.
+    let agent = object
+        .get("agent")
+        .map(|agent| text(Some(agent)).map(is_agent_id).unwrap_or(false))
+        .unwrap_or(true);
+    agent && object.get("egress").map(is_egress).unwrap_or(false)
 }
 
 fn is_error_code(value: &str) -> bool {

@@ -7,6 +7,8 @@ use serde_json::{json, Value};
 use tempfile::tempdir;
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
+use veeloe_runtime_supervisor::egress::Egress;
+use veeloe_runtime_supervisor::trust::{Owner, Trust};
 use veeloe_runtime_supervisor::llm::{HttpAnswer, HttpClient};
 use veeloe_runtime_supervisor::providers::{Auth, Provider};
 use veeloe_runtime_supervisor::push_tokens::PushTokens;
@@ -92,6 +94,17 @@ impl Recording {
     }
 }
 
+/// v0.1's one Member: the Owner, who has Manage at every Agent (ADR 0010).
+fn owners() -> Trust {
+    Trust {
+        owners: vec![Owner {
+            member: "member-1".into(),
+            keys: vec!["controller-1".into()],
+        }],
+        ..Trust::default()
+    }
+}
+
 fn from() -> Inbound {
     Inbound {
         member: "member-1".into(),
@@ -131,7 +144,9 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
         uploads: None,
         push_tokens: None,
         providers: &providers,
-        egress: &[],
+        egress: None,
+        trust: None,
+        proxies: None,
         budgets: None,
         http: &http,
     };
@@ -194,10 +209,9 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
 
     dispatch(&machine, &outbox, &from(), "agent.list", &json!({})).await;
     assert_eq!(outbox.last().0, "agent.listed");
-    assert_eq!(
-        agents_listed(&registry, &[], &["api.anthropic.com".into()])["egress"],
-        json!(["api.anthropic.com"])
-    );
+    // A new Agent starts with no way out, and its own row says so (issue #43).
+    assert_eq!(outbox.last().1["agents"][0]["egress"], json!([]));
+    assert_eq!(agents_listed(&registry, &[])["egress"], json!([]));
 
     workers.stop_all();
 }
@@ -224,6 +238,7 @@ async fn a_deleted_agent_waits_in_the_trash_and_can_be_restored() {
         model: "model-a".into(),
         character: None,
         allowlist: Vec::new(),
+        egress: Vec::new(),
         approval_timeout_s: 3_600,
         budget: None,
         deleted_at: None,
@@ -241,7 +256,9 @@ async fn a_deleted_agent_waits_in_the_trash_and_can_be_restored() {
         uploads: None,
         push_tokens: None,
         providers: &providers,
-        egress: &[],
+        egress: None,
+        trust: None,
+        proxies: None,
         budgets: None,
         http: &http,
     };
@@ -423,7 +440,9 @@ async fn a_push_token_is_kept_for_the_controller_key_and_then_removed() {
         uploads: None,
         push_tokens: Some(&tokens),
         providers: &providers,
-        egress: &[],
+        egress: None,
+        trust: None,
+        proxies: None,
         budgets: None,
         http: &http,
     };
@@ -468,6 +487,7 @@ async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
         model: "model-a".into(),
         character: None,
         allowlist: Vec::new(),
+        egress: Vec::new(),
         approval_timeout_s: 3_600,
         budget: Some(budget),
         deleted_at: None,
@@ -499,7 +519,9 @@ async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
         uploads: None,
         push_tokens: None,
         providers: &providers,
-        egress: &[],
+        egress: None,
+        trust: None,
+        proxies: None,
         budgets: Some(&budgets),
         http: &http,
     };
@@ -507,5 +529,157 @@ async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
     let (type_, body) = outbox.last();
     assert_eq!(type_, "machine.status");
     assert_eq!(body["budgetToday"]["limitTokens"], 5_000_000);
+    workers.stop_all();
+}
+
+/// Issue #43: `egress.set` names an Agent and checks Manage at it; without an
+/// Agent it still changes every one, as the Controller sends it today.
+#[tokio::test]
+async fn egress_set_checks_manage_and_touches_only_the_agent_it_names() {
+    let home = tempdir().expect("home");
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    for id in ["a1", "a2"] {
+        registry
+            .add(&veeloe_runtime_supervisor::agents::Agent {
+                id: id.into(),
+                name: id.into(),
+                provider: "main".into(),
+                model: "model-a".into(),
+                character: None,
+                allowlist: Vec::new(),
+                egress: Vec::new(),
+                approval_timeout_s: 3_600,
+                budget: None,
+                deleted_at: None,
+            })
+            .expect("add");
+    }
+    let workers = Workers::new(
+        home.path().to_path_buf(),
+        vec!["/bin/true".into()],
+        Arc::new(Silent) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent: &str, _message: FromWorker| {}),
+        Arc::new(|_line: &str| {}),
+        Arc::new(|_agent, command| command),
+    );
+    let egress = Egress::open(home.path()).expect("egress");
+    let trust = owners();
+    let outbox = Recording::default();
+    let providers = providers();
+    let http = Models;
+    let machine = Machine {
+        registry: &registry,
+        workers: &workers,
+        routes: None,
+        secret_key: None,
+        uploads: None,
+        push_tokens: None,
+        providers: &providers,
+        egress: Some(&egress),
+        trust: Some(&trust),
+        proxies: None,
+        budgets: None,
+        http: &http,
+    };
+
+    // No Agent: every Agent, as before the split.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "egress.set",
+        &json!({ "egress": ["github.com"] }),
+    )
+    .await;
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "agent.listed");
+    for agent in body["agents"].as_array().expect("agents") {
+        assert_eq!(agent["egress"], json!(["github.com"]), "{agent}");
+    }
+    assert_eq!(body["egress"], json!(["github.com"]));
+
+    // With an Agent: only that one, and the top-level list is the union.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "egress.set",
+        &json!({ "agent": "a1", "egress": ["example.com"] }),
+    )
+    .await;
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "agent.listed");
+    let by_id = |id: &str| {
+        body["agents"]
+            .as_array()
+            .expect("agents")
+            .iter()
+            .find(|agent| agent["id"] == id)
+            .expect("agent")
+            .clone()
+    };
+    assert_eq!(by_id("a1")["egress"], json!(["example.com"]));
+    assert_eq!(by_id("a2")["egress"], json!(["github.com"]));
+    assert_eq!(body["egress"], json!(["example.com", "github.com"]));
+
+    // An Agent this Machine does not have is refused, and changes nothing.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "egress.set",
+        &json!({ "agent": "nope", "egress": [] }),
+    )
+    .await;
+    assert_eq!(outbox.last().0, "error");
+    assert_eq!(outbox.last().1["code"], "agent.unknown");
+
+    // A Member who is not an Owner has no Manage at any Agent (ADR 0010): the
+    // v0.1 form of the check, since there is no Grant yet.
+    let stranger = Inbound {
+        member: "m_2".into(),
+        ..from()
+    };
+    dispatch(
+        &machine,
+        &outbox,
+        &stranger,
+        "egress.set",
+        &json!({ "agent": "a1", "egress": [] }),
+    )
+    .await;
+    assert_eq!(outbox.last().0, "error");
+    assert_eq!(outbox.last().1["code"], "egress.forbidden");
+    assert_eq!(egress.current("a1"), vec!["example.com".to_string()]);
+
+    // An id that is purged and used again starts empty, not with the old list.
+    registry.remove("a1").expect("purge");
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.create",
+        &json!({ "id": "a1", "name": "a1", "provider": "main", "model": "model-a" }),
+    )
+    .await;
+    assert_eq!(outbox.last().0, "agent.listed");
+    assert!(egress.current("a1").is_empty());
+
+    // A key trusted for the Owner is the same Member; another key is not.
+    let forged = Inbound {
+        member: "member-1".into(),
+        key: Some("someone-else".into()),
+        ..from()
+    };
+    dispatch(
+        &machine,
+        &outbox,
+        &forged,
+        "egress.set",
+        &json!({ "agent": "a1", "egress": [] }),
+    )
+    .await;
+    assert_eq!(outbox.last().1["code"], "egress.forbidden");
+
     workers.stop_all();
 }

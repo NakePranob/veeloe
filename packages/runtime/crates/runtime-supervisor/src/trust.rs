@@ -141,6 +141,24 @@ impl Trust {
             .collect()
     }
 
+    /// Whether this Member may change an Agent's settings such as its Egress
+    /// (issue #43).
+    ///
+    /// v0.1 has one Member, the Owner, and an Owner has Manage at every Agent
+    /// (ADR 0010, 0031). So this is being an Owner, and when the envelope names
+    /// the key that signed it, one of that Owner's keys: a key trusted for one
+    /// Member cannot act as another. When Grants are stored per Agent this
+    /// narrows to the Member's Grant at that Agent; the callers already ask per
+    /// Agent, so only this function changes.
+    pub fn manages(&self, member: &str, key: Option<&str>) -> bool {
+        self.owners.iter().any(|owner| {
+            owner.member == member
+                && key
+                    .map(|key| owner.keys.iter().any(|known| known == key))
+                    .unwrap_or(true)
+        })
+    }
+
     fn to_json(&self) -> Value {
         let mut value = json!({
             "owners": self
