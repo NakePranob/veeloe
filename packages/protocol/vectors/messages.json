@@ -606,6 +606,57 @@
       "valid": true
     },
     {
+      "name": "listed with each Agent's own Egress",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "egress": [
+              "github.com"
+            ]
+          },
+          {
+            "id": "agent-2",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "egress": [
+              "*.npmjs.org"
+            ]
+          }
+        ],
+        "providers": [],
+        "egress": [
+          "github.com",
+          "*.npmjs.org"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with an Agent Egress entry that is not a domain",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "egress": [
+              "10.0.0.1"
+            ]
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
+    },
+    {
       "name": "listed with an Egress entry that is not a domain",
       "type": "agent.listed",
       "body": {
@@ -694,6 +745,26 @@
         ]
       },
       "valid": true
+    },
+    {
+      "name": "set one Agent's Egress",
+      "type": "egress.set",
+      "body": {
+        "agent": "agent-1",
+        "egress": [
+          "github.com"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "set the Egress of an Agent id that is not a folder name",
+      "type": "egress.set",
+      "body": {
+        "agent": "../trust",
+        "egress": []
+      },
+      "valid": false
     },
     {
       "name": "set the Egress to nothing",

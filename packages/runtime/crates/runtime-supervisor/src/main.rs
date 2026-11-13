@@ -15,7 +15,7 @@ use veeloe_protocol::pairing::PAIRING_TTL_SECONDS;
 use veeloe_runtime_core::ipc::LlmHttpRequest;
 use veeloe_runtime_core::{FromWorker, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
-use veeloe_runtime_supervisor::egress::{is_valid_egress, Egress};
+use veeloe_runtime_supervisor::egress::Egress;
 use veeloe_runtime_supervisor::help::{help_for, USAGE};
 use veeloe_runtime_supervisor::hub_link::{HubLink, HubLinkOptions, HubLinkSink, HubSender};
 use veeloe_runtime_supervisor::llm::{HttpClient, LlmProxy};
@@ -24,10 +24,11 @@ use veeloe_runtime_supervisor::memory;
 use veeloe_runtime_supervisor::models;
 use veeloe_runtime_supervisor::pair::{run_pair, PairOptions, PairResult};
 use veeloe_runtime_supervisor::providers::{load_providers, upstream_headers};
+use veeloe_runtime_supervisor::proxy::Proxies;
 use veeloe_runtime_supervisor::service;
 use veeloe_runtime_supervisor::status::{remove_pid_file, run_status, write_pid_file};
 use veeloe_runtime_supervisor::tasks::{
-    agents_listed, dispatch, forward, Inbound, Machine, MachineOutbox, Outbox,
+    dispatch, forward, Inbound, Machine, MachineOutbox,
 };
 use veeloe_runtime_supervisor::task_routes::TaskRoutes;
 use veeloe_runtime_supervisor::trust::{
@@ -121,6 +122,8 @@ struct Supervisor {
     registry: AgentRegistry,
     trust: Mutex<Trust>,
     egress: Arc<Egress>,
+    /// One listener per Agent (ADR 0029, issue #43).
+    proxies: Arc<Proxies>,
     secret_key: [u8; 32],
     seen: Mutex<MemorySeen>,
     /// This Supervisor, so a message that needs the wire (a Provider's models)
@@ -323,44 +326,8 @@ impl HubLinkSink for Supervisor {
                 .to_string(),
             task: verified.signed.task.clone(),
         };
-        if verified.signed.type_ == "egress.set" {
-            let Some(domains) = verified
-                .signed
-                .body
-                .get("egress")
-                .and_then(Value::as_array)
-                .map(|entries| {
-                    entries
-                        .iter()
-                        .filter_map(|entry| entry.as_str().map(str::to_string))
-                        .collect::<Vec<_>>()
-                })
-            else {
-                return;
-            };
-            let Some(me) = self.me.upgrade() else { return };
-            let outbox = Arc::clone(&outbox);
-            // The list is checked before it is applied, and every Member hears
-            // the new one; a running worker is told without a restart (ADR 0029).
-            tokio::spawn(async move {
-                if !is_valid_egress(&domains) {
-                    outbox.error(&from, "egress.invalid_domain");
-                    return;
-                }
-                let _ = me.egress.set(domains.clone());
-                let providers = load_providers(&me.home).unwrap_or_default();
-                let providers = models::info(&providers, me.http.as_ref()).await;
-                outbox.to_member(
-                    &from.member,
-                    "agent.listed",
-                    agents_listed(&me.registry, &providers, &domains),
-                    None,
-                );
-            });
-            return;
-        }
         let Some(me) = self.me.upgrade() else { return };
-        let egress = me.egress.current();
+        let trust = me.trust.lock().expect("trust").clone();
         let type_ = verified.signed.type_.clone();
         let body = verified.signed.body.clone();
         // Off the link's own task: a Provider's models come over the wire, and
@@ -380,7 +347,9 @@ impl HubLinkSink for Supervisor {
                 uploads: Some(&me.uploads),
                 push_tokens: Some(me.push_tokens.as_ref()),
                 providers: &providers,
-                egress: &egress,
+                egress: Some(me.egress.as_ref()),
+                trust: Some(&trust),
+                proxies: Some(me.proxies.as_ref()),
                 budgets: Some(me.budgets.as_ref()),
                 http: me.http.as_ref(),
             };
@@ -1136,10 +1105,10 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     }
     let _ = logs::record(&home, "info", "runtime.start", json!({}));
     let egress = Arc::new(Egress::open(&home)?);
-    // Every command reaches the network only through this proxy, which checks
-    // the Egress on each connection; Seatbelt cannot match a domain itself. The
-    // proxy steps around the ranges already reserved for Agents, so its port is
-    // never one a command may bind (ADR 0069).
+    // Every command reaches the network only through its own Agent's proxy,
+    // which checks that Agent's Egress on each connection; Seatbelt cannot match
+    // a domain itself (ADR 0008, 0029, 0069). One listener per Agent, each on a
+    // port outside every range a command may bind.
     let reserved = veeloe_runtime_supervisor::ports::Ports::open(&home)
         .map_err(|error| format!("cannot open the Agents' ports folder: {error}"))?;
     // A corrupt `ports.json` is read as empty, not a reason to refuse to start:
@@ -1151,20 +1120,19 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         );
         eprintln!("veeloe: the next Agent that starts writes a fresh one.");
     }
-    // On Linux the proxy also answers on a Unix socket in the Runtime's folder:
-    // a worker's network namespace has no route to this process, so that file
-    // is bound into it and is the only way out (ADR 0069). macOS keeps the TCP
-    // listener alone, because its profile allows that one port.
-    #[cfg(target_os = "linux")]
-    let proxy_socket = Some(veeloe_runtime_supervisor::proxy::socket_path(&home));
-    #[cfg(not(target_os = "linux"))]
-    let proxy_socket: Option<std::path::PathBuf> = None;
-    let egress_proxy = veeloe_runtime_supervisor::proxy::start_with_socket(
-        Arc::clone(&egress),
-        &|port| reserved.is_taken(port),
-        proxy_socket.as_deref(),
-    )
-    .await?;
+    let proxies = Arc::new(Proxies::new(home.clone(), Arc::clone(&egress)));
+    for agent in registry.all().unwrap_or_default() {
+        // An Agent in the trash has no worker, so it needs no listener either.
+        if agent.deleted() {
+            continue;
+        }
+        if let Err(error) = proxies.ensure(&agent.id).await {
+            eprintln!(
+                "veeloe: agent {} has no proxy, so its worker will not start: {error}",
+                agent.id
+            );
+        }
+    }
     let budgets = Arc::new(veeloe_runtime_supervisor::usage::Budgets::new(
         UsageStore::open(&supervisor_dir(&home)?.join("usage.db"))?,
     ));
@@ -1189,6 +1157,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         registry,
         trust: Mutex::new(trust),
         egress,
+        proxies: Arc::clone(&proxies),
         secret_key,
         seen: Mutex::new(MemorySeen::default()),
         me: me.clone(),
@@ -1251,11 +1220,11 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
 
     let weak = Arc::downgrade(&supervisor);
     // The worker runs inside its Agent's sandbox, and every command it starts
-    // inherits it (ADR 0008, 0069). It reaches the network only through the
-    // Egress proxy. A worker that cannot be wrapped is not started: an empty
-    // argv ends its session before it runs.
+    // inherits it (ADR 0008, 0069). It reaches the network only through that
+    // Agent's own proxy. A worker that cannot be wrapped — or has no proxy —
+    // is not started: an empty argv ends its session before it runs.
     let wrap =
-        veeloe_runtime_supervisor::workers::sandboxed(home.clone(), egress_proxy.url.clone());
+        veeloe_runtime_supervisor::workers::sandboxed(home.clone(), Arc::clone(&proxies));
     let workers = Workers::new(
         home.clone(),
         worker_command(),
@@ -1273,9 +1242,18 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // ends a Turn: the report is what the Owner fixes the Machine with (#35).
     {
         let home = home.clone();
-        let proxy_url = egress_proxy.url.clone();
+        let proxies = Arc::clone(&proxies);
         workers.checking_toolchains(Arc::new(move |agent, bin| {
-            let policy = veeloe_runtime_supervisor::workers::rules(&home, agent, bin, &proxy_url)?;
+            // The same rules the worker got, including its own proxy and the
+            // ports no range may cover (issue #43).
+            let proxy = proxies.get(&agent.id)?;
+            let policy = veeloe_runtime_supervisor::workers::rules(
+                &home,
+                agent,
+                bin,
+                &proxy,
+                &proxies.ports(),
+            )?;
             Some(veeloe_runtime_supervisor::toolchain::check(
                 &policy,
                 &std::env::var("PATH").unwrap_or_default(),
@@ -1310,6 +1288,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(workers) = supervisor.workers.get() {
         workers.stop_all();
     }
+    proxies.stop_all();
     drop(denials);
     Ok(())
 }

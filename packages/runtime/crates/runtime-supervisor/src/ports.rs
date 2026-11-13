@@ -189,12 +189,23 @@ impl Ports {
     }
 
     /// This Agent's range: the one it already has, or a new one written down
-    /// before it is used. `exclude` is the port the Egress proxy listens on
-    /// this run, which no range may cover.
+    /// before it is used. `exclude` is a port this run must not cover, such as
+    /// an Egress proxy's.
     ///
     /// The answer is the same on every call and after a restart, because the
     /// first answer is the one in the file.
     pub fn range(&self, agent: &str, exclude: Option<u16>) -> Result<Range, PortsError> {
+        self.range_avoiding(agent, &|port| exclude == Some(port))
+    }
+
+    /// The same, for a set of ports that is not one number: every Agent's proxy
+    /// is on a port no range may cover, so a command never binds the way out
+    /// (ADR 0069, issue #43).
+    pub fn range_avoiding(
+        &self,
+        agent: &str,
+        avoid: &(dyn Fn(u16) -> bool + Send + Sync),
+    ) -> Result<Range, PortsError> {
         let _allocating = ALLOCATING
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -209,7 +220,7 @@ impl Ports {
         if let Some(start) = assigned.get(agent) {
             return Ok(Range { start: *start });
         }
-        let start = first_free(&assigned, exclude).ok_or(PortsError::Exhausted)?;
+        let start = first_free(&assigned, avoid).ok_or(PortsError::Exhausted)?;
         assigned.insert(agent.to_string(), start);
         save(&dir, &assigned)?;
         Ok(Range { start })
@@ -243,15 +254,18 @@ fn note_unreadable(home: &Path, reason: Option<&str>) {
     );
 }
 
-/// The lowest range that overlaps no reservation and covers no excluded port.
-fn first_free(assigned: &BTreeMap<String, u16>, exclude: Option<u16>) -> Option<u16> {
+/// The lowest range that overlaps no reservation and covers no avoided port.
+fn first_free(
+    assigned: &BTreeMap<String, u16>,
+    avoid: &(dyn Fn(u16) -> bool + Send + Sync),
+) -> Option<u16> {
     let mut start = FIRST;
     while start + COUNT <= LAST {
         let overlaps = assigned
             .values()
             .any(|other| start < other + COUNT && *other < start + COUNT);
-        let covers_excluded = exclude.is_some_and(|port| (start..start + COUNT).contains(&port));
-        if !overlaps && !covers_excluded {
+        let covers_avoided = (start..start + COUNT).any(avoid);
+        if !overlaps && !covers_avoided {
             return Some(start);
         }
         start += STEP;

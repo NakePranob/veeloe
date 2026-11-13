@@ -19,6 +19,7 @@ fn agent(id: &str) -> Agent {
         model: "model-a".into(),
         character: None,
         allowlist: Vec::new(),
+        egress: Vec::new(),
         approval_timeout_s: 3_600,
         budget: None,
         deleted_at: None,

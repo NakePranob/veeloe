@@ -43,6 +43,11 @@ pub struct Agent {
     pub character: Option<Value>,
     #[serde(default)]
     pub allowlist: Vec<String>,
+    /// The domains this Agent itself may reach (ADR 0029, issue #43). Kept in
+    /// the Agent's own row so `agents.json` from before this change still
+    /// reads: a missing list is an empty one, and lets nothing out.
+    #[serde(default)]
+    pub egress: Vec<String>,
     #[serde(rename = "approvalTimeoutS", default = "default_timeout")]
     pub approval_timeout_s: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -139,6 +144,33 @@ impl AgentRegistry {
             .filter(|agent| agent.id != id)
             .collect();
         self.save(&agents)
+    }
+
+    /// One Agent's Egress, in one write of the whole file (ADR 0029, issue
+    /// #43). `false` when this Machine has no such Agent, so nothing is written.
+    pub fn set_egress(&self, id: &str, domains: &[String]) -> Result<bool, AgentError> {
+        let mut agents = self.all()?;
+        let Some(slot) = agents.iter_mut().find(|agent| agent.id == id) else {
+            return Ok(false);
+        };
+        slot.egress = domains.to_vec();
+        self.save(&agents)?;
+        Ok(true)
+    }
+
+    /// The same list for every Agent, in one write: the legacy `egress.set`
+    /// without an Agent, and the migration from the Machine's old list (issue
+    /// #43). Gives back how many Agents it wrote, which is zero when there are
+    /// none.
+    pub fn set_egress_everywhere(&self, domains: &[String]) -> Result<usize, AgentError> {
+        let mut agents = self.all()?;
+        for agent in &mut agents {
+            agent.egress = domains.to_vec();
+        }
+        if !agents.is_empty() {
+            self.save(&agents)?;
+        }
+        Ok(agents.len())
     }
 
     /// Put the Agent in the trash (`agent-trash`). `false` when it is not there,

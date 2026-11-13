@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { AgentIdSchema } from "./ids";
 
-/** How many domains one Machine's Egress may hold. */
+/** How many domains one Agent's Egress may hold. */
 export const EGRESS_MAX = 100;
 
 /**
@@ -13,9 +14,13 @@ export const EgressDomainSchema = z
   .max(253)
   .regex(/^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/);
 
-/** The whole list, as the Machine keeps it: the same list sent twice changes nothing. */
+/** The whole list, as one Agent keeps it: the same list sent twice changes nothing. */
 export const EgressSchema = z.array(EgressDomainSchema).max(EGRESS_MAX);
 
-/** Controller → Machine: this is the Machine's Egress now. Answered with `agent.listed`. */
-export const EgressSetBodySchema = z.looseObject({ egress: EgressSchema });
+/**
+ * Controller → Machine: this is an Egress now. Without `agent` it is every Agent's
+ * list, as before issue #43; with it, only that Agent's (ADR 0029). Answered with
+ * `agent.listed`.
+ */
+export const EgressSetBodySchema = z.looseObject({ egress: EgressSchema, agent: AgentIdSchema.optional() });
 export type EgressSetBody = z.infer<typeof EgressSetBodySchema>;
