@@ -4,6 +4,8 @@ description = "The supervisor process of the Veeloe Runtime."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+# The embedded AppArmor profile is read from `packaging/`, outside the crate.
+publish = false
 
 [[bin]]
 name = "veeloe"

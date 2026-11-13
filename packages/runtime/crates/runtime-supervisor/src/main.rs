@@ -492,7 +492,7 @@ async fn run() -> Result<(), CliError> {
             // The only fix `doctor` has is the AppArmor profile (issue #49);
             // what it needs from the Machine is injected, so a test runs it
             // on macOS without root or AppArmor.
-            if !args.iter().any(|arg| arg == "--fix-apparmor") {
+            if args.len() != 2 || args[1] != "--fix-apparmor" {
                 return Err(CliError::usage(
                     "what should doctor fix? veeloe doctor --fix-apparmor",
                 ));

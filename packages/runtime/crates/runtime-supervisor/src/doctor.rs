@@ -37,7 +37,7 @@ pub trait Host {
     fn uid(&self) -> u32;
     /// [`APPARMOR_RESTRICT`]'s value, or `None` when this Machine has no such
     /// file (macOS, an older Linux).
-    fn restriction(&self) -> Option<String>;
+    fn restriction(&self) -> Result<Option<String>, String>;
     /// Writes the profile atomically with `mode`, replacing the file at `path`.
     fn write_profile(&self, path: &Path, contents: &str, mode: u32) -> Result<(), String>;
     /// Runs `program` with `args`; a non-zero exit is an `Err` with its stderr.
@@ -57,10 +57,13 @@ impl Host for SystemHost {
         unsafe { libc::geteuid() }
     }
 
-    fn restriction(&self) -> Option<String> {
-        std::fs::read_to_string(APPARMOR_RESTRICT)
-            .ok()
-            .map(|value| value.trim().to_string())
+    fn restriction(&self) -> Result<Option<String>, String> {
+        match std::fs::read_to_string(APPARMOR_RESTRICT) {
+            Ok(value) => Ok(Some(value.trim().to_string())),
+            // A kernel without the rule has no file: that is not an error.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.to_string()),
+        }
     }
 
     fn write_profile(&self, path: &Path, contents: &str, mode: u32) -> Result<(), String> {
@@ -108,7 +111,15 @@ pub fn fix_apparmor(host: &dyn Host) -> Result<Vec<String>, String> {
             )])
         }
     }
-    let Some(value) = host.restriction() else {
+    let value = match host.restriction() {
+        Ok(value) => value,
+        Err(error) => {
+            return Err(format!(
+                "cannot read {APPARMOR_RESTRICT}: {error}. Nothing was changed."
+            ))
+        }
+    };
+    let Some(value) = value else {
         return Ok(vec![not_needed(&format!(
             "this Machine has no {APPARMOR_RESTRICT}, so unprivileged user namespaces are not restricted by AppArmor"
         ))]);
@@ -143,7 +154,9 @@ pub fn fix_apparmor(host: &dyn Host) -> Result<Vec<String>, String> {
         .map_err(|error| {
             format!(
                 "wrote {} but could not load it: {error}\n\
-                 The profile is on disk; run `sudo apparmor_parser -r {}` to see the parser's message.",
+                 The profile is on disk; run `sudo apparmor_parser -r {}` to see the parser's message.\n\
+                 If you will not fix it, delete {} so a full AppArmor reload does not pick up a broken file.",
+                path.display(),
                 path.display(),
                 path.display()
             )
@@ -185,6 +198,8 @@ mod tests {
         platform: Option<Platform>,
         uid: u32,
         restriction: Option<String>,
+        /// A read error other than "no file", which must not read as no rule.
+        restriction_error: Option<&'static str>,
         written: RefCell<Vec<(PathBuf, String, u32)>>,
         ran: RefCell<Vec<(String, Vec<String>)>>,
         run_fails: Option<&'static str>,
@@ -196,6 +211,7 @@ mod tests {
                 platform: Some(Platform::Linux),
                 uid: 0,
                 restriction: Some("1\n".into()),
+                restriction_error: None,
                 written: RefCell::new(Vec::new()),
                 ran: RefCell::new(Vec::new()),
                 run_fails: None,
@@ -221,8 +237,11 @@ mod tests {
             self.uid
         }
 
-        fn restriction(&self) -> Option<String> {
-            self.restriction.clone()
+        fn restriction(&self) -> Result<Option<String>, String> {
+            match self.restriction_error {
+                Some(error) => Err(error.to_string()),
+                None => Ok(self.restriction.clone()),
+            }
         }
 
         fn write_profile(&self, path: &Path, contents: &str, mode: u32) -> Result<(), String> {
@@ -253,12 +272,32 @@ mod tests {
         // The file in `packaging/` and the text in the binary are one, by
         // `include_str!`; the release has no other copy.
         assert!(PROFILE.contains("profile veeloe-bwrap /usr/bin/bwrap flags=(unconfined)"));
+        assert!(
+            PROFILE.contains(&format!("profile {APPARMOR_PROFILE} ")),
+            "the profile name and the install path disagree: {PROFILE}"
+        );
         assert!(PROFILE.contains("userns,"));
         assert!(PROFILE.contains("abi <abi/4.0>,"));
         assert!(PROFILE.contains("include <tunables/global>"));
         // Only one program is named, and it is the one the sandbox wraps.
         assert_eq!(PROFILE.matches("/usr/").count(), 1, "{PROFILE}");
         assert!(!PROFILE.contains("flags=(enforce)"), "{PROFILE}");
+        // One rule only: a later edit that grants more must fail this test.
+        for rule in ["capability", "network", "file,", "dbus", "mount", "signal", "ptrace", "unix"] {
+            assert!(!PROFILE.contains(rule), "{rule} is granted: {PROFILE}");
+        }
+    }
+
+    #[test]
+    fn an_unreadable_restriction_file_is_an_error_not_an_all_clear() {
+        let host = Fake {
+            restriction_error: Some("permission denied"),
+            ..Fake::restricted()
+        };
+        let error = fix_apparmor(&host).expect_err("unreadable must not read as no rule");
+        assert!(error.contains("permission denied"), "{error}");
+        assert!(host.written.borrow().is_empty());
+        assert!(host.ran.borrow().is_empty());
     }
 
     #[test]

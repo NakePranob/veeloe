@@ -103,6 +103,11 @@ fn doctor_names_the_one_fix_it_has() {
     assert_eq!(code, 2, "{stderr}");
     assert!(stderr.contains("veeloe doctor --fix-apparmor"), "{stderr}");
 
+    // Exactly that flag: a stray argument is a typo, not another fix.
+    let (code, stderr) = stderr_of(home.path(), &["doctor", "--fix-apparmor", "--extra"]);
+    assert_eq!(code, 2, "{stderr}");
+    assert!(stderr.contains("what should doctor fix?"), "{stderr}");
+
     let (code, out) = veeloe(home.path(), &["help", "doctor"]);
     assert_eq!(code, 0);
     assert!(out.contains("veeloe doctor --fix-apparmor"), "{out}");
