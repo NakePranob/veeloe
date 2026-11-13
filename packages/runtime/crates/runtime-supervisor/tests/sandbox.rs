@@ -265,6 +265,47 @@ mod running {
         );
     }
 
+    /// Issue #42: on Linux the proxy's Unix socket is the one way out of the
+    /// namespace, so a command has to be able to reach it there. The test
+    /// answers from outside the sandbox, with bytes that came from inside it,
+    /// which is what a proxied request is (ADR 0069).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_command_reaches_the_proxys_unix_socket_from_inside_its_namespace() {
+        use std::io::{Read, Write};
+        use std::os::unix::net::UnixListener;
+
+        let mut home = home();
+        let socket = home.root.join("runtime/egress.sock");
+        let listener = UnixListener::bind(&socket).expect("bind the proxy's socket");
+        home.policy.proxy_socket = Some(socket.to_string_lossy().to_string());
+        // The proxy, as the supervisor runs it: outside the namespace, reading
+        // a request and answering it.
+        let answering = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("a command connected");
+            let mut request = [0u8; 4];
+            stream.read_exact(&mut request).expect("the request");
+            stream
+                .write_all(format!("pong:{}", String::from_utf8_lossy(&request)).as_bytes())
+                .expect("the answer");
+        });
+        write_script(
+            &home,
+            "ask.py",
+            &[
+                "import socket",
+                "client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)",
+                "client.connect(\"/run/veeloe/egress.sock\")",
+                "client.sendall(b\"ping\")",
+                "print(client.recv(64).decode())",
+            ]
+            .join("\n"),
+        );
+        let answer = allowed(&home, "python3 ask.py");
+        answering.join().expect("the answer");
+        assert!(answer.contains("pong:ping"), "{answer}");
+    }
+
     /// A Stop or a timeout ends a command with a signal, so the command it
     /// started must be signalled too. Everything outside this sandbox — the
     /// supervisor, another Agent — must not be.

@@ -25,12 +25,23 @@ pub struct Policy {
     /// the proxy is what checks the Egress. Without one, nothing gets out: a
     /// domain list the kernel cannot check is not a rule (ADR 0008, 0029).
     pub proxy: Option<u16>,
+    /// The proxy's Unix socket on the Machine, which `bwrap` binds into the
+    /// network namespace at [`PROXY_SOCKET`]. Linux has no loopback route to
+    /// the supervisor, so this file is the one way out; macOS has no namespace
+    /// and ignores it (ADR 0069).
+    pub proxy_socket: Option<String>,
     /// The localhost ports this Agent owns and no other Agent does. macOS has
     /// no network namespace to give a worker, so its localhost is a range: the
     /// profile allows these ports in and out, and nothing else on the Machine
     /// (ADR 0069). Empty means the Agent may listen on nothing.
     pub ports: Vec<u16>,
 }
+
+/// Where the proxy's Unix socket appears inside a Linux worker's namespace: a
+/// fixed path, under the `/run` only this namespace has. The worker's bridge
+/// listens on loopback and forwards to it, so a command reaches the network
+/// through the supervisor and nowhere else (ADR 0069).
+pub const PROXY_SOCKET: &str = "/run/veeloe/egress.sock";
 
 /// What a program on macOS needs to read to run at all, and the toolchains in
 /// the places the OS and its package managers put them. Read only.
@@ -120,6 +131,7 @@ impl Policy {
             tmp: tmp.to_string_lossy().to_string(),
             bin: bin.to_string_lossy().to_string(),
             proxy: None,
+            proxy_socket: None,
             ports: Vec::new(),
         }
     }
@@ -212,10 +224,17 @@ pub fn bwrap_args(policy: &Policy) -> Vec<String> {
         "--dev".into(),
         "/dev".into(),
     ]);
-    // `--unshare-all` gives the command its own network namespace with no
-    // loopback route to the supervisor's proxy, so on Linux this denies every
-    // egress for now. Wiring the proxy into the namespace is follow-up work;
-    // until then Linux fails closed rather than claiming Egress parity.
+    // `--unshare-all` gives the command its own network namespace. Its loopback
+    // is up, so a dev server, a database and the tests beside them work and
+    // nothing outside the namespace answers. The one way out is the proxy's
+    // Unix socket, bound in at a fixed path: the worker's bridge forwards
+    // `HTTP_PROXY` there and the proxy checks the Egress on every connection
+    // (ADR 0069). Without a socket the namespace has no route out at all.
+    if let Some(socket) = &policy.proxy_socket {
+        args.extend(["--dir".into(), "/run".into()]);
+        args.extend(["--dir".into(), "/run/veeloe".into()]);
+        args.extend(["--bind".into(), socket.clone(), PROXY_SOCKET.into()]);
+    }
     args
 }
 

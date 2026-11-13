@@ -60,8 +60,19 @@ pub fn sandboxed(home: PathBuf, proxy_url: String) -> Wrap {
         let Some(policy) = rules(&home, agent, &bin, &proxy_url) else {
             return Vec::new();
         };
-        command.push("--proxy".to_string());
-        command.push(proxy_url.clone());
+        // How the worker finds the proxy. macOS reaches it over loopback, on
+        // the one port the profile allows out. Linux has no route to the
+        // supervisor, only the socket bound into its namespace, and the worker
+        // runs a bridge from its own loopback to that socket so every command
+        // can keep using an ordinary `http://127.0.0.1:<port>` proxy URL
+        // (ADR 0069).
+        if cfg!(target_os = "linux") {
+            command.push("--proxy-unix".to_string());
+            command.push(sandbox::PROXY_SOCKET.to_string());
+        } else {
+            command.push("--proxy".to_string());
+            command.push(proxy_url.clone());
+        }
         Sandbox::new(policy).wrap(&command)
     })
 }
@@ -80,6 +91,13 @@ pub fn rules(home: &Path, agent: &Agent, bin: &Path, proxy_url: &str) -> Option<
         .trim_end_matches('/')
         .rsplit_once(':')
         .and_then(|(_, port)| port.parse().ok());
+    // The one way out on Linux is this socket, bound into the namespace at a
+    // fixed path (ADR 0069). A system without one never reads it.
+    policy.proxy_socket = Some(
+        crate::proxy::socket_path(home)
+            .to_string_lossy()
+            .to_string(),
+    );
     // The Agent's own localhost, from the range the supervisor reserved for it
     // and kept outside its folder (ADR 0069). The toolchain check runs under
     // these rules too, so it sees what the worker sees. A range that cannot be

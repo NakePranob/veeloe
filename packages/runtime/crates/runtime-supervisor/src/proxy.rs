@@ -6,11 +6,18 @@
 //! localhost, and the proxy decides per connection whether the Machine's
 //! Egress lets the host out. It is read on every connection, so `egress.set`
 //! takes effect without starting a worker again.
+//!
+//! Two transports carry the same requests to the same checks: TCP on loopback
+//! for macOS, whose profile allows that one port, and a Unix socket for Linux,
+//! which has no route to the supervisor at all and gets the socket bound into
+//! its network namespace (ADR 0069). The proxy does not know which one it is
+//! answering on.
 
 use std::net::{IpAddr, SocketAddr};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{lookup_host, TcpListener, TcpStream};
 
 use crate::egress::Egress;
@@ -22,6 +29,14 @@ const MAX_HEAD: usize = 16 * 1024;
 pub struct Proxy {
     pub url: String,
     pub port: u16,
+    /// The Unix socket it also answers on, where the Machine has one.
+    pub socket: Option<PathBuf>,
+}
+
+/// Where the proxy's Unix socket sits: `<VEELOE_HOME>/runtime/egress.sock`, in
+/// the Runtime's own folder, out of reach of what a command may write.
+pub fn socket_path(home: &Path) -> PathBuf {
+    home.join("runtime").join("egress.sock")
 }
 
 /// Starts the proxy on a free loopback port. It runs until the process ends.
@@ -37,6 +52,18 @@ pub async fn start_avoiding(
     egress: Arc<Egress>,
     avoid: &(dyn Fn(u16) -> bool + Send + Sync),
 ) -> std::io::Result<Proxy> {
+    start_with_socket(egress, avoid, None).await
+}
+
+/// Starts the proxy on a free loopback port and, when `socket` names a path,
+/// on that Unix socket too, so a Linux worker can reach it from inside its own
+/// network namespace (ADR 0069). Both listeners go through one `serve`, so an
+/// Egress check is never weaker on one of them.
+pub async fn start_with_socket(
+    egress: Arc<Egress>,
+    avoid: &(dyn Fn(u16) -> bool + Send + Sync),
+    socket: Option<&Path>,
+) -> std::io::Result<Proxy> {
     for _ in 0..16 {
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let port = listener.local_addr()?.port();
@@ -45,6 +72,10 @@ pub async fn start_avoiding(
             drop(listener);
             continue;
         }
+        let socket = match socket {
+            Some(path) => Some(listen_unix(path, Arc::clone(&egress)).await?),
+            None => None,
+        };
         tokio::spawn(async move {
             loop {
                 let Ok((client, _)) = listener.accept().await else {
@@ -59,6 +90,7 @@ pub async fn start_avoiding(
         return Ok(Proxy {
             url: format!("http://127.0.0.1:{port}"),
             port,
+            socket,
         });
     }
     Err(std::io::Error::new(
@@ -67,8 +99,37 @@ pub async fn start_avoiding(
     ))
 }
 
+/// A Unix listener on `path`, answering with the same `serve` as TCP. A file
+/// left by a Runtime that did not end cleanly is taken over rather than
+/// blocking every start after it.
+async fn listen_unix(path: &Path, egress: Arc<Egress>) -> std::io::Result<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let _ = std::fs::remove_file(path);
+    let listener = tokio::net::UnixListener::bind(path)?;
+    // Only this Machine's owner, and so only workers under it, may ask this
+    // socket for a way out. The folder is already the Runtime's alone; the file
+    // says so itself as well.
+    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    tokio::spawn(async move {
+        loop {
+            let Ok((client, _)) = listener.accept().await else {
+                break;
+            };
+            let egress = Arc::clone(&egress);
+            tokio::spawn(async move {
+                let _ = serve(client, egress).await;
+            });
+        }
+    });
+    Ok(path.to_path_buf())
+}
+
 /// One client: read its CONNECT, check the host, then copy bytes both ways.
-async fn serve(mut client: TcpStream, egress: Arc<Egress>) -> std::io::Result<()> {
+async fn serve<S>(mut client: S, egress: Arc<Egress>) -> std::io::Result<()>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
     let mut head = Vec::new();
     let mut buffer = [0u8; 1024];
     loop {
@@ -272,6 +333,7 @@ fn public_v4(ip: std::net::Ipv4Addr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::AsyncWriteExt;
 
     #[test]
     fn a_domain_matches_exactly_or_through_a_wildcard() {
@@ -310,5 +372,31 @@ mod tests {
         assert!(out.contains("Host: example.com\r\n"));
         assert!(!out.to_ascii_lowercase().contains("proxy-authorization"));
         assert!(out.ends_with("\r\n\r\nhello"));
+    }
+
+    /// Issue #42: the Unix socket answers with the same rules as the TCP port.
+    /// A domain the Egress does not name gets no answer at all, whichever way
+    /// the request arrived (ADR 0022, 0069).
+    #[tokio::test]
+    async fn a_request_on_the_unix_socket_is_checked_like_one_on_tcp() {
+        let home = tempfile::tempdir().expect("home");
+        let egress = Arc::new(Egress::open(home.path()).expect("egress"));
+        let socket = home.path().join("egress.sock");
+        let proxy = start_with_socket(Arc::clone(&egress), &|_| false, Some(&socket))
+            .await
+            .expect("proxy");
+        assert_eq!(proxy.socket.as_deref(), Some(socket.as_path()));
+
+        let mut client = tokio::net::UnixStream::connect(&socket)
+            .await
+            .expect("connect the socket");
+        client
+            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+            .await
+            .expect("write");
+        let mut answer = [0u8; 16];
+        // The empty Egress drops the connection instead of answering it.
+        let read = client.read(&mut answer).await.expect("read");
+        assert_eq!(read, 0);
     }
 }

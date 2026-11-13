@@ -20,6 +20,31 @@ use veeloe_runtime_supervisor::providers::{
 use veeloe_runtime_supervisor::toolchain::{Outcome, Report};
 use veeloe_runtime_supervisor::workers::{sandboxed, SupervisorLlm, Workers};
 
+/// Stands in for the supervisor's Egress proxy: a Unix socket at the path the
+/// Linux wrap binds into the worker's namespace, accepting and dropping what
+/// it gets. The worker's bridge connects to it before it says ready, so it has
+/// to be there even where no Turn reaches the network (ADR 0069).
+fn egress_socket(home: &std::path::Path) {
+    let path = veeloe_runtime_supervisor::proxy::socket_path(home);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).expect("runtime folder");
+    }
+    let _ = std::fs::remove_file(&path);
+    let listener = std::os::unix::net::UnixListener::bind(&path).expect("bind the proxy socket");
+    std::thread::spawn(move || {
+        for client in listener.incoming() {
+            drop(client);
+        }
+    });
+}
+
+/// The wrap the supervisor uses, with that socket in place. The proxy's TCP
+/// port is not listening: no test here needs the network.
+fn sandboxed_for(home: &std::path::Path) -> veeloe_runtime_supervisor::workers::Wrap {
+    egress_socket(home);
+    sandboxed(home.to_path_buf(), "http://127.0.0.1:9".into())
+}
+
 fn agent() -> Agent {
     Agent {
         id: "a1".into(),
@@ -334,7 +359,7 @@ async fn a_sandboxed_worker_runs_a_turn_and_its_tools_stay_in_the_agents_folder(
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
         // No proxy listens here: this Turn needs no network.
-        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+        sandboxed_for(&home_path),
     );
 
     workers.start(&agent);
@@ -433,7 +458,7 @@ async fn a_sandboxed_worker_runs_a_turn_with_git_and_bun() {
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
         // No proxy listens here: neither `git` nor `bun` reaches the network.
-        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+        sandboxed_for(&home_path),
     );
 
     workers.start(&agent);
@@ -568,7 +593,7 @@ async fn a_command_sees_the_agents_ports_and_can_serve_on_them() {
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
         // Nothing listens on the proxy's port here: the range is its own.
-        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+        sandboxed_for(&home_path),
     );
 
     workers.start(&agent);
@@ -601,6 +626,14 @@ async fn a_command_sees_the_agents_ports_and_can_serve_on_them() {
         "the Turn never ran the command: {:?} {:?}",
         heard.lock().expect("heard"),
         lines.lock().expect("lines")
+    );
+    // Let the Turn end before the worker is stopped. Every odd request is the
+    // command, and a Turn cut in half leaves the next worker a text answer
+    // where the second command is expected.
+    assert!(
+        until(|| task_ended(&heard, "t1"), 20_000).await,
+        "the first Turn never ended: {:?}",
+        heard.lock().expect("heard")
     );
     workers.stop_all();
     let first = content_of(&heard, "t-ports-1");
@@ -769,7 +802,7 @@ async fn a_toolchain_that_cannot_run_is_reported_and_the_worker_still_turns() {
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
         // No proxy listens here: this Turn needs no network.
-        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+        sandboxed_for(&home_path),
     );
     // What a Machine without `bun` under its rules would answer.
     workers.checking_toolchains(Arc::new(|_agent, _bin| {
@@ -861,6 +894,15 @@ fn tool_results(heard: &Arc<Mutex<Vec<FromWorker>>>) -> Vec<(String, String, boo
         .collect()
 }
 
+/// Whether this Task's Turn ended, so a worker can be stopped without cutting
+/// it in half.
+fn task_ended(heard: &Arc<Mutex<Vec<FromWorker>>>, task: &str) -> bool {
+    heard.lock().expect("heard").iter().any(|message| {
+        matches!(message, FromWorker::Event { task: seen, event, .. }
+            if seen == task && event.kind == "turn.ended")
+    })
+}
+
 /// Answers the first request with a command and the file tools aimed at the
 /// Task log, and the second with the end of the Turn.
 struct TrespassLlm {
@@ -936,7 +978,7 @@ async fn a_command_and_the_file_tools_cannot_reach_the_task_log() {
             recording.lock().expect("heard").push(message);
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
-        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+        sandboxed_for(&home_path),
     );
 
     workers.start(&agent);
