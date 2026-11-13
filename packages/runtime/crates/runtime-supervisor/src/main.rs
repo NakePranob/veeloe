@@ -1257,6 +1257,13 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         }));
     }
     let _ = supervisor.workers.set(workers);
+    // The sandbox keeps no log of its own that a process can read: a refusal
+    // goes to the system log, and this reader turns one into a Runtime log line
+    // naming the service, so a missing name is added from evidence (issue #37).
+    let denials = supervisor
+        .workers
+        .get()
+        .and_then(|workers| workers.watching_denials());
 
     let link = HubLink::start(
         HubLinkOptions {
@@ -1277,6 +1284,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(workers) = supervisor.workers.get() {
         workers.stop_all();
     }
+    drop(denials);
     Ok(())
 }
 

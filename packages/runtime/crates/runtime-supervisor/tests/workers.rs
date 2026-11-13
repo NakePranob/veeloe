@@ -403,6 +403,170 @@ async fn a_sandboxed_worker_runs_a_turn_and_its_tools_stay_in_the_agents_folder(
     assert!(dir.join(".home/.gitconfig").is_file());
 }
 
+/// Issue #37: the profile names one service at a time, and a real Turn still
+/// runs the toolchains a Task cannot be done without. The check is behaviour:
+/// `git` and `bun` answer inside the narrowed sandbox, not what the profile
+/// says (ADR 0022).
+#[cfg(target_os = "macos")]
+#[tokio::test]
+async fn a_sandboxed_worker_runs_a_turn_with_git_and_bun() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut agent = agent();
+    agent.allowlist = vec!["git".into(), "bun".into()];
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let llm = Arc::new(ToolchainLlm {
+        requests: Mutex::new(0),
+    });
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::clone(&llm) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        // No proxy listens here: neither `git` nor `bun` reaches the network.
+        sandboxed(home_path.clone(), "http://127.0.0.1:9".into()),
+    );
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the worker under the narrowed service list never said ready: {:?}",
+        lines.lock().expect("lines")
+    );
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    let ended = || {
+        heard.lock().expect("heard").iter().any(
+            |message| matches!(message, FromWorker::Event { event, .. } if event.kind == "turn.ended"),
+        )
+    };
+    assert!(
+        until(ended, 30_000).await,
+        "the Turn with git and bun never ended: {:?} {:?}",
+        heard.lock().expect("heard"),
+        lines.lock().expect("lines")
+    );
+    workers.stop_all();
+
+    let results: Vec<(String, serde_json::Value)> = heard
+        .lock()
+        .expect("heard")
+        .iter()
+        .filter_map(|message| match message {
+            FromWorker::Event { event, .. } if event.kind == "tool.result" => {
+                Some(event.body["content"].as_array().cloned().unwrap_or_default())
+            }
+            _ => None,
+        })
+        .flatten()
+        .map(|block| {
+            (
+                block["tool_use_id"].as_str().unwrap_or_default().to_string(),
+                block.clone(),
+            )
+        })
+        .collect();
+    let result = |id: &str| {
+        results
+            .iter()
+            .find(|(seen, _)| seen == id)
+            .map(|(_, block)| block.clone())
+            .unwrap_or_else(|| panic!("no result for {id}: {results:?}"))
+    };
+    // Each command ran and said its version: no refusal, no missing library.
+    for (id, expected) in [
+        ("t-git", "git version"),
+        ("t-bun-run", "bun-ok"),
+    ] {
+        let block = result(id);
+        assert!(
+            block.get("is_error").is_none(),
+            "`{id}` failed under the narrowed service list: {block}"
+        );
+        let content = block["content"].as_str().unwrap_or_default();
+        assert!(content.contains(expected), "`{id}` answered without `{expected}`: {block}");
+        assert!(content.contains("exit code: 0"), "`{id}` did not exit cleanly: {block}");
+    }
+    // `bun --version` answers with the version alone, which is what a version
+    // check looks like when it works.
+    let bun = result("t-bun");
+    assert!(
+        bun.get("is_error").is_none(),
+        "`bun --version` failed under the narrowed service list: {bun}"
+    );
+    let text = bun["content"].as_str().unwrap_or_default();
+    let version = text.lines().next().unwrap_or_default();
+    assert!(
+        version.chars().next().is_some_and(|first| first.is_ascii_digit())
+            && version.contains('.')
+            && text.contains("exit code: 0"),
+        "`bun --version` answered without a version: {bun}"
+    );
+}
+
+/// Answers the first request with the toolchains a Task needs and the second
+/// with the end of the Turn.
+struct ToolchainLlm {
+    requests: Mutex<usize>,
+}
+
+#[async_trait]
+impl SupervisorLlm for ToolchainLlm {
+    async fn answer(&self, _agent: &str, _request: LlmHttpRequest) -> LlmHttpResponse {
+        let first = {
+            let mut seen = self.requests.lock().expect("requests");
+            *seen += 1;
+            *seen == 1
+        };
+        let body = if first {
+            let bash = |id: &str, command: &str| {
+                json!({ "type": "tool_use", "id": id, "name": "bash", "input": { "command": command } })
+            };
+            json!({
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    bash("t-git", "git --version"),
+                    bash("t-bun", "bun --version"),
+                    bash("t-bun-run", "bun -e 'console.log(\"bun-ok\")'"),
+                ],
+                "stop_reason": "tool_use",
+            })
+        } else {
+            json!({
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "done" }],
+                "stop_reason": "end_turn",
+            })
+        };
+        LlmHttpResponse {
+            status: 200,
+            headers: vec![("content-type".into(), "application/json".into())],
+            body: body.to_string(),
+        }
+    }
+}
+
 /// Issue #35: a Machine whose toolchain cannot run is told to the Owner when
 /// the worker opens, and the worker runs a Turn anyway.
 #[cfg(any(target_os = "macos", target_os = "linux"))]
