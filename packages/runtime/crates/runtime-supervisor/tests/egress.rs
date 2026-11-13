@@ -6,6 +6,7 @@
 //! view a Controller that knows one list still reads.
 
 use std::fs;
+use std::sync::Arc;
 
 use tempfile::tempdir;
 use veeloe_runtime_supervisor::agents::{Agent, AgentRegistry};
@@ -118,6 +119,90 @@ fn a_list_the_protocol_refuses_is_not_kept() {
     assert!(egress.current("a1").is_empty());
     assert!(!is_valid_egress(&domains(&["localhost"])));
     assert!(is_valid_egress(&domains(&["*.example.com"])));
+}
+
+/// Issue #44 review: a permanent yes (`always`) and an `egress.set` can arrive
+/// at the same moment. Both hold one lock for the whole read, write and assign,
+/// so neither writes the other over in `agents.json`.
+#[test]
+fn a_permanent_yes_and_a_set_do_not_lose_each_other() {
+    let home = tempdir().expect("home");
+    two_agents(home.path());
+    let egress = Arc::new(Egress::open(home.path()).expect("open"));
+
+    let always = {
+        let egress = Arc::clone(&egress);
+        std::thread::spawn(move || {
+            for i in 0..25 {
+                egress
+                    .add_domain("a1", &format!("d{i}.example.com"))
+                    .expect("add")
+                    .expect("a1 exists");
+            }
+        })
+    };
+    let set = {
+        let egress = Arc::clone(&egress);
+        std::thread::spawn(move || {
+            for i in 0..25 {
+                egress
+                    .set_agent("a2", domains(&[&format!("s{i}.example.com")]))
+                    .expect("set")
+                    .expect("a2 exists");
+            }
+        })
+    };
+    always.join().expect("always thread");
+    set.join().expect("set thread");
+
+    // Every permanent yes survived, and A2 kept the last list it was given.
+    let added: Vec<String> = (0..25).map(|i| format!("d{i}.example.com")).collect();
+    assert_eq!(egress.current("a1"), added, "a permanent yes was lost");
+    assert_eq!(egress.current("a2"), domains(&["s24.example.com"]));
+    let reopened = Egress::open(home.path()).expect("reopen");
+    assert_eq!(
+        reopened.current("a1"),
+        added,
+        "agents.json lost a permanent yes"
+    );
+    assert_eq!(reopened.current("a2"), domains(&["s24.example.com"]));
+}
+
+/// The same on one Agent: whichever of the two lands last, the mirror and
+/// `agents.json` still say the same thing.
+#[test]
+fn a_set_and_a_permanent_yes_on_one_agent_leave_one_truth() {
+    let home = tempdir().expect("home");
+    two_agents(home.path());
+    let egress = Arc::new(Egress::open(home.path()).expect("open"));
+
+    let always = {
+        let egress = Arc::clone(&egress);
+        std::thread::spawn(move || {
+            for _ in 0..25 {
+                egress.add_domain("a1", "example.com").expect("add");
+            }
+        })
+    };
+    let set = {
+        let egress = Arc::clone(&egress);
+        std::thread::spawn(move || {
+            for _ in 0..25 {
+                egress
+                    .set_agent("a1", domains(&["github.com"]))
+                    .expect("set");
+            }
+        })
+    };
+    always.join().expect("always thread");
+    set.join().expect("set thread");
+
+    let reopened = Egress::open(home.path()).expect("reopen");
+    assert_eq!(
+        egress.current("a1"),
+        reopened.current("a1"),
+        "the mirror disagrees with agents.json"
+    );
 }
 
 /// Without `agent`, the legacy request changes every Agent, as it did before

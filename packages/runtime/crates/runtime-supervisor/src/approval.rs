@@ -36,8 +36,17 @@ use crate::trust::Trust;
 pub const DEFAULT_TIMEOUT_S: u64 = 3_600;
 
 /// What the proxy knows about the Turn an Agent is running: who it acts for and
-/// which Task it belongs to. Learned from the `turn.started`/`turn.ended` events
-/// the supervisor already sees, never from the worker.
+/// which Task it belongs to.
+///
+/// The Turn is the worker's own account, not a supervisor fact: `turn.started`,
+/// `turn.ended` and the `member` in them come from payloads the worker sends.
+/// What is the supervisor's is where it looks: the log-write hook sees the
+/// event before the worker's copy is live, and `deliver` sees that copy byte for
+/// byte, so a Turn is recorded here even when a command reaches the proxy first.
+///
+/// `member` is therefore only what the worker said, not a starter this
+/// supervisor checked. Binding it to a supervisor-verified starter belongs with
+/// the per-member Grant split (ADR 0010).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Turn {
     pub task: String,
