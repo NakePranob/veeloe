@@ -33,8 +33,8 @@
 
 ## 5. ปิด change
 
-- [ ] 5.1 merge spec delta เข้า `openspec/specs/runtime-sandbox/` และ `openspec/specs/task-log/`
-- [ ] 5.2 รัน `bun run check`, `bun run test` และ `cargo test` ที่เกี่ยวข้อง แล้วรายงานผลจริง
+- [x] 5.1 merge spec delta เข้า `openspec/specs/runtime-sandbox/` และ `openspec/specs/task-log/`
+- [x] 5.2 รัน `bun run check`, `bun run test` และ `cargo test` ที่เกี่ยวข้อง แล้วรายงานผลจริง
 - [ ] 5.3 archive change นี้แล้วปิด issue #33 พร้อมอ้างถึง ticket #34–#37
 
 ## 6. หลักฐานการตรวจ (บน macOS 27.0.1, 13 พ.ย. 2026)
