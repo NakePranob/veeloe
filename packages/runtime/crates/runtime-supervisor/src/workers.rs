@@ -32,6 +32,12 @@ use crate::toolchain::{Report, Reported};
 /// crash waits the shortest time again.
 const HEALTHY: Duration = Duration::from_secs(60);
 
+/// A scoped worker that ends this soon after its scope opened, before it said
+/// Ready, did not start: the scope itself failed. Retrying the scope on every
+/// restart would fail the same way, so the scope is not used again on this
+/// Machine and the restart path opens the worker plainly (issue #48).
+const SCOPE_GRACE: Duration = Duration::from_secs(5);
+
 /// How often a worker's memory is read (issue #47). Two seconds is enough to
 /// catch a runaway before the Mac swaps itself to a stop, and cheap enough for
 /// every Agent to have one.
@@ -56,6 +62,10 @@ pub type Toolchains = Arc<dyn Fn(&Agent, &Path) -> Option<Vec<Report>> + Send + 
 /// replaces the real probe so the fallback is checked on any system (issue
 /// #48).
 pub type CgroupProbe = Arc<dyn Fn() -> bool + Send + Sync>;
+/// Builds the argv that opens a worker's scope. The real one is `cgroup::argv`;
+/// a test replaces it so a scope that fails after it spawns can be checked on
+/// any system (issue #48).
+pub type ScopeArgv = Arc<dyn Fn(crate::cgroup::Scope, &[String]) -> Vec<String> + Send + Sync>;
 
 /// The Wrap a Runtime uses: each worker inside its own Agent's sandbox, which
 /// every command it starts inherits, reaching the network only through that
@@ -198,6 +208,8 @@ struct Inner {
     cgroup: Mutex<Option<bool>>,
     /// How that answer is found; the real systemd probe unless a test says.
     cgroup_probe: Mutex<Option<CgroupProbe>>,
+    /// How a worker's scope argv is built; `cgroup::argv` unless a test says.
+    cgroup_argv: Mutex<Option<ScopeArgv>>,
     /// The fallback is said once in the Runtime log, not once per worker.
     cgroup_logged: AtomicBool,
     /// How this Runtime reads a process's memory. Real `proc_pidinfo` on macOS;
@@ -254,6 +266,7 @@ impl Workers {
                 limits: Mutex::new(Limits::default()),
                 cgroup: Mutex::new(None),
                 cgroup_probe: Mutex::new(None),
+                cgroup_argv: Mutex::new(None),
                 cgroup_logged: AtomicBool::new(false),
                 memory: Mutex::new(system_memory()),
                 running: Mutex::new(HashMap::new()),
@@ -281,6 +294,12 @@ impl Workers {
     /// checked without a Linux user session.
     pub fn probing_cgroup(&self, probe: CgroupProbe) {
         *self.inner.cgroup_probe.lock().expect("cgroup probe") = Some(probe);
+    }
+
+    /// Build a worker's scope argv instead of `cgroup::argv`, so a scope that
+    /// fails after it spawns is checked without a real systemd (issue #48).
+    pub fn scoping_cgroup(&self, argv: ScopeArgv) {
+        *self.inner.cgroup_argv.lock().expect("cgroup argv") = Some(argv);
     }
 
     /// Read a process's memory instead of asking the OS, so a test decides when
@@ -505,13 +524,16 @@ async fn session(
         Some(scope) => Some(scope),
         None => {
             // Said once per supervisor, never per worker, and never about an
-            // Agent: this is a fact about the Machine.
-            say_cgroup_unavailable(inner);
+            // Agent: this is a fact about the Machine. macOS has no cgroups at
+            // all, so there is nothing to say there.
+            if cfg!(target_os = "linux") {
+                say_cgroup_unavailable(inner, cgroup::NO_SYSTEMD);
+            }
             None
         }
     };
     // The same command either way, so the fallback differs only in its argv.
-    let prepared = |argv: &[String]| -> std::io::Result<Child> {
+    let prepared = |argv: &[String], scoped: bool| -> std::io::Result<Child> {
         let (program, rest) = argv.split_first().expect("a worker argv has a program");
         let mut command = Command::new(program);
         command.args(rest);
@@ -534,12 +556,14 @@ async fn session(
                 "VEELOE_AGENT_APPROVAL_TIMEOUT_S",
                 agent.approval_timeout_s.to_string(),
             );
-        // `systemd-run` finds the owner's user manager through these, and the
-        // worker needs neither: they are passed only so the wrapper can talk to
-        // systemd, and the sandbox keeps the paths they name out of reach.
-        for name in ["XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] {
-            if let Ok(value) = std::env::var(name) {
-                command.env(name, value);
+        // `systemd-run` finds the owner's user manager through these. They are
+        // passed only when a scope is used, so the plain path never widens what
+        // the worker can see (issue #48).
+        if scoped {
+            for name in ["XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] {
+                if let Ok(value) = std::env::var(name) {
+                    command.env(name, value);
+                }
             }
         }
         if let Some(ports) = &ports {
@@ -560,19 +584,25 @@ async fn session(
         command.spawn()
     };
     let started: std::io::Result<Child> = match scope {
-        None => prepared(&worker_argv),
-        Some(scope) => match prepared(&cgroup::argv(scope, &worker_argv)) {
-            Ok(child) => Ok(child),
-            // `systemd-run` is there but would not start this worker — its user
-            // manager went away, or it refused a property. The worker is started
-            // the plain way rather than not at all, and no scope is tried again
-            // on this Machine (issue #48).
-            Err(_) => {
-                *inner.cgroup.lock().expect("cgroup") = Some(false);
-                say_cgroup_unavailable(inner);
-                prepared(&worker_argv)
+        None => prepared(&worker_argv, false),
+        Some(scope) => {
+            let argv = match inner.cgroup_argv.lock().expect("cgroup argv").clone() {
+                Some(build) => build(scope, &worker_argv),
+                None => cgroup::argv(scope, &worker_argv),
+            };
+            match prepared(&argv, true) {
+                Ok(child) => Ok(child),
+                // `systemd-run` is there but would not start this worker — its
+                // user manager went away, or it refused a property. The worker
+                // is started the plain way rather than not at all, and no scope
+                // is tried again on this Machine (issue #48).
+                Err(_) => {
+                    *inner.cgroup.lock().expect("cgroup") = Some(false);
+                    say_cgroup_unavailable(inner, cgroup::SCOPE_FAILED);
+                    prepared(&worker_argv, false)
+                }
             }
-        },
+        }
     };
     let mut child: Child = match started {
         Ok(child) => child,
@@ -583,6 +613,9 @@ async fn session(
             }
         }
     };
+    // When this session's process started, so a scope that fails before the
+    // worker is ready can be told from a worker that ran and then died.
+    let spawned = Instant::now();
     let pid = child.id().unwrap_or_default();
     inner
         .pids
@@ -715,6 +748,23 @@ async fn session(
                 Ok(None) | Err(_) => {
                     let status = child.wait().await.ok();
                     let killed_for_memory = killed_for_memory.load(Ordering::SeqCst);
+                    // A scoped worker that ends this soon, before Ready, never
+                    // started: `systemd-run` opened a scope and the scope
+                    // failed. Trying the scope again on every restart would
+                    // fail the same way, so this Machine is done with scopes
+                    // and the restart path opens the worker plainly (issue #48).
+                    if scope.is_some()
+                        && !is_ready
+                        && !killed_for_memory
+                        && spawned.elapsed() < SCOPE_GRACE
+                    {
+                        *inner.cgroup.lock().expect("cgroup") = Some(false);
+                        say_cgroup_unavailable(inner, cgroup::SCOPE_FAILED);
+                        break Ending {
+                            stopped: false,
+                            why: "its cgroup scope failed".into(),
+                        };
+                    }
                     let burned = burned_cpu.load(Ordering::SeqCst);
                     // The OS cut it, or this Runtime did for memory. Either way
                     // the Owner is told which limit, with codes only (ADR 0052).
@@ -753,7 +803,16 @@ async fn session(
                             format!("the signal {signal}")
                         }
                         None if killed_for_memory => "its memory limit".to_string(),
-                        None => "it ended".to_string(),
+                        // No signal and no limit of ours: a clean end, or an
+                        // exit code. Under a scope `systemd-run` may report a
+                        // cgroup kill this way, so the code is said rather
+                        // than calling it a limit nobody proved (issue #48).
+                        None => match status.as_ref().and_then(|status| status.code()) {
+                            Some(code) if code != 0 => {
+                                format!("it ended with exit code {code}")
+                            }
+                            _ => "it ended".to_string(),
+                        },
                     };
                     break Ending { stopped: false, why };
                 }
@@ -831,19 +890,25 @@ fn system_memory() -> Option<ResidentMemory> {
     }
 }
 
-/// What the worker and every command under it hold resident, in bytes. The
-/// worker's own RSS is not the whole story: a build started by a Task is its
-/// child, and that is usually what fills the memory. On Linux the walk also
-/// covers the `systemd-run` that opened the worker's scope, so a worker under
-/// it is still counted.
-fn resident_total(read: &ResidentMemory, pid: u32) -> Option<u64> {
+/// The worker's process and every one below it, which is what its limits are
+/// counted over. The worker's own reading is not the whole story: a build
+/// started by a Task is its child, and that is usually what fills the memory.
+/// On Linux the process this Runtime holds is the `systemd-run` that opened the
+/// worker's scope, so one walk covers wrapper and worker alike (issue #48).
+fn process_tree(pid: u32) -> Vec<u32> {
     let mut pids = vec![pid];
     #[cfg(unix)]
     pids.extend(crate::limits::descendants(pid));
+    pids
+}
+
+/// One reading summed over `pids`: what the OS said for each, or `None` when it
+/// could say for none of them.
+fn tree_total(pids: &[u32], read: &dyn Fn(u32) -> Option<u64>) -> Option<u64> {
     let mut total = None;
     for pid in pids {
-        if let Some(bytes) = read(pid) {
-            total = Some(total.unwrap_or(0u64).saturating_add(bytes));
+        if let Some(value) = read(*pid) {
+            total = Some(total.unwrap_or(0u64).saturating_add(value));
         }
     }
     total
@@ -871,14 +936,11 @@ async fn scope_for(inner: &Arc<Inner>, limits: &Limits) -> Option<crate::cgroup:
     usable.then(|| crate::cgroup::Scope::of(limits))
 }
 
-/// Says once, at Runtime log level and without an Agent, that this Machine
-/// cannot keep a worker in a cgroup, so the older caps are all there is
-/// (issue #48). macOS has no cgroups at all, so there is nothing to report
-/// there and nothing is written.
-fn say_cgroup_unavailable(inner: &Inner) {
-    if !cfg!(target_os = "linux") {
-        return;
-    }
+/// Says once, at Runtime log level and without an Agent, that workers run
+/// without a cgroup, so the older caps are all there is, and why: no user
+/// systemd on this Machine, or a scope that failed (issue #48). macOS never
+/// calls it: there are no cgroups to fall back from.
+fn say_cgroup_unavailable(inner: &Inner, reason: &'static str) {
     if inner.cgroup_logged.swap(true, Ordering::SeqCst) {
         return;
     }
@@ -886,9 +948,14 @@ fn say_cgroup_unavailable(inner: &Inner) {
         &inner.home,
         "warn",
         cgroup::UNAVAILABLE,
-        serde_json::json!({}),
+        serde_json::json!({ "reason": reason }),
     );
-    (inner.log)("no cgroups on this Machine; workers run with the CPU limit and the memory watch");
+    let why = if reason == cgroup::SCOPE_FAILED {
+        "the cgroup scope failed; workers run with the CPU limit and the memory watch"
+    } else {
+        "no cgroups on this Machine; workers run with the CPU limit and the memory watch"
+    };
+    (inner.log)(why);
 }
 
 /// Watch one worker's memory until it ends. Over the limit, the Runtime records
@@ -910,13 +977,15 @@ fn watching_memory(
         every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             every.tick().await;
-            // The CPU time so far, read beside the memory so one look costs two
-            // system calls. The last look before the worker dies is within one
-            // poll of what it really burned.
-            if let Some(nanos) = crate::limits::cpu_nanos(pid) {
+            // One look at the tree serves both readings. CPU is summed over it
+            // because under a scope the pid is the `systemd-run` wrapper and
+            // the worker burns time below it (issue #48). The last look before
+            // the worker dies is within one poll of what it really burned.
+            let pids = process_tree(pid);
+            if let Some(nanos) = tree_total(&pids, &|pid| crate::limits::cpu_nanos(pid)) {
                 burned_cpu.store(nanos, Ordering::SeqCst);
             }
-            let Some(bytes) = resident_total(&read, pid) else {
+            let Some(bytes) = tree_total(&pids, &|pid| read(pid)) else {
                 continue;
             };
             if bytes <= limit {
@@ -973,6 +1042,9 @@ fn report_toolchains(inner: &Arc<Inner>, agent: &Agent) {
 mod tests {
     /// Issue #48: the memory watch must exist on Linux too, where it is the
     /// backstop for a Machine with no user systemd to make a scope with.
+    /// Gated to unix because the reader itself is: a non-unix CI must not fail
+    /// on a watch this Runtime never has there (review follow-up).
+    #[cfg(unix)]
     #[test]
     fn the_memory_watch_has_a_reader_on_this_system() {
         assert!(
@@ -987,5 +1059,57 @@ mod tests {
         let read = super::system_memory().expect("a reader");
         let bytes = read(std::process::id()).expect("this process is in /proc");
         assert!(bytes > 0, "a running process holds some memory");
+    }
+
+    /// Issue #48 (review): the two readings a limit is counted over are summed
+    /// over the same tree, so a process below the worker counts. Here the tree
+    /// and its readings are injected: no process is started to check the sum.
+    #[test]
+    fn a_tree_total_adds_every_process_below_the_worker() {
+        let read = |pid: u32| match pid {
+            10 => Some(2_000_000_000),
+            11 => Some(1_000_000_000),
+            12 => Some(0),
+            _ => None,
+        };
+        assert_eq!(super::tree_total(&[10, 11, 12], &read), Some(3_000_000_000));
+        assert_eq!(
+            super::tree_total(&[99], &read),
+            None,
+            "a reading nobody could give is not zero"
+        );
+    }
+
+    /// Issue #48 (review): under a scope the pid this Runtime holds is
+    /// `systemd-run`, and the worker's CPU time is below it. A fake `/proc`
+    /// stands in for the real one, so the sum is checked on any Linux kernel.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_scoped_workers_cpu_counts_the_process_below_the_wrapper() {
+        let root = tempfile::tempdir().expect("proc");
+        let write = |pid: u32, ppid: u32, ticks: u64| {
+            let dir = root.path().join(pid.to_string());
+            std::fs::create_dir_all(&dir).expect("process dir");
+            std::fs::write(
+                dir.join("stat"),
+                format!("{pid} (systemd-run) S {ppid} 0 0 0 0 0 0 0 0 0 {ticks} 0 0 0"),
+            )
+            .expect("stat");
+        };
+        write(100, 1, 1); // the wrapper this Runtime holds
+        write(101, 100, 3); // the worker below it
+
+        let mut pids = vec![100];
+        pids.extend(crate::limits::descendants_with(100, |pid| {
+            crate::limits::children_in(root.path(), pid)
+        }));
+        assert_eq!(pids, vec![100, 101]);
+        let wrapper = crate::limits::cpu_nanos_in(root.path(), 100).expect("wrapper time");
+        let worker = crate::limits::cpu_nanos_in(root.path(), 101).expect("worker time");
+        assert_eq!(
+            super::tree_total(&pids, &|pid| crate::limits::cpu_nanos_in(root.path(), pid)),
+            Some(wrapper + worker),
+            "the worker's time was not added to the wrapper's"
+        );
     }
 }

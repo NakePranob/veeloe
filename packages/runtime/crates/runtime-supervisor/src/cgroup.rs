@@ -9,6 +9,13 @@
 //!
 //! A Machine without a user systemd session — most containers, and every Mac —
 //! keeps what #47 put in place: `RLIMIT_CPU` and the resident-memory watch.
+//!
+//! Two things the wrapper changes about what the supervisor can tell. The
+//! process it holds is `systemd-run`, so CPU and memory are summed over that
+//! process and everything below it; the worker is below it. And `systemd-run`
+//! may report a scope that failed — and a kill from the cgroup's own OOM — as
+//! an exit code instead of a signal, so an exit code names no limit here and
+//! such a kill can only be reported as a plain end (see `limits::breach`).
 
 #[cfg(target_os = "linux")]
 use std::process::{Command, Stdio};
@@ -18,8 +25,9 @@ use std::time::{Duration, Instant};
 use crate::limits::Limits;
 
 /// How long the user manager may take to answer before it counts as missing.
-/// Detection happens once, off the worker's own path, so a Machine whose
-/// systemd is wedged still opens workers.
+/// Detection runs on the first worker's session path (issue #48), once, and is
+/// cached; this timeout bounds that one check, so a Machine whose systemd is
+/// wedged costs its first worker up to two seconds, and no later one anything.
 #[cfg(target_os = "linux")]
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -62,8 +70,8 @@ pub fn argv(scope: Scope, worker: &[String]) -> Vec<String> {
     argv
 }
 
-/// Whether this Machine can put a worker in a scope. Asked once per supervisor
-/// and cached there, never at startup (issue #48).
+/// Whether this Machine can put a worker in a scope. Asked once per supervisor,
+/// on the first worker's session path, and cached there (issue #48).
 #[cfg(target_os = "linux")]
 pub fn detect() -> bool {
     // Both halves matter: `systemd-run` may be installed while the owner has no
@@ -134,6 +142,15 @@ fn quiet_success(program: &str, args: &[&str]) -> bool {
 /// The name of the Runtime log event that says the scope could not be used, so
 /// the older caps are all there is (issue #48).
 pub const UNAVAILABLE: &str = "worker.cgroup_unavailable";
+
+/// Why the scope is not in use: this Machine has no user systemd to make one
+/// with.
+pub const NO_SYSTEMD: &str = "no_systemd";
+
+/// Why the scope is not in use: the scope `systemd-run` opened failed before
+/// the worker said Ready. The event carries exactly one reason, so the Owner
+/// can tell a Machine without cgroups from one whose cgroups refused the worker.
+pub const SCOPE_FAILED: &str = "scope_failed";
 
 #[cfg(test)]
 mod tests {
@@ -238,5 +255,11 @@ mod tests {
     #[test]
     fn the_unavailable_event_keeps_its_name() {
         assert_eq!(UNAVAILABLE, "worker.cgroup_unavailable");
+    }
+
+    #[test]
+    fn the_unavailable_reasons_keep_their_names() {
+        assert_eq!(NO_SYSTEMD, "no_systemd");
+        assert_eq!(SCOPE_FAILED, "scope_failed");
     }
 }

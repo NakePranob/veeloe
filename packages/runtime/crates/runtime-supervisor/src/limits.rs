@@ -165,6 +165,12 @@ pub enum Cut {
 /// made is not reported as a limit the Runtime hit. `burned_nanos` is `None`
 /// when the OS could not say. A kill this Runtime made for memory is not the
 /// CPU's, so it answers nothing.
+///
+/// Under a cgroup scope the process this Runtime waits on is `systemd-run`,
+/// which may report a failed scope — and a kill from the cgroup's own OOM — as
+/// an exit code instead of a signal. An exit code names no limit here: only a
+/// signal does, so such a kill can only be reported as a plain end. A non-zero
+/// exit is never mislabelled as the CPU's.
 pub fn breach(
     status: &ExitStatus,
     killed_for_memory: bool,
@@ -610,6 +616,13 @@ mod tests {
         assert_eq!(
             breach(&status(libc::SIGTERM), false, burned(soft), soft),
             None
+        );
+        // `systemd-run` may report a scope's end as an exit code rather than a
+        // signal, so the code is never read as one of our limits (issue #48).
+        assert_eq!(
+            breach(&ExitStatus::from_raw(1 << 8), false, burned(soft), soft),
+            None,
+            "an exit code names no limit"
         );
         assert_eq!(breach(&status(0), false, burned(soft), soft), None);
     }
