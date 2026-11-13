@@ -17,6 +17,11 @@ use std::path::Path;
 /// namespaces to programs with an AppArmor profile. `1` means restricted.
 pub const APPARMOR_RESTRICT: &str = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns";
 
+/// Veeloe's own AppArmor profile, installed as `/etc/apparmor.d/<name>` by
+/// `veeloe doctor --fix-apparmor` (issue #49). It allows `userns` for
+/// `/usr/bin/bwrap` only, so the sysctl can stay at 1 for every other program.
+pub const APPARMOR_PROFILE: &str = "veeloe-bwrap";
+
 /// The file Debian uses for the same rule. `0` means unprivileged user
 /// namespaces are off.
 pub const USERNS_CLONE: &str = "/proc/sys/kernel/unprivileged_userns_clone";
@@ -189,10 +194,10 @@ fn missing_bwrap(os_release: Option<&str>) -> String {
 fn apparmor_restricted() -> String {
     format!(
         "the OS sandbox cannot start: {APPARMOR_RESTRICT} is 1, so this kernel restricts unprivileged user namespaces (Ubuntu 24.04 and later).\n\
-         Fix it for bubblewrap only, not for the whole machine: install an AppArmor profile that lets /usr/bin/bwrap create user namespaces.\n\
-         Ubuntu ships one as bwrap-userns-restrict:\n\
-         \x20 sudo cp /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/\n\
-         \x20 sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict\n\
+         Fix it for bubblewrap only, not for the whole machine: Veeloe's AppArmor profile {APPARMOR_PROFILE} lets /usr/bin/bwrap create user namespaces.\n\
+         Install and load it with:\n\
+         \x20 sudo veeloe doctor --fix-apparmor\n\
+         It writes /etc/apparmor.d/{APPARMOR_PROFILE}, loads it with apparmor_parser -r and checks that bwrap can create a user namespace.\n\
          Do not set kernel.apparmor_restrict_unprivileged_userns=0: that removes the protection for every program, not just the sandbox."
     )
 }
@@ -406,9 +411,15 @@ mod tests {
         let message = linux(&probe).expect_err("user namespaces are restricted");
         assert!(message.contains(APPARMOR_RESTRICT), "{message}");
         assert!(message.contains("is 1"), "{message}");
-        assert!(message.contains("bwrap-userns-restrict"), "{message}");
+        assert!(
+            message.contains("sudo veeloe doctor --fix-apparmor"),
+            "{message}"
+        );
+        assert!(message.contains(APPARMOR_PROFILE), "{message}");
         assert!(message.contains("apparmor_parser"), "{message}");
         assert!(message.contains("not for the whole machine"), "{message}");
+        // The profile is Veeloe's, not one the user has to find on the system.
+        assert!(!message.contains("bwrap-userns-restrict"), "{message}");
         // The other switch is not what refuses here, and the message is one fix.
         assert!(!message.contains(USERNS_CLONE), "{message}");
     }

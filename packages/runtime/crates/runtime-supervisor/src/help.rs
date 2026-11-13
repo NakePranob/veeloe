@@ -3,9 +3,9 @@
 //! the Controller's).
 
 pub const USAGE: &str =
-    "usage: veeloe [pair | unpair | status | logs | memory | provider add|list|remove | service install|uninstall | help <command>]";
+    "usage: veeloe [pair | unpair | status | logs | memory | provider add|list|remove | service install|uninstall | doctor --fix-apparmor | help <command>]";
 
-const COMMANDS: [(&str, &str); 8] = [
+const COMMANDS: [(&str, &str); 9] = [
     (
         "start",
         "veeloe
@@ -68,6 +68,20 @@ veeloe service uninstall
   the current VEELOE_HOME and writes its log to runtime/logs/service.log.",
     ),
     (
+        "doctor",
+        "veeloe doctor --fix-apparmor
+  Fix what stops the OS sandbox from starting on this Machine. The only fix is
+  the AppArmor profile Ubuntu 24.04 and later need for bubblewrap: it allows
+  user namespaces for /usr/bin/bwrap only, so the protection stays on for every
+  other program. Needs root; writes /etc/apparmor.d/veeloe-bwrap, loads it with
+  apparmor_parser -r, then checks that bwrap can create a user namespace.
+
+  sudo veeloe doctor --fix-apparmor    install, load and check the profile
+
+  macOS needs nothing: it uses sandbox-exec. Nothing is changed when the
+  Machine does not restrict unprivileged user namespaces.",
+    ),
+    (
         "logs",
         "veeloe logs [--follow]
   Show the Runtime's content-free logs on this Machine. Files rotate daily
@@ -119,7 +133,9 @@ mod tests {
     fn all_of_them_names_every_command_and_points_at_one_command_help() {
         let all = help_for(None).expect("all");
         assert!(all.starts_with("Veeloe Runtime: your Agents, on this Machine."));
-        for command in ["start", "pair", "unpair", "status", "logs", "memory", "provider", "service"] {
+        for command in [
+            "start", "pair", "unpair", "status", "logs", "memory", "provider", "service", "doctor",
+        ] {
             assert!(help_for(Some(command)).is_some(), "{command}");
         }
         assert!(all.ends_with("More on one command: veeloe help <command>"));

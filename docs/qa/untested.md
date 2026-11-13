@@ -10,11 +10,11 @@
 ### 1. Ubuntu 24.04 ที่ AppArmor จำกัด user namespace (ยังไม่ทดสอบจริง)
 
 - สถานะ: ยังไม่เคยรันบนเครื่องที่ `kernel.apparmor_restrict_unprivileged_userns=1`
-- ที่ทำแล้ว: unit test ด้วย probe ปลอม, CI เคส `bwrap` ขาด (Linux runner ปิด restriction ให้ job)
+- ที่ทำแล้ว: unit test ด้วย probe ปลอม, CI เคส `bwrap` ขาด (Linux runner ปิด restriction ให้ job), profile parse ผ่าน `apparmor_parser -Q` ใน Ubuntu 24.04 container
 - ต้องมี: Ubuntu 24.04 ค่า default (restriction=1) หรือ VM
 - ขั้นตอน:
-  1. รัน `veeloe` แล้วตรวจข้อความ preflight ว่า names ไฟล์/ค่า และแนะนำ `bwrap-userns-restrict` (ไม่ใช่ปิดทั้งเครื่อง)
-  2. ทำตามข้อความ (คัดลอก profile + `apparmor_parser -r`) แล้วรันใหม่
+  1. รัน `veeloe` แล้วตรวจข้อความ preflight ว่า names ไฟล์/ค่า และแนะนำ `sudo veeloe doctor --fix-apparmor` (ไม่ใช่ปิดทั้งเครื่อง)
+  2. รัน `sudo veeloe doctor --fix-apparmor` แล้วรัน `veeloe` ใหม่
   3. ตรวจว่า supervisor เริ่มได้, worker ขึ้น `ready`, e2e sandbox ผ่าน
 - หลักฐานที่ต้องเก็บ: ข้อความก่อน/หลังแก้, `aa-status` หรือ sysctl value, ผลรัน
 
@@ -35,9 +35,10 @@
 
 ### 4. AppArmor profile ของ Veeloe (ไฟล์ + installer)
 
-- สถานะ: **ยังไม่ implement** — ข้อความ preflight อ้าง profile ที่ Ubuntu ให้มา
+- สถานะ: implement แล้ว (#49) แต่ยังไม่เคยโหลดจริงบน kernel ที่ restriction=1
+- ที่ทำแล้ว: unit test ของ doctor (fake host), profile parse ผ่าน `apparmor_parser -Q` 4.0.1 ใน Ubuntu 24.04 container
 - ต้องมี: Ubuntu 24.04 ที่ restriction=1
-- ตรวจ: ติดตั้ง profile แล้ว bwrap สร้าง userns ได้โดยไม่ปิดทั้งเครื่อง
+- ตรวจ: `sudo veeloe doctor --fix-apparmor` เขียน `/etc/apparmor.d/veeloe-bwrap`, `apparmor_parser -r` ผ่าน, `bwrap --unshare-user -- /bin/true` สำเร็จ โดยไม่ปิด sysctl ทั้งเครื่อง
 
 ## macOS
 
