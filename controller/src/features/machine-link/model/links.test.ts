@@ -46,6 +46,7 @@ mock.module("expo-file-system", () => ({
 }));
 mock.module("react-native", () => ({ Linking: { openURL: async () => {} } }));
 const { egressOf, saveMachine } = await import("../../../entities/machine/model/machines");
+const { egressOf: agentEgressOf } = await import("../../../entities/agent/model/agents");
 const { createMachineLinks } = await import("./links");
 
 // TEST-ONLY KEYS.
@@ -266,6 +267,8 @@ test("the Egress goes as one signed list, and the list kept is the one the Machi
   expect(links.setEgress(machine, ["github.com", "*.npmjs.org"])).toBe(true);
   await until(() => fake.hub.frames.length === 3);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "egress.set", to: "machine-1", member, body: { egress: ["github.com", "*.npmjs.org"] } });
+  // Without an Agent the body is the whole list and nothing else, as it was before per-Agent Egress.
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed).body).toEqual({ egress: ["github.com", "*.npmjs.org"] });
 
   fake.push(signed("agent.listed", { agents: [], providers: [], egress: ["evil.example.com"] }, { seed: strangerSeed }));
   fake.push(signed("agent.listed", { agents: [], providers: [], egress: ["github.com", "*.npmjs.org"] }));
@@ -274,6 +277,35 @@ test("the Egress goes as one signed list, and the list kept is the one the Machi
   fake.push(signed("agent.listed", { agents: [], providers: [] }, { seq: 2 }));
   await Bun.sleep(50);
   expect(egressOf((await database.query<Machine>("SELECT * FROM machine"))[0]!)).toEqual(["github.com", "*.npmjs.org"]);
+});
+
+const egressRows = (database: Awaited<ReturnType<typeof setup>>["database"]) => database.query<{ id: string; egress: string }>("SELECT id, egress FROM agent ORDER BY id");
+
+test("one Agent's Egress goes with its id, and the other Agents' lists stay as the Machine signed them", async () => {
+  const { database, fake, machine, links } = await setup();
+  const listed = (a1: string[], a2: string[]) => ({
+    agents: [
+      { id: "a1", name: "A", provider: "main", model: "model-a", egress: a1 },
+      { id: "a2", name: "B", provider: "main", model: "model-a", egress: a2 },
+    ],
+    providers: [],
+    egress: [...new Set([...a1, ...a2])],
+  });
+  fake.push(signed("agent.listed", listed(["github.com"], ["*.npmjs.org"])));
+  await until(async () => (await egressRows(database)).length === 2);
+  expect((await egressRows(database)).map((row) => [row.id, agentEgressOf(row)])).toEqual([
+    ["a1", ["github.com"]],
+    ["a2", ["*.npmjs.org"]],
+  ]);
+
+  expect(links.setEgress(machine, ["github.com", "pypi.org"], "a1")).toBe(true);
+  await until(() => fake.hub.frames.some((frame) => JSON.parse(frame.signed).type === "egress.set"));
+  expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "egress.set", to: "machine-1", member, body: { agent: "a1", egress: ["github.com", "pypi.org"] } });
+
+  // The signed answer is what is shown: a1 moved, a2 did not.
+  fake.push(signed("agent.listed", listed(["github.com", "pypi.org"], ["*.npmjs.org"]), { seq: 2 }));
+  await until(async () => agentEgressOf((await egressRows(database)).find((row) => row.id === "a1")!).includes("pypi.org"));
+  expect(agentEgressOf((await egressRows(database)).find((row) => row.id === "a2")!)).toEqual(["*.npmjs.org"]);
 });
 
 const newSeed = new Uint8Array(32).fill(0x55);

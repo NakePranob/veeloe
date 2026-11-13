@@ -8,5 +8,6 @@ export { confirm, inform } from "./inform";
 export { Label } from "./label";
 export { Meter } from "./meter";
 export { QrCode, QrScanner } from "./qr";
+export { Select, type SelectOption } from "./select";
 export { Text } from "./text";
 export { column, icon, motion, radius, SIDEBAR_WIDTH, space, type, useColors, useShadows, useSplit, type Colors } from "./theme";

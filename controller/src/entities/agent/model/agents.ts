@@ -19,6 +19,8 @@ export type AgentRow = {
   allowlist: string | null;
   /** How long one Approval waits, in seconds, or null from a Machine older than `approval-and-allowlist`. */
   approval_timeout_s: number | null;
+  /** This Agent's own Egress as JSON, empty from a Machine older than per-Agent Egress. */
+  egress: string;
 };
 
 /** The Approval timeout the Machine last sent, in seconds, or null when it never sent one. */
@@ -32,6 +34,16 @@ export function allowlistOf(row: Pick<AgentRow, "allowlist">): string[] | null {
   try {
     const parsed: unknown = JSON.parse(row.allowlist);
     return Array.isArray(parsed) && parsed.every((entry): entry is string => typeof entry === "string") ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The domains in this Agent's own Egress, as a list. Broken JSON reads as an empty list. */
+export function egressOf(row: Pick<AgentRow, "egress">): string[] {
+  try {
+    const parsed: unknown = JSON.parse(row.egress);
+    return Array.isArray(parsed) ? parsed.filter((domain): domain is string => typeof domain === "string") : [];
   } catch {
     return [];
   }
@@ -77,8 +89,10 @@ function writeUsage(transaction: WriteTransaction, { agent, day, tokens }: Agent
 export function saveAgents(database: Database, machineId: string, agents: Agent[], trash?: AgentTrashEntry[]) {
   return database.write([AGENT_TOPIC], async (transaction) => {
     for (const agent of agents) {
+      // Null when the Machine is older than per-Agent Egress, so what is kept stays.
+      const egress = agent.egress ? JSON.stringify(agent.egress) : null;
       await transaction.run(
-        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            machine_id = excluded.machine_id,
            name = excluded.name,
@@ -87,8 +101,9 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
            character = COALESCE(excluded.character, agent.character),
            budget = COALESCE(excluded.budget, agent.budget),
            allowlist = COALESCE(excluded.allowlist, agent.allowlist),
-           approval_timeout_s = COALESCE(excluded.approval_timeout_s, agent.approval_timeout_s)`,
-        [agent.id, machineId, agent.name, agent.provider, agent.model, agent.character ? JSON.stringify(agent.character) : null, agent.budget ?? null, agent.allowlist ? JSON.stringify(agent.allowlist) : null, agent.approvalTimeoutS ?? null],
+           approval_timeout_s = COALESCE(excluded.approval_timeout_s, agent.approval_timeout_s),
+           egress = COALESCE(?, agent.egress)`,
+        [agent.id, machineId, agent.name, agent.provider, agent.model, agent.character ? JSON.stringify(agent.character) : null, agent.budget ?? null, agent.allowlist ? JSON.stringify(agent.allowlist) : null, agent.approvalTimeoutS ?? null, egress ?? "[]", egress],
       );
       if (agent.usage) await writeUsage(transaction, { agent: agent.id, ...agent.usage });
     }

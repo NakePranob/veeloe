@@ -88,4 +88,7 @@ export const MIGRATIONS = [
   )`,
   // The deleted Agent's Character, as JSON, so the trash still shows who it was (`agent-trash`).
   `ALTER TABLE agent_trash ADD COLUMN character TEXT`,
+  // Each Agent's own Egress as the Machine last said, a JSON list of domains; empty
+  // for one from a Machine older than per-Agent Egress (`agent-egress-ui`).
+  `ALTER TABLE agent ADD COLUMN egress TEXT NOT NULL DEFAULT '[]'`,
 ] as const;

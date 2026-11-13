@@ -44,10 +44,15 @@
   "egress": {
     "who": "every Agent on {{machine}}",
     "whoNamed": "every Agent on {{machine}} ({{agents}})",
+    "whoOne": "the Agent {{agent}} on {{machine}}",
+    "agent": "Agent",
+    "allAgents": "All Agents",
     "footer": "These domains are open to {{who}}, not to one Agent alone. Outside this list the sandbox lets no Agent out. Data can still leave to the domains listed, so add only ones you trust (ADR 0008).",
+    "footerOne": "These domains are open to {{who}} alone; the other Agents are untouched. Outside this list the sandbox lets it out nowhere. Data can still leave to the domains listed, so add only ones you trust (ADR 0008).",
     "none": {
       "title": "No domains allowed",
-      "detail": "Agents can't reach the internet at all"
+      "detail": "Agents can't reach the internet at all",
+      "detailOne": "This Agent can't reach the internet at all"
     },
     "remove": "Remove",
     "add": "Add domain",

@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "bun:test";
 import type { Agent } from "@veeloe/protocol-ts";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { allowlistOf, approvalTimeoutOf, saveAgents, saveUsage } from "./agents";
+import { allowlistOf, approvalTimeoutOf, egressOf, saveAgents, saveUsage } from "./agents";
 
 // Real SQL on bun:sqlite, behind the few methods expo-sqlite gives the app.
 function connect(): Connection {
@@ -94,6 +94,51 @@ test("allowlistOf reads null as unknown and broken JSON as empty", async () => {
   expect(allowlistOf({ allowlist: null })).toBeNull();
   expect(allowlistOf({ allowlist: "nope{" })).toEqual([]);
   expect(allowlistOf({ allowlist: JSON.stringify([1]) })).toEqual([]);
+});
+
+test("each Agent's Egress is kept as its own JSON, and an answer without one does not erase what is kept", async () => {
+  const other = { ...agent, id: "a2", name: "B" };
+  await saveAgents(database, "machine-1", [
+    { ...agent, egress: ["github.com"] },
+    { ...other, egress: ["*.npmjs.org"] },
+  ]);
+  const rows = () => database.query<{ id: string; egress: string }>("SELECT id, egress FROM agent ORDER BY id");
+  expect((await rows()).map((row) => [row.id, egressOf(row)])).toEqual([
+    ["a1", ["github.com"]],
+    ["a2", ["*.npmjs.org"]],
+  ]);
+
+  // A Machine older than per-Agent Egress says nothing of it, which leaves both lists as they were.
+  await saveAgents(database, "machine-1", [
+    { id: "a1", name: "Renamed", provider: "main", model: "model-a" },
+    { id: "a2", name: "B", provider: "main", model: "model-a" },
+  ]);
+  expect((await rows()).map((row) => egressOf(row))).toEqual([["github.com"], ["*.npmjs.org"]]);
+
+  // An Agent added later starts empty, while the one still listed keeps its list.
+  await saveAgents(database, "machine-1", [{ id: "a2", name: "B", provider: "main", model: "model-a" }, { ...other, id: "a3", name: "C" }]);
+  expect((await rows()).map((row) => [row.id, egressOf(row)])).toEqual([
+    ["a2", ["*.npmjs.org"]],
+    ["a3", []],
+  ]);
+});
+
+test("egressOf reads broken JSON as empty and keeps only the domains", () => {
+  expect(egressOf({ egress: "nope{" })).toEqual([]);
+  expect(egressOf({ egress: JSON.stringify(["github.com", 1]) })).toEqual(["github.com"]);
+  expect(egressOf({ egress: "[]" })).toEqual([]);
+});
+
+test("a database from before per-Agent Egress upgrades with an empty list, and its Agent stays", async () => {
+  const before = MIGRATIONS.findIndex((migration) => migration.includes("ADD COLUMN egress"));
+  expect(before).toBeGreaterThan(-1);
+  const connection = connect();
+  await migrate(connection, MIGRATIONS.slice(0, before));
+  await connection.runAsync("INSERT INTO agent (id, machine_id, name, provider, model) VALUES (?, ?, ?, ?, ?)", ["old", "machine-1", "Old", "main", "model-a"] as never[]);
+  await migrate(connection, MIGRATIONS);
+  const [row] = await connection.getAllAsync<{ id: string; egress: string }>("SELECT id, egress FROM agent");
+  expect(row).toEqual({ id: "old", egress: "[]" });
+  expect(egressOf(row!)).toEqual([]);
 });
 
 test("an Agent the Machine no longer lists is removed here, while another Machine's Agent stays", async () => {
