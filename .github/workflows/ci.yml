@@ -40,10 +40,12 @@ jobs:
           # factory for a module another file already mocked hangs Bun 1.3.14
           # on the runner (links.test.ts after inbox.test.ts). Each file stays
           # self-contained and a hang names its file.
-          (cd controller && for file in $(find src scripts -name '*.test.ts' -o -name '*.test.tsx' | sort); do \
-            echo "== $file"; \
-            timeout 60 bun test --timeout 15000 "$file" || exit 1; \
-          done)
+          (cd controller && files=$(find src scripts -name '*.test.ts' -o -name '*.test.tsx' | sort); \
+            if [ -z "$files" ]; then echo "no controller test files found"; exit 1; fi; \
+            for file in $files; do \
+              echo "== $file"; \
+              timeout 60 bun test --timeout 15000 "$file" || exit 1; \
+            done)
       - name: Steiger (Controller prototype, Feature-Sliced Design)
         run: bun run check:prototype
       - name: Steiger and i18n keys (Controller)
