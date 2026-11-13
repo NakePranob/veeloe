@@ -17,6 +17,7 @@ use veeloe_runtime_core::preflight;
 use veeloe_runtime_core::{FromWorker, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
 use veeloe_runtime_supervisor::approval::Approvals;
+use veeloe_runtime_supervisor::doctor;
 use veeloe_runtime_supervisor::egress::Egress;
 use veeloe_runtime_supervisor::help::{help_for, USAGE};
 use veeloe_runtime_supervisor::hub_link::{HubLink, HubLinkOptions, HubLinkSink, HubSender};
@@ -487,6 +488,20 @@ async fn run() -> Result<(), CliError> {
                 "not a service command: see veeloe help service",
             )),
         },
+        Some("doctor") => {
+            // The only fix `doctor` has is the AppArmor profile (issue #49);
+            // what it needs from the Machine is injected, so a test runs it
+            // on macOS without root or AppArmor.
+            if args.len() != 2 || args[1] != "--fix-apparmor" {
+                return Err(CliError::usage(
+                    "what should doctor fix? veeloe doctor --fix-apparmor",
+                ));
+            }
+            for line in doctor::fix_apparmor(&doctor::SystemHost).map_err(CliError::from)? {
+                println!("{line}");
+            }
+            Ok(())
+        }
         Some("provider") => {
             match args.get(1).map(String::as_str) {
                 Some("add") | Some("list") | Some("remove") => {

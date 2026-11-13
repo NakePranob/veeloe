@@ -71,6 +71,7 @@ fn help_names_every_command_and_each_command_has_its_own_text() {
         "Forget every Controller",
         "Show whether this Machine is paired",
         "Set up the LLMs (Providers)",
+        "Fix what stops the OS sandbox from starting",
     ] {
         assert!(out.contains(phrase), "{phrase}: {out}");
     }
@@ -93,6 +94,38 @@ fn help_names_every_command_and_each_command_has_its_own_text() {
     let (code, stderr) = stderr_of(home.path(), &["help", "deploy"]);
     assert_eq!(code, 2);
     assert!(stderr.contains("no command deploy"), "{stderr}");
+}
+
+#[test]
+fn doctor_names_the_one_fix_it_has() {
+    let home = tempdir().expect("home");
+    let (code, stderr) = stderr_of(home.path(), &["doctor"]);
+    assert_eq!(code, 2, "{stderr}");
+    assert!(stderr.contains("veeloe doctor --fix-apparmor"), "{stderr}");
+
+    // Exactly that flag: a stray argument is a typo, not another fix.
+    let (code, stderr) = stderr_of(home.path(), &["doctor", "--fix-apparmor", "--extra"]);
+    assert_eq!(code, 2, "{stderr}");
+    assert!(stderr.contains("what should doctor fix?"), "{stderr}");
+
+    let (code, out) = veeloe(home.path(), &["help", "doctor"]);
+    assert_eq!(code, 0);
+    assert!(out.contains("veeloe doctor --fix-apparmor"), "{out}");
+    assert!(out.contains("/etc/apparmor.d/veeloe-bwrap"), "{out}");
+}
+
+/// On macOS there is no AppArmor rule to fix: the command says so and touches
+/// nothing. The Linux states are unit tests in
+/// `runtime-supervisor/src/doctor.rs`, where the Host is a table instead of
+/// this Machine (and root).
+#[cfg(target_os = "macos")]
+#[test]
+fn doctor_on_macos_says_nothing_is_needed() {
+    let home = tempdir().expect("home");
+    let (code, out) = veeloe(home.path(), &["doctor", "--fix-apparmor"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("nothing to do"), "{out}");
+    assert!(out.contains("sandbox-exec"), "{out}");
 }
 
 #[test]
