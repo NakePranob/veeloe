@@ -7,9 +7,9 @@
 
 ## 2. ทางออกเน็ตบน Linux
 
-- [ ] 2.1 proxy เปิด Unix listener ที่ `<VEELOE_HOME>/runtime/egress.sock` ใช้ตัวจัดการ/ตรวจ Egress ชุดเดียวกับ TCP
-- [ ] 2.2 `bwrap` bind Unix socket เข้า namespace ที่ path คงที่และสร้าง parent dir ให้
-- [ ] 2.3 worker เปิด TCP bridge บน loopback ใน namespace ไป Unix socket และตั้ง `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` ให้คำสั่ง; ถ้า bridge เปิดไม่ได้ worker ไม่พร้อมรับงานและรายงาน
+- [x] 2.1 proxy เปิด Unix listener ที่ `<VEELOE_HOME>/runtime/egress.sock` ใช้ตัวจัดการ/ตรวจ Egress ชุดเดียวกับ TCP
+- [x] 2.2 `bwrap` bind Unix socket เข้า namespace ที่ path คงที่และสร้าง parent dir ให้
+- [x] 2.3 worker เปิด TCP bridge บน loopback ใน namespace ไป Unix socket และตั้ง `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` ให้คำสั่ง; ถ้า bridge เปิดไม่ได้ worker ไม่พร้อมรับงานและรายงาน
 - [ ] 2.4 test: คำสั่งใน namespace ต่อ `example.com` ผ่าน proxy ได้เมื่ออยู่ใน Egress, ออกตรงไม่ได้เมื่อ Egress ว่าง, loopback ของตัวเองใช้ได้, สอง Agent ใช้ port เดียวกันได้
 - [ ] 2.5 e2e เคส Egress เอา skip macOS-only ออกและผ่านบน Linux
 

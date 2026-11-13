@@ -69,10 +69,28 @@ pub async fn run_stdio() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .and_then(|raw| serde_json::from_str::<Vec<String>>(&raw).ok())
         .unwrap_or_default();
-    let proxy = std::env::args()
-        .skip_while(|arg| arg != "--proxy")
-        .nth(1)
-        .filter(|url| url.starts_with("http://127.0.0.1:"));
+    // The supervisor names how this process reaches it: a URL on macOS, whose
+    // sandbox allows the proxy's port, or a Unix socket on Linux, whose network
+    // namespace has no route to the supervisor at all. On Linux the worker
+    // answers on its own loopback and forwards to that socket, so every command
+    // gets the same kind of `HTTP_PROXY` either way (ADR 0069). A bridge that
+    // cannot reach the socket ends the start: a worker with no way out is not
+    // a worker with no network, it is one that fails every Turn halfway.
+    let proxy_socket = std::env::args()
+        .skip_while(|arg| arg != "--proxy-unix")
+        .nth(1);
+    let proxy = match proxy_socket {
+        Some(socket) => {
+            let bridge = crate::bridge::start(std::path::Path::new(&socket))
+                .await
+                .map_err(|error| format!("cannot reach the Egress proxy at {socket}: {error}"))?;
+            Some(bridge.url)
+        }
+        None => std::env::args()
+            .skip_while(|arg| arg != "--proxy")
+            .nth(1)
+            .filter(|url| url.starts_with("http://127.0.0.1:")),
+    };
 
     let mut config = Config::new(dir, name);
     config.allowlist = allowlist;

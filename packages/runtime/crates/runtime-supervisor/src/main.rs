@@ -1142,9 +1142,18 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // never one a command may bind (ADR 0069).
     let reserved = veeloe_runtime_supervisor::ports::Ports::open(&home)
         .map_err(|error| format!("cannot read the Agents' ports: {error}"))?;
-    let egress_proxy = veeloe_runtime_supervisor::proxy::start_avoiding(
+    // On Linux the proxy also answers on a Unix socket in the Runtime's folder:
+    // a worker's network namespace has no route to this process, so that file
+    // is bound into it and is the only way out (ADR 0069). macOS keeps the TCP
+    // listener alone, because its profile allows that one port.
+    #[cfg(target_os = "linux")]
+    let proxy_socket = Some(veeloe_runtime_supervisor::proxy::socket_path(&home));
+    #[cfg(not(target_os = "linux"))]
+    let proxy_socket: Option<std::path::PathBuf> = None;
+    let egress_proxy = veeloe_runtime_supervisor::proxy::start_with_socket(
         Arc::clone(&egress),
         &|port| reserved.is_taken(port),
+        proxy_socket.as_deref(),
     )
     .await?;
     let budgets = Arc::new(veeloe_runtime_supervisor::usage::Budgets::new(
