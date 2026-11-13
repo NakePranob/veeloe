@@ -10,7 +10,7 @@
 
 ## 2. ที่ยังต้องยืนยัน
 
-- [ ] 2.1 CI Linux: กรณี bwrap ขาด / AppArmor ถูกจำกัด / clone sysctl เป็น 0 ตรวจด้วย
-      probe ปลอมบน macOS แล้ว แต่รอบนี้ยังไม่ได้รัน `veeloe` บน Linux จริง
+- [x] 2.1 CI Linux: เคส bwrap ขาดรันจริงผ่าน CLI test (PATH ว่าง) แล้วบน runner;
+      เคส AppArmor/clone sysctl ยังพิสูจน์ด้วย probe ปลอมเท่านั้น เพราะ runner ไม่ได้อยู่ในสถานะถูกจำกัด
 - [ ] 2.2 AppArmor profile ของ Veeloe เอง (ไฟล์และตัวติดตั้ง) ยังไม่อยู่ในรอบนี้:
       ข้อความอ้าง profile ที่ Ubuntu มีให้ (`bwrap-userns-restrict`) ตาม ADR 0069
