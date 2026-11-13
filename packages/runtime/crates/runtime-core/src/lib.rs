@@ -6,6 +6,7 @@ pub mod conversation;
 pub mod event_store;
 pub mod ipc;
 pub mod memory;
+pub mod preflight;
 pub mod sandbox;
 pub mod ports;
 pub mod usage;
