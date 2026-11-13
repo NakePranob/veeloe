@@ -22,6 +22,7 @@ use veeloe_runtime_core::sandbox::{self, Policy, Sandbox};
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, TaskEvent, ToWorker};
 
 use crate::agents::{agent_dir, Agent};
+use crate::cgroup;
 use crate::hub_link::random;
 use crate::limits::{Limits, ResidentMemory};
 use crate::task_log::TaskLogs;
@@ -51,6 +52,10 @@ pub type Wrap = Arc<dyn Fn(&Agent, Vec<String>) -> Vec<String> + Send + Sync>;
 /// Runtime log level; nothing waits for it and nothing fails because of it
 /// (issue #35).
 pub type Toolchains = Arc<dyn Fn(&Agent, &Path) -> Option<Vec<Report>> + Send + Sync>;
+/// Answers whether this Machine can put a worker in a cgroup scope. A test
+/// replaces the real probe so the fallback is checked on any system (issue
+/// #48).
+pub type CgroupProbe = Arc<dyn Fn() -> bool + Send + Sync>;
 
 /// The Wrap a Runtime uses: each worker inside its own Agent's sandbox, which
 /// every command it starts inherits, reaching the network only through that
@@ -187,6 +192,14 @@ struct Inner {
     /// What one worker may use (issue #47). The default is what a Machine
     /// without a `limits` in its config gets.
     limits: Mutex<Limits>,
+    /// Whether a worker can be put in a cgroup scope, answered once and kept
+    /// for the supervisor's lifetime (issue #48). `None` until the first worker
+    /// asks.
+    cgroup: Mutex<Option<bool>>,
+    /// How that answer is found; the real systemd probe unless a test says.
+    cgroup_probe: Mutex<Option<CgroupProbe>>,
+    /// The fallback is said once in the Runtime log, not once per worker.
+    cgroup_logged: AtomicBool,
     /// How this Runtime reads a process's memory. Real `proc_pidinfo` on macOS;
     /// a test replaces it so a limit can be crossed without a memory hog.
     memory: Mutex<Option<ResidentMemory>>,
@@ -239,6 +252,9 @@ impl Workers {
                 pids: Mutex::new(HashMap::new()),
                 reported: Reported::default(),
                 limits: Mutex::new(Limits::default()),
+                cgroup: Mutex::new(None),
+                cgroup_probe: Mutex::new(None),
+                cgroup_logged: AtomicBool::new(false),
                 memory: Mutex::new(system_memory()),
                 running: Mutex::new(HashMap::new()),
                 stopping: AtomicBool::new(false),
@@ -258,6 +274,13 @@ impl Workers {
     /// is ended and started again like any other crash.
     pub fn limiting(&self, limits: Limits) {
         *self.inner.limits.lock().expect("limits") = limits;
+    }
+
+    /// Answer whether this Machine can put a worker in a cgroup scope, instead
+    /// of asking systemd (issue #48). A test uses it so the fallback path is
+    /// checked without a Linux user session.
+    pub fn probing_cgroup(&self, probe: CgroupProbe) {
+        *self.inner.cgroup_probe.lock().expect("cgroup probe") = Some(probe);
     }
 
     /// Read a process's memory instead of asking the OS, so a test decides when
@@ -446,13 +469,13 @@ async fn session(
             why: format!("could not open the Task log: {why}"),
         };
     }
-    let argv = (inner.wrap)(agent, inner.command.clone());
-    let Some((program, rest)) = argv.split_first() else {
+    let worker_argv = (inner.wrap)(agent, inner.command.clone());
+    if worker_argv.is_empty() {
         return Ending {
             stopped: false,
             why: "no sandbox to run it in".into(),
         };
-    };
+    }
     // The port range the wrap just reserved for this Agent, read back from the
     // file so a restart hands out the same one (ADR 0069). Every command sees
     // `PORT` and the whole list, so a dev server started by a Task keeps its
@@ -475,44 +498,83 @@ async fn session(
             agent.id
         ));
     }
-    let mut command = Command::new(program);
-    command.args(rest);
-    command
-        .env_clear()
-        // Only what a worker needs. Never a Provider's key: the supervisor holds
-        // that (ADR 0042).
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", &agent_home)
-        .env("XDG_CACHE_HOME", agent_home.join(".cache"))
-        .env("GIT_CONFIG_GLOBAL", agent_home.join(".gitconfig"))
-        .env("TMPDIR", dir.join("tmp"))
-        .env("VEELOE_AGENT_DIR", &dir)
-        .env("VEELOE_AGENT_NAME", &agent.name)
-        .env(
-            "VEELOE_AGENT_ALLOWLIST",
-            serde_json::to_string(&agent.allowlist).unwrap_or_else(|_| "[]".into()),
-        )
-        .env(
-            "VEELOE_AGENT_APPROVAL_TIMEOUT_S",
-            agent.approval_timeout_s.to_string(),
-        );
-    if let Some(ports) = &ports {
-        command
-            .env("PORT", ports.start().to_string())
-            .env("VEELOE_PORTS", ports.listed());
-    }
-    command
-        .current_dir(dir.join("workdir"))
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
-    // A worker that burns CPU for longer than the Owner allows is cut by the
-    // OS itself, with no code of ours in the way (issue #47). macOS only:
-    // Linux is capped by a cgroup in a later ticket (ADR 0069).
+    // What one worker may use (issue #47), and where it runs on Linux: inside a
+    // cgroup scope when the Machine has a user manager to put it in (issue #48).
     let limits = *inner.limits.lock().expect("limits");
-    #[cfg(target_os = "macos")]
-    crate::limits::capping_cpu_time(&mut command, limits.cpu_seconds);
-    let mut child: Child = match command.spawn() {
+    let scope = match scope_for(inner, &limits).await {
+        Some(scope) => Some(scope),
+        None => {
+            // Said once per supervisor, never per worker, and never about an
+            // Agent: this is a fact about the Machine.
+            say_cgroup_unavailable(inner);
+            None
+        }
+    };
+    // The same command either way, so the fallback differs only in its argv.
+    let prepared = |argv: &[String]| -> std::io::Result<Child> {
+        let (program, rest) = argv.split_first().expect("a worker argv has a program");
+        let mut command = Command::new(program);
+        command.args(rest);
+        command
+            .env_clear()
+            // Only what a worker needs. Never a Provider's key: the supervisor
+            // holds that (ADR 0042).
+            .env("PATH", std::env::var("PATH").unwrap_or_default())
+            .env("HOME", &agent_home)
+            .env("XDG_CACHE_HOME", agent_home.join(".cache"))
+            .env("GIT_CONFIG_GLOBAL", agent_home.join(".gitconfig"))
+            .env("TMPDIR", dir.join("tmp"))
+            .env("VEELOE_AGENT_DIR", &dir)
+            .env("VEELOE_AGENT_NAME", &agent.name)
+            .env(
+                "VEELOE_AGENT_ALLOWLIST",
+                serde_json::to_string(&agent.allowlist).unwrap_or_else(|_| "[]".into()),
+            )
+            .env(
+                "VEELOE_AGENT_APPROVAL_TIMEOUT_S",
+                agent.approval_timeout_s.to_string(),
+            );
+        // `systemd-run` finds the owner's user manager through these, and the
+        // worker needs neither: they are passed only so the wrapper can talk to
+        // systemd, and the sandbox keeps the paths they name out of reach.
+        for name in ["XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] {
+            if let Ok(value) = std::env::var(name) {
+                command.env(name, value);
+            }
+        }
+        if let Some(ports) = &ports {
+            command
+                .env("PORT", ports.start().to_string())
+                .env("VEELOE_PORTS", ports.listed());
+        }
+        command
+            .current_dir(dir.join("workdir"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+        // A worker that burns CPU for longer than the Owner allows is cut by the
+        // OS itself, with no code of ours in the way (issue #47). Kept on Linux
+        // beside the scope, as the backstop for the CPUQuota rate (issue #48).
+        #[cfg(unix)]
+        crate::limits::capping_cpu_time(&mut command, limits.cpu_seconds);
+        command.spawn()
+    };
+    let started: std::io::Result<Child> = match scope {
+        None => prepared(&worker_argv),
+        Some(scope) => match prepared(&cgroup::argv(scope, &worker_argv)) {
+            Ok(child) => Ok(child),
+            // `systemd-run` is there but would not start this worker — its user
+            // manager went away, or it refused a property. The worker is started
+            // the plain way rather than not at all, and no scope is tried again
+            // on this Machine (issue #48).
+            Err(_) => {
+                *inner.cgroup.lock().expect("cgroup") = Some(false);
+                say_cgroup_unavailable(inner);
+                prepared(&worker_argv)
+            }
+        },
+    };
+    let mut child: Child = match started {
         Ok(child) => child,
         Err(error) => {
             return Ending {
@@ -567,7 +629,13 @@ async fn session(
                     }
                 }
                 None => {
-                    let _ = child.kill().await;
+                    let _ = child.start_kill();
+                    // On Linux the process this Runtime holds may be the
+                    // `systemd-run` that opened the scope, with the worker
+                    // below it: killing only the wrapper would leave the worker
+                    // running (issue #48).
+                    crate::limits::kill_tree(pid);
+                    let _ = child.wait().await;
                     break Ending { stopped: true, why: "stopped".into() };
                 }
             },
@@ -750,13 +818,14 @@ async fn write(stdin: &mut ChildStdin, message: &ToWorker) {
 }
 
 /// The reader the Runtime uses in real life: `proc_pidinfo` on macOS, which has
-/// no cgroups. Elsewhere there is no watch in this ticket (ADR 0069).
+/// no cgroups, and `/proc/<pid>/statm` on Linux, where the watch is the backstop
+/// for a Machine with no user systemd to make a scope with (ADR 0069).
 fn system_memory() -> Option<ResidentMemory> {
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     {
         Some(Arc::new(crate::limits::resident_bytes))
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(unix))]
     {
         None
     }
@@ -764,10 +833,12 @@ fn system_memory() -> Option<ResidentMemory> {
 
 /// What the worker and every command under it hold resident, in bytes. The
 /// worker's own RSS is not the whole story: a build started by a Task is its
-/// child, and that is usually what fills the memory.
+/// child, and that is usually what fills the memory. On Linux the walk also
+/// covers the `systemd-run` that opened the worker's scope, so a worker under
+/// it is still counted.
 fn resident_total(read: &ResidentMemory, pid: u32) -> Option<u64> {
     let mut pids = vec![pid];
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     pids.extend(crate::limits::descendants(pid));
     let mut total = None;
     for pid in pids {
@@ -776,6 +847,48 @@ fn resident_total(read: &ResidentMemory, pid: u32) -> Option<u64> {
         }
     }
     total
+}
+
+/// The scope one worker should run in, or `None` when this Machine has no user
+/// systemd to make one with. Asked once per supervisor and kept: the answer is
+/// a fact about the Machine, not about a worker (issue #48).
+async fn scope_for(inner: &Arc<Inner>, limits: &Limits) -> Option<crate::cgroup::Scope> {
+    let known = *inner.cgroup.lock().expect("cgroup");
+    let usable = match known {
+        Some(usable) => usable,
+        None => {
+            let probe = inner.cgroup_probe.lock().expect("cgroup probe").clone();
+            let usable = tokio::task::spawn_blocking(move || match probe {
+                Some(probe) => probe(),
+                None => crate::cgroup::detect(),
+            })
+            .await
+            .unwrap_or(false);
+            *inner.cgroup.lock().expect("cgroup") = Some(usable);
+            usable
+        }
+    };
+    usable.then(|| crate::cgroup::Scope::of(limits))
+}
+
+/// Says once, at Runtime log level and without an Agent, that this Machine
+/// cannot keep a worker in a cgroup, so the older caps are all there is
+/// (issue #48). macOS has no cgroups at all, so there is nothing to report
+/// there and nothing is written.
+fn say_cgroup_unavailable(inner: &Inner) {
+    if !cfg!(target_os = "linux") {
+        return;
+    }
+    if inner.cgroup_logged.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let _ = crate::logs::record(
+        &inner.home,
+        "warn",
+        cgroup::UNAVAILABLE,
+        serde_json::json!({}),
+    );
+    (inner.log)("no cgroups on this Machine; workers run with the CPU limit and the memory watch");
 }
 
 /// Watch one worker's memory until it ends. Over the limit, the Runtime records
@@ -854,4 +967,25 @@ fn report_toolchains(inner: &Arc<Inner>, agent: &Agent) {
             inner.reported.record(&inner.home, &agent.id, &reports);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    /// Issue #48: the memory watch must exist on Linux too, where it is the
+    /// backstop for a Machine with no user systemd to make a scope with.
+    #[test]
+    fn the_memory_watch_has_a_reader_on_this_system() {
+        assert!(
+            super::system_memory().is_some(),
+            "no resident-memory reader on this system"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_linux_reader_reads_this_process_from_proc() {
+        let read = super::system_memory().expect("a reader");
+        let bytes = read(std::process::id()).expect("this process is in /proc");
+        assert!(bytes > 0, "a running process holds some memory");
+    }
 }

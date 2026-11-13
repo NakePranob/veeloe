@@ -3,6 +3,7 @@
 
 pub mod agents;
 pub mod approval;
+pub mod cgroup;
 pub mod denials;
 pub mod providers;
 pub mod egress;
