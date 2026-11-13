@@ -1263,6 +1263,8 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // is not started: an empty argv ends its session before it runs.
     let wrap =
         veeloe_runtime_supervisor::workers::sandboxed(home.clone(), Arc::clone(&proxies));
+    // What one worker may use, from `config.json` and its defaults (issue #47).
+    let limits = veeloe_runtime_supervisor::limits::load(&home);
     let workers = Workers::with_logs(
         home.clone(),
         worker_command(),
@@ -1276,6 +1278,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         wrap,
         task_logs,
     );
+    workers.limiting(limits);
     {
         let approvals = Arc::clone(&approvals);
         workers.watching_session_end(Arc::new(move |agent: &str| {
