@@ -131,6 +131,10 @@ impl Egress {
     /// The whole new list for one Agent, already checked against the Protocol's
     /// schema. `None` when the list is not one, or this Machine has no such
     /// Agent: the proxy keeps what it had.
+    ///
+    /// The read, the write of `agents.json` and the union view, and the mirror
+    /// all happen under the one lock, so this cannot lose a domain an `always`
+    /// added at the same moment (issue #44).
     pub fn set_agent(
         &self,
         agent: &str,
@@ -139,17 +143,9 @@ impl Egress {
         if !is_valid_egress(&domains) {
             return Ok(None);
         }
-        let registry = AgentRegistry::open(&self.home)?;
         let next = dedupe(domains);
-        if !registry.set_egress(agent, &next)? {
-            return Ok(None);
-        }
-        self.current
-            .lock()
-            .expect("egress")
-            .insert(agent.to_string(), next.clone());
-        write_union(&self.home, &registry)?;
-        Ok(Some(next))
+        let mut current = self.current.lock().expect("egress");
+        self.write_agent(&mut current, agent, next)
     }
 
     /// Adds one domain to this Agent's list, in one write, for a permanent yes
@@ -157,8 +153,10 @@ impl Egress {
     /// Machine has no such Agent: the approval then stays unanswered rather
     /// than promising a way out that was never written.
     ///
-    /// Read and write happen under the same lock as [`Egress::current`], so two
-    /// permanent yeses at once cannot lose one of the domains.
+    /// The read and the write happen under the same lock as [`Egress::current`],
+    /// [`Egress::set_agent`] and [`Egress::set_all`], so two permanent yeses at
+    /// once — or one at the same moment as an `egress.set` — cannot lose one of
+    /// the writes.
     pub fn add_domain(
         &self,
         agent: &str,
@@ -172,34 +170,47 @@ impl Egress {
         if !next.iter().any(|known| known == domain) {
             next.push(domain.to_string());
         }
+        self.write_agent(&mut current, agent, next)
+    }
+
+    /// The whole new list for every Agent: the legacy `egress.set` without an
+    /// Agent, until the Controller has a per-Agent screen. Also how the
+    /// migration brings the old Machine list across. Holds the same lock as the
+    /// other two writers for the whole read and write (issue #44).
+    pub fn set_all(&self, domains: Vec<String>) -> Result<Option<Vec<String>>, EgressError> {
+        if !is_valid_egress(&domains) {
+            return Ok(None);
+        }
+        let next = dedupe(domains);
+        let mut current = self.current.lock().expect("egress");
+        let registry = AgentRegistry::open(&self.home)?;
+        registry.set_egress_everywhere(&next)?;
+        let agents = registry.all()?;
+        for agent in agents {
+            current.insert(agent.id, next.clone());
+        }
+        // A new Agent starts with an empty list, not this one; nothing is
+        // remembered for ids that do not exist yet (issue #43).
+        write_union(&self.home, &registry)?;
+        Ok(Some(next))
+    }
+
+    /// Writes one Agent's whole list while the caller holds the lock: the row
+    /// in `agents.json`, the union view a Controller still reads, and the
+    /// mirror. One lock covers the read, the write and the assign, which is
+    /// what keeps a permanent yes and an `egress.set` that arrive together from
+    /// writing one over the other (issue #44).
+    fn write_agent(
+        &self,
+        current: &mut HashMap<String, Vec<String>>,
+        agent: &str,
+        next: Vec<String>,
+    ) -> Result<Option<Vec<String>>, EgressError> {
         let registry = AgentRegistry::open(&self.home)?;
         if !registry.set_egress(agent, &next)? {
             return Ok(None);
         }
         current.insert(agent.to_string(), next.clone());
-        write_union(&self.home, &registry)?;
-        Ok(Some(next))
-    }
-
-    /// The whole new list for every Agent: the legacy `egress.set` without an
-    /// Agent, until the Controller has a per-Agent screen. Also how the
-    /// migration brings the old Machine list across.
-    pub fn set_all(&self, domains: Vec<String>) -> Result<Option<Vec<String>>, EgressError> {
-        if !is_valid_egress(&domains) {
-            return Ok(None);
-        }
-        let registry = AgentRegistry::open(&self.home)?;
-        let next = dedupe(domains);
-        registry.set_egress_everywhere(&next)?;
-        let agents = registry.all()?;
-        {
-            let mut current = self.current.lock().expect("egress");
-            for agent in agents {
-                current.insert(agent.id, next.clone());
-            }
-            // A new Agent starts with an empty list, not this one; nothing is
-            // remembered for ids that do not exist yet (issue #43).
-        }
         write_union(&self.home, &registry)?;
         Ok(Some(next))
     }
