@@ -16,6 +16,7 @@ fn agent(budget: Option<u64>) -> Agent {
         model: "model-a".into(),
         character: None,
         allowlist: Vec::new(),
+        egress: Vec::new(),
         approval_timeout_s: 3_600,
         budget,
         deleted_at: None,

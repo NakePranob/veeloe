@@ -20,29 +20,18 @@ use veeloe_runtime_supervisor::providers::{
 use veeloe_runtime_supervisor::toolchain::{Outcome, Report};
 use veeloe_runtime_supervisor::workers::{sandboxed, SupervisorLlm, Workers};
 
-/// Stands in for the supervisor's Egress proxy: a Unix socket at the path the
-/// Linux wrap binds into the worker's namespace, accepting and dropping what
-/// it gets. The worker's bridge connects to it before it says ready, so it has
-/// to be there even where no Turn reaches the network (ADR 0069).
-fn egress_socket(home: &std::path::Path) {
-    let path = veeloe_runtime_supervisor::proxy::socket_path(home);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).expect("runtime folder");
-    }
-    let _ = std::fs::remove_file(&path);
-    let listener = std::os::unix::net::UnixListener::bind(&path).expect("bind the proxy socket");
-    std::thread::spawn(move || {
-        for client in listener.incoming() {
-            drop(client);
-        }
-    });
-}
-
-/// The wrap the supervisor uses, with that socket in place. The proxy's TCP
-/// port is not listening: no test here needs the network.
-fn sandboxed_for(home: &std::path::Path) -> veeloe_runtime_supervisor::workers::Wrap {
-    egress_socket(home);
-    sandboxed(home.to_path_buf(), "http://127.0.0.1:9".into())
+/// The wrap the supervisor uses, with this Agent's own proxy running. No test
+/// here reaches the network, but the listener and the Linux socket have to be
+/// there before the worker says ready (ADR 0069, issue #43).
+async fn sandboxed_for(home: &std::path::Path) -> veeloe_runtime_supervisor::workers::Wrap {
+    let egress =
+        Arc::new(veeloe_runtime_supervisor::egress::Egress::open(home).expect("egress"));
+    let proxies = Arc::new(veeloe_runtime_supervisor::proxy::Proxies::new(
+        home.to_path_buf(),
+        egress,
+    ));
+    proxies.ensure("a1").await.expect("the Agent's proxy");
+    sandboxed(home.to_path_buf(), proxies)
 }
 
 fn agent() -> Agent {
@@ -53,6 +42,7 @@ fn agent() -> Agent {
         model: "model-a".into(),
         character: None,
         allowlist: Vec::new(),
+        egress: Vec::new(),
         approval_timeout_s: 3_600,
         budget: None,
         deleted_at: None,
@@ -358,8 +348,8 @@ async fn a_sandboxed_worker_runs_a_turn_and_its_tools_stay_in_the_agents_folder(
             recording.lock().expect("heard").push(message);
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
-        // No proxy listens here: this Turn needs no network.
-        sandboxed_for(&home_path),
+        // The Agent's proxy listens; this Turn just never reaches the network.
+        sandboxed_for(&home_path).await,
     );
 
     workers.start(&agent);
@@ -458,7 +448,7 @@ async fn a_sandboxed_worker_runs_a_turn_with_git_and_bun() {
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
         // No proxy listens here: neither `git` nor `bun` reaches the network.
-        sandboxed_for(&home_path),
+        sandboxed_for(&home_path).await,
     );
 
     workers.start(&agent);
@@ -593,7 +583,7 @@ async fn a_command_sees_the_agents_ports_and_can_serve_on_them() {
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
         // Nothing listens on the proxy's port here: the range is its own.
-        sandboxed_for(&home_path),
+        sandboxed_for(&home_path).await,
     );
 
     workers.start(&agent);
@@ -801,8 +791,8 @@ async fn a_toolchain_that_cannot_run_is_reported_and_the_worker_still_turns() {
             recording.lock().expect("heard").push(message);
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
-        // No proxy listens here: this Turn needs no network.
-        sandboxed_for(&home_path),
+        // The Agent's proxy listens; this Turn just never reaches the network.
+        sandboxed_for(&home_path).await,
     );
     // What a Machine without `bun` under its rules would answer.
     workers.checking_toolchains(Arc::new(|_agent, _bin| {
@@ -978,7 +968,7 @@ async fn a_command_and_the_file_tools_cannot_reach_the_task_log() {
             recording.lock().expect("heard").push(message);
         }),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
-        sandboxed_for(&home_path),
+        sandboxed_for(&home_path).await,
     );
 
     workers.start(&agent);

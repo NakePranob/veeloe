@@ -180,8 +180,10 @@ test("an Agent runs commands in its sandbox and cannot get out of it", async () 
     c.send("agent.create", { id, name: id, provider: "main", model: "model-a" });
     await c.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === id));
   }
-  const listed = await c.waitFor((m) => m.type === "agent.listed");
+  const listed = await c.waitFor((m) => m.type === "agent.listed" && m.body.agents.length === 2);
   expect(listed.type === "agent.listed" && listed.body.egress).toEqual([]);
+  // Each Agent's own list is empty too: A new Agent starts with no way out (issue #43).
+  expect(listed.type === "agent.listed" && listed.body.agents.map((a) => a.egress)).toEqual([[], []]);
 
   // Its Workdir, and nothing it does there carries to the next command.
   expect(await run("pwd")).toEqual({ output: `${join(home, "agents/agent-a/workdir")}\nexit code: 0`, failed: false });
@@ -228,6 +230,42 @@ test("a domain the owner adds to the Egress opens at once for every Agent, and c
   await c.waitFor((m) => m.type === "agent.listed" && m.body.egress?.length === 0);
   expect((await run("curl -sS -m 10 -o /dev/null https://example.com")).failed).toBe(true);
 }, 120_000);
+
+// Issue #43: the Egress belongs to one Agent. A reaches what it was given; B,
+// whose list is empty, does not, and B's proxy is its own listener, so it never
+// answers for A either (ADR 0029).
+test("one Agent's Egress opens for it alone", async () => {
+  // B gets a domain of its own first, so every later answer names a state the
+  // older ones never had and the checks cannot read a stale list.
+  c.send("egress.set", { agent: "agent-b", egress: ["example.org"] });
+  await c.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-b" && a.egress?.includes("example.org") === true));
+
+  c.send("egress.set", { agent: "agent-a", egress: ["example.com"] });
+  const listed = await c.waitFor(
+    (m) =>
+      m.type === "agent.listed" &&
+      m.body.agents.some((a) => a.id === "agent-a" && a.egress?.includes("example.com") === true) &&
+      m.body.agents.some((a) => a.id === "agent-b" && a.egress?.includes("example.org") === true),
+  );
+  if (listed.type !== "agent.listed") throw new Error("no list");
+  const own = (id: string) => listed.body.agents.find((a) => a.id === id)?.egress;
+  expect(own("agent-a")).toEqual(["example.com"]);
+  expect(own("agent-b")).toEqual(["example.org"]);
+  // The top-level list is the union, for a Controller that reads only that shape.
+  expect(listed.body.egress).toEqual(["example.com", "example.org"]);
+
+  expect(await run("curl -sS -m 20 -o /dev/null -w '%{http_code}' https://example.com", "agent-a")).toEqual({ output: "200\nexit code: 0", failed: false });
+  expect((await run("curl -sS -m 10 -o /dev/null https://example.com", "agent-b")).failed).toBe(true);
+
+  // Taking it out of A closes A, and still leaves B as it was.
+  c.send("egress.set", { agent: "agent-a", egress: [] });
+  await c.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-a" && a.egress?.length === 0) && m.body.agents.some((a) => a.id === "agent-b" && a.egress?.includes("example.org") === true));
+  expect((await run("curl -sS -m 10 -o /dev/null https://example.com", "agent-a")).failed).toBe(true);
+
+  // Leave both as the next file expects to find them.
+  c.send("egress.set", { agent: "agent-b", egress: [] });
+  await c.waitFor((m) => m.type === "agent.listed" && m.body.egress?.length === 0);
+}, 240_000);
 
 /** The SSE of one finished answer that just says `text`. */
 function say(text: string) {

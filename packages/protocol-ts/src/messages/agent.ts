@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { AllowlistSchema } from "./allowlist";
 import { EgressSchema } from "./egress";
+import { AgentIdSchema } from "./ids";
 
 /** Also a folder name on the Machine (ADR 0032), so nothing that could leave it. */
-export const AgentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+export { AgentIdSchema };
 const id = AgentIdSchema;
 const name = z.string().trim().min(1).max(80);
 
@@ -72,6 +73,11 @@ const AgentSchema = z.looseObject({
   approvalTimeoutS: approvalTimeoutS.optional(),
   /** The Budget the Machine keeps, defaulted when it never said one (`daily-budget`). */
   budget: budget.optional(),
+  /**
+   * What this Agent itself may reach (ADR 0029, issue #43). The Machine may still
+   * send one top-level `egress` for a Controller that knows only that shape.
+   */
+  egress: EgressSchema.optional(),
   /** Today's tokens, as of this answer. Absent from a Machine older than `daily-budget`. */
   usage: usage.optional(),
 });
@@ -114,7 +120,8 @@ export const AgentListedBodySchema = z.looseObject({
   /** Agents the Machine deleted and has not purged yet. Absent from a Machine older than `agent-trash`. */
   trash: z.array(AgentTrashEntrySchema).optional(),
   providers: z.array(ProviderSchema),
-  /** The Machine's Egress (`sandboxed-commands`). Absent from a Machine older than that. */
+  /** Every Agent's Egress together, for a Controller that reads only this shape
+   * (`sandboxed-commands`, ADR 0029, issue #43). Each Agent's own list is in it. */
   egress: EgressSchema.optional(),
 });
 export type AgentListedBody = z.infer<typeof AgentListedBodySchema>;

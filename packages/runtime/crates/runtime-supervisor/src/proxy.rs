@@ -1,69 +1,108 @@
-//! The local proxy every sandboxed command reaches the network through
-//! (ADR 0008, 0029).
+//! The local proxy each Agent's sandboxed commands reach the network through
+//! (ADR 0008, 0029, issue #43).
 //!
 //! Seatbelt cannot match a domain, and a list the kernel cannot check is not a
-//! rule. So the sandbox allows exactly one outbound address, this proxy on
-//! localhost, and the proxy decides per connection whether the Machine's
+//! rule. So the sandbox allows exactly one outbound address, this Agent's proxy
+//! on localhost, and the proxy decides per connection whether *that Agent's*
 //! Egress lets the host out. It is read on every connection, so `egress.set`
 //! takes effect without starting a worker again.
 //!
+//! One listener per Agent: a request that arrives on A's listener is checked
+//! against A's list and never B's, so A cannot borrow B's way out (ADR 0029).
 //! Two transports carry the same requests to the same checks: TCP on loopback
 //! for macOS, whose profile allows that one port, and a Unix socket for Linux,
 //! which has no route to the supervisor at all and gets the socket bound into
-//! its network namespace (ADR 0069). The proxy does not know which one it is
-//! answering on.
+//! its network namespace (ADR 0069).
 
+use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{lookup_host, TcpListener, TcpStream};
+use tokio::task::JoinHandle;
 
 use crate::egress::Egress;
 
 /// The largest request head a client may send before the proxy gives up.
 const MAX_HEAD: usize = 16 * 1024;
 
-/// A running proxy: the URL commands get, and the port the sandbox allows.
+/// A running proxy: the URL one Agent's commands get, the port the sandbox
+/// allows, and the socket its namespace gets on Linux.
 pub struct Proxy {
     pub url: String,
     pub port: u16,
     /// The Unix socket it also answers on, where the Machine has one.
     pub socket: Option<PathBuf>,
+    tasks: Vec<JoinHandle<()>>,
 }
 
-/// Where the proxy's Unix socket sits: `<VEELOE_HOME>/runtime/egress.sock`, in
-/// the Runtime's own folder, out of reach of what a command may write.
-pub fn socket_path(home: &Path) -> PathBuf {
+/// What the wrap needs of one Agent's proxy, copied out of the registry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProxyView {
+    pub url: String,
+    pub port: u16,
+    pub socket: Option<PathBuf>,
+}
+
+impl Proxy {
+    pub fn view(&self) -> ProxyView {
+        ProxyView {
+            url: self.url.clone(),
+            port: self.port,
+            socket: self.socket.clone(),
+        }
+    }
+}
+
+impl Drop for Proxy {
+    fn drop(&mut self) {
+        // The listener closes with its task, so an Agent that is gone stops
+        // taking requests at once (ADR 0029).
+        for task in &self.tasks {
+            task.abort();
+        }
+    }
+}
+
+/// Where one Agent's proxy Unix socket sits:
+/// `<VEELOE_HOME>/runtime/egress/<agent>.sock`, in the Runtime's own folder,
+/// out of reach of what a command may write (ADR 0069).
+pub fn socket_path(home: &Path, agent: &str) -> PathBuf {
+    home.join("runtime").join("egress").join(format!("{agent}.sock"))
+}
+
+/// The one Machine-wide socket a Runtime before #43 listened on. It is only
+/// read to remove it: no Agent's proxy answers there (ADR 0069, issue #43).
+fn stale_machine_socket(home: &Path) -> PathBuf {
     home.join("runtime").join("egress.sock")
 }
 
-/// Starts the proxy on a free loopback port. It runs until the process ends.
-pub async fn start(egress: Arc<Egress>) -> std::io::Result<Proxy> {
-    start_avoiding(egress, &|_| false).await
+/// Starts the proxy on a free loopback port. Tests only: the supervisor starts
+/// listeners through [`Proxies::ensure`], so an Agent always has its own list
+/// and no caller can open a Machine-wide proxy again (issue #43 review).
+#[cfg(test)]
+async fn start(egress: Arc<Egress>, agent: &str) -> std::io::Result<Proxy> {
+    start_with_socket(egress, agent, &|_| false, None).await
 }
 
-/// Starts the proxy on a free loopback port that `avoid` accepts. The Agent
-/// ranges are reserved before the proxy opens, and a port inside a range is a
-/// port a command may bind, so the proxy steps out of their way instead of
-/// taking one that was already given away (ADR 0069).
-pub async fn start_avoiding(
+/// Starts one Agent's proxy on a free loopback port and, when `socket` names a
+/// path, on that Unix socket too, so its Linux worker can reach it from inside
+/// its own network namespace (ADR 0069). Both listeners go through one `serve`,
+/// so an Egress check is never weaker on one of them, and both answer with this
+/// Agent's list only. Private: only [`Proxies::ensure`] opens one, and it picks
+/// a port outside the Agents' ranges (issue #43 review). The Agent ranges are
+/// reserved before the proxy opens, and a port inside a range is a port a
+/// command may bind, so `avoid` steps out of their way instead of taking one
+/// that was already given away (ADR 0069).
+async fn start_with_socket(
     egress: Arc<Egress>,
-    avoid: &(dyn Fn(u16) -> bool + Send + Sync),
-) -> std::io::Result<Proxy> {
-    start_with_socket(egress, avoid, None).await
-}
-
-/// Starts the proxy on a free loopback port and, when `socket` names a path,
-/// on that Unix socket too, so a Linux worker can reach it from inside its own
-/// network namespace (ADR 0069). Both listeners go through one `serve`, so an
-/// Egress check is never weaker on one of them.
-pub async fn start_with_socket(
-    egress: Arc<Egress>,
+    agent: &str,
     avoid: &(dyn Fn(u16) -> bool + Send + Sync),
     socket: Option<&Path>,
 ) -> std::io::Result<Proxy> {
+    let agent: Arc<str> = Arc::from(agent);
     for _ in 0..16 {
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let port = listener.local_addr()?.port();
@@ -72,25 +111,24 @@ pub async fn start_with_socket(
             drop(listener);
             continue;
         }
+        let mut tasks = vec![tokio::spawn(accepting(
+            listener,
+            Arc::clone(&egress),
+            Arc::clone(&agent),
+        ))];
         let socket = match socket {
-            Some(path) => Some(listen_unix(path, Arc::clone(&egress)).await?),
+            Some(path) => {
+                let (path, task) = listen_unix(path, Arc::clone(&egress), Arc::clone(&agent)).await?;
+                tasks.push(task);
+                Some(path)
+            }
             None => None,
         };
-        tokio::spawn(async move {
-            loop {
-                let Ok((client, _)) = listener.accept().await else {
-                    break;
-                };
-                let egress = Arc::clone(&egress);
-                tokio::spawn(async move {
-                    let _ = serve(client, egress).await;
-                });
-            }
-        });
         return Ok(Proxy {
             url: format!("http://127.0.0.1:{port}"),
             port,
             socket,
+            tasks,
         });
     }
     Err(std::io::Error::new(
@@ -99,10 +137,29 @@ pub async fn start_with_socket(
     ))
 }
 
+/// One Agent's TCP listener: every connection is answered with that Agent's
+/// Egress, whichever Agent asked.
+async fn accepting(listener: TcpListener, egress: Arc<Egress>, agent: Arc<str>) {
+    loop {
+        let Ok((client, _)) = listener.accept().await else {
+            break;
+        };
+        let egress = Arc::clone(&egress);
+        let agent = Arc::clone(&agent);
+        tokio::spawn(async move {
+            let _ = serve(client, egress, agent).await;
+        });
+    }
+}
+
 /// A Unix listener on `path`, answering with the same `serve` as TCP. A file
 /// left by a Runtime that did not end cleanly is taken over rather than
 /// blocking every start after it.
-async fn listen_unix(path: &Path, egress: Arc<Egress>) -> std::io::Result<PathBuf> {
+async fn listen_unix(
+    path: &Path,
+    egress: Arc<Egress>,
+    agent: Arc<str>,
+) -> std::io::Result<(PathBuf, JoinHandle<()>)> {
     use std::os::unix::fs::PermissionsExt;
 
     let _ = std::fs::remove_file(path);
@@ -111,22 +168,133 @@ async fn listen_unix(path: &Path, egress: Arc<Egress>) -> std::io::Result<PathBu
     // socket for a way out. The folder is already the Runtime's alone; the file
     // says so itself as well.
     let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
-    tokio::spawn(async move {
+    let path = path.to_path_buf();
+    let task = tokio::spawn(async move {
         loop {
             let Ok((client, _)) = listener.accept().await else {
                 break;
             };
             let egress = Arc::clone(&egress);
+            let agent = Arc::clone(&agent);
             tokio::spawn(async move {
-                let _ = serve(client, egress).await;
+                let _ = serve(client, egress, agent).await;
             });
         }
     });
-    Ok(path.to_path_buf())
+    Ok((path, task))
 }
 
-/// One client: read its CONNECT, check the host, then copy bytes both ways.
-async fn serve<S>(mut client: S, egress: Arc<Egress>) -> std::io::Result<()>
+/// Every Agent's proxy on this Machine, started when its Agent gets a worker
+/// and stopped when it no longer has one (issue #43).
+pub struct Proxies {
+    home: PathBuf,
+    egress: Arc<Egress>,
+    running: Mutex<HashMap<String, Proxy>>,
+    /// One start at a time, so two calls for the same Agent cannot both bind
+    /// its socket and leave the winner's path pointing at the loser.
+    starting: tokio::sync::Mutex<()>,
+}
+
+impl Proxies {
+    pub fn new(home: PathBuf, egress: Arc<Egress>) -> Self {
+        // A Runtime from before #43 listened on one socket for the whole
+        // Machine. An upgrade keeps the file a killed one left behind, and
+        // nothing answers on it any more: remove it once, here, so a Linux
+        // Agent is never handed a dead listener. Absent is the normal case.
+        let _ = std::fs::remove_file(stale_machine_socket(&home));
+        Self {
+            home,
+            egress,
+            running: Mutex::new(HashMap::new()),
+            starting: tokio::sync::Mutex::new(()),
+        }
+    }
+
+    /// This Agent's proxy, or `None` when it has none: its worker is then not
+    /// started at all rather than started with no way out.
+    pub fn get(&self, agent: &str) -> Option<ProxyView> {
+        self.running
+            .lock()
+            .expect("proxies")
+            .get(agent)
+            .map(Proxy::view)
+    }
+
+    /// The ports every Agent's proxy listens on, so no free range is handed to
+    /// a command on top of one (ADR 0069).
+    pub fn ports(&self) -> Vec<u16> {
+        self.running
+            .lock()
+            .expect("proxies")
+            .values()
+            .map(|proxy| proxy.port)
+            .collect()
+    }
+
+    /// One Agent's proxy, started if it is not running. The same call twice
+    /// gives back the same listener, so a worker that restarts keeps its URL.
+    pub async fn ensure(&self, agent: &str) -> std::io::Result<ProxyView> {
+        let _starting = self.starting.lock().await;
+        if let Some(view) = self.get(agent) {
+            return Ok(view);
+        }
+        // An id that is not a folder name never names a socket.
+        crate::agents::agent_root(&self.home, agent)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string()))?;
+        let ports = crate::ports::Ports::open(&self.home)
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        #[cfg(target_os = "linux")]
+        let socket = Some(socket_path(&self.home, agent));
+        #[cfg(not(target_os = "linux"))]
+        let socket: Option<PathBuf> = None;
+        if let Some(path) = &socket {
+            if let Some(dir) = path.parent() {
+                std::fs::create_dir_all(dir)?;
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+            }
+        }
+        let taken = self.ports();
+        let proxy = start_with_socket(
+            Arc::clone(&self.egress),
+            agent,
+            &|port| ports.is_taken(port) || taken.contains(&port),
+            socket.as_deref(),
+        )
+        .await?;
+        let view = proxy.view();
+        self.running
+            .lock()
+            .expect("proxies")
+            .insert(agent.to_string(), proxy);
+        Ok(view)
+    }
+
+    /// The Agent has no worker any more: its listener closes, and its socket
+    /// goes with it. Starting it again later opens both anew.
+    pub fn stop(&self, agent: &str) {
+        let proxy = self.running.lock().expect("proxies").remove(agent);
+        if let Some(proxy) = proxy {
+            if let Some(socket) = &proxy.socket {
+                let _ = std::fs::remove_file(socket);
+            }
+        }
+    }
+
+    /// Every listener, for good: the supervisor is ending.
+    pub fn stop_all(&self) {
+        let mut running = self.running.lock().expect("proxies");
+        for (_, proxy) in running.drain() {
+            if let Some(socket) = &proxy.socket {
+                let _ = std::fs::remove_file(socket);
+            }
+        }
+    }
+}
+
+/// One client: read its CONNECT, check the host against this Agent's Egress,
+/// then copy bytes both ways.
+async fn serve<S>(mut client: S, egress: Arc<Egress>, agent: Arc<str>) -> std::io::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
@@ -171,7 +339,7 @@ where
         };
         (host, port, Some(path))
     };
-    if !allowed(&host, &egress.current()) {
+    if !allowed(&host, &egress.current(&agent)) {
         // No answer at all: a 403 is still an HTTP response a command could
         // treat as success. Dropping the connection is the refusal.
         return Ok(());
@@ -374,15 +542,36 @@ mod tests {
         assert!(out.ends_with("\r\n\r\nhello"));
     }
 
-    /// Issue #42: the Unix socket answers with the same rules as the TCP port.
+    fn egress_with(home: &Path, agents: &[(&str, &[&str])]) -> Arc<Egress> {
+        let registry = crate::agents::AgentRegistry::open(home).expect("registry");
+        for (id, domains) in agents {
+            registry
+                .add(&crate::agents::Agent {
+                    id: (*id).to_string(),
+                    name: (*id).to_string(),
+                    provider: "main".into(),
+                    model: "model-a".into(),
+                    character: None,
+                    allowlist: Vec::new(),
+                    egress: domains.iter().map(|d| (*d).to_string()).collect(),
+                    approval_timeout_s: 3_600,
+                    budget: None,
+                    deleted_at: None,
+                })
+                .expect("add");
+        }
+        Arc::new(Egress::open(home).expect("egress"))
+    }
+
+    /// Issue #43: the Unix socket answers with the same rules as the TCP port.
     /// A domain the Egress does not name gets no answer at all, whichever way
     /// the request arrived (ADR 0022, 0069).
     #[tokio::test]
     async fn a_request_on_the_unix_socket_is_checked_like_one_on_tcp() {
         let home = tempfile::tempdir().expect("home");
-        let egress = Arc::new(Egress::open(home.path()).expect("egress"));
+        let egress = egress_with(home.path(), &[("a1", &[])]);
         let socket = home.path().join("egress.sock");
-        let proxy = start_with_socket(Arc::clone(&egress), &|_| false, Some(&socket))
+        let proxy = start_with_socket(Arc::clone(&egress), "a1", &|_| false, Some(&socket))
             .await
             .expect("proxy");
         assert_eq!(proxy.socket.as_deref(), Some(socket.as_path()));
@@ -398,5 +587,82 @@ mod tests {
         // The empty Egress drops the connection instead of answering it.
         let read = client.read(&mut answer).await.expect("read");
         assert_eq!(read, 0);
+    }
+
+    /// Issue #43: a request that reaches one Agent's listener is judged by that
+    /// Agent's list and no other. B's domain is dropped on A's proxy, and A's
+    /// domain on B's, so neither can borrow the other's way out (ADR 0029).
+    #[tokio::test]
+    async fn one_agents_proxy_refuses_what_another_agents_egress_names() {
+        let home = tempfile::tempdir().expect("home");
+        let egress = egress_with(
+            home.path(),
+            &[("a1", &["a.example.com"]), ("a2", &["b.example.com"])],
+        );
+        assert_eq!(egress.current("a1"), vec!["a.example.com".to_string()]);
+        assert_eq!(egress.current("a2"), vec!["b.example.com".to_string()]);
+
+        let proxy = start(Arc::clone(&egress), "a1").await.expect("proxy a1");
+        let mut client = TcpStream::connect(("127.0.0.1", proxy.port))
+            .await
+            .expect("connect a1");
+        client
+            .write_all(b"CONNECT b.example.com:443 HTTP/1.1\r\n\r\n")
+            .await
+            .expect("write");
+        let mut answer = [0u8; 16];
+        let read = client.read(&mut answer).await.expect("read");
+        assert_eq!(read, 0, "agent a1 used agent a2's Egress");
+
+        let proxy = start(Arc::clone(&egress), "a2").await.expect("proxy a2");
+        let mut client = TcpStream::connect(("127.0.0.1", proxy.port))
+            .await
+            .expect("connect a2");
+        client
+            .write_all(b"CONNECT a.example.com:443 HTTP/1.1\r\n\r\n")
+            .await
+            .expect("write");
+        let mut answer = [0u8; 16];
+        let read = client.read(&mut answer).await.expect("read");
+        assert_eq!(read, 0, "agent a2 used agent a1's Egress");
+    }
+
+    /// Issue #43: each Agent gets its own listener, kept while it asks for it.
+    #[tokio::test]
+    async fn every_agent_gets_its_own_listener() {
+        let home = tempfile::tempdir().expect("home");
+        let egress = egress_with(home.path(), &[("a1", &[]), ("a2", &[])]);
+        let proxies = Proxies::new(home.path().to_path_buf(), egress);
+        let one = proxies.ensure("a1").await.expect("a1");
+        let two = proxies.ensure("a2").await.expect("a2");
+        assert_ne!(one.port, two.port);
+        assert_eq!(proxies.ensure("a1").await.expect("again"), one);
+        assert_eq!(proxies.get("a1"), Some(one.clone()));
+        assert_eq!(proxies.ports().len(), 2);
+
+        proxies.stop("a1");
+        assert_eq!(proxies.get("a1"), None);
+        assert_eq!(proxies.get("a2"), Some(two));
+    }
+
+    /// Issue #43 review: the one Machine-wide socket a Runtime from before the
+    /// split listened on is removed when the supervisor opens its proxies, so a
+    /// Linux Agent is not handed a listener nothing answers on. Each Agent's
+    /// own socket is not touched.
+    #[test]
+    fn a_socket_from_before_the_split_is_removed_and_agent_sockets_are_kept() {
+        let home = tempfile::tempdir().expect("home");
+        let runtime = home.path().join("runtime");
+        std::fs::create_dir_all(runtime.join("egress")).expect("runtime");
+        let stale = runtime.join("egress.sock");
+        std::fs::write(&stale, b"").expect("the pre-#43 socket");
+        let kept = socket_path(home.path(), "a1");
+        std::fs::write(&kept, b"").expect("an Agent's socket");
+
+        let egress = Arc::new(Egress::open(home.path()).expect("egress"));
+        let _proxies = Proxies::new(home.path().to_path_buf(), egress);
+
+        assert!(!stale.exists(), "the pre-#43 socket was left in place");
+        assert!(kept.exists(), "an Agent's own socket was removed");
     }
 }

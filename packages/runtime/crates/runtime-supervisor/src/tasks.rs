@@ -14,11 +14,13 @@ use veeloe_protocol::signer::{Outgoing, Signer};
 use veeloe_runtime_core::{FromWorker, ToWorker};
 
 use crate::agents::AgentRegistry;
+use crate::egress::{is_valid_egress, Egress};
 use crate::hub_link::HubSender;
 use crate::llm::HttpClient;
 use crate::models;
 use crate::providers::Provider;
-use crate::trust::{FileSeenSequences, TrustError};
+use crate::proxy::Proxies;
+use crate::trust::{FileSeenSequences, Trust, TrustError};
 use crate::uploads::UploadError;
 use crate::workers::Workers;
 
@@ -99,16 +101,28 @@ impl Outbox for MachineOutbox {
 
 /// What the Controller sees of this Machine's Agents. Never a Provider's URL or
 /// key, only its name.
-pub fn agents_listed(registry: &AgentRegistry, providers: &[Value], egress: &[String]) -> Value {
+///
+/// Each Agent carries its own Egress (ADR 0029, issue #43). The top-level `egress`
+/// stays for a Controller that reads one list: it is the union of every Agent's,
+/// which is exactly what each Agent's list was before the split and what the
+/// legacy `egress.set` still sets everywhere.
+pub fn agents_listed(registry: &AgentRegistry, providers: &[Value]) -> Value {
     let mut agents: Vec<Value> = Vec::new();
     let mut trash: Vec<Value> = Vec::new();
+    let mut union: Vec<String> = Vec::new();
     for agent in registry.all().unwrap_or_default() {
+        for domain in &agent.egress {
+            if !union.contains(domain) {
+                union.push(domain.clone());
+            }
+        }
         let mut value = json!({
             "id": agent.id,
             "name": agent.name,
             "provider": agent.provider,
             "model": agent.model,
             "allowlist": agent.allowlist,
+            "egress": agent.egress,
             "approvalTimeoutS": agent.approval_timeout_s,
         });
         if let Some(character) = &agent.character {
@@ -128,7 +142,7 @@ pub fn agents_listed(registry: &AgentRegistry, providers: &[Value], egress: &[St
             _ => agents.push(value),
         }
     }
-    json!({ "agents": agents, "trash": trash, "providers": providers, "egress": egress })
+    json!({ "agents": agents, "trash": trash, "providers": providers, "egress": union })
 }
 
 fn agent_of(body: &Value) -> &str {
@@ -149,7 +163,15 @@ pub struct Machine<'a> {
     pub uploads: Option<&'a crate::uploads::Uploads>,
     pub push_tokens: Option<&'a crate::push_tokens::PushTokens>,
     pub providers: &'a [Provider],
-    pub egress: &'a [String],
+    /// Every Agent's Egress, written through `egress.set` (ADR 0029, #43).
+    /// Absent in slices that do not test it; a real supervisor always has one.
+    pub egress: Option<&'a Egress>,
+    /// Who may change an Agent's settings: the Owner, in v0.1 (ADR 0010).
+    /// Absent means nobody may, so a slice that cannot check refuses.
+    pub trust: Option<&'a Trust>,
+    /// The per-Agent proxies, so a new Agent gets its own listener and a
+    /// deleted one loses it. Absent in slices that never start a worker.
+    pub proxies: Option<&'a Proxies>,
     pub budgets: Option<&'a crate::usage::Budgets>,
     pub http: &'a dyn HttpClient,
 }
@@ -181,9 +203,78 @@ pub async fn dispatch(
         agents_listed(
             registry,
             &models::info(machine.providers, machine.http).await,
-            machine.egress,
         )
     };
+    if type_ == "egress.set" {
+        // Changing an Agent's Egress is a Manage action (ADR 0029, 0010). In
+        // v0.1 that is being an Owner whose key signed: there is no second
+        // Member and no Grant yet, so refusing a non-Owner is the whole check.
+        let Some(trust) = machine.trust else {
+            return outbox.error(from, "egress.forbidden");
+        };
+        if !trust.manages(&from.member, from.key.as_deref()) {
+            return outbox.error(from, "egress.forbidden");
+        }
+        let Some(egress) = machine.egress else {
+            return outbox.error(from, "egress.unavailable");
+        };
+        // Every entry must be a domain. Dropping the ones that are not would
+        // change every Agent's way out to a list shorter than the Member sent,
+        // so one bad entry refuses the whole request (issue #43 review).
+        let Some(domains) = body
+            .get("egress")
+            .and_then(Value::as_array)
+            .and_then(|entries| {
+                entries
+                    .iter()
+                    .map(|entry| entry.as_str().map(str::to_string))
+                    .collect::<Option<Vec<_>>>()
+            })
+        else {
+            return outbox.error(from, "egress.invalid_domain");
+        };
+        if !is_valid_egress(&domains) {
+            return outbox.error(from, "egress.invalid_domain");
+        }
+        // With `agent`, only that Agent's list changes. Without it, the legacy
+        // behaviour: every Agent's, until the Controller has a per-Agent screen.
+        // An `agent` that is present but not a string names no Agent, so reading
+        // it as absent would broadcast a request that meant one Agent: refuse it
+        // instead (issue #43 review).
+        let target = match body.get("agent") {
+            None => None,
+            Some(Value::String(agent)) => Some(agent.as_str()),
+            Some(_) => return outbox.error(from, "egress.invalid_domain"),
+        };
+        let changed = match target {
+            Some(agent) => {
+                if registry.get(agent).ok().flatten().is_none() {
+                    return outbox.error(from, "agent.unknown");
+                }
+                egress.set_agent(agent, domains)
+            }
+            None => egress.set_all(domains),
+        };
+        match changed {
+            Ok(Some(_)) => {
+                outbox.to_member(&from.member, "agent.listed", listed().await, None);
+            }
+            // An Agent that vanished between the check and the write is still
+            // an unknown Agent, not a bad list.
+            Ok(None) => {
+                return outbox.error(
+                    from,
+                    if target.is_some() {
+                        "agent.unknown"
+                    } else {
+                        "egress.invalid_domain"
+                    },
+                )
+            }
+            Err(_) => return outbox.error(from, "egress.unavailable"),
+        }
+        return;
+    }
     if type_ == "push.register" {
         let (Some(tokens), Some(device)) = (machine.push_tokens, from.key.as_deref()) else {
             return outbox.error(from, "push.unavailable");
@@ -267,7 +358,7 @@ pub async fn dispatch(
         outbox.to_member(
             &from.member,
             "agent.listed",
-            crate::tasks::agents_listed(registry, &models, machine.egress),
+            crate::tasks::agents_listed(registry, &models),
             None,
         );
         return;
@@ -464,6 +555,11 @@ pub async fn dispatch(
         }
         // Stop the worker first: the registry entry is what starts a new one.
         workers.stop(id);
+        // Its listener goes with it, so nothing answers for an Agent in the
+        // trash (ADR 0029, issue #43).
+        if let Some(proxies) = machine.proxies {
+            proxies.stop(id);
+        }
         if registry.soft_delete(id, crate::usage::now_ms()).is_err() {
             return outbox.error(from, "agent.unknown");
         }
@@ -496,6 +592,16 @@ pub async fn dispatch(
             return outbox.error(from, "agent.unknown");
         }
         if let Ok(Some(agent)) = registry.get(id) {
+            if let Some(proxies) = machine.proxies {
+                if let Err(error) = proxies.ensure(&agent.id).await {
+                    let _ = crate::logs::record(
+                        registry.home(),
+                        "warn",
+                        "agent.proxy_failed",
+                        json!({ "agent": agent.id.clone(), "reason": error.to_string() }),
+                    );
+                }
+            }
             workers.start(&agent);
         }
         let _ = crate::logs::record(
@@ -526,6 +632,9 @@ pub async fn dispatch(
             model: String::new(),
             character: None,
             allowlist: Vec::new(),
+            // A new Agent starts with no way out, not the list it was created
+            // beside: only the migration copies an old Machine list (#43).
+            egress: Vec::new(),
             approval_timeout_s: 3_600,
             budget: None,
             deleted_at: None,
@@ -552,6 +661,9 @@ pub async fn dispatch(
                         .collect()
                 })
                 .unwrap_or(base.allowlist),
+            // Egress changes only through `egress.set`, which checks Manage and
+            // knows about the Controller's legacy list (issue #43).
+            egress: base.egress,
             approval_timeout_s: body
                 .get("approvalTimeoutS")
                 .and_then(Value::as_u64)
@@ -585,6 +697,23 @@ pub async fn dispatch(
             return outbox.error(from, "agent.unknown");
         }
         if type_ == "agent.create" {
+            // An id that was used, purged and used again starts empty, not with
+            // what the old Agent's row held (issue #43).
+            if let Some(egress) = machine.egress {
+                egress.forget(&next.id);
+            }
+            // Its own listener before its worker: a worker with no way out is
+            // not started at all (issue #43).
+            if let Some(proxies) = machine.proxies {
+                if let Err(error) = proxies.ensure(&next.id).await {
+                    let _ = crate::logs::record(
+                        registry.home(),
+                        "warn",
+                        "agent.proxy_failed",
+                        json!({ "agent": next.id.clone(), "reason": error.to_string() }),
+                    );
+                }
+            }
             workers.start(&next);
         } else {
             workers.rename(&next);
