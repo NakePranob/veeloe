@@ -13,4 +13,4 @@
 ## 3. ตรวจ
 
 - [x] 3.1 cargo test workspace ผ่าน macOS
-- [ ] 3.2 CI ผ่าน (รอ CI บน macOS; Linux ไม่เปลี่ยนในชิ้นนี้)
+- [x] 3.2 CI ผ่าน — run 43456877591 เขียวทุก job (รอ CI บน macOS; Linux ไม่เปลี่ยนในชิ้นนี้)
