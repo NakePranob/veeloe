@@ -58,10 +58,17 @@ struct Terminal {
 
 impl Terminal {
     fn start(home: &Path) -> Self {
-        let mut child = Command::new("script")
-            .arg("-q")
-            .arg("/dev/null")
-            .arg(env!("CARGO_BIN_EXE_veeloe"))
+        let binary = env!("CARGO_BIN_EXE_veeloe");
+        let mut pty = Command::new("script");
+        // BSD `script` (macOS) takes the command as trailing arguments and
+        // returns its status; GNU `script` (Linux) takes the command after `-c`
+        // and needs `-e` to return that status instead of its own.
+        if cfg!(target_os = "linux") {
+            pty.args(["-q", "-e", "-c", binary, "/dev/null"]);
+        } else {
+            pty.args(["-q", "/dev/null", binary]);
+        }
+        let mut child = pty
             .env("VEELOE_HOME", home)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

@@ -144,3 +144,10 @@ pub async fn until(condition: impl Fn() -> bool, millis: u64) -> bool {
     condition()
 }
 
+/// The `veeloe` binary Cargo built for this test, in the hidden mode that turns
+/// it into a worker (ADR 0020). Cargo names the file itself, so where a runner
+/// keeps its target folder is not the test's business.
+pub fn worker_binary() -> Vec<String> {
+    vec![env!("CARGO_BIN_EXE_veeloe").to_string(), "worker".to_string()]
+}
+

@@ -35,6 +35,11 @@ const MACOS_READ: &[&str] = &[
     "/Library/Apple",
     "/Library/Preferences",
     "/Library/Developer/CommandLineTools",
+    // The vendor installers, python.org among them, put a toolchain here and
+    // the binary it installs links against it. Which layout a Machine has is
+    // not the Agent's problem.
+    "/Library/Frameworks",
+    "/Library/Python",
     "/private/etc",
     "/private/var/db/dyld",
     "/private/var/db/timezone",

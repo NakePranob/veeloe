@@ -105,6 +105,24 @@ jobs:
       - name: Protocol tests (Rust, TypeScript fixtures, Hub)
         run: bun run check:protocol
 
+  # The Runtime is checked on Linux above, but the profile that only macOS
+  # enforces is `sandbox-exec`, and a path the OS moves breaks Agent work with
+  # no build to catch it. This job runs only what needs that profile, one test
+  # at a time because they start real workers (ADR 0022, 0069).
+  runtime-macos:
+    name: Runtime sandbox (macOS)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: packages/runtime
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Commands under sandbox-exec
+        run: cargo test -p veeloe-runtime-supervisor --test sandbox -- --test-threads=1
+      - name: A real worker under sandbox-exec
+        run: cargo test -p veeloe-runtime-supervisor --test workers -- --test-threads=1
+
   e2e:
     name: e2e
     runs-on: ubuntu-latest

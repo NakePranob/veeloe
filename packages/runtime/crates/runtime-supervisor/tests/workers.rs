@@ -2,13 +2,14 @@
 //! from the supervisor, ported from
 //! `packages/runtime-legacy/src/supervisor/{agents,providers,workers}`.
 
-use std::path::PathBuf;
-use std::process::Command;
+mod support;
+
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use serde_json::json;
+use support::worker_binary;
 use tempfile::tempdir;
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, ToWorker};
 use veeloe_runtime_supervisor::agents::{agent_dir, Agent, AgentRegistry};
@@ -128,39 +129,6 @@ impl SupervisorLlm for CannedLlm {
             .to_string(),
         }
     }
-}
-
-fn worker_binary() -> Vec<String> {
-    // The test binary sits in `target/debug/deps`, so the worker is one folder up.
-    let beside = std::env::current_exe()
-        .expect("current exe")
-        .parent()
-        .and_then(|deps| deps.parent())
-        .map(|debug| debug.join("veeloe"));
-    if let Some(path) = beside.as_ref() {
-        if path.is_file() {
-            return vec![path.to_string_lossy().to_string(), "worker".to_string()];
-        }
-    }
-    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
-    let status = Command::new(cargo)
-        .args([
-            "build",
-            "-p",
-            "veeloe-runtime-supervisor",
-            "--bin",
-            "veeloe",
-        ])
-        .status()
-        .expect("build the worker");
-    assert!(status.success(), "could not build veeloe");
-    vec![
-        beside
-            .expect("a target folder")
-            .to_string_lossy()
-            .to_string(),
-        "worker".to_string(),
-    ]
 }
 
 async fn until(condition: impl Fn() -> bool, millis: u64) -> bool {
