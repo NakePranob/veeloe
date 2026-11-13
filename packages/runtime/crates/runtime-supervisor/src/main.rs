@@ -1137,8 +1137,34 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let _ = logs::record(&home, "info", "runtime.start", json!({}));
     let egress = Arc::new(Egress::open(&home)?);
     // Every command reaches the network only through this proxy, which checks
-    // the Egress on each connection; Seatbelt cannot match a domain itself.
-    let egress_proxy = veeloe_runtime_supervisor::proxy::start(Arc::clone(&egress)).await?;
+    // the Egress on each connection; Seatbelt cannot match a domain itself. The
+    // proxy steps around the ranges already reserved for Agents, so its port is
+    // never one a command may bind (ADR 0069).
+    let reserved = veeloe_runtime_supervisor::ports::Ports::open(&home)
+        .map_err(|error| format!("cannot open the Agents' ports folder: {error}"))?;
+    // A corrupt `ports.json` is read as empty, not a reason to refuse to start:
+    // every Agent would go down with one bad file. The Runtime log already
+    // holds the reason; this is the line the operator sees.
+    if let Some(reason) = reserved.warning() {
+        eprintln!(
+            "veeloe: the Agents' ports file could not be read, so none are reserved: {reason}"
+        );
+        eprintln!("veeloe: the next Agent that starts writes a fresh one.");
+    }
+    // On Linux the proxy also answers on a Unix socket in the Runtime's folder:
+    // a worker's network namespace has no route to this process, so that file
+    // is bound into it and is the only way out (ADR 0069). macOS keeps the TCP
+    // listener alone, because its profile allows that one port.
+    #[cfg(target_os = "linux")]
+    let proxy_socket = Some(veeloe_runtime_supervisor::proxy::socket_path(&home));
+    #[cfg(not(target_os = "linux"))]
+    let proxy_socket: Option<std::path::PathBuf> = None;
+    let egress_proxy = veeloe_runtime_supervisor::proxy::start_with_socket(
+        Arc::clone(&egress),
+        &|port| reserved.is_taken(port),
+        proxy_socket.as_deref(),
+    )
+    .await?;
     let budgets = Arc::new(veeloe_runtime_supervisor::usage::Budgets::new(
         UsageStore::open(&supervisor_dir(&home)?.join("usage.db"))?,
     ));

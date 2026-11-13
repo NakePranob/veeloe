@@ -60,8 +60,19 @@ pub fn sandboxed(home: PathBuf, proxy_url: String) -> Wrap {
         let Some(policy) = rules(&home, agent, &bin, &proxy_url) else {
             return Vec::new();
         };
-        command.push("--proxy".to_string());
-        command.push(proxy_url.clone());
+        // How the worker finds the proxy. macOS reaches it over loopback, on
+        // the one port the profile allows out. Linux has no route to the
+        // supervisor, only the socket bound into its namespace, and the worker
+        // runs a bridge from its own loopback to that socket so every command
+        // can keep using an ordinary `http://127.0.0.1:<port>` proxy URL
+        // (ADR 0069).
+        if cfg!(target_os = "linux") {
+            command.push("--proxy-unix".to_string());
+            command.push(sandbox::PROXY_SOCKET.to_string());
+        } else {
+            command.push("--proxy".to_string());
+            command.push(proxy_url.clone());
+        }
         Sandbox::new(policy).wrap(&command)
     })
 }
@@ -80,6 +91,21 @@ pub fn rules(home: &Path, agent: &Agent, bin: &Path, proxy_url: &str) -> Option<
         .trim_end_matches('/')
         .rsplit_once(':')
         .and_then(|(_, port)| port.parse().ok());
+    // The one way out on Linux is this socket, bound into the namespace at a
+    // fixed path (ADR 0069). A system without one never reads it.
+    policy.proxy_socket = Some(
+        crate::proxy::socket_path(home)
+            .to_string_lossy()
+            .to_string(),
+    );
+    // The Agent's own localhost, from the range the supervisor reserved for it
+    // and kept outside its folder (ADR 0069). The toolchain check runs under
+    // these rules too, so it sees what the worker sees. A range that cannot be
+    // read leaves the Agent without ports, never without a worker.
+    policy.ports = crate::ports::Ports::open(home)
+        .and_then(|ports| ports.range(&agent.id, policy.proxy))
+        .map(|range| range.ports())
+        .unwrap_or_default();
     Some(policy)
 }
 
@@ -336,6 +362,28 @@ async fn session(
             why: "no sandbox to run it in".into(),
         };
     };
+    // The port range the wrap just reserved for this Agent, read back from the
+    // file so a restart hands out the same one (ADR 0069). Every command sees
+    // `PORT` and the whole list, so a dev server started by a Task keeps its
+    // address across Turns and finds the database beside it. This reads only:
+    // `rules()` is the one place that allocates, with the proxy's port
+    // excluded, so a second allocation here could only reserve a worse range.
+    let ports = match crate::ports::Ports::open(&inner.home) {
+        Ok(ports) => ports.existing(&agent.id),
+        Err(error) => {
+            (inner.log)(&format!(
+                "agent {} runs without localhost ports: {error}",
+                agent.id
+            ));
+            None
+        }
+    };
+    if ports.is_none() {
+        (inner.log)(&format!(
+            "agent {} runs without localhost ports: no range is reserved",
+            agent.id
+        ));
+    }
     let mut command = Command::new(program);
     command.args(rest);
     command
@@ -356,7 +404,13 @@ async fn session(
         .env(
             "VEELOE_AGENT_APPROVAL_TIMEOUT_S",
             agent.approval_timeout_s.to_string(),
-        )
+        );
+    if let Some(ports) = &ports {
+        command
+            .env("PORT", ports.start().to_string())
+            .env("VEELOE_PORTS", ports.listed());
+    }
+    command
         .current_dir(dir.join("workdir"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
