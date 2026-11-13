@@ -10,8 +10,10 @@ use std::path::Path;
 /// What one Agent may touch. Every field is absolute.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Policy {
-    /// The Agent's own folder: the only place it may write. It holds the Task
-    /// log, the Workdir, the TMPDIR and the Agent's own home.
+    /// The Agent's own folder: the only place it may write. It holds the
+    /// Workdir, the TMPDIR and the Agent's own home. The Task log is **not**
+    /// here: the supervisor keeps it at `<home>/task-logs/<id>`, outside what a
+    /// command inside this folder can write (ADR 0069).
     pub folder: String,
     /// Where a command starts.
     pub workdir: String,
@@ -85,26 +87,14 @@ const MACOS_SERVICES: &[(&str, Reason)] = &[
 ];
 
 /// Where an allowed service is needed, so the next person can tell a
-/// requirement from an accident (issue #37).
+/// requirement from an accident (issue #37). Only two sources exist today: the
+/// OS the process runs on, and a toolchain a Task cannot be done without.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Reason {
-    /// The worker process itself, before any tool runs.
-    Worker,
     /// A toolchain a Task cannot be done without: `git`, `node`, `bun`, `python3`.
     Toolchain,
     /// What the OS itself needs under the rules, for the process to run at all.
     Os,
-}
-
-impl Reason {
-    /// The word the design doc and the comments use for this source.
-    pub fn word(self) -> &'static str {
-        match self {
-            Self::Worker => "worker",
-            Self::Toolchain => "toolchain",
-            Self::Os => "os",
-        }
-    }
 }
 
 impl Policy {
