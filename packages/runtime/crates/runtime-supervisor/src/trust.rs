@@ -159,6 +159,16 @@ impl Trust {
         })
     }
 
+    /// Whether this Member may answer an Approval for this Agent (ADR 0010).
+    ///
+    /// v0.1 has one Member, the Owner, and an Owner has Approve at every Agent
+    /// (ADR 0010, 0031), so this is the same check as [`Trust::manages`]. The
+    /// callers ask per Agent already, so when Grants are stored per Agent only
+    /// this function narrows.
+    pub fn approves(&self, member: &str, key: Option<&str>) -> bool {
+        self.manages(member, key)
+    }
+
     fn to_json(&self) -> Value {
         let mut value = json!({
             "owners": self

@@ -543,6 +543,55 @@
       "valid": false
     },
     {
+      "name": "approve a command",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "approve"
+      },
+      "valid": true
+    },
+    {
+      "name": "deny a request",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "deny"
+      },
+      "valid": true
+    },
+    {
+      "name": "allow a domain for good",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "always"
+      },
+      "valid": true
+    },
+    {
+      "name": "an Approval answer with a decision this build does not know",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "maybe"
+      },
+      "valid": false
+    },
+    {
+      "name": "an Approval answer with no request",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "decision": "approve"
+      },
+      "valid": false
+    },
+    {
       "name": "sync from the start",
       "type": "task.sync",
       "body": {

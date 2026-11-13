@@ -19,7 +19,7 @@ use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{mpsc, watch};
 use veeloe_protocol::backoff::Backoff;
 use veeloe_runtime_core::sandbox::{self, Policy, Sandbox};
-use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, ToWorker};
+use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, TaskEvent, ToWorker};
 
 use crate::agents::{agent_dir, Agent};
 use crate::hub_link::random;
@@ -150,6 +150,13 @@ fn agent_home(dir: &Path, agent: &Agent) -> std::io::Result<PathBuf> {
     Ok(home)
 }
 pub type Log = Arc<dyn Fn(&str) + Send + Sync>;
+/// Told when one Agent's worker session ends, before it is started again. The
+/// Turn context it held is gone with it (ADR 0033, issue #44).
+pub type SessionEnded = Arc<dyn Fn(&str) + Send + Sync>;
+/// One event the supervisor just wrote, before the worker's live copy of it.
+/// The proxy learns the running Turn from this, so no command can reach it
+/// before its Turn does (issue #44).
+pub type TurnEvent = Arc<dyn Fn(&str, &str, &TaskEvent) + Send + Sync>;
 
 struct Entry {
     frames: mpsc::UnboundedSender<ToWorker>,
@@ -165,6 +172,8 @@ struct Inner {
     log: Log,
     wrap: Wrap,
     toolchains: Mutex<Option<Toolchains>>,
+    session_ended: Mutex<Option<SessionEnded>>,
+    turn_events: Mutex<Option<TurnEvent>>,
     /// The process id of each Agent's running worker, so a sandbox refusal in
     /// the system log can be tied back to the work that caused it (issue #37).
     pids: Mutex<HashMap<String, u32>>,
@@ -172,7 +181,7 @@ struct Inner {
     running: Mutex<HashMap<String, Entry>>,
     stopping: AtomicBool,
     /// The Task logs, which only this process writes (ADR 0069).
-    logs: TaskLogs,
+    logs: Arc<TaskLogs>,
 }
 
 pub struct Workers {
@@ -188,7 +197,22 @@ impl Workers {
         log: Log,
         wrap: Wrap,
     ) -> Self {
-        let logs = TaskLogs::new(home.clone());
+        let logs = Arc::new(TaskLogs::new(home.clone()));
+        Self::with_logs(home, command, llm, on_message, log, wrap, logs)
+    }
+
+    /// The same workers, writing through a Task log the supervisor also hands
+    /// to the domain Approvals: one writer per file, and a proxy approval is in
+    /// the same log as the Turn that caused it (issue #44).
+    pub fn with_logs(
+        home: PathBuf,
+        command: Vec<String>,
+        llm: Arc<dyn SupervisorLlm>,
+        on_message: OnMessage,
+        log: Log,
+        wrap: Wrap,
+        logs: Arc<TaskLogs>,
+    ) -> Self {
         Self {
             inner: Arc::new(Inner {
                 home,
@@ -198,6 +222,8 @@ impl Workers {
                 log,
                 wrap,
                 toolchains: Mutex::new(None),
+                session_ended: Mutex::new(None),
+                turn_events: Mutex::new(None),
                 pids: Mutex::new(HashMap::new()),
                 reported: Reported::default(),
                 running: Mutex::new(HashMap::new()),
@@ -211,6 +237,23 @@ impl Workers {
     /// level (issue #35). Without it a worker still starts; nothing is reported.
     pub fn checking_toolchains(&self, check: Toolchains) {
         *self.inner.toolchains.lock().expect("toolchains") = Some(check);
+    }
+
+    /// Follow a worker session's end, so an Approval its Turn was waiting on is
+    /// refused instead of waiting for a Turn that is gone (issue #44).
+    pub fn watching_session_end(&self, ended: SessionEnded) {
+        *self.inner.session_ended.lock().expect("session ended") = Some(ended);
+    }
+
+    /// Follow every event the supervisor writes, so the Turn a command runs in
+    /// is known before the command runs (issue #44).
+    pub fn watching_turns(&self, event: TurnEvent) {
+        *self.inner.turn_events.lock().expect("turn events") = Some(event);
+    }
+
+    /// The one Task log, shared with the domain Approvals (issue #44).
+    pub fn logs(&self) -> Arc<TaskLogs> {
+        Arc::clone(&self.inner.logs)
     }
 
     /// Follow the macOS sandbox's own record, so a service the profile does not
@@ -315,6 +358,15 @@ async fn run(
     loop {
         let started = Instant::now();
         let ending = session(&inner, &agent, &mut queue, &mut waiting, &ready).await;
+        if let Some(ended) = inner
+            .session_ended
+            .lock()
+            .expect("session ended")
+            .as_ref()
+            .map(Arc::clone)
+        {
+            ended(&agent.id);
+        }
         if ending.stopped || inner.stopping.load(Ordering::SeqCst) {
             return;
         }
@@ -503,6 +555,15 @@ async fn session(
                                 message_id.as_deref(),
                             ) {
                                 Ok(event) => {
+                                    if let Some(watching) = inner
+                                        .turn_events
+                                        .lock()
+                                        .expect("turn events")
+                                        .as_ref()
+                                        .map(Arc::clone)
+                                    {
+                                        watching(&agent.id, &task, &event);
+                                    }
                                     write(&mut writing, &ToWorker::LogAppended { id, event })
                                         .await;
                                 }

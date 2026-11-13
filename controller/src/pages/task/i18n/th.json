@@ -51,6 +51,8 @@
   },
   "approval": {
     "title": "{{name}} ขออนุมัติ",
+    "domainTitle": "{{name}} ขอออกไปยังโดเมนนี้",
+    "domainBody": "โดเมนนี้ไม่อยู่ใน Egress ของ {{name}}",
     "expiresIn_one": "หมดอายุใน {{count}} นาที",
     "expiresIn_other": "หมดอายุใน {{count}} นาที",
     "expiresInHours_one": "หมดอายุใน {{count}} ชม.",
@@ -64,6 +66,8 @@
     "sent": "ส่งคำตอบแล้ว",
     "notInAllowlist": "ไม่อยู่ใน Allowlist ถ้าไม่ตอบก่อนหมดอายุจะนับว่าปฏิเสธ",
     "approve": "อนุมัติ",
+    "allowOnce": "อนุญาตครั้งนี้",
+    "allowAlways": "อนุญาตถาวร",
     "deny": "ปฏิเสธ",
     "always": "อนุญาตตลอด",
     "steer": "บอกให้ทำอย่างอื่น",
@@ -93,6 +97,8 @@
   },
   "authenticate": {
     "approve": "อนุมัติให้ {{name}} รันคำสั่งนี้",
-    "always": "เพิ่ม {{entries}} เข้า Allowlist และอนุมัติ"
+    "always": "เพิ่ม {{entries}} เข้า Allowlist และอนุมัติ",
+    "domain": "อนุญาตโดเมนนี้ให้ {{name}}: {{domain}}",
+    "domainAlways": "เพิ่ม {{domain}} เข้า Egress ของ {{name}}"
   }
 }

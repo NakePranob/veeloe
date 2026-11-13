@@ -2,8 +2,12 @@ import { z } from "zod";
 import { AgentIdSchema } from "./agent";
 import { AllowlistEntrySchema } from "./allowlist";
 
-/** การตัดสินใจของ Member ต่อคำขอ Approval หนึ่งรายการ (`approval-and-allowlist`). */
-export const ApprovalDecisionSchema = z.enum(["approve", "deny", "redirect"]);
+/**
+ * การตัดสินใจของ Member ต่อคำขอ Approval หนึ่งรายการ (`approval-and-allowlist`).
+ * `always` มีเฉพาะ Approval ของโดเมน: อนุญาตครั้งนี้แล้วเพิ่มโดเมนเข้า Egress ของ
+ * Agent ตัวนั้นด้วย (issue #44) คำขอของคำสั่งยังใช้ `approve` กับ `allowAlways`.
+ */
+export const ApprovalDecisionSchema = z.enum(["approve", "deny", "redirect", "always"]);
 export type ApprovalDecision = z.infer<typeof ApprovalDecisionSchema>;
 
 /**
@@ -24,12 +28,22 @@ export const ApprovalAnswerBodySchema = z.looseObject({
 });
 export type ApprovalAnswerBody = z.infer<typeof ApprovalAnswerBodySchema>;
 
-/** `body` ของ event `approval.requested`: คำขอที่ worker เขียนลง log แล้วหยุด Turn ไว้. */
+/**
+ * `body` ของ event `approval.requested`: คำขอที่หยุด Turn ไว้.
+ * `kind: "domain"` คือคำขอจาก proxy ของ Agent (issue #44) ซึ่งมี `domain`, `agent`
+ * และ `task` แทน `command`; คำขอของคำสั่งยังมี `command` กับ `parts` เหมือนเดิม.
+ */
 export const ApprovalRequestedBodySchema = z.looseObject({
   request: z.string().min(1).max(64),
-  command: z.string().min(1),
+  /** `domain` เมื่อ proxy เป็นคนขอ; ไม่มีในคำขอของคำสั่ง. */
+  kind: z.enum(["domain"]).optional(),
+  domain: z.string().min(1).max(253).optional(),
+  /** Agent และ Task ที่คำขอนี้เป็นของ, ในคำขอของโดเมน. */
+  agent: AgentIdSchema.optional(),
+  task: z.string().min(1).max(64).optional(),
+  command: z.string().min(1).optional(),
   /** ท่อนที่แยกแล้วทีละท่อน. */
-  parts: z.array(z.string().min(1)),
+  parts: z.array(z.string().min(1)).optional(),
   /** Unix milliseconds ที่คำขอหมดอายุ. */
   expiresAt: z.number().int().nonnegative(),
 });

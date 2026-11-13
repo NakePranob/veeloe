@@ -15,6 +15,7 @@ use veeloe_protocol::pairing::PAIRING_TTL_SECONDS;
 use veeloe_runtime_core::ipc::LlmHttpRequest;
 use veeloe_runtime_core::{FromWorker, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
+use veeloe_runtime_supervisor::approval::Approvals;
 use veeloe_runtime_supervisor::egress::Egress;
 use veeloe_runtime_supervisor::help::{help_for, USAGE};
 use veeloe_runtime_supervisor::hub_link::{HubLink, HubLinkOptions, HubLinkSink, HubSender};
@@ -124,6 +125,8 @@ struct Supervisor {
     egress: Arc<Egress>,
     /// One listener per Agent (ADR 0029, issue #43).
     proxies: Arc<Proxies>,
+    /// The domain Approvals those proxies wait on (issue #44).
+    approvals: Arc<Approvals>,
     secret_key: [u8; 32],
     seen: Mutex<MemorySeen>,
     /// This Supervisor, so a message that needs the wire (a Provider's models)
@@ -169,6 +172,9 @@ fn turn_log(agent: &str, message: &FromWorker) -> Option<(&'static str, Value)> 
 
 impl Supervisor {
     fn deliver(&self, agent: &str, message: FromWorker) {
+        // The proxy learns the running Turn from these events, and an ended
+        // Turn refuses what its proxy still waits on (issue #44).
+        self.approvals.observe(agent, &message);
         self.log_turn(agent, &message);
         self.notify(agent, &message);
         let outbox = self.outbox.lock().expect("outbox");
@@ -350,6 +356,7 @@ impl HubLinkSink for Supervisor {
                 egress: Some(me.egress.as_ref()),
                 trust: Some(&trust),
                 proxies: Some(me.proxies.as_ref()),
+                approvals: Some(me.approvals.as_ref()),
                 budgets: Some(me.budgets.as_ref()),
                 http: me.http.as_ref(),
             };
@@ -1105,6 +1112,17 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     }
     let _ = logs::record(&home, "info", "runtime.start", json!({}));
     let egress = Arc::new(Egress::open(&home)?);
+    // One Task log, written by the supervisor only (ADR 0069), shared with the
+    // domain Approvals so a proxy's request lands in the Turn that caused it
+    // (issue #44).
+    let task_logs = Arc::new(veeloe_runtime_supervisor::task_log::TaskLogs::new(
+        home.clone(),
+    ));
+    let approvals = Arc::new(Approvals::new(
+        home.clone(),
+        Arc::clone(&egress),
+        Arc::clone(&task_logs),
+    ));
     // Every command reaches the network only through its own Agent's proxy,
     // which checks that Agent's Egress on each connection; Seatbelt cannot match
     // a domain itself (ADR 0008, 0029, 0069). One listener per Agent, each on a
@@ -1120,7 +1138,11 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         );
         eprintln!("veeloe: the next Agent that starts writes a fresh one.");
     }
-    let proxies = Arc::new(Proxies::new(home.clone(), Arc::clone(&egress)));
+    let proxies = Arc::new(Proxies::with_approvals(
+        home.clone(),
+        Arc::clone(&egress),
+        Some(Arc::clone(&approvals)),
+    ));
     for agent in registry.all().unwrap_or_default() {
         // An Agent in the trash has no worker, so it needs no listener either.
         if agent.deleted() {
@@ -1158,6 +1180,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         trust: Mutex::new(trust),
         egress,
         proxies: Arc::clone(&proxies),
+        approvals: Arc::clone(&approvals),
         secret_key,
         seen: Mutex::new(MemorySeen::default()),
         me: me.clone(),
@@ -1219,13 +1242,23 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let llm: Arc<dyn SupervisorLlm> = Arc::new(ProxyLlm { proxy });
 
     let weak = Arc::downgrade(&supervisor);
+    // A domain Approval reaches the Member the same way a worker's event does,
+    // so the Controller already knows how to draw it (issue #44).
+    {
+        let weak = weak.clone();
+        approvals.delivering(Arc::new(move |agent: &str, message: FromWorker| {
+            if let Some(supervisor) = weak.upgrade() {
+                supervisor.deliver(agent, message);
+            }
+        }));
+    }
     // The worker runs inside its Agent's sandbox, and every command it starts
     // inherits it (ADR 0008, 0069). It reaches the network only through that
     // Agent's own proxy. A worker that cannot be wrapped — or has no proxy —
     // is not started: an empty argv ends its session before it runs.
     let wrap =
         veeloe_runtime_supervisor::workers::sandboxed(home.clone(), Arc::clone(&proxies));
-    let workers = Workers::new(
+    let workers = Workers::with_logs(
         home.clone(),
         worker_command(),
         llm,
@@ -1236,7 +1269,20 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         }),
         Arc::new(|line| println!("{line}")),
         wrap,
+        task_logs,
     );
+    {
+        let approvals = Arc::clone(&approvals);
+        workers.watching_session_end(Arc::new(move |agent: &str| {
+            approvals.forget_agent(agent);
+        }));
+    }
+    {
+        let approvals = Arc::clone(&approvals);
+        workers.watching_turns(Arc::new(move |agent: &str, task: &str, event| {
+            approvals.observe_event(agent, task, event);
+        }));
+    }
     // Which toolchains a worker cannot run, checked under the same rules and
     // recorded at Runtime log level when it opens. It never stops a worker or
     // ends a Turn: the report is what the Owner fixes the Machine with (#35).

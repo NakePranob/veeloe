@@ -152,6 +152,35 @@ impl Egress {
         Ok(Some(next))
     }
 
+    /// Adds one domain to this Agent's list, in one write, for a permanent yes
+    /// on an Approval (issue #44). `None` when the domain is not one, or this
+    /// Machine has no such Agent: the approval then stays unanswered rather
+    /// than promising a way out that was never written.
+    ///
+    /// Read and write happen under the same lock as [`Egress::current`], so two
+    /// permanent yeses at once cannot lose one of the domains.
+    pub fn add_domain(
+        &self,
+        agent: &str,
+        domain: &str,
+    ) -> Result<Option<Vec<String>>, EgressError> {
+        if !is_valid_egress(std::slice::from_ref(&domain.to_string())) {
+            return Ok(None);
+        }
+        let mut current = self.current.lock().expect("egress");
+        let mut next = current.get(agent).cloned().unwrap_or_default();
+        if !next.iter().any(|known| known == domain) {
+            next.push(domain.to_string());
+        }
+        let registry = AgentRegistry::open(&self.home)?;
+        if !registry.set_egress(agent, &next)? {
+            return Ok(None);
+        }
+        current.insert(agent.to_string(), next.clone());
+        write_union(&self.home, &registry)?;
+        Ok(Some(next))
+    }
+
     /// The whole new list for every Agent: the legacy `egress.set` without an
     /// Agent, until the Controller has a per-Agent screen. Also how the
     /// migration brings the old Machine list across.

@@ -150,16 +150,45 @@ function controller() {
 let c: ReturnType<typeof controller>;
 let n = 0;
 
-/** Has Agent A run `command` as one Turn, and gives back what `bash` returned. */
-async function run(command: string, agent = "agent-a") {
+/** What a test does when the proxy asks about a domain outside the Egress. */
+type DomainAnswer = "approve" | "always" | "deny" | "forbid";
+
+/**
+ * Has Agent A run `command` as one Turn, and gives back what `bash` returned.
+ * Each command asks once, then a domain outside the Egress asks again
+ * (issue #44): `domain` says what the Owner does with that second card.
+ */
+async function run(command: string, agent = "agent-a", domain: DomainAnswer = "deny") {
   const task = `task-${++n}`;
   c.send("task.message", { agent, id: `m-${n}`, text: command }, task);
-  // This file tests the sandbox, not the Allowlist: approve each command at once
-  // so it reaches the sandbox instead of waiting for a human (approval-and-allowlist).
-  const approval = await c.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "approval.requested");
-  if (approval.type === "task.event") {
-    const request = (approval.body.body as { request: string }).request;
-    c.send("approval.answer", { agent, request, decision: "approve" }, task);
+  // This file tests the sandbox, not the Allowlist: answer each command at once
+  // so it reaches the sandbox instead of waiting for a human. A domain approval
+  // is answered by the test's `domain` choice, and `forbid` says none may come.
+  const answered = new Set<string>();
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    const ended = c.inbox.find((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended");
+    const approval = c.inbox.find(
+      (m) =>
+        m.type === "task.event" &&
+        m.task === task &&
+        m.body.kind === "approval.requested" &&
+        !answered.has((m.body.body as { request: string }).request),
+    );
+    if (approval?.type === "task.event") {
+      const body = approval.body.body as { request: string; kind?: string; domain?: string };
+      answered.add(body.request);
+      if (body.kind === "domain") {
+        if (domain === "forbid") throw new Error(`a domain approval was asked for ${body.domain}, and this Turn must not ask`);
+        c.send("approval.answer", { agent, request: body.request, decision: domain }, task);
+      } else {
+        c.send("approval.answer", { agent, request: body.request, decision: "approve" }, task);
+      }
+      continue;
+    }
+    if (ended) break;
+    if (Date.now() > deadline) throw new Error(`the Turn did not end: ${task}`);
+    await Bun.sleep(20);
   }
   const ended = await c
     .waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended")
@@ -265,6 +294,47 @@ test("one Agent's Egress opens for it alone", async () => {
   // Leave both as the next file expects to find them.
   c.send("egress.set", { agent: "agent-b", egress: [] });
   await c.waitFor((m) => m.type === "agent.listed" && m.body.egress?.length === 0);
+}, 240_000);
+
+// Issue #44: a domain outside the Egress asks the Owner instead of being
+// dropped. Approve opens this connection only; Always also writes the domain
+// into that Agent's Egress, so the next request does not ask again and the
+// other Agent still does.
+test("a domain outside the Egress asks, and a permanent yes is remembered for that Agent alone", async () => {
+  const curl = "curl -sS -m 20 -o /dev/null -w '%{http_code}' https://example.com";
+
+  // One connection, allowed once: the domain is not written anywhere.
+  expect(await run(curl, "agent-a", "approve")).toEqual({ output: "200\nexit code: 0", failed: false });
+  const beforeOnce = c.inbox.length;
+  c.send("agent.list", {});
+  const afterOnce = await c.waitFor(
+    (m) => c.inbox.indexOf(m) >= beforeOnce && m.type === "agent.listed" && m.body.agents.length === 2 && m.body.agents.every((a) => (a.egress ?? []).length === 0),
+  );
+  expect(afterOnce.type).toBe("agent.listed");
+
+  // A permanent yes: example.com goes into A's Egress, not B's.
+  expect(await run(curl, "agent-a", "always")).toEqual({ output: "200\nexit code: 0", failed: false });
+  const beforeAlways = c.inbox.length;
+  c.send("agent.list", {});
+  const afterAlways = await c.waitFor(
+    (m) =>
+      c.inbox.indexOf(m) >= beforeAlways &&
+      m.type === "agent.listed" &&
+      m.body.agents.some((a) => a.id === "agent-a" && a.egress?.includes("example.com") === true) &&
+      m.body.agents.some((a) => a.id === "agent-b" && (a.egress ?? []).length === 0),
+  );
+  expect(afterAlways.type).toBe("agent.listed");
+
+  // The next request does not ask: `forbid` fails the Turn if a card appears.
+  expect(await run(curl, "agent-a", "forbid")).toEqual({ output: "200\nexit code: 0", failed: false });
+
+  // The other Agent never got the permanent yes: it asks, and a deny closes it.
+  expect((await run(curl, "agent-b", "deny")).failed).toBe(true);
+
+  // Leave the next file the empty Egress it expects.
+  const beforeClear = c.inbox.length;
+  c.send("egress.set", { agent: "agent-a", egress: [] });
+  await c.waitFor((m) => c.inbox.indexOf(m) >= beforeClear && m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-a" && (a.egress ?? []).length === 0));
 }, 240_000);
 
 /** The SSE of one finished answer that just says `text`. */
