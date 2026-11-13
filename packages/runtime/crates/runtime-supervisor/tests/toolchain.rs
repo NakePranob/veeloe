@@ -127,7 +127,7 @@ mod running {
             let program = layout.join("bin/git");
             fs::write(
                 &program,
-                "#!/bin/sh\ncat \"$(dirname \"$0\")/../lib/version.txt\" > /dev/null\n",
+                "#!/bin/sh\nd=${0%/*}\n/bin/cat \"$d/../lib/version.txt\" > /dev/null\n",
             )
             .expect("program");
             fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).expect("chmod");
@@ -141,9 +141,12 @@ mod running {
             }
         }
 
-        /// The `PATH` a worker gets: this layout first, then the system's.
+        /// The `PATH` a worker gets for this layout: the layout's own `bin`
+        /// alone. A system copy of the same name would make a refusal look
+        /// like a pass on Linux, where a path that is not bound is simply
+        /// absent and `execvp` moves on to the next entry (issue #35).
         fn path(&self) -> String {
-            format!("{}:/bin:/usr/bin", self.bin.display())
+            self.bin.display().to_string()
         }
 
         /// The rules, with `read` as the folder the program comes from: the same
