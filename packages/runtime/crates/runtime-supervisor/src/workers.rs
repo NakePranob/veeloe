@@ -23,6 +23,7 @@ use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, ToWorker}
 
 use crate::agents::{agent_dir, Agent};
 use crate::hub_link::random;
+use crate::task_log::TaskLogs;
 
 /// A worker that lived this long counts as having started fine, so its next
 /// crash waits the shortest time again.
@@ -107,6 +108,8 @@ struct Inner {
     wrap: Wrap,
     running: Mutex<HashMap<String, Entry>>,
     stopping: AtomicBool,
+    /// The Task logs, which only this process writes (ADR 0069).
+    logs: TaskLogs,
 }
 
 pub struct Workers {
@@ -122,6 +125,7 @@ impl Workers {
         log: Log,
         wrap: Wrap,
     ) -> Self {
+        let logs = TaskLogs::new(home.clone());
         Self {
             inner: Arc::new(Inner {
                 home,
@@ -132,6 +136,7 @@ impl Workers {
                 wrap,
                 running: Mutex::new(HashMap::new()),
                 stopping: AtomicBool::new(false),
+                logs,
             }),
         }
     }
@@ -263,6 +268,15 @@ async fn session(
             }
         }
     };
+    // The log moves out of the Agent's writable folder the first time, and is
+    // open here before the worker starts: the worker never opens it itself
+    // (ADR 0069), so a missing log is a failure to start, not an empty history.
+    if let Err(why) = inner.logs.prepare(&agent.id, &dir) {
+        return Ending {
+            stopped: false,
+            why: format!("could not open the Task log: {why}"),
+        };
+    }
     let argv = (inner.wrap)(agent, inner.command.clone());
     let Some((program, rest)) = argv.split_first() else {
         return Ending {
@@ -351,6 +365,38 @@ async fn session(
                                 },
                             )
                             .await;
+                        }
+                        FromWorker::LogAppend { id, task, starter, kind, body, message_id } => {
+                            match inner.logs.record(
+                                &agent.id,
+                                &task,
+                                &starter,
+                                &kind,
+                                &body,
+                                message_id.as_deref(),
+                            ) {
+                                Ok(event) => {
+                                    write(&mut writing, &ToWorker::LogAppended { id, event })
+                                        .await;
+                                }
+                                Err(code) => {
+                                    (inner.log)(&format!(
+                                        "could not write the Task log of agent {}: {code}",
+                                        agent.id
+                                    ));
+                                    write(&mut writing, &ToWorker::LogFailed { id, code }).await;
+                                }
+                            }
+                        }
+                        FromWorker::LogRead { id, query } => {
+                            match inner.logs.answer(&agent.id, &query) {
+                                Ok(answer) => {
+                                    write(&mut writing, &ToWorker::LogAnswer { id, answer }).await;
+                                }
+                                Err(code) => {
+                                    write(&mut writing, &ToWorker::LogFailed { id, code }).await;
+                                }
+                            }
                         }
                         other => (inner.on_message)(&agent.id, other),
                     }

@@ -5,6 +5,7 @@
 //! the agent loop needs are here so far — the LLM proxy joins in task 2.5.
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::event_store::{TaskEvent, TaskSummary};
 
@@ -117,6 +118,39 @@ pub enum ToWorker {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         task: Option<String>,
     },
+    /// The Task log's answer to one [`FromWorker::LogRead`].
+    #[serde(rename = "log.answer")]
+    LogAnswer { id: String, answer: LogAnswer },
+    /// The event the supervisor wrote, for the append that asked for it.
+    #[serde(rename = "log.appended")]
+    LogAppended { id: String, event: TaskEvent },
+    /// The supervisor refused or failed one read or append, so the worker sees
+    /// a refusal instead of an event that never reached the log.
+    #[serde(rename = "log.failed")]
+    LogFailed { id: String, code: String },
+}
+
+/// One read of the Task log, asked by a worker that cannot open the file: the
+/// supervisor owns the log (ADR 0020, 0069).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "query", rename_all = "camelCase")]
+pub enum LogQuery {
+    Starter { task: String },
+    HasMessage { id: String },
+    Events { task: String, after: i64 },
+    TasksStartedBy { member: String },
+    OpenTurns,
+}
+
+/// The log's answer to one [`LogQuery`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "answer", rename_all = "camelCase")]
+pub enum LogAnswer {
+    Starter { starter: Option<String> },
+    HasMessage { seen: bool },
+    Events { events: Vec<TaskEvent> },
+    TasksStartedBy { tasks: Vec<TaskSummary> },
+    OpenTurns { tasks: Vec<String> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -163,6 +197,26 @@ pub enum FromWorker {
         headers: Vec<(String, String)>,
         body: String,
     },
+    /// One event to write. The supervisor is the only writer, and it answers
+    /// with [`ToWorker::LogAppended`] once the event is committed (ADR 0069).
+    #[serde(rename = "log.append")]
+    LogAppend {
+        id: String,
+        task: String,
+        starter: String,
+        #[serde(rename = "eventKind")]
+        kind: String,
+        body: Value,
+        #[serde(
+            rename = "messageId",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        message_id: Option<String>,
+    },
+    /// One read of the log, which the worker cannot open itself.
+    #[serde(rename = "log.read")]
+    LogRead { id: String, query: LogQuery },
 }
 
 /// One HTTP request to a Provider, carried over IPC (ADR 0008, 0042).

@@ -23,3 +23,4 @@ pub mod logs;
 pub mod memory;
 pub mod models;
 pub mod status;
+pub mod task_log;

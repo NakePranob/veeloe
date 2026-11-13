@@ -8,14 +8,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use async_trait::async_trait;
+use serde_json::Value;
 use tokio::sync::oneshot;
 use veeloe_plugin_api::{Cancel, ToolRegistry};
 use veeloe_runtime_core::sandbox::Sandbox;
 use veeloe_runtime_core::{
-    AgentCore, AgentError, EventStore, FromWorker, LlmError, LlmHttpRequest, LlmHttpResponse,
-    SupervisorLink, ToWorker,
+    AgentCore, AgentError, EventLog, FromWorker, LlmError, LlmHttpRequest, LlmHttpResponse,
+    LogAnswer, LogQuery, StoreError, SupervisorLink, TaskEvent, TaskSummary, ToWorker,
 };
 
 use crate::llm::{AnthropicLlm, LlmTransport};
@@ -26,7 +28,8 @@ use crate::tools::memory::MemoryTool;
 /// Where a worker keeps everything it owns, and what it calls itself.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// The Agent's folder: `tasks.db` and `workdir` live here.
+    /// The Agent's folder: its `workdir` and its `tmp` live here. Its Task log
+    /// does not: the supervisor owns that file (ADR 0069).
     pub dir: PathBuf,
     pub name: String,
     pub allowlist: Vec<String>,
@@ -124,10 +127,162 @@ pub struct Worker {
     inner: Arc<Inner>,
 }
 
+/// How long one write or read waits for the supervisor's answer. The two
+/// processes share a pipe, so this only trips when the supervisor is gone —
+/// and then the Turn fails visibly instead of hanging.
+const LOG_TIMEOUT: Duration = Duration::from_secs(30);
+
+type Written = std::sync::mpsc::Sender<Result<TaskEvent, StoreError>>;
+type Reading = std::sync::mpsc::Sender<Result<LogAnswer, StoreError>>;
+
+/// The Task log seen from the worker: everything it writes and reads is a
+/// request to the supervisor, which owns the file (ADR 0020, 0069). The log is
+/// therefore not in this process's file system at all, so no command and no
+/// tool can open it, let alone rewrite history.
+pub struct IpcLog {
+    link: Arc<dyn SupervisorLink>,
+    written: Mutex<HashMap<String, Written>>,
+    read: Mutex<HashMap<String, Reading>>,
+    next: AtomicU64,
+}
+
+impl IpcLog {
+    pub fn new(link: Arc<dyn SupervisorLink>) -> Self {
+        Self {
+            link,
+            written: Mutex::new(HashMap::new()),
+            read: Mutex::new(HashMap::new()),
+            next: AtomicU64::new(0),
+        }
+    }
+
+    fn request_id(&self) -> String {
+        format!("log{}", self.next.fetch_add(1, Ordering::SeqCst) + 1)
+    }
+
+    /// The supervisor's answer to one append. False when nothing waits on it.
+    pub fn written(&self, id: &str, answer: Result<TaskEvent, StoreError>) -> bool {
+        let waiter = self.written.lock().expect("written").remove(id);
+        match waiter {
+            Some(waiter) => waiter.send(answer).is_ok(),
+            None => false,
+        }
+    }
+
+    /// The supervisor's answer to one read.
+    pub fn answered(&self, id: &str, answer: Result<LogAnswer, StoreError>) -> bool {
+        let waiter = self.read.lock().expect("read").remove(id);
+        match waiter {
+            Some(waiter) => waiter.send(answer).is_ok(),
+            None => false,
+        }
+    }
+
+    /// A refusal from the supervisor, for whichever request it names.
+    pub fn refused(&self, id: &str, code: &str) {
+        if !self.written(id, Err(StoreError::Refused(code.to_string()))) {
+            self.answered(id, Err(StoreError::Refused(code.to_string())));
+        }
+    }
+
+    fn ask(&self, query: LogQuery) -> Result<LogAnswer, StoreError> {
+        let id = self.request_id();
+        let (answer, answered) = std::sync::mpsc::channel();
+        self.read.lock().expect("read").insert(id.clone(), answer);
+        self.link.send(FromWorker::LogRead {
+            id: id.clone(),
+            query,
+        });
+        let settle = answered.recv_timeout(LOG_TIMEOUT);
+        if settle.is_err() {
+            self.read.lock().expect("read").remove(&id);
+            return Err(StoreError::Refused("log.unavailable".into()));
+        }
+        settle.expect("checked above")
+    }
+}
+
+impl EventLog for IpcLog {
+    fn record(
+        &self,
+        task: &str,
+        starter: &str,
+        kind: &str,
+        body: &Value,
+        message_id: Option<&str>,
+    ) -> Result<TaskEvent, StoreError> {
+        let id = self.request_id();
+        let (written, answer) = std::sync::mpsc::channel();
+        self.written
+            .lock()
+            .expect("written")
+            .insert(id.clone(), written);
+        self.link.send(FromWorker::LogAppend {
+            id: id.clone(),
+            task: task.to_string(),
+            starter: starter.to_string(),
+            kind: kind.to_string(),
+            body: body.clone(),
+            message_id: message_id.map(str::to_string),
+        });
+        let settle = answer.recv_timeout(LOG_TIMEOUT);
+        if settle.is_err() {
+            self.written.lock().expect("written").remove(&id);
+            return Err(StoreError::Refused("log.unavailable".into()));
+        }
+        settle.expect("checked above")
+    }
+
+    fn starter_of(&self, task: &str) -> Result<Option<String>, StoreError> {
+        match self.ask(LogQuery::Starter {
+            task: task.to_string(),
+        })? {
+            LogAnswer::Starter { starter } => Ok(starter),
+            _ => Err(StoreError::Refused("log.answer".into())),
+        }
+    }
+
+    fn has_message(&self, message_id: &str) -> Result<bool, StoreError> {
+        match self.ask(LogQuery::HasMessage {
+            id: message_id.to_string(),
+        })? {
+            LogAnswer::HasMessage { seen } => Ok(seen),
+            _ => Err(StoreError::Refused("log.answer".into())),
+        }
+    }
+
+    fn events(&self, task: &str, after: i64) -> Result<Vec<TaskEvent>, StoreError> {
+        match self.ask(LogQuery::Events {
+            task: task.to_string(),
+            after,
+        })? {
+            LogAnswer::Events { events } => Ok(events),
+            _ => Err(StoreError::Refused("log.answer".into())),
+        }
+    }
+
+    fn tasks_started_by(&self, member: &str) -> Result<Vec<TaskSummary>, StoreError> {
+        match self.ask(LogQuery::TasksStartedBy {
+            member: member.to_string(),
+        })? {
+            LogAnswer::TasksStartedBy { tasks } => Ok(tasks),
+            _ => Err(StoreError::Refused("log.answer".into())),
+        }
+    }
+
+    fn open_turns(&self) -> Result<Vec<String>, StoreError> {
+        match self.ask(LogQuery::OpenTurns)? {
+            LogAnswer::OpenTurns { tasks } => Ok(tasks),
+            _ => Err(StoreError::Refused("log.answer".into())),
+        }
+    }
+}
+
 struct Inner {
     core: AgentCore,
     transport: Arc<IpcTransport>,
     link: Arc<dyn SupervisorLink>,
+    log: Arc<IpcLog>,
 }
 
 impl Clone for Worker {
@@ -185,11 +340,13 @@ impl Worker {
         let llm = Arc::new(AnthropicLlm::new(
             Arc::clone(&transport) as Arc<dyn LlmTransport>
         ));
-        let store = EventStore::open(config.dir.join("tasks.db"))?;
+        // The log is the supervisor's file; this process only asks for it
+        // (ADR 0020, 0069).
+        let log = Arc::new(IpcLog::new(Arc::clone(&link)));
         let workdir = config.dir.join("workdir");
-        let core = AgentCore::new(
+        let core = AgentCore::over_log(
             config.name,
-            store,
+            Arc::clone(&log) as Arc<dyn EventLog>,
             llm,
             tools,
             Arc::clone(&link),
@@ -206,6 +363,7 @@ impl Worker {
                 core,
                 transport,
                 link,
+                log,
             }),
         })
     }
@@ -220,19 +378,47 @@ impl Worker {
     }
 
     pub fn receive(&self, message: ToWorker) -> Result<(), AgentError> {
-        if let ToWorker::LlmResponse {
-            id,
-            status,
-            headers,
-            body,
-        } = message
-        {
-            self.inner
-                .transport
-                .receive(LlmHttpResponse { status, headers, body }, &id);
+        if self.reply(&message) {
             return Ok(());
         }
         self.inner.core.receive(message)
+    }
+
+    /// The answers this worker waits on — a Provider's reply, or the
+    /// supervisor's word on one log request — belong to the task that asked,
+    /// never to the Agent's loop. True when this was one of them.
+    pub fn reply(&self, message: &ToWorker) -> bool {
+        match message {
+            ToWorker::LlmResponse {
+                id,
+                status,
+                headers,
+                body,
+            } => {
+                self.inner.transport.receive(
+                    LlmHttpResponse {
+                        status: *status,
+                        headers: headers.clone(),
+                        body: body.clone(),
+                    },
+                    id,
+                );
+                true
+            }
+            ToWorker::LogAppended { id, event } => {
+                self.inner.log.written(id, Ok(event.clone()));
+                true
+            }
+            ToWorker::LogFailed { id, code } => {
+                self.inner.log.refused(id, code);
+                true
+            }
+            ToWorker::LogAnswer { id, answer } => {
+                self.inner.log.answered(id, Ok(answer.clone()));
+                true
+            }
+            _ => false,
+        }
     }
 
     pub async fn idle(&self) {
