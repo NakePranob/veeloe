@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { ApprovalAnswerBodySchema, ApprovalAnsweredBodySchema, ApprovalRequestedBodySchema } from "./approval";
 
 describe("ApprovalAnswerBodySchema", () => {
-  test("accepts approve, deny and redirect", () => {
-    for (const decision of ["approve", "deny", "redirect"] as const) {
+  test("accepts approve, deny, redirect and always", () => {
+    for (const decision of ["approve", "deny", "redirect", "always"] as const) {
       const parsed = ApprovalAnswerBodySchema.safeParse({ agent: "a1", request: "ap_1", decision });
       expect(parsed.success).toBe(true);
     }
@@ -25,6 +25,11 @@ describe("ApprovalAnswerBodySchema", () => {
 describe("approval event bodies", () => {
   test("requested holds the command, its parts and expiry", () => {
     const parsed = ApprovalRequestedBodySchema.safeParse({ request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 1 });
+    expect(parsed.success).toBe(true);
+  });
+
+  test("requested holds a domain outside the Egress instead of a command", () => {
+    const parsed = ApprovalRequestedBodySchema.safeParse({ request: "ap_1", kind: "domain", domain: "example.com", agent: "a1", task: "task-1", expiresAt: 1 });
     expect(parsed.success).toBe(true);
   });
 

@@ -105,6 +105,7 @@ fn machine<'a>(
         egress: None,
         trust: None,
         proxies: None,
+        approvals: None,
         budgets: None,
         http,
     }

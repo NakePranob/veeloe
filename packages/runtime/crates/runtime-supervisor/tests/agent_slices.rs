@@ -147,6 +147,7 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
         egress: None,
         trust: None,
         proxies: None,
+        approvals: None,
         budgets: None,
         http: &http,
     };
@@ -259,6 +260,7 @@ async fn a_deleted_agent_waits_in_the_trash_and_can_be_restored() {
         egress: None,
         trust: None,
         proxies: None,
+        approvals: None,
         budgets: None,
         http: &http,
     };
@@ -443,6 +445,7 @@ async fn a_push_token_is_kept_for_the_controller_key_and_then_removed() {
         egress: None,
         trust: None,
         proxies: None,
+        approvals: None,
         budgets: None,
         http: &http,
     };
@@ -522,6 +525,7 @@ async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
         egress: None,
         trust: None,
         proxies: None,
+        approvals: None,
         budgets: Some(&budgets),
         http: &http,
     };
@@ -578,6 +582,7 @@ async fn egress_set_checks_manage_and_touches_only_the_agent_it_names() {
         egress: Some(&egress),
         trust: Some(&trust),
         proxies: None,
+        approvals: None,
         budgets: None,
         http: &http,
     };
@@ -732,6 +737,7 @@ async fn a_malformed_egress_request_is_refused_and_changes_no_agent() {
         egress: Some(&egress),
         trust: Some(&trust),
         proxies: None,
+        approvals: None,
         budgets: None,
         http: &http,
     };

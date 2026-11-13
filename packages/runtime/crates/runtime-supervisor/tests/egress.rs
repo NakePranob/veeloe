@@ -47,6 +47,33 @@ fn no_file_lets_nothing_out() {
     assert!(egress.current("a2").is_empty());
 }
 
+/// Issue #44: a permanent yes adds exactly one domain to exactly one Agent, and
+/// the next read of `agents.json` already has it.
+#[test]
+fn a_permanent_yes_adds_one_domain_to_one_agent() {
+    let home = tempdir().expect("home");
+    let registry = two_agents(home.path());
+    let egress = Egress::open(home.path()).expect("open");
+    assert_eq!(
+        egress.add_domain("a1", "example.com").expect("add"),
+        Some(domains(&["example.com"]))
+    );
+    // The same domain twice is still one entry.
+    assert_eq!(
+        egress.add_domain("a1", "example.com").expect("add again"),
+        Some(domains(&["example.com"]))
+    );
+    assert_eq!(egress.current("a1"), domains(&["example.com"]));
+    assert!(egress.current("a2").is_empty());
+    assert_eq!(
+        registry.get("a1").expect("get").expect("a1").egress,
+        domains(&["example.com"])
+    );
+    // An address is not a domain, and an unknown Agent is not written.
+    assert_eq!(egress.add_domain("a1", "10.0.0.1").expect("bad"), None);
+    assert_eq!(egress.add_domain("nobody", "example.org").expect("none"), None);
+}
+
 #[test]
 fn each_agent_keeps_its_own_list() {
     let home = tempdir().expect("home");

@@ -23,6 +23,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{lookup_host, TcpListener, TcpStream};
 use tokio::task::JoinHandle;
 
+use crate::approval::Approvals;
 use crate::egress::Egress;
 
 /// The largest request head a client may send before the proxy gives up.
@@ -84,7 +85,7 @@ fn stale_machine_socket(home: &Path) -> PathBuf {
 /// and no caller can open a Machine-wide proxy again (issue #43 review).
 #[cfg(test)]
 async fn start(egress: Arc<Egress>, agent: &str) -> std::io::Result<Proxy> {
-    start_with_socket(egress, agent, &|_| false, None).await
+    start_with_socket(egress, agent, &|_| false, None, None).await
 }
 
 /// Starts one Agent's proxy on a free loopback port and, when `socket` names a
@@ -101,6 +102,7 @@ async fn start_with_socket(
     agent: &str,
     avoid: &(dyn Fn(u16) -> bool + Send + Sync),
     socket: Option<&Path>,
+    approvals: Option<Arc<Approvals>>,
 ) -> std::io::Result<Proxy> {
     let agent: Arc<str> = Arc::from(agent);
     for _ in 0..16 {
@@ -115,10 +117,17 @@ async fn start_with_socket(
             listener,
             Arc::clone(&egress),
             Arc::clone(&agent),
+            approvals.clone(),
         ))];
         let socket = match socket {
             Some(path) => {
-                let (path, task) = listen_unix(path, Arc::clone(&egress), Arc::clone(&agent)).await?;
+                let (path, task) = listen_unix(
+                    path,
+                    Arc::clone(&egress),
+                    Arc::clone(&agent),
+                    approvals.clone(),
+                )
+                .await?;
                 tasks.push(task);
                 Some(path)
             }
@@ -139,15 +148,21 @@ async fn start_with_socket(
 
 /// One Agent's TCP listener: every connection is answered with that Agent's
 /// Egress, whichever Agent asked.
-async fn accepting(listener: TcpListener, egress: Arc<Egress>, agent: Arc<str>) {
+async fn accepting(
+    listener: TcpListener,
+    egress: Arc<Egress>,
+    agent: Arc<str>,
+    approvals: Option<Arc<Approvals>>,
+) {
     loop {
         let Ok((client, _)) = listener.accept().await else {
             break;
         };
         let egress = Arc::clone(&egress);
         let agent = Arc::clone(&agent);
+        let approvals = approvals.clone();
         tokio::spawn(async move {
-            let _ = serve(client, egress, agent).await;
+            let _ = serve(client, egress, agent, approvals).await;
         });
     }
 }
@@ -159,6 +174,7 @@ async fn listen_unix(
     path: &Path,
     egress: Arc<Egress>,
     agent: Arc<str>,
+    approvals: Option<Arc<Approvals>>,
 ) -> std::io::Result<(PathBuf, JoinHandle<()>)> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -176,8 +192,9 @@ async fn listen_unix(
             };
             let egress = Arc::clone(&egress);
             let agent = Arc::clone(&agent);
+            let approvals = approvals.clone();
             tokio::spawn(async move {
-                let _ = serve(client, egress, agent).await;
+                let _ = serve(client, egress, agent, approvals).await;
             });
         }
     });
@@ -189,6 +206,7 @@ async fn listen_unix(
 pub struct Proxies {
     home: PathBuf,
     egress: Arc<Egress>,
+    approvals: Option<Arc<Approvals>>,
     running: Mutex<HashMap<String, Proxy>>,
     /// One start at a time, so two calls for the same Agent cannot both bind
     /// its socket and leave the winner's path pointing at the loser.
@@ -197,6 +215,16 @@ pub struct Proxies {
 
 impl Proxies {
     pub fn new(home: PathBuf, egress: Arc<Egress>) -> Self {
+        Self::with_approvals(home, egress, None)
+    }
+
+    /// The same registry with domain Approvals (issue #44): a host outside an
+    /// Agent's Egress asks before it opens instead of being dropped.
+    pub fn with_approvals(
+        home: PathBuf,
+        egress: Arc<Egress>,
+        approvals: Option<Arc<Approvals>>,
+    ) -> Self {
         // A Runtime from before #43 listened on one socket for the whole
         // Machine. An upgrade keeps the file a killed one left behind, and
         // nothing answers on it any more: remove it once, here, so a Linux
@@ -205,6 +233,7 @@ impl Proxies {
         Self {
             home,
             egress,
+            approvals,
             running: Mutex::new(HashMap::new()),
             starting: tokio::sync::Mutex::new(()),
         }
@@ -260,6 +289,7 @@ impl Proxies {
             agent,
             &|port| ports.is_taken(port) || taken.contains(&port),
             socket.as_deref(),
+            self.approvals.clone(),
         )
         .await?;
         let view = proxy.view();
@@ -273,6 +303,11 @@ impl Proxies {
     /// The Agent has no worker any more: its listener closes, and its socket
     /// goes with it. Starting it again later opens both anew.
     pub fn stop(&self, agent: &str) {
+        // Nothing of this Agent may keep waiting for an answer that its proxy
+        // can no longer carry (issue #44).
+        if let Some(approvals) = &self.approvals {
+            approvals.forget_agent(agent);
+        }
         let proxy = self.running.lock().expect("proxies").remove(agent);
         if let Some(proxy) = proxy {
             if let Some(socket) = &proxy.socket {
@@ -283,6 +318,11 @@ impl Proxies {
 
     /// Every listener, for good: the supervisor is ending.
     pub fn stop_all(&self) {
+        if let Some(approvals) = &self.approvals {
+            for agent in self.running.lock().expect("proxies").keys() {
+                approvals.forget_agent(agent);
+            }
+        }
         let mut running = self.running.lock().expect("proxies");
         for (_, proxy) in running.drain() {
             if let Some(socket) = &proxy.socket {
@@ -293,8 +333,14 @@ impl Proxies {
 }
 
 /// One client: read its CONNECT, check the host against this Agent's Egress,
-/// then copy bytes both ways.
-async fn serve<S>(mut client: S, egress: Arc<Egress>, agent: Arc<str>) -> std::io::Result<()>
+/// ask the Agent's Member when the host is outside it, then copy bytes both
+/// ways (issue #44).
+async fn serve<S>(
+    mut client: S,
+    egress: Arc<Egress>,
+    agent: Arc<str>,
+    approvals: Option<Arc<Approvals>>,
+) -> std::io::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
@@ -339,10 +385,35 @@ where
         };
         (host, port, Some(path))
     };
-    if !allowed(&host, &egress.current(&agent)) {
-        // No answer at all: a 403 is still an HTTP response a command could
-        // treat as success. Dropping the connection is the refusal.
-        return Ok(());
+    // One spelling for the Egress check, the approval request and the log.
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    match &approvals {
+        Some(approvals) => {
+            // No Turn, no answer: a connection nobody is acting for is refused
+            // rather than opened (issue #44).
+            if approvals.current_turn(&agent).is_none() {
+                return Ok(());
+            }
+            if !allowed(&host, &egress.current(&agent)) {
+                // Only a domain can be added to an Egress, so only a domain is
+                // worth asking about. An address, `localhost` or a malformed
+                // name is refused as before: a permanent yes could never cover
+                // it (ADR 0029).
+                let askable =
+                    crate::egress::is_valid_egress(std::slice::from_ref(&host));
+                if !askable || !approvals.ask(&agent, &host).await {
+                    // No answer at all: a 403 is still an HTTP response a
+                    // command could treat as success. Dropping the connection
+                    // is the refusal.
+                    return Ok(());
+                }
+            }
+        }
+        None => {
+            if !allowed(&host, &egress.current(&agent)) {
+                return Ok(());
+            }
+        }
     }
 
     let Some(address) = public_address(&host, port).await else {
@@ -501,7 +572,10 @@ fn public_v4(ip: std::net::Ipv4Addr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::approval::Approvals;
+    use crate::task_log::TaskLogs;
     use tokio::io::AsyncWriteExt;
+    use veeloe_runtime_core::{FromWorker, LogAnswer, LogQuery, TaskEvent};
 
     #[test]
     fn a_domain_matches_exactly_or_through_a_wildcard() {
@@ -563,6 +637,122 @@ mod tests {
         Arc::new(Egress::open(home).expect("egress"))
     }
 
+    fn approvals_for(home: &Path, egress: &Arc<Egress>, agent: &str, task: &str) -> Arc<Approvals> {
+        std::fs::create_dir_all(crate::task_log::dir(home, agent)).expect("task log");
+        let logs = Arc::new(TaskLogs::new(home));
+        let approvals = Arc::new(Approvals::new(
+            home.to_path_buf(),
+            Arc::clone(egress),
+            logs,
+        ));
+        approvals.observe(
+            agent,
+            &FromWorker::Event {
+                task: task.into(),
+                starter: "m_1".into(),
+                event: TaskEvent {
+                    seq: 1,
+                    kind: "turn.started".into(),
+                    at: 0,
+                    body: serde_json::json!({ "member": "m_1" }),
+                },
+            },
+        );
+        approvals
+    }
+
+    /// Issue #44: no running Turn means no way out, even for a domain the
+    /// Egress names: a connection nobody is acting for is refused.
+    #[tokio::test]
+    async fn a_connection_with_no_running_turn_is_refused() {
+        let home = tempfile::tempdir().expect("home");
+        let egress = egress_with(home.path(), &[("a1", &["example.com"])]);
+        std::fs::create_dir_all(crate::task_log::dir(home.path(), "a1")).expect("task log");
+        let logs = Arc::new(TaskLogs::new(home.path()));
+        let approvals = Arc::new(Approvals::new(
+            home.path().to_path_buf(),
+            Arc::clone(&egress),
+            logs,
+        ));
+        let proxy = start_with_socket(
+            Arc::clone(&egress),
+            "a1",
+            &|_| false,
+            None,
+            Some(approvals),
+        )
+        .await
+        .expect("proxy");
+        let mut client = TcpStream::connect(("127.0.0.1", proxy.port))
+            .await
+            .expect("connect");
+        client
+            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+            .await
+            .expect("write");
+        let mut answer = [0u8; 16];
+        assert_eq!(client.read(&mut answer).await.expect("read"), 0);
+    }
+
+    /// Issue #44: a domain outside the Egress holds the connection and asks;
+    /// when its Turn ends before anyone answers, the connection closes.
+    #[tokio::test]
+    async fn a_domain_outside_the_egress_holds_the_connection_until_the_turn_ends() {
+        let home = tempfile::tempdir().expect("home");
+        let egress = egress_with(home.path(), &[("a1", &[])]);
+        let approvals = approvals_for(home.path(), &egress, "a1", "t1");
+        let proxy = start_with_socket(
+            Arc::clone(&egress),
+            "a1",
+            &|_| false,
+            None,
+            Some(Arc::clone(&approvals)),
+        )
+        .await
+        .expect("proxy");
+        let mut client = TcpStream::connect(("127.0.0.1", proxy.port))
+            .await
+            .expect("connect");
+        client
+            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+            .await
+            .expect("write");
+
+        // It waits instead of answering or dropping.
+        let mut answer = [0u8; 16];
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), client.read(&mut answer))
+                .await
+                .is_err(),
+            "the proxy answered a domain it had not been allowed"
+        );
+        // The request is in the Task's log, of the domain kind.
+        let LogAnswer::Events { events } = approvals_log(home.path(), "a1", "t1") else {
+            panic!("events");
+        };
+        let request = events
+            .iter()
+            .find(|event| event.kind == "approval.requested")
+            .expect("a request");
+        assert_eq!(request.body["kind"], "domain");
+        assert_eq!(request.body["domain"], "example.com");
+
+        approvals.forget_agent("a1");
+        assert_eq!(client.read(&mut answer).await.expect("read"), 0);
+    }
+
+    fn approvals_log(home: &Path, agent: &str, task: &str) -> LogAnswer {
+        TaskLogs::new(home)
+            .answer(
+                agent,
+                &LogQuery::Events {
+                    task: task.into(),
+                    after: 0,
+                },
+            )
+            .expect("events")
+    }
+
     /// Issue #43: the Unix socket answers with the same rules as the TCP port.
     /// A domain the Egress does not name gets no answer at all, whichever way
     /// the request arrived (ADR 0022, 0069).
@@ -571,7 +761,13 @@ mod tests {
         let home = tempfile::tempdir().expect("home");
         let egress = egress_with(home.path(), &[("a1", &[])]);
         let socket = home.path().join("egress.sock");
-        let proxy = start_with_socket(Arc::clone(&egress), "a1", &|_| false, Some(&socket))
+        let proxy = start_with_socket(
+            Arc::clone(&egress),
+            "a1",
+            &|_| false,
+            Some(&socket),
+            None,
+        )
             .await
             .expect("proxy");
         assert_eq!(proxy.socket.as_deref(), Some(socket.as_path()));

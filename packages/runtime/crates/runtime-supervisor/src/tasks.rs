@@ -14,6 +14,7 @@ use veeloe_protocol::signer::{Outgoing, Signer};
 use veeloe_runtime_core::{FromWorker, ToWorker};
 
 use crate::agents::AgentRegistry;
+use crate::approval::Approvals;
 use crate::egress::{is_valid_egress, Egress};
 use crate::hub_link::HubSender;
 use crate::llm::HttpClient;
@@ -172,6 +173,9 @@ pub struct Machine<'a> {
     /// The per-Agent proxies, so a new Agent gets its own listener and a
     /// deleted one loses it. Absent in slices that never start a worker.
     pub proxies: Option<&'a Proxies>,
+    /// The domain Approvals the proxies are waiting on (issue #44). Absent in
+    /// slices that never start a proxy.
+    pub approvals: Option<&'a Approvals>,
     pub budgets: Option<&'a crate::usage::Budgets>,
     pub http: &'a dyn HttpClient,
 }
@@ -187,6 +191,16 @@ pub async fn dispatch(
 ) {
     let registry = machine.registry;
     let workers = machine.workers;
+    // A domain Approval is answered here, not by the worker that never asked
+    // it: the proxy wrote it, and its connection waits on this answer (issue
+    // #44). A request the worker holds is not ours and goes on to the worker.
+    if type_ == "approval.answer" {
+        if let Some(approvals) = machine.approvals {
+            if approvals.answer(from, body, machine.trust, outbox) {
+                return;
+            }
+        }
+    }
     let listed = || async {
         // A list is the only clock the trash needs: no timer, and a Machine that
         // was off past the 30 days purges as soon as it is asked (`agent-trash`).
@@ -873,6 +887,8 @@ pub async fn dispatch(
                 "approve" => veeloe_runtime_core::ApprovalDecision::Approve,
                 "deny" => veeloe_runtime_core::ApprovalDecision::Deny,
                 "redirect" => veeloe_runtime_core::ApprovalDecision::Redirect,
+                // A permanent yes belongs to a domain Approval, which the
+                // supervisor answered above; a command has no such decision.
                 _ => return outbox.error(from, "approval.unknown"),
             };
             // Allow-always grows the Allowlist too, in one write: the command may

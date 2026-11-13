@@ -34,6 +34,10 @@ export type ApprovalStatus = "open" | "approved" | "denied" | "expired" | "close
 /** One Approval the Agent asked for, and how it ended. */
 export type Approval = {
   request: string;
+  /** A domain the proxy asked to reach (issue #44); absent for a command. */
+  kind?: "domain";
+  domain?: string;
+  /** The command, or the domain for a domain approval, as the card shows it. */
   command: string;
   parts: string[];
   expiresAt: number;
@@ -88,7 +92,7 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
   const approvals = new Map<string, { item: Extract<Item, { kind: "approval" }>; index: number }>();
   let open = false;
   for (const event of events) {
-    let body: { text?: string; content?: unknown; reason?: string; code?: string; request?: string; command?: string; parts?: string[]; expiresAt?: number; member?: string; decision?: string; message?: string; summary?: string; tokensBefore?: number; tokensAfter?: number; name?: string; size?: number; hash?: string; path?: string };
+    let body: { text?: string; content?: unknown; reason?: string; code?: string; request?: string; kind?: string; domain?: string; agent?: string; task?: string; command?: string; parts?: string[]; expiresAt?: number; member?: string; decision?: string; message?: string; summary?: string; tokensBefore?: number; tokensAfter?: number; name?: string; size?: number; hash?: string; path?: string };
     try {
       body = JSON.parse(event.body) ?? {};
     } catch {
@@ -114,14 +118,16 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
         call.state = result.is_error ? "failed" : "ok";
         call.output = typeof result.content === "string" ? result.content : textOf(result.content);
       }
-    } else if (event.kind === "approval.requested" && typeof body.request === "string" && typeof body.command === "string") {
+    } else if (event.kind === "approval.requested" && typeof body.request === "string" && (typeof body.command === "string" || (body.kind === "domain" && typeof body.domain === "string"))) {
+      const domain = body.kind === "domain" && typeof body.domain === "string" ? body.domain : undefined;
       const item: Extract<Item, { kind: "approval" }> = {
         key,
         kind: "approval",
         approval: {
           request: body.request,
-          command: body.command,
-          parts: Array.isArray(body.parts) ? body.parts.filter((part): part is string => typeof part === "string") : [body.command],
+          ...(domain !== undefined ? { kind: "domain" as const, domain } : {}),
+          command: typeof body.command === "string" ? body.command : (domain ?? ""),
+          parts: Array.isArray(body.parts) ? body.parts.filter((part): part is string => typeof part === "string") : typeof body.command === "string" ? [body.command] : [],
           expiresAt: typeof body.expiresAt === "number" ? body.expiresAt : now,
           ...(typeof body.reason === "string" && { reason: body.reason }),
           status: "open",
@@ -134,7 +140,8 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       if (found) {
         // The Machine writes the expiry itself, as a denial with nobody's name on it.
         const expired = typeof body.member !== "string";
-        found.item.approval.status = expired ? "expired" : body.decision === "approve" ? "approved" : "denied";
+        // A permanent yes is a yes; the card still says which one it was.
+        found.item.approval.status = expired ? "expired" : body.decision === "approve" || body.decision === "always" ? "approved" : "denied";
         if (typeof body.member === "string") found.item.approval.answeredBy = { member: body.member, decision: body.decision, ...(typeof body.message === "string" && { message: body.message }) };
       }
     } else if (event.kind === "turn.stopped" && typeof body.member === "string") {

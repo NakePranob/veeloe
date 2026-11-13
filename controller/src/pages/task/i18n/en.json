@@ -51,6 +51,8 @@
   },
   "approval": {
     "title": "{{name}} wants to run this",
+    "domainTitle": "{{name}} wants to reach this domain",
+    "domainBody": "This domain is not in {{name}}'s Egress.",
     "expiresIn_one": "Expires in {{count}} minute",
     "expiresIn_other": "Expires in {{count}} minutes",
     "expiresInHours_one": "Expires in {{count}} hour",
@@ -64,6 +66,8 @@
     "sent": "Answer sent",
     "notInAllowlist": "Not in the Allowlist. If nobody answers before it expires, it counts as denied.",
     "approve": "Approve",
+    "allowOnce": "Allow once",
+    "allowAlways": "Always allow",
     "deny": "Deny",
     "always": "Always allow",
     "steer": "Tell it what to do instead",
@@ -93,6 +97,8 @@
   },
   "authenticate": {
     "approve": "Approve this command for {{name}}",
-    "always": "Add {{entries}} to the Allowlist and approve"
+    "always": "Add {{entries}} to the Allowlist and approve",
+    "domain": "Allow this domain for {{name}}: {{domain}}",
+    "domainAlways": "Add {{domain}} to {{name}}'s Egress"
   }
 }

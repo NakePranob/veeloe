@@ -792,7 +792,9 @@ fn is_approval_answer(object: &Map<String, Value>) -> bool {
         return false;
     }
     let decision = text(object.get("decision"));
-    if !matches!(decision, Some("approve" | "deny" | "redirect")) {
+    // `always` is a domain approval's yes: it allows this connection and adds
+    // the domain to that Agent's Egress (issue #44).
+    if !matches!(decision, Some("approve" | "deny" | "redirect" | "always")) {
         return false;
     }
     if let Some(message) = object.get("message") {

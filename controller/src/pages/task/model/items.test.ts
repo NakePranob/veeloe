@@ -81,6 +81,22 @@ test("an Approval nobody answers shows waiting, then expired past its time", () 
   expect(items(events, 3000).items[0]).toMatchObject({ kind: "approval", approval: { status: "expired" } });
 });
 
+test("a domain Approval shows the domain instead of a command (issue #44)", () => {
+  const { items: shown } = items(
+    [
+      row(1, "turn.started", {}),
+      row(2, "approval.requested", { request: "apd_1", kind: "domain", domain: "example.com", agent: "a1", task: "t1", expiresAt: 2000 }),
+      row(3, "approval.answered", { request: "apd_1", member: "m_kai", decision: "always" }),
+    ],
+    1000,
+  );
+  expect(shown).toHaveLength(1);
+  expect(shown[0]).toMatchObject({
+    kind: "approval",
+    approval: { request: "apd_1", kind: "domain", domain: "example.com", command: "example.com", parts: [], status: "approved", answeredBy: { member: "m_kai", decision: "always" } },
+  });
+});
+
 test("the Machine's own expiry counts as expired, not as a denial by someone", () => {
   const { items: shown } = items(
     [
