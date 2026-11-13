@@ -218,12 +218,19 @@ pub async fn dispatch(
         let Some(egress) = machine.egress else {
             return outbox.error(from, "egress.unavailable");
         };
-        let Some(domains) = body.get("egress").and_then(Value::as_array).map(|entries| {
-            entries
-                .iter()
-                .filter_map(|entry| entry.as_str().map(str::to_string))
-                .collect::<Vec<_>>()
-        }) else {
+        // Every entry must be a domain. Dropping the ones that are not would
+        // change every Agent's way out to a list shorter than the Member sent,
+        // so one bad entry refuses the whole request (issue #43 review).
+        let Some(domains) = body
+            .get("egress")
+            .and_then(Value::as_array)
+            .and_then(|entries| {
+                entries
+                    .iter()
+                    .map(|entry| entry.as_str().map(str::to_string))
+                    .collect::<Option<Vec<_>>>()
+            })
+        else {
             return outbox.error(from, "egress.invalid_domain");
         };
         if !is_valid_egress(&domains) {
@@ -231,7 +238,14 @@ pub async fn dispatch(
         }
         // With `agent`, only that Agent's list changes. Without it, the legacy
         // behaviour: every Agent's, until the Controller has a per-Agent screen.
-        let target = body.get("agent").and_then(Value::as_str);
+        // An `agent` that is present but not a string names no Agent, so reading
+        // it as absent would broadcast a request that meant one Agent: refuse it
+        // instead (issue #43 review).
+        let target = match body.get("agent") {
+            None => None,
+            Some(Value::String(agent)) => Some(agent.as_str()),
+            Some(_) => return outbox.error(from, "egress.invalid_domain"),
+        };
         let changed = match target {
             Some(agent) => {
                 if registry.get(agent).ok().flatten().is_none() {
