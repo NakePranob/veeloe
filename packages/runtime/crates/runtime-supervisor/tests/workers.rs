@@ -4,6 +4,7 @@
 
 mod support;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -13,6 +14,7 @@ use support::worker_binary;
 use tempfile::tempdir;
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, ToWorker};
 use veeloe_runtime_supervisor::agents::{agent_dir, Agent, AgentRegistry};
+use veeloe_runtime_supervisor::limits::Limits;
 use veeloe_runtime_supervisor::logs;
 use veeloe_runtime_supervisor::providers::{
     load_providers, save_providers, upstream_headers, Auth, Provider,
@@ -1191,4 +1193,320 @@ async fn an_existing_log_keeps_its_history_after_the_move() {
     // Nothing the Owner had to do: the file moved, and only the log moved.
     assert!(!old.exists(), "the old log is still in the writable folder");
     assert!(veeloe_runtime_supervisor::task_log::path(&home_path, "a1").is_file());
+}
+
+/// Issue #47: the CPU time limit the config names reaches the worker, and every
+/// command it starts inherits it. The check is what the command answers, not
+/// the value the supervisor meant to set (ADR 0022).
+#[cfg(target_os = "macos")]
+#[tokio::test]
+async fn a_workers_commands_inherit_the_cpu_limit_from_config() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut agent = agent();
+    agent.allowlist = vec!["ulimit".into()];
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(OneCommandLlm {
+            command: "ulimit -t".into(),
+            requests: Mutex::new(0),
+        }) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        Arc::new(|_agent, command| command),
+    );
+    workers.limiting(Limits {
+        cpu_seconds: 1_234,
+        memory_mb: 4_096,
+    });
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the worker never said ready: {:?}",
+        lines.lock().expect("lines")
+    );
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    assert!(
+        until(|| task_ended(&heard, "t1"), 20_000).await,
+        "the Turn never ended: {:?} {:?}",
+        heard.lock().expect("heard"),
+        lines.lock().expect("lines")
+    );
+    workers.stop_all();
+
+    let results = tool_results(&heard);
+    let (_, content, is_error) = results
+        .iter()
+        .find(|(seen, _, _)| seen == "t-limit")
+        .unwrap_or_else(|| panic!("no result for the command: {results:?}"));
+    assert!(!is_error, "`ulimit -t` was refused: {content}");
+    assert!(
+        content.contains("1234"),
+        "the command did not see the CPU limit from config: {content}"
+    );
+}
+
+/// Answers one command, then ends the Turn.
+struct OneCommandLlm {
+    command: String,
+    requests: Mutex<usize>,
+}
+
+#[async_trait]
+impl SupervisorLlm for OneCommandLlm {
+    async fn answer(&self, _agent: &str, _request: LlmHttpRequest) -> LlmHttpResponse {
+        let first = {
+            let mut seen = self.requests.lock().expect("requests");
+            *seen += 1;
+            *seen == 1
+        };
+        let body = if first {
+            json!({
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_use",
+                    "id": "t-limit",
+                    "name": "bash",
+                    "input": { "command": self.command },
+                }],
+                "stop_reason": "tool_use",
+            })
+        } else {
+            json!({
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "done" }],
+                "stop_reason": "end_turn",
+            })
+        };
+        LlmHttpResponse {
+            status: 200,
+            headers: vec![("content-type".into(), "application/json".into())],
+            body: body.to_string(),
+        }
+    }
+}
+
+/// A Turn whose command runs long enough to be cut in the middle.
+struct HangingLlm;
+
+#[async_trait]
+impl SupervisorLlm for HangingLlm {
+    async fn answer(&self, _agent: &str, _request: LlmHttpRequest) -> LlmHttpResponse {
+        LlmHttpResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: json!({
+                "content": [{
+                    "type": "tool_use",
+                    "id": "t-hang",
+                    "name": "bash",
+                    "input": { "command": "sleep 30" },
+                }],
+                "stop_reason": "tool_use",
+            })
+            .to_string(),
+        }
+    }
+}
+
+/// Issue #47: a worker that stays under its memory limit keeps running, so the
+/// watch does not end healthy work.
+#[cfg(target_os = "macos")]
+#[tokio::test]
+async fn a_worker_under_its_memory_limit_keeps_running() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let agent = agent();
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(CannedLlm {
+            requests: Mutex::new(Vec::new()),
+        }) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(|_line| {}),
+        Arc::new(|_agent, command| command),
+    );
+    // One megabyte: a worker doing an ordinary Turn is never near 4096 MB.
+    workers.reading_memory(Arc::new(|_pid| Some(1024 * 1024)));
+
+    workers.start(&agent);
+    assert!(until(|| workers.is_ready("a1"), 10_000).await);
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    assert!(
+        until(|| task_ended(&heard, "t1"), 10_000).await,
+        "the Turn never ended: {:?}",
+        heard.lock().expect("heard")
+    );
+    workers.stop_all();
+    let limit = logs::recent(&home_path)
+        .expect("logs")
+        .into_iter()
+        .find(|line| line.contains("worker.limit"));
+    assert!(limit.is_none(), "a healthy worker was cut: {limit:?}");
+}
+
+/// Issue #47: over its memory limit a worker is killed, the Runtime log says
+/// which Agent and which limit without any content, the worker is started
+/// again, and the Turn it held ends interrupted through the usual path
+/// (ADR 0033): nothing hangs.
+#[cfg(target_os = "macos")]
+#[tokio::test]
+async fn a_worker_over_its_memory_limit_is_killed_and_its_turn_is_interrupted() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut agent = agent();
+    agent.allowlist = vec!["sleep".into()];
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(HangingLlm) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        Arc::new(|_agent, command| command),
+    );
+    // Under the limit while the worker opens; the test lets one reading cross
+    // it once the Turn is running, so the kill lands in the middle of real
+    // work. The next reading is small again, as it would be once the process
+    // holding the memory is gone.
+    let over = Arc::new(AtomicBool::new(false));
+    let watched = Arc::clone(&over);
+    workers.reading_memory(Arc::new(move |_pid| {
+        Some(if watched.swap(false, Ordering::SeqCst) {
+            8_192 * 1024 * 1024
+        } else {
+            1024 * 1024
+        })
+    }));
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the worker never said ready: {:?}",
+        lines.lock().expect("lines")
+    );
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    let started = || {
+        heard.lock().expect("heard").iter().any(
+            |message| matches!(message, FromWorker::Event { event, .. } if event.kind == "llm.message"),
+        )
+    };
+    assert!(
+        until(started, 10_000).await,
+        "the Turn never started: {:?} {:?}",
+        heard.lock().expect("heard"),
+        lines.lock().expect("lines")
+    );
+    over.store(true, Ordering::SeqCst);
+
+    let limit = || -> Option<String> {
+        logs::recent(&home_path)
+            .ok()?
+            .into_iter()
+            .find(|line| line.contains("worker.limit"))
+    };
+    assert!(
+        until(|| limit().is_some(), 15_000).await,
+        "the worker was never cut for memory: {:?} {:?}",
+        logs::recent(&home_path),
+        lines.lock().expect("lines")
+    );
+    let line = limit().expect("the limit event");
+    let value: serde_json::Value = serde_json::from_str(&line).expect("json");
+    assert_eq!(value["level"], "warn");
+    assert_eq!(value["event"], "worker.limit");
+    assert_eq!(value["fields"], json!({ "agent": "a1", "limit": "memory" }));
+    assert!(
+        !line.contains(home_path.to_str().expect("home")),
+        "the limit event carries a path: {line}"
+    );
+
+    // The restarted worker finds the open Turn and closes it as interrupted,
+    // rather than leaving the Owner waiting on a Turn nobody runs.
+    let log = veeloe_runtime_supervisor::task_log::path(&home_path, "a1");
+    let interrupted = || {
+        veeloe_runtime_core::EventStore::open(&log)
+            .and_then(|store| store.events("t1", 0))
+            .map(|events| {
+                // The worker writes both, one after the other, so wait for the
+                // end too instead of reading between them.
+                events.iter().any(|event| event.kind == "turn.interrupted")
+                    && events.iter().any(|event| event.kind == "turn.ended")
+            })
+            .unwrap_or(false)
+    };
+    assert!(
+        until(interrupted, 15_000).await,
+        "the killed Turn was left open: {:?} {:?}",
+        logs::recent(&home_path),
+        lines.lock().expect("lines")
+    );
+    let events = veeloe_runtime_core::EventStore::open(&log)
+        .expect("the supervisor's log")
+        .events("t1", 0)
+        .expect("events");
+    let ended = events
+        .iter()
+        .find(|event| event.kind == "turn.ended")
+        .expect("a closed Turn");
+    assert_eq!(ended.body["reason"], json!("interrupted"));
+    workers.stop_all();
 }
