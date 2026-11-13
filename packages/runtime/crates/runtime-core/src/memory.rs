@@ -175,6 +175,16 @@ fn safe_path(workdir: &Path, relative: &Path) -> Result<PathBuf, MemoryWriteErro
         return Err(MemoryWriteError::Bad("no file name".into()));
     };
     let target = real_dir.join(name);
+    // Never write through a link, and never replace one with a file either: a
+    // link can point out of the Workdir, and an atomic rename over it would
+    // land somewhere the OS would otherwise refuse (ADR 0032, 0069).
+    if let Ok(metadata) = fs::symlink_metadata(&target) {
+        if metadata.file_type().is_symlink() {
+            return Err(MemoryWriteError::Bad(
+                "refusing to write through a symlink".into(),
+            ));
+        }
+    }
     if target.exists() {
         let real = fs::canonicalize(&target)?;
         if !real.starts_with(&root) {
@@ -376,6 +386,24 @@ mod tests {
         let error = append_daily_note(home.path(), "2026-11-12", "x").expect_err("refused");
         assert!(matches!(error, MemoryWriteError::Bad(_)), "{error}");
         assert!(!outside.path().join("2026-11-12.md").exists());
+    }
+
+    #[test]
+    fn a_link_whose_target_is_missing_is_refused_rather_than_replaced() {
+        let home = tempdir().expect("home");
+        // Written outside the Workdir and not there yet: on Linux an atomic
+        // rename would replace the link and report success, which would hide
+        // what the link was aimed at (ADR 0032, 0069).
+        let outside = home.path().join("elsewhere/tasks.db");
+        std::os::unix::fs::symlink(&outside, home.path().join(MEMORY_FILE)).expect("link");
+
+        let error = write_memory(home.path(), "x", Mode::Append).expect_err("refused");
+        assert!(matches!(error, MemoryWriteError::Bad(_)), "{error}");
+        let kind = fs::symlink_metadata(home.path().join(MEMORY_FILE))
+            .expect("link")
+            .file_type();
+        assert!(kind.is_symlink(), "the link was replaced by a file");
+        assert!(!outside.exists());
     }
 
     #[test]
