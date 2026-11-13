@@ -49,7 +49,11 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
         <Select
           label={t("egress.agent")}
           value={agent?.id ?? ""}
-          onChange={setScope}
+          onChange={(next) => {
+            setScope(next);
+            // A domain typed for one Agent is not a draft for another.
+            setDraft("");
+          }}
           options={[{ value: "", label: t("egress.allAgents") }, ...agents.map((entry) => ({ value: entry.id, label: entry.name }))]}
         />
       )}
