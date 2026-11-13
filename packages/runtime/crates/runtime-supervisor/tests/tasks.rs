@@ -132,6 +132,7 @@ impl HubLinkSink for Slice {
                 egress: None,
                 trust: None,
                 proxies: None,
+                approvals: None,
                 budgets: None,
                 http: &http,
             };

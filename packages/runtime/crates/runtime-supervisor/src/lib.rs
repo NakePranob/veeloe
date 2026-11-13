@@ -2,6 +2,7 @@
 //! lifecycle (ADR 0020, 0042). The port fills this in one service at a time.
 
 pub mod agents;
+pub mod approval;
 pub mod denials;
 pub mod providers;
 pub mod egress;
