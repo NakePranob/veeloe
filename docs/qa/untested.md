@@ -28,8 +28,9 @@
 
 ### 3. systemd cgroup v2 resource limits
 
-- สถานะ: **ยังไม่ implement** (งานถัดไปของ #32)
-- ต้องมี: Linux ที่มี user systemd (CI runner ไม่มี user session)
+- สถานะ: implement แล้ว (#48) แต่ยังไม่เคยเปิด scope จริงบนเครื่องที่มี user systemd
+- ที่ทำแล้ว: argv/fallback/fake-/proc + fallback บน Linux Docker/CI
+- ต้องมี: เครื่อง Linux ที่มี `systemd --user` เพื่อยืนยัน MemoryMax/CPUQuota/TasksMax จริง
 - ตรวจ: `MemoryMax`, `CPUQuota`, `TasksMax` มีผลกับ worker; คำสั่งที่กินเกินถูกฆ่า
 
 ### 4. AppArmor profile ของ Veeloe (ไฟล์ + installer)
@@ -42,7 +43,7 @@
 
 ### 5. Resource limits (RLIMIT_CPU / RSS)
 
-- สถานะ: **ยังไม่ implement** (งานถัดไปของ #32)
+- สถานะ: implement แล้ว (#47) และมี test จริงเรื่อง RLIMIT/RSS; ยังไม่เคยทดสอบ worker เต็มตัวที่ใช้ CPU ถึง limit (ต้อง 30 นาที)
 - ตรวจ: worker ที่ busy loop ถูกตัดตาม CPU time; worker ที่กิน RAM เกินถูก supervisor ฆ่าและรายงาน
 
 ### 6. mach-lookup ของ Chromium / headless browser
