@@ -7,7 +7,7 @@
 //! A tool that cannot run is information for the Owner, not a gate: the worker
 //! starts and a Turn ends whether the check finds all four or none.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -76,6 +76,10 @@ fn run(policy: &Policy, path: &str, tool: &str) -> Outcome {
     if !on_path(path, tool) {
         return Outcome::Missing;
     }
+    // `$HOME` is `.home` inside the Agent's folder, not the folder itself: a
+    // tool that writes `~/.gitconfig` writes where the worker's would, and the
+    // folder's Workdir and TMPDIR are not mistaken for a home.
+    let home = Path::new(&policy.folder).join(".home");
     let argv = Sandbox::new(policy.clone()).wrap(&[tool.to_string(), "--version".to_string()]);
     let Some((program, rest)) = argv.split_first() else {
         return Outcome::Missing;
@@ -83,11 +87,16 @@ fn run(policy: &Policy, path: &str, tool: &str) -> Outcome {
     let mut command = Command::new(program);
     command
         .args(rest)
-        // What the worker itself gets: the same `PATH` and its own folder as
-        // `$HOME`. Nothing else is inherited, and no output is read.
+        // What the worker itself gets: the same `PATH`, its own home, cache,
+        // git config and TMPDIR (ADR 0069). The supervisor makes `.home`
+        // before it starts the worker and before it runs this check, so the
+        // paths exist here. Nothing else is inherited, and no output is read.
         .env_clear()
         .env("PATH", path)
-        .env("HOME", &policy.folder)
+        .env("HOME", &home)
+        .env("XDG_CACHE_HOME", home.join(".cache"))
+        .env("GIT_CONFIG_GLOBAL", home.join(".gitconfig"))
+        .env("TMPDIR", &policy.tmp)
         .current_dir(&policy.workdir)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -133,22 +142,23 @@ fn on_path(path: &str, tool: &str) -> bool {
 }
 
 /// The report each Agent's worker last wrote, so a worker that keeps ending
-/// does not fill the log with the same four names.
+/// does not fill the log with the same four names. Keyed by Agent: two Agents
+/// compared with each other's report would suppress a real change.
 #[derive(Default)]
 pub struct Reported {
-    last: Mutex<Option<Vec<Report>>>,
+    last: Mutex<HashMap<String, Vec<Report>>>,
 }
 
 impl Reported {
     /// Write the report at Runtime log level: the Agent, each tool's name and
-    /// its result, and nothing else. The same report twice in a row is written
-    /// once.
+    /// its result, and nothing else. The same report twice in a row for the
+    /// same Agent is written once.
     pub fn record(&self, home: &Path, agent: &str, reports: &[Report]) {
         let mut last = self.last.lock().expect("reported");
-        if last.as_deref() == Some(reports) {
+        if last.get(agent).map(Vec::as_slice) == Some(reports) {
             return;
         }
-        *last = Some(reports.to_vec());
+        last.insert(agent.to_string(), reports.to_vec());
         let tools: BTreeMap<&str, &str> = reports
             .iter()
             .map(|report| (report.tool.as_str(), report.outcome.as_str()))

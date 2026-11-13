@@ -100,6 +100,12 @@ pub async fn run_stdio() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
             let Ok(message) = serde_json::from_str::<ToWorker>(&line) else {
+                // The supervisor writes these frames, so one this side cannot
+                // read is its bug, not a reason to end the Agent. Nothing of
+                // the frame is repeated: it can carry a Task's words. The
+                // supervisor inherits this process's stderr, so the line is
+                // visible in the Runtime log.
+                eprintln!("veeloe: worker skipped one unreadable frame from the supervisor");
                 continue;
             };
             if replying.reply(&message) {

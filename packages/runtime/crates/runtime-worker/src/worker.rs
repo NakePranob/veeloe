@@ -130,6 +130,16 @@ pub struct Worker {
 /// How long one write or read waits for the supervisor's answer. The two
 /// processes share a pipe, so this only trips when the supervisor is gone —
 /// and then the Turn fails visibly instead of hanging.
+///
+/// The wait blocks the calling Tokio thread on purpose. The answer does not
+/// need any task of this runtime to run: the supervisor is another process and
+/// answers from its own select loop, and the dedicated stdin reader thread
+/// (`entry.rs`) receives that answer and completes the channel from an ordinary
+/// OS thread, not from a future. So the blocked thread is woken by the pipe
+/// alone, and a `spawn_blocking` hop would add a task without changing when or
+/// whether the wait ends. What it costs is one Tokio worker thread while the
+/// Agent's Turn waits on the log, which is the wait the Turn is in anyway, and
+/// the 30s bound keeps a missing supervisor from holding it forever.
 const LOG_TIMEOUT: Duration = Duration::from_secs(30);
 
 type Written = std::sync::mpsc::Sender<Result<TaskEvent, StoreError>>;

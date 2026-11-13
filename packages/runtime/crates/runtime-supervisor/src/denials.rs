@@ -13,7 +13,7 @@
 //! profile again (ADR 0069).
 //!
 //! A denial line never carries a file's contents or a path, and a refusal is
-//! written once per service however often a tool retries.
+//! written once per Agent and service however often a tool retries.
 
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader};
@@ -117,22 +117,52 @@ fn owner_of(pid: u32, running: &HashMap<u32, String>) -> Option<String> {
     None
 }
 
+/// One line the Runtime log takes for a refusal, and what makes two refusals
+/// the same line.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Line {
+    /// The Agent whose work asked, when the process chain still names one.
+    pub agent: Option<String>,
+    /// The service that was refused: the only thing the Owner acts on.
+    pub service: String,
+    pub level: &'static str,
+    /// What the log holds: the service and the process, never a path.
+    pub fields: serde_json::Value,
+}
+
+impl Line {
+    /// The dedupe key: one line per Agent and service. The Owner's own
+    /// refusals (no Agent) are keyed apart from any Agent's, so a service Agent
+    /// A already needed is still named when Agent B needs it.
+    pub fn key(&self) -> (Option<String>, String) {
+        (self.agent.clone(), self.service.clone())
+    }
+}
+
 /// What to write for one refusal, if anything. `None` when the refusal is
 /// someone else's: another app on the Machine has its own sandbox and its own
 /// denials, and they do not belong in this Runtime's log.
-pub fn line_for(
-    denial: &Denial,
-    running: &HashMap<u32, String>,
-) -> Option<(&'static str, serde_json::Value)> {
+pub fn line_for(denial: &Denial, running: &HashMap<u32, String>) -> Option<Line> {
     let agent = owner_of(denial.pid, running);
-    if agent.is_none() && (running.is_empty() || !TOOL_NAMES.contains(&denial.process.as_str())) {
-        return None;
+    if agent.is_none() {
+        // The pid chain is gone (the tool already exited) or was never a
+        // worker's. A name alone can only stand for this work while exactly one
+        // worker runs: with two, the Owner's own `git` would be counted as one
+        // of theirs.
+        if running.len() != 1 || !TOOL_NAMES.contains(&denial.process.as_str()) {
+            return None;
+        }
     }
     let mut fields = json!({ "service": denial.service, "process": denial.process });
-    if let Some(agent) = agent {
+    if let Some(agent) = &agent {
         fields["agent"] = json!(agent);
     }
-    Some(("warn", fields))
+    Some(Line {
+        agent,
+        service: denial.service.clone(),
+        level: "warn",
+        fields,
+    })
 }
 
 /// The system log reader, alive while the Runtime is. Dropping it stops the
@@ -175,16 +205,17 @@ impl Denials {
                 let Some(denial) = parse(&line) else {
                     continue;
                 };
-                let Some((level, fields)) = line_for(&denial, &running()) else {
+                let Some(line) = line_for(&denial, &running()) else {
                     continue;
                 };
-                // The same service is worth naming once: a tool that retries
-                // must not turn one missing name into a wall of lines. Another
-                // app's refusal is not counted, so our own later one still is.
-                if !seen.lock().expect("seen").insert(denial.service.clone()) {
+                // The same service is worth naming once per Agent: a tool that
+                // retries must not turn one missing name into a wall of lines,
+                // and Agent B's need is not Agent A's. Another app's refusal is
+                // not counted, so our own later one still is.
+                if !seen.lock().expect("seen").insert(line.key()) {
                     continue;
                 }
-                let _ = crate::logs::record(&home, level, "sandbox.denied", fields);
+                let _ = crate::logs::record(&home, line.level, "sandbox.denied", line.fields);
             }
         });
         Some(Self { child, stopping })
@@ -253,11 +284,53 @@ mod tests {
             service: "com.apple.SecurityServer".into(),
         };
         let running = HashMap::from([(7u32, "a1".to_string())]);
-        let (level, fields) = line_for(&denial, &running).expect("a line");
-        assert_eq!(level, "warn");
-        assert_eq!(fields["service"], "com.apple.SecurityServer");
-        assert_eq!(fields["process"], "git");
+        let line = line_for(&denial, &running).expect("a line");
+        assert_eq!(line.level, "warn");
+        assert_eq!(line.fields["service"], "com.apple.SecurityServer");
+        assert_eq!(line.fields["process"], "git");
         // The pid is not written: it says nothing after the process is gone.
-        assert!(fields.get("agent").is_none());
+        assert!(line.fields.get("agent").is_none());
+    }
+
+    #[test]
+    fn a_name_alone_means_this_work_only_while_one_worker_runs() {
+        let denial = Denial {
+            process: "git".into(),
+            pid: 42,
+            service: "com.apple.SecurityServer".into(),
+        };
+        // Two workers: the name could be either one's command, or the Owner's
+        // own `git`, so the refusal is not attributed to an Agent.
+        let two = HashMap::from([(7u32, "a1".to_string()), (8u32, "a2".to_string())]);
+        assert!(line_for(&denial, &two).is_none());
+    }
+
+    #[test]
+    fn the_same_service_is_a_separate_line_for_each_agent() {
+        let denial = Denial {
+            process: "git".into(),
+            pid: 42,
+            service: "com.apple.SecurityServer".into(),
+        };
+        let first =
+            line_for(&denial, &HashMap::from([(42u32, "a1".to_string())])).expect("a line for a1");
+        let other = Denial {
+            pid: 43,
+            ..denial.clone()
+        };
+        let second =
+            line_for(&other, &HashMap::from([(43u32, "a2".to_string())])).expect("a line for a2");
+        assert_eq!(first.agent.as_deref(), Some("a1"));
+        assert_eq!(second.agent.as_deref(), Some("a2"));
+        // The reader dedupes on this key, so a1's line cannot swallow a2's.
+        assert_ne!(first.key(), second.key());
+        // The same Agent asking again for the same service is one line.
+        let again = Denial {
+            pid: 44,
+            ..denial.clone()
+        };
+        let repeat = line_for(&again, &HashMap::from([(44u32, "a1".to_string())]))
+            .expect("a second line for a1");
+        assert_eq!(first.key(), repeat.key());
     }
 }

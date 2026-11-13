@@ -52,6 +52,34 @@ fn the_report_holds_names_and_results_and_nothing_else() {
     assert_eq!(logs::recent(home.path()).expect("recent").len(), 2);
 }
 
+#[test]
+fn one_agents_report_does_not_suppress_another_agents() {
+    let home = tempdir().expect("home");
+    let reported = Reported::default();
+    let reports = vec![Report {
+        tool: "git".into(),
+        outcome: Outcome::Ok,
+    }];
+
+    reported.record(home.path(), "a1", &reports);
+    // The same four answers for a second Agent are its own first report, not a
+    // repeat of a1's, and the log keeps both.
+    reported.record(home.path(), "a2", &reports);
+    let lines = logs::recent(home.path()).expect("recent");
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    let agents: Vec<String> = lines
+        .iter()
+        .map(|line| {
+            let value: serde_json::Value = serde_json::from_str(line).expect("json");
+            value["fields"]["agent"]
+                .as_str()
+                .expect("agent")
+                .to_string()
+        })
+        .collect();
+    assert_eq!(agents, ["a1", "a2"]);
+}
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod running {
     use std::fs;
