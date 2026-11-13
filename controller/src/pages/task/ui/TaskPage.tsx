@@ -156,6 +156,7 @@ function placeholderAgent(id: string, machineId: string | undefined, name: strin
     usage_tokens: null,
     allowlist: null,
     approval_timeout_s: null,
+    egress: "[]",
   };
 }
 

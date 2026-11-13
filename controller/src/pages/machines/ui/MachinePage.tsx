@@ -119,7 +119,7 @@ export function MachinePage() {
         {status.providerError && <Row icon="warning" iconColor="orange" title={t("provider.failed")} detail={describeError({ code: status.providerError })} />}
       </Section>
 
-      <EgressSection machine={machine} agentNames={agents.map((agent) => agent.name)} />
+      <EgressSection machine={machine} agents={agents} />
     </Screen>
   );
 }

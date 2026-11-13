@@ -567,12 +567,13 @@ export function createMachineLinks({
     },
 
     /**
-     * The Machine's whole new Egress. The page asks for a fresh authentication
-     * first (ADR 0012); the Machine answers with `agent.listed`, which is what
-     * changes the list shown. False when the Hub is not connected and nothing went.
+     * A new Egress: the Machine's whole list without `agent`, or one Agent's list
+     * with it (`agent-egress-ui`). The page asks for a fresh authentication first
+     * (ADR 0012); the Machine answers with `agent.listed`, which is what changes
+     * the list shown. False when the Hub is not connected and nothing went.
      */
-    setEgress(machine: Machine, egress: string[]) {
-      return sendTo(machine, "other", { type: "egress.set", body: { egress } }) !== null;
+    setEgress(machine: Machine, egress: string[], agent?: string) {
+      return sendTo(machine, "other", { type: "egress.set", body: agent ? { egress, agent } : { egress } }) !== null;
     },
 
     /**
