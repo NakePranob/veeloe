@@ -365,17 +365,25 @@ async fn session(
     // The port range the wrap just reserved for this Agent, read back from the
     // file so a restart hands out the same one (ADR 0069). Every command sees
     // `PORT` and the whole list, so a dev server started by a Task keeps its
-    // address across Turns and finds the database beside it.
-    let ports = crate::ports::Ports::open(&inner.home)
-        .and_then(|ports| ports.range(&agent.id, None))
-        .map_err(|error| {
+    // address across Turns and finds the database beside it. This reads only:
+    // `rules()` is the one place that allocates, with the proxy's port
+    // excluded, so a second allocation here could only reserve a worse range.
+    let ports = match crate::ports::Ports::open(&inner.home) {
+        Ok(ports) => ports.existing(&agent.id),
+        Err(error) => {
             (inner.log)(&format!(
                 "agent {} runs without localhost ports: {error}",
                 agent.id
             ));
-            error
-        })
-        .ok();
+            None
+        }
+    };
+    if ports.is_none() {
+        (inner.log)(&format!(
+            "agent {} runs without localhost ports: no range is reserved",
+            agent.id
+        ));
+    }
     let mut command = Command::new(program);
     command.args(rest);
     command

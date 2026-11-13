@@ -23,7 +23,7 @@ mod running {
     use std::fs;
     use std::net::{TcpListener, TcpStream};
     use std::path::{Path, PathBuf};
-    use std::process::Command;
+    use std::process::{Child, Command, Stdio};
 
     use tempfile::{tempdir, TempDir};
     use veeloe_runtime_core::sandbox::{Policy, Sandbox};
@@ -104,7 +104,9 @@ mod running {
         fs::write(Path::new(&home.policy.workdir).join(name), text).expect("script");
     }
 
-    fn run(home: &Home, command: &str) -> std::process::Output {
+    /// Starts a command under the rules without waiting for it, so two of them
+    /// can hold something at the same time.
+    fn spawn(home: &Home, command: &str) -> Child {
         let policy = &home.policy;
         let argv = Sandbox::new(policy.clone()).wrap(&[
             "/bin/bash".to_string(),
@@ -116,7 +118,16 @@ mod running {
             .args(&argv[1..])
             .env("HOME", Path::new(&policy.folder).join(".home"))
             .current_dir(&policy.workdir)
-            .output()
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("run under the sandbox")
+    }
+
+    fn run(home: &Home, command: &str) -> std::process::Output {
+        spawn(home, command)
+            .wait_with_output()
             .expect("run under the sandbox")
     }
 
@@ -304,6 +315,66 @@ mod running {
         let answer = allowed(&home, "python3 ask.py");
         answering.join().expect("the answer");
         assert!(answer.contains("pong:ping"), "{answer}");
+    }
+
+    /// Issue #42: two Linux Agents bind the same port number at the same
+    /// moment, each in its own network namespace, and both keep it. That is
+    /// what lets two Agents run the same dev server on the same address
+    /// without one of them losing the port (ADR 0069).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn two_linux_agents_bind_the_same_port_in_their_own_namespaces() {
+        let start = free_range();
+        let port = start;
+        // The Machine's own listener on the same number: if either namespace
+        // were the Machine's, its bind below would fail against this.
+        let machine = TcpListener::bind(("127.0.0.1", port)).expect("the Machine's listener");
+        let script = [
+            "import socket, sys, time",
+            "port = int(sys.argv[1])",
+            "server = socket.socket()",
+            "server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)",
+            "server.bind((\"127.0.0.1\", port))",
+            "server.listen(1)",
+            "client = socket.create_connection((\"127.0.0.1\", port), timeout=2)",
+            "client.sendall(b\"ping\")",
+            "conn, _ = server.accept()",
+            "print(\"bound\", port, conn.recv(4).decode(), flush=True)",
+            // Long enough for the other Agent to bind its own namespace while
+            // this one still holds the port.
+            "time.sleep(2)",
+            "conn.close()",
+        ]
+        .join("\n");
+        let first = with_ports(home(), start);
+        let second = with_ports(home(), start);
+        write_script(&first, "hold.py", &script);
+        write_script(&second, "hold.py", &script);
+        // Both are started before either is waited on: a sequential run would
+        // prove nothing about two namespaces at once.
+        let one = spawn(&first, &format!("python3 hold.py {port}"));
+        let two = spawn(&second, &format!("python3 hold.py {port}"));
+        for (which, child) in [("first", one), ("second", two)] {
+            let out = child.wait_with_output().expect("the Agent's command");
+            assert!(
+                out.status.success(),
+                "the {which} Agent could not bind port {port}: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            assert!(
+                stdout.contains(&format!("bound {port} ping")),
+                "the {which} Agent did not serve on port {port}: {stdout}"
+            );
+        }
+        // The Machine's listener never saw a connection from either namespace.
+        machine
+            .set_nonblocking(true)
+            .expect("non-blocking listener");
+        assert!(
+            machine.accept().is_err(),
+            "a namespace reached the Machine's listener"
+        );
     }
 
     /// A Stop or a timeout ends a command with a signal, so the command it
