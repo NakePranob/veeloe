@@ -15,7 +15,7 @@
 
 ## 3. ตรวจทั้งระบบ
 
-- [ ] 3.1 `cargo test --workspace -- --test-threads=1` ผ่านบน macOS
-- [ ] 3.2 test ที่มี `cfg(linux)` และ CI job `Runtime and Protocol (Rust)` ผ่านบน Linux
-- [ ] 3.3 `bun test` (e2e) ผ่านทั้ง macOS และ Linux
-- [ ] 3.4 ตรวจ manual ด้วย dev stack: Agent รัน dev server บน `PORT`, ต่อ `localhost`, และ `curl` โดเมนใน Egress
+- [x] 3.1 `cargo test --workspace -- --test-threads=1` ผ่านบน macOS
+- [x] 3.2 test ที่มี `cfg(linux)` และ CI job `Runtime and Protocol (Rust)` ผ่านบน Linux
+- [x] 3.3 `bun test` (e2e) ผ่านทั้ง macOS และ Linux
+- [x] 3.4 ตรวจ manual ด้วย dev stack: Agent รัน dev server บน `PORT`, ต่อ `localhost`, และ `curl` โดเมนใน Egress
