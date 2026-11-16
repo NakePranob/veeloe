@@ -1,29 +1,30 @@
-//! The Task slices: a Member's words, a sync, a list and a Stop, each routed to
-//! the Agent's worker, and every answer signed back to the Member. Ported from
-//! `packages/runtime-legacy/src/supervisor/{task-message,task-sync,task-list,task-stop}`
-//! and the outbox in `supervisor/index.ts`.
+//! Every message a Member sends, routed by type to the module that answers it
+//! (`agent_config`, `task_message`, `usage_list`, ...), and the outbox that
+//! signs each answer back to the Member. The outbox is ported from
+//! `supervisor/index.ts`.
 
 use std::path::Path;
 use std::sync::Mutex;
 
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use veeloe_protocol::base64url::to_base64url;
 use veeloe_protocol::crypto::public_key_of;
 use veeloe_protocol::signer::{Outgoing, Signer};
-use veeloe_runtime_core::{FromWorker, ToWorker};
+use veeloe_runtime_core::FromWorker;
 
 use crate::agents::AgentRegistry;
 use crate::approval::Approvals;
-use crate::egress::{is_valid_egress, Egress};
+use crate::egress::Egress;
 use crate::hub_link::HubSender;
 use crate::llm::HttpClient;
-use crate::models;
 use crate::providers::Provider;
 use crate::proxy::Proxies;
 use crate::trust::{FileSeenSequences, Trust, TrustError};
-use crate::uploads::UploadError;
 use crate::workers::Workers;
+use crate::{
+    agent_config, egress_set, file_transfer, machine_status, memory_get, provider_add,
+    push_register, task_message, usage_list,
+};
 
 /// How many events one `task.events` frame carries.
 ///
@@ -146,7 +147,7 @@ pub fn agents_listed(registry: &AgentRegistry, providers: &[Value]) -> Value {
     json!({ "agents": agents, "trash": trash, "providers": providers, "egress": union })
 }
 
-fn agent_of(body: &Value) -> &str {
+pub(crate) fn agent_of(body: &Value) -> &str {
     body.get("agent")
         .and_then(Value::as_str)
         .unwrap_or_default()
@@ -180,8 +181,7 @@ pub struct Machine<'a> {
     pub http: &'a dyn HttpClient,
 }
 
-/// `agent.*`, then `task.message`, `task.sync`, `task.stop` and `task.list`,
-/// each to the Agent's worker (ADR 0021).
+/// Routes each message type to its module (ADR 0021).
 pub async fn dispatch(
     machine: &Machine<'_>,
     outbox: &dyn Outbox,
@@ -189,749 +189,31 @@ pub async fn dispatch(
     type_: &str,
     body: &Value,
 ) {
-    let registry = machine.registry;
-    let workers = machine.workers;
-    // A domain Approval is answered here, not by the worker that never asked
-    // it: the proxy wrote it, and its connection waits on this answer (issue
-    // #44). A request the worker holds is not ours and goes on to the worker.
-    if type_ == "approval.answer" {
-        if let Some(approvals) = machine.approvals {
-            if approvals.answer(from, body, machine.trust, outbox) {
-                return;
-            }
-        }
-    }
-    let listed = || async {
-        // A list is the only clock the trash needs: no timer, and a Machine that
-        // was off past the 30 days purges as soon as it is asked (`agent-trash`).
-        if let Ok(purged) = registry.purge_expired(crate::usage::now_ms()) {
-            if purged > 0 {
-                let _ = crate::logs::record(
-                    registry.home(),
-                    "warn",
-                    "agent.purge",
-                    json!({ "agents": purged }),
-                );
-            }
-        }
-        agents_listed(
-            registry,
-            &models::info(machine.providers, machine.http).await,
-        )
-    };
-    if type_ == "egress.set" {
-        // Changing an Agent's Egress is a Manage action (ADR 0029, 0010). In
-        // v0.1 that is being an Owner whose key signed: there is no second
-        // Member and no Grant yet, so refusing a non-Owner is the whole check.
-        let Some(trust) = machine.trust else {
-            return outbox.error(from, "egress.forbidden");
-        };
-        if !trust.manages(&from.member, from.key.as_deref()) {
-            return outbox.error(from, "egress.forbidden");
-        }
-        let Some(egress) = machine.egress else {
-            return outbox.error(from, "egress.unavailable");
-        };
-        // Every entry must be a domain. Dropping the ones that are not would
-        // change every Agent's way out to a list shorter than the Member sent,
-        // so one bad entry refuses the whole request (issue #43 review).
-        let Some(domains) = body
-            .get("egress")
-            .and_then(Value::as_array)
-            .and_then(|entries| {
-                entries
-                    .iter()
-                    .map(|entry| entry.as_str().map(str::to_string))
-                    .collect::<Option<Vec<_>>>()
-            })
-        else {
-            return outbox.error(from, "egress.invalid_domain");
-        };
-        if !is_valid_egress(&domains) {
-            return outbox.error(from, "egress.invalid_domain");
-        }
-        // With `agent`, only that Agent's list changes. Without it, the legacy
-        // behaviour: every Agent's, until the Controller has a per-Agent screen.
-        // An `agent` that is present but not a string names no Agent, so reading
-        // it as absent would broadcast a request that meant one Agent: refuse it
-        // instead (issue #43 review).
-        let target = match body.get("agent") {
-            None => None,
-            Some(Value::String(agent)) => Some(agent.as_str()),
-            Some(_) => return outbox.error(from, "egress.invalid_domain"),
-        };
-        let changed = match target {
-            Some(agent) => {
-                if registry.get(agent).ok().flatten().is_none() {
-                    return outbox.error(from, "agent.unknown");
-                }
-                egress.set_agent(agent, domains)
-            }
-            None => egress.set_all(domains),
-        };
-        match changed {
-            Ok(Some(_)) => {
-                outbox.to_member(&from.member, "agent.listed", listed().await, None);
-            }
-            // An Agent that vanished between the check and the write is still
-            // an unknown Agent, not a bad list.
-            Ok(None) => {
-                return outbox.error(
-                    from,
-                    if target.is_some() {
-                        "agent.unknown"
-                    } else {
-                        "egress.invalid_domain"
-                    },
-                )
-            }
-            Err(_) => return outbox.error(from, "egress.unavailable"),
-        }
-        return;
-    }
-    if type_ == "push.register" {
-        let (Some(tokens), Some(device)) = (machine.push_tokens, from.key.as_deref()) else {
-            return outbox.error(from, "push.unavailable");
-        };
-        let (Some(token), language) = (
-            body.get("token").and_then(Value::as_str),
-            body.get("language").and_then(Value::as_str).unwrap_or("en"),
-        ) else {
-            return outbox.error(from, "push.invalid");
-        };
-        match tokens.register(
-            &from.member,
-            device,
-            token,
-            language,
-            crate::usage::now_ms() as u64,
-        ) {
-            Ok(held) => outbox.to_member(
-                &from.member,
-                "push.registered",
-                json!({ "token": held.token }),
-                None,
-            ),
-            Err(_) => outbox.error(from, "push.invalid"),
-        }
-        return;
-    }
-    if type_ == "push.unregister" {
-        let (Some(tokens), Some(device)) = (machine.push_tokens, from.key.as_deref()) else {
-            return outbox.error(from, "push.unavailable");
-        };
-        match tokens.unregister(device) {
-            Ok(_) => outbox.to_member(&from.member, "push.unregistered", json!({}), None),
-            Err(_) => outbox.error(from, "push.invalid"),
-        }
-        return;
-    }
-    if type_ == "provider.add" {
-        let Some(secret_key) = machine.secret_key else {
-            return outbox.error(from, "provider.unavailable");
-        };
-        let (Some(name), Some(url), Some(key)) = (
-            body.get("name").and_then(Value::as_str),
-            body.get("url").and_then(Value::as_str),
-            body.get("key").and_then(Value::as_str),
-        ) else {
-            return outbox.error(from, "provider.invalid");
-        };
-        let plaintext = match veeloe_protocol::sealed::open(secret_key, key) {
-            Ok(plaintext) => plaintext,
-            Err(_) => return outbox.error(from, "provider.invalid"),
-        };
-        let key = match String::from_utf8(plaintext) {
-            Ok(key) => key,
-            Err(_) => return outbox.error(from, "provider.invalid"),
-        };
-        let preset = body
-            .get("preset")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        let (auth, _) =
-            match crate::models::detect_auth(url, &key, preset.as_deref(), machine.http).await {
-                Ok(found) => found,
-                Err(code) => return outbox.error(from, code),
-            };
-        let mut providers = machine.providers.to_vec();
-        if providers.iter().any(|provider| provider.name == name) {
-            return outbox.error(from, "provider.exists");
-        }
-        providers.push(crate::providers::Provider {
-            name: name.to_string(),
-            url: url.to_string(),
-            key,
-            auth,
-            preset,
-        });
-        if crate::providers::save_providers(registry.home(), &providers).is_err() {
-            return outbox.error(from, "provider.invalid");
-        }
-        let models = crate::models::info(&providers, machine.http).await;
-        outbox.to_member(
-            &from.member,
-            "agent.listed",
-            crate::tasks::agents_listed(registry, &models),
-            None,
-        );
-        return;
-    }
-    if type_ == "file.chunk" {
-        let Some(uploads) = machine.uploads else {
-            return outbox.error(from, "attachment.unavailable");
-        };
-        let (Some(file), Some(index), Some(total), Some(data)) = (
-            body.get("file").and_then(Value::as_str),
-            body.get("index").and_then(Value::as_u64),
-            body.get("total").and_then(Value::as_u64),
-            body.get("data").and_then(Value::as_str),
-        ) else {
-            return outbox.error(from, "attachment.invalid");
-        };
-        let Ok(bytes) = veeloe_protocol::base64url::from_base64url(data) else {
-            return outbox.error(from, "attachment.invalid");
-        };
-        match uploads.add(file, index as usize, total as usize, &bytes) {
-            Ok(_) => {}
-            Err(UploadError::TooLarge) => return outbox.error(from, "attachment.too_large"),
-            Err(_) => return outbox.error(from, "attachment.invalid"),
-        }
-        return;
-    }
-    if type_ == "file.get" {
-        let Ok(Some(agent)) = registry.get(agent_of(body)) else {
-            return outbox.error(from, "agent.unknown");
-        };
-        let Some(task) = from.task.as_deref() else {
-            return outbox.error(from, "task.unknown");
-        };
-        let (Some(path), Some(hash)) = (
-            body.get("path").and_then(Value::as_str),
-            body.get("hash").and_then(Value::as_str),
-        ) else {
-            return outbox.error(from, "attachment.invalid");
-        };
-        let Ok(workdir) = crate::agents::agent_dir(registry.home(), &agent.id) else {
-            return outbox.error(from, "agent.unavailable");
-        };
-        let Ok(real) = std::fs::canonicalize(path) else {
-            return outbox.error(from, "attachment.missing");
-        };
-        // The path the Agent offered is already real; resolve the folder too, or a
-        // symlinked home (`/var` on macOS) would fail a prefix that is really inside it.
-        let Ok(root) = std::fs::canonicalize(workdir.join("workdir")) else {
-            return outbox.error(from, "agent.unavailable");
-        };
-        if !real.starts_with(root) {
-            return outbox.error(from, "attachment.invalid");
-        }
-        let Ok(bytes) = std::fs::read(&real) else {
-            return outbox.error(from, "attachment.missing");
-        };
-        if to_base64url(&Sha256::digest(&bytes)) != hash {
-            return outbox.error(from, "attachment.invalid");
-        }
-        let chunk = 256 * 1024;
-        let total = std::cmp::max(1, bytes.len().div_ceil(chunk));
-        for index in 0..total {
-            let start = index * chunk;
-            let end = std::cmp::min(start + chunk, bytes.len());
-            outbox.to_member(
-                &from.member,
-                "file.chunk",
-                json!({
-                    "file": hash,
-                    "name": real.file_name().and_then(|name| name.to_str()).unwrap_or("file"),
-                    "index": index,
-                    "total": total,
-                    "data": veeloe_protocol::base64url::to_base64url(&bytes[start..end]),
-                }),
-                Some(task),
-            );
-        }
-        return;
-    }
-    if type_ == "machine.status" {
-        // A deleted Agent's Budget is not part of today's limit (`agent-trash`).
-        let agents: Vec<crate::agents::Agent> = registry
-            .all()
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|agent| !agent.deleted())
-            .collect();
-        let today = crate::usage::budget_day(crate::usage::now_ms());
-        let (used, limit) = machine.budgets.map_or((0, 0), |budgets| {
-            let ids: Vec<String> = agents.iter().map(|agent| agent.id.clone()).collect();
-            let used = budgets
-                .range(&ids, &today, &today)
-                .unwrap_or_default()
-                .iter()
-                .flat_map(|entry| entry.days.iter())
-                .map(|day| day.tokens)
-                .sum();
-            let limit = agents.iter().filter_map(|agent| agent.budget).sum();
-            (used, limit)
-        });
-        outbox.to_member(
-            &from.member,
-            "machine.status",
-            json!({
-                "version": env!("CARGO_PKG_VERSION"),
-                "features": ["logs", "service", "delete-agent"],
-                "lastError": Value::Null,
-                "diskFreeBytes": disk_free_bytes(),
-                "budgetToday": { "usedTokens": used, "limitTokens": limit },
-            }),
-            None,
-        );
-        return;
-    }
-    if type_ == "usage.list" {
-        let days = body.get("days").and_then(Value::as_u64).unwrap_or(0);
-        if !(1..=90).contains(&days) {
-            return outbox.error(from, "usage.invalid_range");
-        }
-        let Some(budgets) = machine.budgets else {
-            return outbox.error(from, "usage.invalid_range");
-        };
-        let to = crate::usage::budget_day(crate::usage::now_ms());
-        let start = crate::usage::shift_day(&to, -((days as i64) - 1));
-        let agents: Vec<String> = match body.get("agent").and_then(Value::as_str) {
-            Some(id) => {
-                if registry.get(id).ok().flatten().is_none() {
-                    return outbox.error(from, "agent.unknown");
-                }
-                vec![id.to_string()]
-            }
-            None => registry
-                .all()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|agent| agent.id)
-                .collect(),
-        };
-        let listed = budgets.range(&agents, &start, &to).unwrap_or_default();
-        outbox.to_member(
-            &from.member,
-            "usage.listed",
-            json!({
-                "request": body.get("request").and_then(Value::as_str).unwrap_or_default(),
-                "from": start,
-                "to": to,
-                "agents": listed,
-            }),
-            None,
-        );
-        return;
-    }
-    if type_ == "memory.get" {
-        let Some(id) = body.get("agent").and_then(Value::as_str) else {
-            return outbox.error(from, "agent.unknown");
-        };
-        if registry.get(id).ok().flatten().is_none() {
-            return outbox.error(from, "agent.unknown");
-        }
-        // Read-only: the Workdir is not created, and an Agent in the trash reads
-        // like `veeloe memory` reads it (`agent-memory-page`).
-        let Ok(dir) = crate::agents::agent_root(registry.home(), id) else {
-            return outbox.error(from, "agent.unknown");
-        };
-        let memory = veeloe_runtime_core::memory::read_memory(&dir.join("workdir"));
-        outbox.to_member(
-            &from.member,
-            "memory.got",
-            json!({
-                "request": body.get("request").and_then(Value::as_str).unwrap_or_default(),
-                "agent": id,
-                "exists": memory.exists,
-                "chars": memory.chars,
-                "text": memory.text,
-            }),
-            None,
-        );
-        return;
-    }
-    if type_ == "agent.list" {
-        outbox.to_member(&from.member, "agent.listed", listed().await, None);
-        return;
-    }
-    if type_ == "agent.delete" {
-        let Some(id) = body.get("id").and_then(Value::as_str) else {
-            return outbox.error(from, "agent.unknown");
-        };
-        let Some(existing) = registry.get(id).ok().flatten() else {
-            return outbox.error(from, "agent.unknown");
-        };
-        // Deleting twice is not a second deletion: it must not move the 30 days.
-        if existing.deleted() {
-            return outbox.to_member(&from.member, "agent.listed", listed().await, None);
-        }
-        // Stop the worker first: the registry entry is what starts a new one.
-        workers.stop(id);
-        // Its listener goes with it, so nothing answers for an Agent in the
-        // trash (ADR 0029, issue #43).
-        if let Some(proxies) = machine.proxies {
-            proxies.stop(id);
-        }
-        if registry.soft_delete(id, crate::usage::now_ms()).is_err() {
-            return outbox.error(from, "agent.unknown");
-        }
-        if let Some(routes) = machine.routes {
-            let _ = routes.forget(id);
-        }
-        let _ = crate::logs::record(
-            registry.home(),
-            "info",
-            "agent.trash",
-            json!({ "agent": id }),
-        );
-        outbox.to_member(&from.member, "agent.listed", listed().await, None);
-        return;
-    }
-    if type_ == "agent.restore" {
-        let Some(id) = body.get("id").and_then(Value::as_str) else {
-            return outbox.error(from, "agent.unknown");
-        };
-        let _ = registry.purge_expired(crate::usage::now_ms());
-        let Some(existing) = registry.get(id).ok().flatten() else {
-            return outbox.error(from, "agent.unknown");
-        };
-        // Restoring an Agent that is not in the trash says so by doing nothing;
-        // a Controller that retries after a lost answer gets the same list.
-        if !existing.deleted() {
-            return outbox.to_member(&from.member, "agent.listed", listed().await, None);
-        }
-        if registry.restore(id).is_err() {
-            return outbox.error(from, "agent.unknown");
-        }
-        if let Ok(Some(agent)) = registry.get(id) {
-            if let Some(proxies) = machine.proxies {
-                if let Err(error) = proxies.ensure(&agent.id).await {
-                    let _ = crate::logs::record(
-                        registry.home(),
-                        "warn",
-                        "agent.proxy_failed",
-                        json!({ "agent": agent.id.clone(), "reason": error.to_string() }),
-                    );
-                }
-            }
-            workers.start(&agent);
-        }
-        let _ = crate::logs::record(
-            registry.home(),
-            "info",
-            "agent.restore",
-            json!({ "agent": id }),
-        );
-        outbox.to_member(&from.member, "agent.listed", listed().await, None);
-        return;
-    }
-    if type_ == "agent.create" || type_ == "agent.update" {
-        let Some(id) = body.get("id").and_then(Value::as_str) else {
-            return outbox.error(from, "agent.unknown");
-        };
-        let existing = registry.get(id).ok().flatten();
-        if type_ == "agent.create" && existing.is_some() {
-            return outbox.error(from, "agent.exists");
-        }
-        // Settings of an Agent in the trash stay as they were until it is restored.
-        if type_ == "agent.update" && existing.as_ref().is_some_and(|agent| agent.deleted()) {
-            return outbox.error(from, "agent.unknown");
-        }
-        let base = existing.unwrap_or_else(|| crate::agents::Agent {
-            id: id.to_string(),
-            name: id.to_string(),
-            provider: String::new(),
-            model: String::new(),
-            character: None,
-            allowlist: Vec::new(),
-            // A new Agent starts with no way out, not the list it was created
-            // beside: only the migration copies an old Machine list (#43).
-            egress: Vec::new(),
-            approval_timeout_s: 3_600,
-            budget: None,
-            deleted_at: None,
-        });
-        let text = |name: &str, fallback: &str| {
-            body.get(name)
-                .and_then(Value::as_str)
-                .map(str::to_string)
-                .unwrap_or_else(|| fallback.to_string())
-        };
-        let next = crate::agents::Agent {
-            id: id.to_string(),
-            name: text("name", &base.name),
-            provider: text("provider", &base.provider),
-            model: text("model", &base.model),
-            character: body.get("character").cloned().or(base.character),
-            allowlist: body
-                .get("allowlist")
-                .and_then(Value::as_array)
-                .map(|entries| {
-                    entries
-                        .iter()
-                        .filter_map(|entry| entry.as_str().map(str::to_string))
-                        .collect()
-                })
-                .unwrap_or(base.allowlist),
-            // Egress changes only through `egress.set`, which checks Manage and
-            // knows about the Controller's legacy list (issue #43).
-            egress: base.egress,
-            approval_timeout_s: body
-                .get("approvalTimeoutS")
-                .and_then(Value::as_u64)
-                .unwrap_or(base.approval_timeout_s),
-            budget: body.get("budget").and_then(Value::as_u64).or(base.budget),
-            deleted_at: base.deleted_at,
-        };
-        // A new Agent must name a Provider on this Machine and a model that
-        // Provider lists; an update may move either, so both are checked again.
-        let Some(provider) = machine
-            .providers
-            .iter()
-            .find(|provider| provider.name == next.provider)
-        else {
-            return outbox.error(from, "agent.provider_unknown");
-        };
-        let known = models::list(provider, machine.http)
-            .await
-            .unwrap_or_default()
-            .iter()
-            .any(|model| model["id"] == next.model);
-        if !known {
-            return outbox.error(from, "agent.provider_unknown");
-        }
-        let saved = if type_ == "agent.create" {
-            registry.add(&next)
-        } else {
-            registry.replace(&next)
-        };
-        if saved.is_err() {
-            return outbox.error(from, "agent.unknown");
-        }
-        if type_ == "agent.create" {
-            // An id that was used, purged and used again starts empty, not with
-            // what the old Agent's row held (issue #43).
-            if let Some(egress) = machine.egress {
-                egress.forget(&next.id);
-            }
-            // Its own listener before its worker: a worker with no way out is
-            // not started at all (issue #43).
-            if let Some(proxies) = machine.proxies {
-                if let Err(error) = proxies.ensure(&next.id).await {
-                    let _ = crate::logs::record(
-                        registry.home(),
-                        "warn",
-                        "agent.proxy_failed",
-                        json!({ "agent": next.id.clone(), "reason": error.to_string() }),
-                    );
-                }
-            }
-            workers.start(&next);
-        } else {
-            workers.rename(&next);
-        }
-        let _ = crate::logs::record(
-            registry.home(),
-            "info",
-            if type_ == "agent.create" {
-                "agent.create"
-            } else {
-                "agent.update"
-            },
-            json!({ "agent": id }),
-        );
-        outbox.to_member(&from.member, "agent.listed", listed().await, None);
-        return;
-    }
-    if type_ == "task.list" {
-        // Each Agent's worker answers with the Tasks this Member started, and
-        // each answer goes back as its own `task.listed`. An Agent with no worker
-        // right now says nothing, and the Controller asks again on its next connect.
-        if let Ok(agents) = registry.all() {
-            for agent in agents {
-                workers.send(
-                    &agent.id,
-                    ToWorker::List {
-                        member: from.member.clone(),
-                    },
-                );
-            }
-        }
-        return;
-    }
-
-    let Ok(Some(agent)) = registry.get(agent_of(body)) else {
-        return outbox.error(from, "agent.unknown");
-    };
-    // An Agent in the trash has no worker, and saying so is not an outage.
-    if agent.deleted() {
-        return outbox.error(from, "agent.unknown");
-    }
-    let Some(task) = from.task.clone() else {
-        return outbox.error(from, "task.unknown");
-    };
-
     match type_ {
-        "task.message" => {
-            if let Some(budgets) = machine.budgets {
-                if budgets
-                    .exhausted(&agent, crate::usage::now_ms())
-                    .unwrap_or(false)
-                {
-                    return outbox.error(from, "budget.exhausted");
-                }
-            }
-            let (Some(id), Some(text)) = (
-                body.get("id").and_then(Value::as_str),
-                body.get("text").and_then(Value::as_str),
-            ) else {
-                return outbox.error(from, "task.unknown");
-            };
-            let mut text = text.to_string();
-            if let Some(attachments) = body.get("attachments").and_then(Value::as_array) {
-                let Some(uploads) = machine.uploads else {
-                    return outbox.error(from, "attachment.unavailable");
-                };
-                let workdir = match crate::agents::agent_dir(registry.home(), &agent.id) {
-                    Ok(dir) => dir.join("workdir"),
-                    Err(_) => return outbox.error(from, "agent.unavailable"),
-                };
-                let mut lines = Vec::new();
-                for attachment in attachments {
-                    let (Some(name), Some(size), Some(hash)) = (
-                        attachment.get("name").and_then(Value::as_str),
-                        attachment.get("size").and_then(Value::as_u64),
-                        attachment.get("hash").and_then(Value::as_str),
-                    ) else {
-                        return outbox.error(from, "attachment.invalid");
-                    };
-                    let Some(bytes) = uploads.take(hash) else {
-                        return outbox.error(from, "attachment.missing");
-                    };
-                    if bytes.len() as u64 != size {
-                        return outbox.error(from, "attachment.invalid");
-                    }
-                    let Ok(path) = uploads.place(&bytes, &workdir, &task, name) else {
-                        return outbox.error(from, "attachment.invalid");
-                    };
-                    lines.push(format!("- {} ({})", name, path.display()));
-                }
-                if !lines.is_empty() {
-                    text.push_str("\n\nAttached files on this Machine:\n");
-                    text.push_str(&lines.join("\n"));
-                }
-            }
-            let sent = workers.send(
-                &agent.id,
-                ToWorker::Message {
-                    task: task.clone(),
-                    id: id.to_string(),
-                    member: from.member.clone(),
-                    text,
-                    reference: from.reference.clone(),
-                },
-            );
-            if !sent {
-                outbox.error(from, "agent.unavailable");
-            } else {
-                let _ = crate::logs::record(
-                    registry.home(),
-                    "info",
-                    "task.message",
-                    json!({ "agent": agent.id, "task": task }),
-                );
-            }
+        "egress.set" => egress_set::set(machine, outbox, from, body).await,
+        "push.register" => push_register::register(machine, outbox, from, body),
+        "push.unregister" => push_register::unregister(machine, outbox, from, body),
+        "provider.add" => provider_add::add(machine, outbox, from, body).await,
+        "file.chunk" => file_transfer::chunk(machine, outbox, from, body),
+        "file.get" => file_transfer::get(machine, outbox, from, body),
+        "machine.status" => machine_status::status(machine, outbox, from, body),
+        "usage.list" => usage_list::list(machine, outbox, from, body),
+        "memory.get" => memory_get::get(machine, outbox, from, body),
+        "agent.list" => agent_config::list(machine, outbox, from, body).await,
+        "agent.delete" => agent_config::delete(machine, outbox, from, body).await,
+        "agent.restore" => agent_config::restore(machine, outbox, from, body).await,
+        "agent.create" => agent_config::create(machine, outbox, from, body).await,
+        "agent.update" => agent_config::update(machine, outbox, from, body).await,
+        "task.list" => task_message::list(machine, outbox, from, body),
+        "task.message" => task_message::message(machine, outbox, from, body),
+        "task.sync" => task_message::sync(machine, outbox, from, body),
+        "task.stop" => task_message::stop(machine, outbox, from, body),
+        "approval.answer" => task_message::approval_answer(machine, outbox, from, body),
+        // An unknown type still names its Agent and Task, and hears
+        // `agent.unknown` or `task.unknown` when either is missing.
+        _ => {
+            let _ = task_message::target(machine, outbox, from, body);
         }
-        "task.sync" => {
-            let after = body.get("after").and_then(Value::as_i64).unwrap_or(0);
-            let sent = workers.send(
-                &agent.id,
-                ToWorker::Sync {
-                    task,
-                    after,
-                    member: from.member.clone(),
-                    reference: from.reference.clone(),
-                },
-            );
-            if !sent {
-                outbox.error(from, "agent.unavailable");
-            }
-        }
-        "task.stop" => {
-            let Some(id) = body.get("id").and_then(Value::as_str) else {
-                return outbox.error(from, "task.unknown");
-            };
-            let sent = workers.send(
-                &agent.id,
-                ToWorker::Stop {
-                    task,
-                    id: id.to_string(),
-                    member: from.member.clone(),
-                    reference: from.reference.clone(),
-                },
-            );
-            if !sent {
-                outbox.error(from, "agent.unavailable");
-            }
-        }
-        "approval.answer" => {
-            let Some(request) = body.get("request").and_then(Value::as_str) else {
-                return outbox.error(from, "approval.unknown");
-            };
-            let Some(decision) = body.get("decision").and_then(Value::as_str) else {
-                return outbox.error(from, "approval.unknown");
-            };
-            let decision = match decision {
-                "approve" => veeloe_runtime_core::ApprovalDecision::Approve,
-                "deny" => veeloe_runtime_core::ApprovalDecision::Deny,
-                "redirect" => veeloe_runtime_core::ApprovalDecision::Redirect,
-                // A permanent yes belongs to a domain Approval, which the
-                // supervisor answered above; a command has no such decision.
-                _ => return outbox.error(from, "approval.unknown"),
-            };
-            // Allow-always grows the Allowlist too, in one write: the command may
-            // have more than one part still asking.
-            if let Some(allow_always) = body.get("allowAlways") {
-                let entries: Vec<String> = match allow_always {
-                    Value::String(entry) => vec![entry.clone()],
-                    Value::Array(entries) => entries
-                        .iter()
-                        .filter_map(|entry| entry.as_str().map(str::to_string))
-                        .collect(),
-                    _ => Vec::new(),
-                };
-                let mut next = agent.clone();
-                for entry in entries {
-                    let entry = entry.trim().to_string();
-                    if !entry.is_empty() && !next.allowlist.contains(&entry) {
-                        next.allowlist.push(entry);
-                    }
-                }
-                if next != agent {
-                    let _ = registry.replace(&next);
-                }
-            }
-            let sent = workers.send(
-                &agent.id,
-                ToWorker::Approval {
-                    request: request.to_string(),
-                    decision,
-                    message: body
-                        .get("message")
-                        .and_then(Value::as_str)
-                        .map(str::to_string),
-                    member: from.member.clone(),
-                    reference: from.reference.clone(),
-                    task: Some(task),
-                },
-            );
-            if !sent {
-                outbox.error(from, "agent.unavailable");
-            }
-        }
-        _ => {}
     }
 }
 
@@ -997,22 +279,6 @@ pub fn forward(outbox: &dyn Outbox, agent: &str, message: FromWorker) {
         | FromWorker::LogAppend { .. }
         | FromWorker::LogRead { .. } => {}
     }
-}
-
-fn disk_free_bytes() -> u64 {
-    use std::ffi::CString;
-
-    let Ok(path) = std::env::current_dir() else {
-        return 0;
-    };
-    let Ok(path) = CString::new(path.to_string_lossy().as_bytes()) else {
-        return 0;
-    };
-    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
-    if unsafe { libc::statvfs(path.as_ptr(), &mut stat) } != 0 {
-        return 0;
-    }
-    (stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64)
 }
 
 #[cfg(test)]

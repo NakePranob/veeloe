@@ -5,6 +5,11 @@
 //! `supervisor/index.ts`. The sandbox (task 4.4) and self-update (4.5) are not
 //! here yet: a worker is started directly.
 
+mod cli {
+    pub mod prompt;
+    pub mod provider;
+}
+
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
@@ -24,22 +29,23 @@ use veeloe_runtime_supervisor::hub_link::{HubLink, HubLinkOptions, HubLinkSink, 
 use veeloe_runtime_supervisor::llm::{HttpClient, LlmProxy};
 use veeloe_runtime_supervisor::logs;
 use veeloe_runtime_supervisor::memory;
-use veeloe_runtime_supervisor::models;
 use veeloe_runtime_supervisor::pair::{run_pair, PairOptions, PairResult};
 use veeloe_runtime_supervisor::providers::{load_providers, upstream_headers};
 use veeloe_runtime_supervisor::proxy::Proxies;
 use veeloe_runtime_supervisor::service;
 use veeloe_runtime_supervisor::status::{remove_pid_file, run_status, write_pid_file};
-use veeloe_runtime_supervisor::tasks::{
-    dispatch, forward, Inbound, Machine, MachineOutbox,
-};
+use veeloe_runtime_supervisor::task_log::turn_log;
 use veeloe_runtime_supervisor::task_routes::TaskRoutes;
+use veeloe_runtime_supervisor::tasks::{dispatch, forward, Inbound, Machine, MachineOutbox};
 use veeloe_runtime_supervisor::trust::{
     load_hub_url, load_or_create_machine_key, load_trust, supervisor_dir, Trust,
 };
 use veeloe_runtime_supervisor::uploads::Uploads;
 use veeloe_runtime_supervisor::usage::UsageStore;
 use veeloe_runtime_supervisor::workers::{SupervisorLlm, Workers};
+
+use cli::prompt::{ask_line, interactive};
+use cli::provider::provider;
 
 /// The Runtime's folder is VEELOE_HOME (default ~/.veeloe), created owner-only.
 fn runtime_home() -> PathBuf {
@@ -150,28 +156,6 @@ struct Supervisor {
 /// The counters a connection reads before it trusts anything.
 type MemorySeen = veeloe_protocol::envelope::MemorySeenSequences;
 
-/// The one line a Turn's end may leave in the log: identifiers and codes, and
-/// never the reason's own wording when it is not a code (ADR 0052).
-fn turn_log(agent: &str, message: &FromWorker) -> Option<(&'static str, Value)> {
-    let FromWorker::Event { task, event, .. } = message else {
-        return None;
-    };
-    if event.kind != "turn.ended" {
-        return None;
-    }
-    let reason = event
-        .body
-        .get("reason")
-        .and_then(Value::as_str)
-        .unwrap_or("ended");
-    let mut fields = json!({ "agent": agent, "task": task, "reason": reason });
-    if let Some(code) = event.body.get("code").and_then(Value::as_str) {
-        fields["code"] = json!(code);
-    }
-    let level = if reason == "error" { "error" } else { "info" };
-    Some((level, fields))
-}
-
 impl Supervisor {
     fn deliver(&self, agent: &str, message: FromWorker) {
         // The proxy learns the running Turn from these events, and an ended
@@ -195,7 +179,12 @@ impl Supervisor {
 
     /// Turn two worker events into a Generic Push; nothing else is sent (ADR 0044).
     fn notify(&self, agent: &str, message: &FromWorker) {
-        let FromWorker::Event { task, starter, event } = message else {
+        let FromWorker::Event {
+            task,
+            starter,
+            event,
+        } = message
+        else {
             return;
         };
         let (kind, approval, tokens) = match event.kind.as_str() {
@@ -569,238 +558,6 @@ fn hub_argument(args: &[String]) -> Option<String> {
     None
 }
 
-/// Whether a person is at a terminal to answer; only then does any command ask
-/// (legacy `interactive()`).
-fn interactive() -> bool {
-    use std::io::IsTerminal;
-    std::io::stdin().is_terminal() && std::io::stdout().is_terminal()
-}
-
-/// One line from the terminal, or `None` when stdin closes first (legacy
-/// `askLine`).
-fn ask_line(question: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
-    use std::io::Write;
-    print!("{question}");
-    std::io::stdout().flush()?;
-    let mut line = String::new();
-    if std::io::stdin().read_line(&mut line)? == 0 {
-        return Ok(None);
-    }
-    Ok(Some(line.trim_end_matches(['\n', '\r']).trim().to_string()))
-}
-
-/// Asks until `check` takes the answer, or stdin closes (legacy `askValid`).
-fn ask_valid<T>(
-    question: &str,
-    check: impl Fn(&str) -> Result<T, String>,
-) -> Result<T, Box<dyn std::error::Error>> {
-    loop {
-        let Some(answer) = ask_line(question)? else {
-            return Err("cancelled, nothing was saved".into());
-        };
-        match check(&answer) {
-            Ok(value) => return Ok(value),
-            Err(problem) => println!("{problem}"),
-        }
-    }
-}
-
-/// A numbered pick, asked again until it is one of them; `None` when stdin
-/// closes (legacy `choose`).
-fn choose(title: &str, labels: &[String]) -> Result<Option<usize>, Box<dyn std::error::Error>> {
-    println!("{title}");
-    for (at, label) in labels.iter().enumerate() {
-        println!("  {}) {label}", at + 1);
-    }
-    loop {
-        let Some(answer) = ask_line(&format!("Choose 1-{}: ", labels.len()))? else {
-            return Ok(None);
-        };
-        if let Ok(picked) = answer.parse::<usize>() {
-            if picked >= 1 && picked <= labels.len() {
-                return Ok(Some(picked - 1));
-            }
-        }
-    }
-}
-
-/// What one keypress does to an arrow pick: move to `at`, pick it, or cancel
-/// (legacy `pickKey`).
-enum Pick {
-    At(usize),
-    Picked(usize),
-    Cancel,
-}
-
-fn pick_key(key: &str, at: usize, count: usize) -> Pick {
-    match key {
-        "\u{1b}[A" | "k" => Pick::At((at + count - 1) % count),
-        "\u{1b}[B" | "j" => Pick::At((at + 1) % count),
-        "\r" | "\n" => Pick::Picked(at),
-        "\u{3}" | "\u{1b}" | "q" => Pick::Cancel,
-        _ => match key.parse::<usize>() {
-            Ok(n) if n >= 1 && n <= count => Pick::Picked(n - 1),
-            _ => Pick::At(at),
-        },
-    }
-}
-
-/// Raw mode for one pick, restored however it ends. False when this stdin is
-/// not a terminal that can be put in it.
-fn raw_mode(enable: bool, saved: &mut Option<libc::termios>) -> bool {
-    unsafe {
-        if enable {
-            let mut term: libc::termios = std::mem::zeroed();
-            if libc::tcgetattr(0, &mut term) != 0 {
-                return false;
-            }
-            *saved = Some(term);
-            let mut raw = term;
-            raw.c_lflag &= !(libc::ICANON | libc::ECHO);
-            raw.c_cc[libc::VMIN] = 1;
-            raw.c_cc[libc::VTIME] = 0;
-            libc::tcsetattr(0, libc::TCSANOW, &raw) == 0
-        } else {
-            saved
-                .map(|original| libc::tcsetattr(0, libc::TCSANOW, &original) == 0)
-                .unwrap_or(false)
-        }
-    }
-}
-
-fn draw_pick(labels: &[String], at: usize, first: bool) {
-    use std::io::Write;
-    let mut out = std::io::stdout();
-    if !first {
-        let _ = write!(out, "\u{1b}[{}A", labels.len());
-    }
-    for (index, label) in labels.iter().enumerate() {
-        let line = if index == at {
-            format!("\u{1b}[2K\u{1b}[36m› {label}\u{1b}[0m\n")
-        } else {
-            format!("\u{1b}[2K  {label}\n")
-        };
-        let _ = out.write_all(line.as_bytes());
-    }
-    let _ = out.flush();
-}
-
-/// Pick one of `labels` with the arrow keys and Enter, or its number; Esc,
-/// Ctrl-C and `q` cancel. Falls back to the numbered pick when stdin cannot go
-/// into raw mode (legacy `pickWithArrows`).
-fn pick_with_arrows(
-    title: &str,
-    labels: &[String],
-) -> Result<Option<usize>, Box<dyn std::error::Error>> {
-    use std::io::{Read, Write};
-    let mut saved = None;
-    if !raw_mode(true, &mut saved) {
-        return choose(title, labels);
-    }
-    println!("{title} \u{1b}[2m(↑ ↓ to move, Enter to pick)\u{1b}[0m");
-    let mut at = 0;
-    draw_pick(labels, at, true);
-    let mut stdin = std::io::stdin();
-    let picked = loop {
-        let mut buffer = [0u8; 8];
-        let read = stdin.read(&mut buffer);
-        let Ok(read) = read else {
-            raw_mode(false, &mut saved);
-            return Err("cancelled, nothing was saved".into());
-        };
-        if read == 0 {
-            break None;
-        }
-        match pick_key(&String::from_utf8_lossy(&buffer[..read]), at, labels.len()) {
-            Pick::At(moved) => {
-                at = moved;
-                draw_pick(labels, at, false);
-            }
-            Pick::Picked(picked) => {
-                draw_pick(labels, at, false);
-                break Some(picked);
-            }
-            Pick::Cancel => break None,
-        }
-    };
-    raw_mode(false, &mut saved);
-    let _ = std::io::stdout().flush();
-    Ok(picked)
-}
-
-/// A Provider's name: lower-case letters, digits and dashes, up to 32 (legacy
-/// `checkName`).
-fn provider_name(
-    name: &str,
-    providers: &[veeloe_runtime_supervisor::providers::Provider],
-) -> Result<String, String> {
-    let allowed = !name.is_empty()
-        && name.len() <= 32
-        && name.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
-        && name
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
-    if !allowed {
-        return Err(format!(
-            "a Provider name is lower-case letters, digits and dashes, up to 32, got \"{name}\""
-        ));
-    }
-    if providers.iter().any(|provider| provider.name == name) {
-        return Err(format!(
-            "a Provider named {name} already exists. Pick another name, or remove it first: veeloe provider remove {name}"
-        ));
-    }
-    Ok(name.to_string())
-}
-
-/// A base URL without a trailing slash. Plain http only to this Machine, so a key
-/// never crosses a network in clear (legacy `providerUrl`).
-fn provider_url(raw: &str) -> Result<String, String> {
-    let url = reqwest::Url::parse(raw).map_err(|_| format!("not a URL: {raw}"))?;
-    let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"));
-    if url.scheme() != "https" && !(url.scheme() == "http" && local) {
-        return Err(format!(
-            "the Provider URL must start with https:// (http:// only for this machine), got {raw}"
-        ));
-    }
-    if url.query().is_some()
-        || url.fragment().is_some()
-        || !url.username().is_empty()
-        || url.password().is_some()
-    {
-        return Err(format!("the Provider URL must be just its base, got {raw}"));
-    }
-    Ok(url.as_str().trim_end_matches('/').to_string())
-}
-
-/// The Provider's key: typed hidden at a terminal, read whole from stdin
-/// anywhere else (legacy `readKey`).
-fn read_key() -> Result<String, Box<dyn std::error::Error>> {
-    use std::io::{Read, Write};
-    if !interactive() {
-        let mut key = String::new();
-        std::io::stdin().read_to_string(&mut key)?;
-        return Ok(key);
-    }
-    // The tty driver does not echo while this line is typed, so the key never
-    // lands on the screen or in a scrollback.
-    let quiet = std::process::Command::new("stty")
-        .arg("-echo")
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false);
-    print!("Provider key: ");
-    std::io::stdout().flush()?;
-    let mut line = String::new();
-    let read = std::io::stdin().read_line(&mut line);
-    if quiet {
-        let _ = std::process::Command::new("stty").arg("echo").status();
-    }
-    println!();
-    read?;
-    Ok(line)
-}
-
 async fn pair(home: PathBuf, args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let hub = hub_argument(args)
         .or_else(|| load_hub_url(&home))
@@ -823,238 +580,6 @@ async fn pair(home: PathBuf, args: &[String]) -> Result<(), Box<dyn std::error::
         PairResult::Paired => Ok(()),
         PairResult::AlreadyPaired => Ok(()),
         PairResult::Expired => std::process::exit(1),
-    }
-}
-
-/// What a Provider that would not list its models is told, as the legacy CLI
-/// put it (`providers/cli.ts`).
-fn provider_problem(problem: &str) -> &'static str {
-    match problem {
-        "provider.rejected" => {
-            "the Provider refused this key. Check the key and run veeloe provider add again"
-        }
-        "provider.unreachable" => {
-            "could not reach the Provider at that URL. Check the URL and your connection, then run veeloe provider add again"
-        }
-        _ => "the Provider answered with an error. Try again later, or check the URL",
-    }
-}
-
-/// `provider add|list|remove`: the LLM this Machine talks to. The key is typed
-/// hidden or piped in, never an argument (ADR 0042, 0065). At a terminal a
-/// missing choice is asked; anywhere else it is named and nothing is asked
-/// (legacy `runProviderCommand`).
-async fn provider(home: PathBuf, args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-    use veeloe_runtime_supervisor::providers::{save_providers, PRESETS};
-    let action = args.first().map(String::as_str).unwrap_or("list");
-    let providers = load_providers(&home).unwrap_or_default();
-    let flag = |name: &str| -> Option<String> {
-        args.iter()
-            .position(|arg| arg == name)
-            .and_then(|at| args.get(at + 1))
-            .cloned()
-    };
-    match action {
-        "list" => {
-            if providers.is_empty() {
-                println!("no Provider yet. Add one with: veeloe provider add");
-            }
-            for provider in &providers {
-                println!("{}\t{}", provider.name, provider.url);
-            }
-            Ok(())
-        }
-        "add" => {
-            let mut preset = flag("--preset");
-            let mut name = flag("--name");
-            let given_url = flag("--url");
-            if preset.is_none() && name.is_none() && given_url.is_none() && interactive() {
-                let labels: Vec<String> = PRESETS
-                    .iter()
-                    .map(|(_, label, _, _)| label.to_string())
-                    .chain(std::iter::once("Custom (enter a URL)".to_string()))
-                    .collect();
-                let Some(picked) = pick_with_arrows("Which Provider do you want to add?", &labels)?
-                else {
-                    return Err("cancelled, nothing was saved".into());
-                };
-                preset = PRESETS.get(picked).map(|(id, _, _, _)| id.to_string());
-            }
-            let (url, fixed_auth, preset) = match preset.as_deref() {
-                Some(id) => {
-                    let Some((id, _, url, auth)) = PRESETS.iter().find(|(name, ..)| *name == id)
-                    else {
-                        let ids: Vec<&str> = PRESETS.iter().map(|(id, ..)| *id).collect();
-                        return Err(format!(
-                            "no built-in Provider {id}. Pick one of: {}",
-                            ids.join(", ")
-                        )
-                        .into());
-                    };
-                    if given_url.is_some() {
-                        return Err(format!(
-                            "--preset {id} sets its own URL; drop --url, or leave out --preset for a custom Provider"
-                        )
-                        .into());
-                    }
-                    (url.to_string(), Some(*auth), Some(id.to_string()))
-                }
-                None => {
-                    // A custom Provider is named first, then its URL, as the
-                    // legacy wizard asked.
-                    if name.is_none() {
-                        if !interactive() {
-                            let ids: Vec<&str> = PRESETS.iter().map(|(id, ..)| *id).collect();
-                            return Err(format!(
-                                "missing --name: veeloe provider add --name <name> --url <base url> (a name is lower-case letters, digits and dashes, up to 32), or --preset <{}>",
-                                ids.join("|")
-                            )
-                            .into());
-                        }
-                        name = Some(ask_valid("Name for this Provider: ", |answer| {
-                            provider_name(answer, &providers)
-                        })?);
-                    }
-                    let url = match given_url {
-                        Some(url) => provider_url(&url)?,
-                        None if interactive() => ask_valid(
-                            "Base URL (such as https://api.anthropic.com): ",
-                            provider_url,
-                        )?,
-                        None => {
-                            return Err(
-                                "missing --url: give the Provider's base URL, such as --url https://api.anthropic.com"
-                                    .into(),
-                            )
-                        }
-                    };
-                    (url, None, None)
-                }
-            };
-            let name = match (name, preset.as_deref()) {
-                (Some(name), _) => provider_name(&name, &providers)?,
-                (None, Some(id)) => provider_name(id, &providers)?,
-                // Unreachable: a custom Provider was named above.
-                (None, None) => return Err("missing --name".into()),
-            };
-            // The key never lands in shell history or `ps`: typed hidden here, or
-            // piped in on stdin.
-            let key = read_key()?.trim().to_string();
-            if key.is_empty() {
-                return Err(
-                    "no key was given. Type it when asked, or pipe it in: veeloe provider add ... < key-file"
-                        .into(),
-                );
-            }
-            let http = ReqwestClient::cli();
-            println!("checking {url} ...");
-            let auth = match fixed_auth {
-                Some(auth) => {
-                    match models::list_models(&url, &key, auth, preset.as_deref(), &http).await {
-                        Ok(models) => {
-                            println!("saved {name} with {} models", models.len());
-                            auth
-                        }
-                        Err(problem) => {
-                            println!("not saved: {}", provider_problem(problem));
-                            std::process::exit(1);
-                        }
-                    }
-                }
-                None => match models::detect_auth(&url, &key, preset.as_deref(), &http).await {
-                    Ok((auth, models)) => {
-                        println!("saved {name} with {} models", models.len());
-                        auth
-                    }
-                    Err(problem) => {
-                        println!("not saved: {}", provider_problem(problem));
-                        std::process::exit(1);
-                    }
-                },
-            };
-            let mut saved = providers.clone();
-            saved.push(veeloe_runtime_supervisor::providers::Provider {
-                name: name.clone(),
-                url,
-                key,
-                auth,
-                preset,
-            });
-            save_providers(&home, &saved)?;
-            println!("Next: create an Agent with it in the Veeloe app. Start the Runtime with veeloe if it is not running.");
-            Ok(())
-        }
-        "remove" => {
-            if providers.is_empty() {
-                println!("there is no Provider to remove. Add one with: veeloe provider add");
-                std::process::exit(1);
-            }
-            let mut name = args
-                .iter()
-                .skip(1)
-                .find(|arg| !arg.starts_with("--"))
-                .cloned();
-            if name.is_none() {
-                if !interactive() {
-                    return Err(
-                        "missing the Provider's name: veeloe provider remove <name> --yes (see them with: veeloe provider list)"
-                            .into(),
-                    );
-                }
-                let labels: Vec<String> = providers
-                    .iter()
-                    .map(|provider| format!("{}  {}", provider.name, provider.url))
-                    .collect();
-                let Some(picked) =
-                    pick_with_arrows("Which Provider do you want to remove?", &labels)?
-                else {
-                    return Err("cancelled, nothing was removed".into());
-                };
-                name = Some(providers[picked].name.clone());
-            }
-            let name = name.expect("a name");
-            if !providers.iter().any(|provider| provider.name == name) {
-                println!("no Provider named {name}. See them with: veeloe provider list");
-                std::process::exit(1);
-            }
-            let users: Vec<String> = AgentRegistry::open(&home)
-                .map(|registry| registry.all().unwrap_or_default())
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|agent| !agent.deleted() && agent.provider == name)
-                .map(|agent| agent.name)
-                .collect();
-            if users.is_empty() {
-                println!("no Agent uses {name}.");
-            } else {
-                println!(
-                    "Agents using {name}: {}. They stop answering until you pick another Provider for them on the Agent's page in the Veeloe app.",
-                    users.join(", ")
-                );
-            }
-            if !args.iter().any(|arg| arg == "--yes") {
-                if !interactive() {
-                    return Err(format!(
-                        "not removed: there is no terminal to confirm on. Run it again with --yes: veeloe provider remove {name} --yes"
-                    )
-                    .into());
-                }
-                let answer = ask_line(&format!("Remove {name}? [y/N] "))?;
-                // A yes only when the answer is y; Enter or anything else keeps it.
-                if answer.unwrap_or_default().to_lowercase() != "y" {
-                    println!("nothing was removed");
-                    std::process::exit(1);
-                }
-            }
-            let saved: Vec<_> = providers
-                .into_iter()
-                .filter(|provider| provider.name != name)
-                .collect();
-            save_providers(&home, &saved)?;
-            println!("removed {name}. Next: add another with veeloe provider add, or see what is left with veeloe status");
-            Ok(())
-        }
-        other => Err(format!("unknown provider command: {other}").into()),
     }
 }
 
@@ -1276,8 +801,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // inherits it (ADR 0008, 0069). It reaches the network only through that
     // Agent's own proxy. A worker that cannot be wrapped — or has no proxy —
     // is not started: an empty argv ends its session before it runs.
-    let wrap =
-        veeloe_runtime_supervisor::workers::sandboxed(home.clone(), Arc::clone(&proxies));
+    let wrap = veeloe_runtime_supervisor::workers::sandboxed(home.clone(), Arc::clone(&proxies));
     // What one worker may use, from `config.json` and its defaults (issue #47).
     let limits = veeloe_runtime_supervisor::limits::load(&home);
     let workers = Workers::with_logs(
@@ -1453,7 +977,7 @@ impl veeloe_runtime_supervisor::llm::HttpClient for ReqwestClient {
 
 #[cfg(test)]
 mod tests {
-    use super::{hub_argument, pick_key, turn_log, Pick};
+    use super::hub_argument;
 
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(|arg| arg.to_string()).collect()
@@ -1475,73 +999,5 @@ mod tests {
         );
         assert_eq!(hub_argument(&args(&[])), None);
         assert_eq!(hub_argument(&args(&["--hub"])), None);
-    }
-
-    #[test]
-    fn an_arrow_pick_moves_wraps_takes_a_number_and_cancels_as_the_legacy_one_did() {
-        assert!(matches!(pick_key("\u{1b}[B", 0, 3), Pick::At(1)));
-        assert!(matches!(pick_key("j", 2, 3), Pick::At(0)));
-        assert!(matches!(pick_key("\u{1b}[A", 0, 3), Pick::At(2)));
-        assert!(matches!(pick_key("k", 1, 3), Pick::At(0)));
-        assert!(matches!(pick_key("\r", 1, 3), Pick::Picked(1)));
-        assert!(matches!(pick_key("3", 0, 3), Pick::Picked(2)));
-        // A number outside the list is not a pick.
-        assert!(matches!(pick_key("9", 1, 3), Pick::At(1)));
-        assert!(matches!(pick_key("\u{1b}", 0, 3), Pick::Cancel));
-        assert!(matches!(pick_key("\u{3}", 0, 3), Pick::Cancel));
-        assert!(matches!(pick_key("q", 0, 3), Pick::Cancel));
-    }
-
-    fn event(kind: &str, body: serde_json::Value) -> veeloe_runtime_core::FromWorker {
-        veeloe_runtime_core::FromWorker::Event {
-            task: "task-1".into(),
-            starter: "member-1".into(),
-            event: veeloe_runtime_core::TaskEvent {
-                seq: 7,
-                kind: kind.into(),
-                at: 1_700_000_000,
-                body,
-            },
-        }
-    }
-
-    #[test]
-    fn a_turn_end_logs_its_ids_and_codes_and_nothing_else() {
-        let (level, fields) = turn_log(
-            "helper",
-            &event(
-                "turn.ended",
-                serde_json::json!({
-                    "reason": "error",
-                    "code": "provider.failed",
-                    "text": "a Task line that must never be logged",
-                    "file": "secret.txt"
-                }),
-            ),
-        )
-        .expect("a turn end is logged");
-        assert_eq!(level, "error");
-        assert_eq!(
-            fields,
-            serde_json::json!({
-                "agent": "helper",
-                "task": "task-1",
-                "reason": "error",
-                "code": "provider.failed"
-            })
-        );
-    }
-
-    #[test]
-    fn other_worker_events_and_a_finished_turn_are_not_logged_as_errors() {
-        assert!(turn_log("helper", &event("turn.started", serde_json::json!({}))).is_none());
-        let (level, fields) = turn_log(
-            "helper",
-            &event("turn.ended", serde_json::json!({ "reason": "stop" })),
-        )
-        .expect("a stopped turn is logged");
-        assert_eq!(level, "info");
-        assert_eq!(fields["reason"], "stop");
-        assert!(fields.get("code").is_none());
     }
 }

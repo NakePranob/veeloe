@@ -15,8 +15,10 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use serde_json::Value;
-use veeloe_runtime_core::{EventLog, EventStore, LogAnswer, LogQuery, StoreError, TaskEvent};
+use serde_json::{json, Value};
+use veeloe_runtime_core::{
+    EventLog, EventStore, FromWorker, LogAnswer, LogQuery, StoreError, TaskEvent,
+};
 
 /// `<home>/task-logs/<id>`: where one Agent's log is kept, outside
 /// `<home>/agents/<id>` so no rule that lets a command write its own folder
@@ -123,4 +125,84 @@ impl TaskLogs {
 /// A read or write that failed, as the code a worker's refusal names.
 fn code(error: StoreError) -> String {
     error.to_string()
+}
+
+/// The one line a Turn's end may leave in the log: identifiers and codes, and
+/// never the reason's own wording when it is not a code (ADR 0052).
+pub fn turn_log(agent: &str, message: &FromWorker) -> Option<(&'static str, Value)> {
+    let FromWorker::Event { task, event, .. } = message else {
+        return None;
+    };
+    if event.kind != "turn.ended" {
+        return None;
+    }
+    let reason = event
+        .body
+        .get("reason")
+        .and_then(Value::as_str)
+        .unwrap_or("ended");
+    let mut fields = json!({ "agent": agent, "task": task, "reason": reason });
+    if let Some(code) = event.body.get("code").and_then(Value::as_str) {
+        fields["code"] = json!(code);
+    }
+    let level = if reason == "error" { "error" } else { "info" };
+    Some((level, fields))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::turn_log;
+
+    fn event(kind: &str, body: serde_json::Value) -> veeloe_runtime_core::FromWorker {
+        veeloe_runtime_core::FromWorker::Event {
+            task: "task-1".into(),
+            starter: "member-1".into(),
+            event: veeloe_runtime_core::TaskEvent {
+                seq: 7,
+                kind: kind.into(),
+                at: 1_700_000_000,
+                body,
+            },
+        }
+    }
+
+    #[test]
+    fn a_turn_end_logs_its_ids_and_codes_and_nothing_else() {
+        let (level, fields) = turn_log(
+            "helper",
+            &event(
+                "turn.ended",
+                serde_json::json!({
+                    "reason": "error",
+                    "code": "provider.failed",
+                    "text": "a Task line that must never be logged",
+                    "file": "secret.txt"
+                }),
+            ),
+        )
+        .expect("a turn end is logged");
+        assert_eq!(level, "error");
+        assert_eq!(
+            fields,
+            serde_json::json!({
+                "agent": "helper",
+                "task": "task-1",
+                "reason": "error",
+                "code": "provider.failed"
+            })
+        );
+    }
+
+    #[test]
+    fn other_worker_events_and_a_finished_turn_are_not_logged_as_errors() {
+        assert!(turn_log("helper", &event("turn.started", serde_json::json!({}))).is_none());
+        let (level, fields) = turn_log(
+            "helper",
+            &event("turn.ended", serde_json::json!({ "reason": "stop" })),
+        )
+        .expect("a stopped turn is logged");
+        assert_eq!(level, "info");
+        assert_eq!(fields["reason"], "stop");
+        assert!(fields.get("code").is_none());
+    }
 }
