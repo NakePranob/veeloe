@@ -3,9 +3,9 @@
 //! the Controller's).
 
 pub const USAGE: &str =
-    "usage: veeloe [pair | unpair | status | logs | memory | provider add|list|remove | service install|uninstall | doctor --fix-apparmor | help <command>]";
+    "usage: veeloe [pair | unpair | status | logs | memory | provider add|list|remove | git token|repos | service install|uninstall | doctor --fix-apparmor | help <command>]";
 
-const COMMANDS: [(&str, &str); 9] = [
+const COMMANDS: [(&str, &str); 10] = [
     (
         "start",
         "veeloe
@@ -53,6 +53,19 @@ veeloe provider remove [<name>] [--yes]
   veeloe provider remove main --yes    no question asked (needed without a terminal)
 
   Built-in: anthropic, opencode-go, openrouter",
+    ),
+    (
+        "git",
+        "veeloe git token
+veeloe git repos <agent> [owner/name ...]
+  Let Agents clone, fetch and push GitHub repos without holding a credential.
+  The token is typed hidden or piped in on stdin; it stays in the Runtime's own
+  folder. An Agent may use only the repos set for it, and push only branches
+  under veeloe/<agent>/: never main, a tag or a delete.
+
+  veeloe git token < token.txt
+  veeloe git repos a1 acme/shop        a1 may use acme/shop
+  veeloe git repos a1                  list what a1 may use",
     ),
     (
         "service",

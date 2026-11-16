@@ -10,6 +10,7 @@ pub mod doctor;
 pub mod egress;
 mod egress_set;
 mod file_transfer;
+pub mod git_broker;
 pub mod help;
 pub mod hub_link;
 pub mod json_file;

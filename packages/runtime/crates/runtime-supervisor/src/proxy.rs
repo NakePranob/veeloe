@@ -25,6 +25,7 @@ use tokio::task::JoinHandle;
 
 use crate::approval::Approvals;
 use crate::egress::Egress;
+use crate::git_broker::{self, GitBroker};
 
 /// The largest request head a client may send before the proxy gives up.
 const MAX_HEAD: usize = 16 * 1024;
@@ -87,7 +88,7 @@ fn stale_machine_socket(home: &Path) -> PathBuf {
 /// and no caller can open a Machine-wide proxy again (issue #43 review).
 #[cfg(test)]
 async fn start(egress: Arc<Egress>, agent: &str) -> std::io::Result<Proxy> {
-    start_with_socket(egress, agent, &|_| false, None, None).await
+    start_with_socket(egress, agent, &|_| false, None, None, None).await
 }
 
 /// Starts one Agent's proxy on a free loopback port and, when `socket` names a
@@ -105,6 +106,7 @@ async fn start_with_socket(
     avoid: &(dyn Fn(u16) -> bool + Send + Sync),
     socket: Option<&Path>,
     approvals: Option<Arc<Approvals>>,
+    broker: Option<Arc<GitBroker>>,
 ) -> std::io::Result<Proxy> {
     let agent: Arc<str> = Arc::from(agent);
     for _ in 0..16 {
@@ -120,6 +122,7 @@ async fn start_with_socket(
             Arc::clone(&egress),
             Arc::clone(&agent),
             approvals.clone(),
+            broker.clone(),
         ))];
         let socket = match socket {
             Some(path) => {
@@ -128,6 +131,7 @@ async fn start_with_socket(
                     Arc::clone(&egress),
                     Arc::clone(&agent),
                     approvals.clone(),
+                    broker.clone(),
                 )
                 .await?;
                 tasks.push(task);
@@ -155,6 +159,7 @@ async fn accepting(
     egress: Arc<Egress>,
     agent: Arc<str>,
     approvals: Option<Arc<Approvals>>,
+    broker: Option<Arc<GitBroker>>,
 ) {
     loop {
         let Ok((client, _)) = listener.accept().await else {
@@ -163,8 +168,9 @@ async fn accepting(
         let egress = Arc::clone(&egress);
         let agent = Arc::clone(&agent);
         let approvals = approvals.clone();
+        let broker = broker.clone();
         tokio::spawn(async move {
-            let _ = serve(client, egress, agent, approvals).await;
+            let _ = serve(client, egress, agent, approvals, broker).await;
         });
     }
 }
@@ -177,6 +183,7 @@ async fn listen_unix(
     egress: Arc<Egress>,
     agent: Arc<str>,
     approvals: Option<Arc<Approvals>>,
+    broker: Option<Arc<GitBroker>>,
 ) -> std::io::Result<(PathBuf, JoinHandle<()>)> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -195,8 +202,9 @@ async fn listen_unix(
             let egress = Arc::clone(&egress);
             let agent = Arc::clone(&agent);
             let approvals = approvals.clone();
+            let broker = broker.clone();
             tokio::spawn(async move {
-                let _ = serve(client, egress, agent, approvals).await;
+                let _ = serve(client, egress, agent, approvals, broker).await;
             });
         }
     });
@@ -209,6 +217,7 @@ pub struct Proxies {
     home: PathBuf,
     egress: Arc<Egress>,
     approvals: Option<Arc<Approvals>>,
+    broker: Arc<GitBroker>,
     running: Mutex<HashMap<String, Proxy>>,
     /// One start at a time, so two calls for the same Agent cannot both bind
     /// its socket and leave the winner's path pointing at the loser.
@@ -233,6 +242,7 @@ impl Proxies {
         // Agent is never handed a dead listener. Absent is the normal case.
         let _ = std::fs::remove_file(stale_machine_socket(&home));
         Self {
+            broker: Arc::new(GitBroker::new(home.clone())),
             home,
             egress,
             approvals,
@@ -293,6 +303,7 @@ impl Proxies {
             &|port| ports.is_taken(port) || taken.contains(&port),
             socket.as_deref(),
             self.approvals.clone(),
+            Some(Arc::clone(&self.broker)),
         )
         .await?;
         let view = proxy.view();
@@ -343,6 +354,7 @@ async fn serve<S>(
     egress: Arc<Egress>,
     agent: Arc<str>,
     approvals: Option<Arc<Approvals>>,
+    broker: Option<Arc<GitBroker>>,
 ) -> std::io::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
@@ -390,13 +402,24 @@ where
     };
     // One spelling for the Egress check, the approval request and the log.
     let host = host.trim_end_matches('.').to_ascii_lowercase();
+    // No Turn, no answer: a connection nobody is acting for is refused rather
+    // than opened (issue #44), the git broker's included.
+    if approvals
+        .as_ref()
+        .is_some_and(|approvals| approvals.current_turn(&agent).is_none())
+    {
+        return Ok(());
+    }
+    if host == git_broker::HOST {
+        // Never a connection of its own: the broker answers, with the token
+        // only it holds (issue #32). A tunnel to it is refused.
+        if let (Some(broker), Some(path)) = (&broker, &plain_path) {
+            broker.serve(client, &head, method, path, &agent).await?;
+        }
+        return Ok(());
+    }
     match &approvals {
         Some(approvals) => {
-            // No Turn, no answer: a connection nobody is acting for is refused
-            // rather than opened (issue #44).
-            if approvals.current_turn(&agent).is_none() {
-                return Ok(());
-            }
             if !allowed(&host, &egress.current(&agent)) {
                 // Only a domain can be added to an Egress, so only a domain is
                 // worth asking about. An address, `localhost` or a malformed
@@ -632,6 +655,7 @@ mod tests {
                     approval_timeout_s: 3_600,
                     budget: None,
                     deleted_at: None,
+                    git_repos: Vec::new(),
                 })
                 .expect("add");
         }
@@ -671,9 +695,16 @@ mod tests {
             Arc::clone(&egress),
             logs,
         ));
-        let proxy = start_with_socket(Arc::clone(&egress), "a1", &|_| false, None, Some(approvals))
-            .await
-            .expect("proxy");
+        let proxy = start_with_socket(
+            Arc::clone(&egress),
+            "a1",
+            &|_| false,
+            None,
+            Some(approvals),
+            None,
+        )
+        .await
+        .expect("proxy");
         let mut client = TcpStream::connect(("127.0.0.1", proxy.port))
             .await
             .expect("connect");
@@ -698,6 +729,7 @@ mod tests {
             &|_| false,
             None,
             Some(Arc::clone(&approvals)),
+            None,
         )
         .await
         .expect("proxy");
@@ -755,9 +787,16 @@ mod tests {
         let home = tempfile::tempdir().expect("home");
         let egress = egress_with(home.path(), &[("a1", &[])]);
         let socket = home.path().join("egress.sock");
-        let proxy = start_with_socket(Arc::clone(&egress), "a1", &|_| false, Some(&socket), None)
-            .await
-            .expect("proxy");
+        let proxy = start_with_socket(
+            Arc::clone(&egress),
+            "a1",
+            &|_| false,
+            Some(&socket),
+            None,
+            None,
+        )
+        .await
+        .expect("proxy");
         assert_eq!(proxy.socket.as_deref(), Some(socket.as_path()));
 
         let mut client = tokio::net::UnixStream::connect(&socket)
@@ -848,5 +887,77 @@ mod tests {
 
         assert!(!stale.exists(), "the pre-#43 socket was left in place");
         assert!(kept.exists(), "an Agent's own socket was removed");
+    }
+
+    /// Issue #32: the broker's name is answered by the broker, during a Turn
+    /// only, and never as a tunnel or a domain to ask about.
+    #[tokio::test]
+    async fn the_git_host_goes_to_the_broker_during_a_turn_only() {
+        async fn send(port: u16, request: &[u8]) -> String {
+            let mut client = TcpStream::connect(("127.0.0.1", port))
+                .await
+                .expect("connect");
+            client.write_all(request).await.expect("write");
+            let mut answer = Vec::new();
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                client.read_to_end(&mut answer),
+            )
+            .await
+            .expect("an answer or a close, not a wait");
+            String::from_utf8_lossy(&answer).into_owned()
+        }
+        let fetch = format!(
+            "GET http://{}/acme/shop.git/info/refs?service=git-upload-pack HTTP/1.1\r\n\r\n",
+            git_broker::HOST
+        );
+        let home = tempfile::tempdir().expect("home");
+        let egress = egress_with(home.path(), &[("a1", &[])]);
+        let broker = Some(Arc::new(GitBroker::new(home.path().to_path_buf())));
+
+        let idle = Arc::new(Approvals::new(
+            home.path().to_path_buf(),
+            Arc::clone(&egress),
+            Arc::new(TaskLogs::new(home.path())),
+        ));
+        let proxy = start_with_socket(
+            Arc::clone(&egress),
+            "a1",
+            &|_| false,
+            None,
+            Some(idle),
+            broker.clone(),
+        )
+        .await
+        .expect("proxy");
+        assert_eq!(
+            send(proxy.port, fetch.as_bytes()).await,
+            "",
+            "no Turn, no answer"
+        );
+
+        let approvals = approvals_for(home.path(), &egress, "a1", "t1");
+        let proxy = start_with_socket(
+            Arc::clone(&egress),
+            "a1",
+            &|_| false,
+            None,
+            Some(approvals),
+            broker,
+        )
+        .await
+        .expect("proxy");
+        // a1 has no repo set: the broker itself refuses, with a reason.
+        let answer = send(proxy.port, fetch.as_bytes()).await;
+        assert!(
+            answer.starts_with("HTTP/1.1 403") && answer.contains("veeloe git repos a1"),
+            "{answer}"
+        );
+        let tunnel = format!("CONNECT {}:443 HTTP/1.1\r\n\r\n", git_broker::HOST);
+        assert_eq!(
+            send(proxy.port, tunnel.as_bytes()).await,
+            "",
+            "a tunnel to the broker is refused"
+        );
     }
 }

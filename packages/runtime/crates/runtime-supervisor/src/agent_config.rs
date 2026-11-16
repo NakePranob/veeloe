@@ -177,6 +177,7 @@ async fn save(
         approval_timeout_s: 3_600,
         budget: None,
         deleted_at: None,
+        git_repos: Vec::new(),
     });
     let text = |name: &str, fallback: &str| {
         body.get(name)
@@ -209,6 +210,8 @@ async fn save(
             .unwrap_or(base.approval_timeout_s),
         budget: body.get("budget").and_then(Value::as_u64).or(base.budget),
         deleted_at: base.deleted_at,
+        // Repos change only through `veeloe git repos` on the Machine (issue #32).
+        git_repos: base.git_repos,
     };
     // A new Agent must name a Provider on this Machine and a model that
     // Provider lists; an update may move either, so both are checked again.

@@ -243,6 +243,7 @@ async fn a_deleted_agent_waits_in_the_trash_and_can_be_restored() {
         approval_timeout_s: 3_600,
         budget: None,
         deleted_at: None,
+        git_repos: Vec::new(),
     };
     registry.add(&agent).expect("add");
     let dir = agent_dir(home.path(), "a1").expect("workdir");
@@ -494,6 +495,7 @@ async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
         approval_timeout_s: 3_600,
         budget: Some(budget),
         deleted_at: None,
+        git_repos: Vec::new(),
     };
     registry.add(&agent("live", 5_000_000)).expect("add");
     registry.add(&agent("gone", 7_000_000)).expect("add");
@@ -555,6 +557,7 @@ async fn egress_set_checks_manage_and_touches_only_the_agent_it_names() {
                 approval_timeout_s: 3_600,
                 budget: None,
                 deleted_at: None,
+                git_repos: Vec::new(),
             })
             .expect("add");
     }
@@ -710,6 +713,7 @@ async fn a_malformed_egress_request_is_refused_and_changes_no_agent() {
                 approval_timeout_s: 3_600,
                 budget: None,
                 deleted_at: None,
+                git_repos: Vec::new(),
             })
             .expect("add");
     }

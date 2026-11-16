@@ -56,7 +56,7 @@ fn provider_url(raw: &str) -> Result<String, String> {
 
 /// The Provider's key: typed hidden at a terminal, read whole from stdin
 /// anywhere else (legacy `readKey`).
-fn read_key() -> Result<String, Box<dyn std::error::Error>> {
+pub(crate) fn read_key(label: &str) -> Result<String, Box<dyn std::error::Error>> {
     use std::io::{Read, Write};
     if !interactive() {
         let mut key = String::new();
@@ -70,7 +70,7 @@ fn read_key() -> Result<String, Box<dyn std::error::Error>> {
         .status()
         .map(|status| status.success())
         .unwrap_or(false);
-    print!("Provider key: ");
+    print!("{label}: ");
     std::io::stdout().flush()?;
     let mut line = String::new();
     let read = std::io::stdin().read_line(&mut line);
@@ -198,7 +198,7 @@ pub(crate) async fn provider(
             };
             // The key never lands in shell history or `ps`: typed hidden here, or
             // piped in on stdin.
-            let key = read_key()?.trim().to_string();
+            let key = read_key("Provider key")?.trim().to_string();
             if key.is_empty() {
                 return Err(
                     "no key was given. Type it when asked, or pipe it in: veeloe provider add ... < key-file"

@@ -56,6 +56,10 @@ pub struct Agent {
     /// while it is in use; the row stays in `agents.json` until it is purged.
     #[serde(rename = "deletedAt", default, skip_serializing_if = "Option::is_none")]
     pub deleted_at: Option<i64>,
+    /// The GitHub repos (`owner/name`) this Agent may clone, fetch and push
+    /// through the git broker; empty lets it reach none (issue #32).
+    #[serde(rename = "gitRepos", default, skip_serializing_if = "Vec::is_empty")]
+    pub git_repos: Vec<String>,
 }
 
 fn default_timeout() -> u64 {

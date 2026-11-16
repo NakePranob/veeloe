@@ -264,6 +264,7 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
             approval_timeout_s: 3_600,
             budget: None,
             deleted_at: None,
+            git_repos: Vec::new(),
         })
         .expect("agent");
 
@@ -420,6 +421,7 @@ async fn an_approval_answer_reaches_the_worker_and_allow_always_grows_the_allowl
             approval_timeout_s: 3_600,
             budget: None,
             deleted_at: None,
+            git_repos: Vec::new(),
         })
         .expect("agent");
 

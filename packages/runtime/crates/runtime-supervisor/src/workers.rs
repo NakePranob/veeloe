@@ -543,6 +543,8 @@ async fn session(
             .env("HOME", &agent_home)
             .env("XDG_CACHE_HOME", agent_home.join(".cache"))
             .env("GIT_CONFIG_GLOBAL", agent_home.join(".gitconfig"))
+            // `git` reaches GitHub only through the broker (issue #32).
+            .envs(crate::git_broker::worker_env())
             .env("TMPDIR", dir.join("tmp"))
             .env("VEELOE_AGENT_DIR", &dir)
             .env("VEELOE_AGENT_NAME", &agent.name)

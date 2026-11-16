@@ -6,6 +6,7 @@
 //! here yet: a worker is started directly.
 
 mod cli {
+    pub mod git;
     pub mod prompt;
     pub mod provider;
 }
@@ -503,6 +504,7 @@ async fn run() -> Result<(), CliError> {
                 )),
             }
         }
+        Some("git") => cli::git::git(home, &args[1..]).map_err(CliError::from),
         Some(other) => Err(CliError::usage(format!("unknown command: {other}"))),
     }
 }

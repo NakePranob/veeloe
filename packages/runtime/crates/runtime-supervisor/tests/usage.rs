@@ -20,6 +20,7 @@ fn agent(budget: Option<u64>) -> Agent {
         approval_timeout_s: 3_600,
         budget,
         deleted_at: None,
+        git_repos: Vec::new(),
     }
 }
 

@@ -86,6 +86,7 @@ fn agent(id: &str) -> Agent {
         approval_timeout_s: 3_600,
         budget: None,
         deleted_at: None,
+        git_repos: Vec::new(),
     }
 }
 
