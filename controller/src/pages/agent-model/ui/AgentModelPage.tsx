@@ -6,13 +6,12 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { Empty, Note, Row, Screen, useColors } from "../../../shared/ui";
-import { modelsOf } from "../model/providers";
-import { ProviderModelSections } from "./ProviderModelSections";
+import { modelsOf, ProviderModelSections } from "../../../widgets/provider-models";
 
 // The Provider and model sections of New Agent, saved with the header button as New Agent creates with
 // it. Stands in for the prototype's two menus on the Agent page (agent-settings design).
 function Picker({ agent }: { agent: AgentRow }) {
-  const t = useT("agents");
+  const t = useT("agent-model");
   const colors = useColors();
   const link = useMachineLink();
   const machine = useMachines()?.find((m) => m.id === agent.machine_id);
@@ -73,7 +72,7 @@ function Picker({ agent }: { agent: AgentRow }) {
 }
 
 export function AgentModelPage() {
-  const t = useT("agents");
+  const t = useT("agent-model");
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
   const agent = useAgents()?.find((a) => a.id === id);
   if (!agent) {

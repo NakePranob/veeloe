@@ -1,1 +1,1 @@
-export { NewAgentPage as default } from "../../src/pages/agents";
+export { NewAgentPage as default } from "../../src/pages/new-agent";

@@ -12,7 +12,7 @@ import { Button, confirm, Empty, Field, Icon, inform, Note, Row, Screen, Section
 // and a sample command to see how the rules fall (ADR 0030). A bash entry is a
 // guard against mistakes, not a wall: the wall is the sandbox and Egress (ADR 0008).
 export function AllowlistPage() {
-  const t = useT("allowlist");
+  const t = useT("agent-allowlist");
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
   const agent = useAgents()?.find((a) => a.id === id);
   const machine = useMachines()?.find((m) => m.id === agent?.machine_id);
@@ -28,7 +28,7 @@ export function AllowlistPage() {
 }
 
 function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: string; agentName: string; machineId: string; stored: string[] | null }) {
-  const t = useT("allowlist");
+  const t = useT("agent-allowlist");
   const link = useMachineLink();
   const machine = useMachines()?.find((m) => m.id === machineId);
   const status = useMachineStatus(machineId);

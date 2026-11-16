@@ -6,7 +6,7 @@ import { Icon, Row } from "../../../shared/ui";
 export const EXPIRIES = [15, 30, 60, 240, 1440] as const;
 
 /** `15 minutes`, `1 hour`, `24 hours`, in the reader's language. */
-export function approvalLabel(seconds: number, t: ReturnType<typeof useT<"agents">>) {
+export function approvalLabel(seconds: number, t: ReturnType<typeof useT<"agent">>) {
   return seconds >= 3600 ? t("approval.hours", { count: seconds / 3600 }) : t("approval.minutes", { count: Math.round(seconds / 60) });
 }
 
@@ -16,7 +16,7 @@ export function approvalLabel(seconds: number, t: ReturnType<typeof useT<"agents
  * under it with a tick on the one in use.
  */
 export function ExpiryPicker({ seconds, disabled, onPick }: { seconds: number; disabled: boolean; onPick: (seconds: number) => void }) {
-  const t = useT("agents");
+  const t = useT("agent");
   const [open, setOpen] = useState(false);
   return (
     <>

@@ -12,14 +12,14 @@ import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatTokens, useNow, when } from "../../../shared/lib";
 import { confirm, Empty, Field, Icon, inform, Meter, Note, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
-import { providerProblem } from "../model/providers";
+import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
 
 // controller-prototype's AgentPage: the Agent's Tasks first, then its settings.
 // ponytail: only what this version has. Description, instructions, Memory, Skill and the rest come with their changes.
 function AgentView({ agent }: { agent: AgentRow }) {
-  const t = useT("agents");
+  const t = useT("agent");
   const status = useT("task-status");
   const language = useLanguage();
   const colors = useColors();
@@ -182,7 +182,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
 }
 
 export function AgentPage() {
-  const t = useT("agents");
+  const t = useT("agent");
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
   const agent = useAgents()?.find((a) => a.id === id);
   if (!agent) {

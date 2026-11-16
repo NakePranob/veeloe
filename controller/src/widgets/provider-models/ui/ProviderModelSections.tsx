@@ -28,7 +28,7 @@ export function ProviderModelSections({
   onProvider: (name: string) => void;
   onModel: (id: string) => void;
 }) {
-  const t = useT("agents");
+  const t = useT("provider-models");
   const colors = useColors();
   const [filter, setFilter] = useState("");
   const providers = status?.providers ?? [];

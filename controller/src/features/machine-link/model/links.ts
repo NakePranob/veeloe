@@ -1,5 +1,4 @@
-import { createBackoff, fromBase64url, hashBytes, parseMessage, publicKeyOf, sealFor, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type ProviderInfo, type SignedPart } from "@veeloe/protocol-ts";
-import { Directory, File, Paths } from "expo-file-system";
+import { createBackoff, fromBase64url, hashBytes, parseMessage, publicKeyOf, sealFor, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type SignedPart } from "@veeloe/protocol-ts";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
@@ -7,69 +6,12 @@ import { addListedTasks, addPendingMessage, failPendingMessage, listTasks, markP
 import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
 import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
-import { decodeChunks, isFileHash, MAX_ATTACHMENT_BYTES, MAX_CHUNK_TEXT, MAX_DOWNLOAD_CHUNKS, safeFileName, type Download } from "./downloads";
-import { openDownloadedFile } from "./open-file";
+import { MAX_ATTACHMENT_BYTES } from "./downloads";
+import { createFileCache } from "./file-cache";
+import { createStatusStore, memoryKey, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, UNKNOWN_USAGE, type MachineStatus, type MemoryStatus, type UsageStatus } from "./statuses";
 
-/** What this Controller knows of a Machine right now, beside what is in the database. */
-export type MachineStatus = {
-  /** Null until it has answered or the Hub said it is not there. */
-  online: boolean | null;
-  providers: ProviderInfo[] | null;
-  /** The code the last `agent.create` came back with, if it failed. */
-  createError: string | null;
-  /** The code the last `agent.update` came back with, if it failed. */
-  updateError: string | null;
-  /** The code the last `agent.delete` came back with, if it failed. */
-  deleteError: string | null;
-  /** The code the last `agent.restore` came back with, if it failed (`agent-trash`). */
-  restoreError: string | null;
-  /** The code the last `task.stop` came back with, if it failed (`stop-and-restart`). */
-  stopError: string | null;
-  /** The code the last `provider.add` came back with, if it failed. */
-  providerError: string | null;
-  /** What `machine.status` last said; null until the Machine answers. */
-  version: string | null;
-  features: string[] | null;
-  lastError: string | null;
-  diskFreeBytes: number | null;
-  budgetToday: { usedTokens: number; limitTokens: number } | null;
-};
-
-export const UNKNOWN_MACHINE_STATUS: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, restoreError: null, stopError: null, providerError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
-
-/** One page's usage request for one Machine: what it asked for, and how it went. */
-export type UsageStatus = {
-  request: string | null;
-  days: number | null;
-  loading: boolean;
-  /** A code from the Hub or the Machine, such as `hub.machine_offline` or `usage.invalid_range`. */
-  error: string | null;
-  /** The range the Machine chose, which its own clock defines; null before its first answer. */
-  from: string | null;
-  to: string | null;
-  /** The biggest Tasks of that answer, for the page's list; only held in memory. */
-  tasks: { agent: string; task: string; tokens: number }[];
-  /** The answer's total for its range, so the "other" row comes from the same answer as the Tasks. */
-  total: number;
-};
-
-const UNKNOWN_USAGE: UsageStatus = { request: null, days: null, loading: false, error: null, from: null, to: null, tasks: [], total: 0 };
-
-/** One Agent's Memory as the Machine last answered it; only held in memory (`agent-memory-page`). */
-export type MemoryStatus = {
-  request: string | null;
-  machine: string | null;
-  agent: string | null;
-  loading: boolean;
-  /** A code from the Hub or the Machine, such as `hub.machine_offline` or `agent.unknown`. */
-  error: string | null;
-  /** The last answer: the whole-file count and the text the next Turn's prompt gets. */
-  memory: { exists: boolean; chars: number; text: string } | null;
-  /** When that answer landed, so the page can say how fresh it is. */
-  fetchedAt: number | null;
-};
-
-export const UNKNOWN_MEMORY: MemoryStatus = { request: null, machine: null, agent: null, loading: false, error: null, memory: null, fetchedAt: null };
+export type { MachineStatus, MemoryStatus, UsageStatus };
+export { UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY };
 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
@@ -104,96 +46,23 @@ export function createMachineLinks({
   const watchers = new Map<string, (signed: SignedPart) => void>();
   const linkListeners = new Set<(links: DeviceLink[]) => void>();
   const requestListeners = new Set<(hubUrl: string, request: HubLinkRequest) => void>();
-  const statuses = new Map<string, MachineStatus>();
-  // A File card's press waits here until its chunks are a file on disk, so the card can say it failed.
-  const downloadWaiters = new Map<string, Set<{ resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>>();
-  const downloads = new Map<string, Download>();
-  /** The name the card asked for, so the cache lookup and the write agree even if chunks say another. */
-  const downloadNames = new Map<string, string>();
-  /** A hash being written or opened; a retransmitted chunk set must not open it twice. */
-  const opening = new Set<string>();
-
-  function settleDownload(hash: string, error?: Error) {
-    downloads.delete(hash);
-    downloadNames.delete(hash);
-    const waiters = downloadWaiters.get(hash);
-    if (!waiters) return;
-    downloadWaiters.delete(hash);
-    for (const waiter of waiters) {
-      clearTimeout(waiter.timer);
-      if (error) waiter.reject(error);
-      else waiter.resolve();
-    }
-  }
-
-  /** Downloaded files live under the cache, one folder per hash, so two files with one name cannot collide. */
-  function cachedFile(hash: string, name: string): File {
-    return new File(new Directory(Paths.cache, "veeloe-files", hash), safeFileName(name));
-  }
-
-  async function keepAndOpen(hash: string, download: Download) {
-    let written = false;
-    try {
-      const bytes = decodeChunks(download.chunks as string[]);
-      // The Machine checked this before chunking; checking again here keeps a bad cache out.
-      if (hashBytes(bytes) !== hash) {
-        settleDownload(hash, new Error("attachment.invalid"));
-        return;
-      }
-      const file = cachedFile(hash, download.name);
-      file.parentDirectory.create({ intermediates: true, idempotent: true });
-      await file.write(bytes);
-      written = true;
-      await openDownloadedFile(file);
-      settleDownload(hash);
-    } catch {
-      settleDownload(hash, new Error(written ? "attachment.open" : "attachment.invalid"));
-    } finally {
-      opening.delete(hash);
-    }
-  }
-
-  // A new object on every change, so React can tell that something moved.
-  let all: Record<string, MachineStatus> = {};
-  const listeners = new Set<() => void>();
-  const usageStatuses = new Map<string, UsageStatus>();
-  // A new object on every change, so React can tell that something moved.
-  let allUsage: Record<string, UsageStatus> = {};
-  const usageListeners = new Set<() => void>();
-  const memoryStatuses = new Map<string, MemoryStatus>();
-  // A new object on every change, so React can tell that something moved.
-  let allMemory: Record<string, MemoryStatus> = {};
-  const memoryListeners = new Set<() => void>();
+  const statuses = createStatusStore(UNKNOWN_MACHINE_STATUS);
+  const usage = createStatusStore(UNKNOWN_USAGE);
+  const memory = createStatusStore(UNKNOWN_MEMORY);
+  const files = createFileCache();
   /** Which Machine an envelope went to, by its sig, so an answer about it finds its way back. */
   const sentTo = new Map<string, { machine: string; kind: Kind; request?: string }>();
   // The Hub does not say when a Machine comes back, so one that was offline is asked again, later each time.
   const retries = new Map<string, { timer: ReturnType<typeof setTimeout>; backoff: ReturnType<typeof createBackoff> }>();
 
-  function setStatus(machine: string, change: Partial<MachineStatus>) {
-    statuses.set(machine, { ...(statuses.get(machine) ?? UNKNOWN_MACHINE_STATUS), ...change });
-    all = Object.fromEntries(statuses);
-    for (const listener of [...listeners]) listener();
-  }
-
-  function setUsage(machine: string, change: Partial<UsageStatus>) {
-    usageStatuses.set(machine, { ...(usageStatuses.get(machine) ?? UNKNOWN_USAGE), ...change });
-    allUsage = Object.fromEntries(usageStatuses);
-    for (const listener of [...usageListeners]) listener();
-  }
-
-  function setMemory(key: string, change: Partial<MemoryStatus>) {
-    memoryStatuses.set(key, { ...(memoryStatuses.get(key) ?? UNKNOWN_MEMORY), ...change });
-    allMemory = Object.fromEntries(memoryStatuses);
-    for (const listener of [...memoryListeners]) listener();
-  }
-
-  /** One Agent's Memory belongs to one Machine, so the key carries both. */
-  const memoryKey = (machine: string, agent: string) => `${machine}:${agent}`;
+  const setStatus = (machine: string, change: Partial<MachineStatus>) => statuses.set(machine, change);
+  const setUsage = (machine: string, change: Partial<UsageStatus>) => usage.set(machine, change);
+  const setMemory = (key: string, change: Partial<MemoryStatus>) => memory.set(key, change);
 
   /** Land an error on the ask it belongs to; a different request id leaves the page alone. */
   function failMemory(machine: string, request: string | undefined, code: string) {
     if (!request) return;
-    for (const [key, status] of memoryStatuses) {
+    for (const [key, status] of memory.entries()) {
       if (status.machine === machine && status.request === request) setMemory(key, { loading: false, error: code });
     }
   }
@@ -228,28 +97,7 @@ export function createMachineLinks({
     if (parsed.kind !== "message") return;
     const { message } = parsed;
     if (message.type === "file.chunk") {
-      const body = message.body as { file?: unknown; index?: unknown; total?: unknown; data?: unknown; name?: unknown };
-      if (typeof body.file !== "string" || typeof body.index !== "number" || typeof body.total !== "number" || typeof body.data !== "string") return;
-      // Only a File card that is waiting may put bytes on disk; an unsolicited chunk opens nothing.
-      if (!isFileHash(body.file) || !downloadWaiters.has(body.file) || opening.has(body.file)) return;
-      if (!Number.isInteger(body.total) || body.total < 1 || !Number.isInteger(body.index) || body.index < 0 || body.index >= body.total) return;
-      if (body.total > MAX_DOWNLOAD_CHUNKS || body.data.length > MAX_CHUNK_TEXT) {
-        settleDownload(body.file, new Error("attachment.too_large"));
-        return;
-      }
-      const item = downloads.get(body.file) ?? {
-        total: body.total,
-        chunks: new Array<string | undefined>(body.total).fill(undefined),
-        name: downloadNames.get(body.file) ?? safeFileName(typeof body.name === "string" ? body.name : `${body.file.slice(0, 8)}.bin`),
-      };
-      if (item.total !== body.total) return;
-      item.chunks[body.index] = body.data;
-      downloads.set(body.file, item);
-      if (item.chunks.every((chunk) => typeof chunk === "string")) {
-        opening.add(body.file);
-        downloads.delete(body.file);
-        void keepAndOpen(body.file, item);
-      }
+      files.chunk(message.body as { file?: unknown; index?: unknown; total?: unknown; data?: unknown; name?: unknown });
       return;
     }
     if (message.type === "agent.listed") {
@@ -274,7 +122,7 @@ export function createMachineLinks({
       // The tally of an answer already given, kept before anything shows it; older news never wins (`daily-budget`).
       await saveUsage(database, message.body);
     } else if (message.type === "usage.listed") {
-      const current = usageStatuses.get(machine.id);
+      const current = usage.get(machine.id);
       // An answer to an older window is dropped whole: its days would otherwise show up in the current one.
       if (!current || current.request !== message.body.request) return;
       await saveUsageHistory(database, machine.id, message.body);
@@ -289,7 +137,7 @@ export function createMachineLinks({
       });
     } else if (message.type === "memory.got") {
       const key = memoryKey(machine.id, message.body.agent);
-      const current = memoryStatuses.get(key);
+      const current = memory.get(key);
       // Only the answer to this page's latest ask counts: a stale or misrouted one changes nothing.
       if (!current || current.request !== message.body.request || current.agent !== message.body.agent) return;
       setMemory(key, {
@@ -305,21 +153,25 @@ export function createMachineLinks({
       for (const task of await addListedTasks(database, machine.id, message.body.tasks)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent, after: 0 } });
     } else if (message.type === "error" && message.body.ref) {
       const about = sentTo.get(message.body.ref);
-      if (about?.kind === "create") setStatus(machine.id, { createError: message.body.code });
-      else if (about?.kind === "update") setStatus(machine.id, { updateError: message.body.code });
-      else if (about?.kind === "delete") setStatus(machine.id, { deleteError: message.body.code });
-      else if (about?.kind === "restore") setStatus(machine.id, { restoreError: message.body.code });
-      else if (about?.kind === "stop") setStatus(machine.id, { stopError: message.body.code });
-      else if (about?.kind === "provider") setStatus(machine.id, { providerError: message.body.code });
-      else if (about?.kind === "usage") {
-        const current = usageStatuses.get(about.machine);
-        if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: message.body.code });
-      } else if (about?.kind === "memory") {
-        failMemory(about.machine, about.request, message.body.code);
-      } else if (about?.kind === "download" && about.request) {
-        settleDownload(about.request, new Error(message.body.code));
-      } else await failPendingMessage(database, message.body.ref, message.body.code);
+      if (about && about.kind !== "hello") await failSent(about, message.body.ref, message.body.code);
+      else await failPendingMessage(database, message.body.ref, message.body.code);
     }
+  }
+
+  /** Land the error about one envelope on the ask it belongs to; a plain message's goes to its pending row. */
+  async function failSent(about: { machine: string; kind: Kind; request?: string }, ref: string, code: string) {
+    if (about.kind === "usage") {
+      const current = usage.get(about.machine);
+      if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: code });
+    } else if (about.kind === "memory") failMemory(about.machine, about.request, code);
+    else if (about.kind === "download" && about.request) files.settle(about.request, new Error(code));
+    else if (about.kind === "create") setStatus(about.machine, { createError: code });
+    else if (about.kind === "update") setStatus(about.machine, { updateError: code });
+    else if (about.kind === "delete") setStatus(about.machine, { deleteError: code });
+    else if (about.kind === "restore") setStatus(about.machine, { restoreError: code });
+    else if (about.kind === "stop") setStatus(about.machine, { stopError: code });
+    else if (about.kind === "provider") setStatus(about.machine, { providerError: code });
+    else await failPendingMessage(database, ref, code);
   }
 
   // The last envelope number from each sender lives in the database, not this process (`protocol-envelope`).
@@ -363,26 +215,7 @@ export function createMachineLinks({
           if (about.kind === "hello" && machine) helloLater(machine);
         }
         if (about.kind === "hello") return;
-        if (about.kind === "usage") {
-          const current = usageStatuses.get(about.machine);
-          if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: error.code });
-          return;
-        }
-        if (about.kind === "memory") {
-          failMemory(about.machine, about.request, error.code);
-          return;
-        }
-        if (about.kind === "download" && about.request) {
-          settleDownload(about.request, new Error(error.code));
-          return;
-        }
-        if (about.kind === "create") setStatus(about.machine, { createError: error.code });
-        else if (about.kind === "update") setStatus(about.machine, { updateError: error.code });
-        else if (about.kind === "delete") setStatus(about.machine, { deleteError: error.code });
-        else if (about.kind === "restore") setStatus(about.machine, { restoreError: error.code });
-        else if (about.kind === "stop") setStatus(about.machine, { stopError: error.code });
-        else if (about.kind === "provider") setStatus(about.machine, { providerError: error.code });
-        else void failPendingMessage(database, error.ref!, error.code);
+        void failSent(about, error.ref!, error.code);
       },
     });
     clients.set(hubUrl, { client, machines });
@@ -408,12 +241,9 @@ export function createMachineLinks({
       for (const [hubUrl, onHub] of byHub) if (!clients.has(hubUrl)) connect(hubUrl, onHub);
     },
 
-    status: (machine: string) => statuses.get(machine) ?? UNKNOWN_MACHINE_STATUS,
-    statuses: () => all,
-    subscribe(listener: () => void) {
-      listeners.add(listener);
-      return () => void listeners.delete(listener);
-    },
+    status: (machine: string) => statuses.or(machine),
+    statuses: statuses.all,
+    subscribe: statuses.subscribe,
 
     /**
      * Asks a Machine for how the last `days` Budget days went. The answer is cached
@@ -421,7 +251,7 @@ export function createMachineLinks({
      * older window out of the page. Null when the Hub is not connected and nothing went.
      */
     requestUsage(machine: Machine, days: number) {
-      const current = usageStatuses.get(machine.id);
+      const current = usage.get(machine.id);
       if (current?.loading && current.days === days) return current.request;
       const request = newId();
       setUsage(machine.id, { request, days, loading: true, error: null });
@@ -432,12 +262,9 @@ export function createMachineLinks({
       return request;
     },
 
-    usage: (machine: string) => usageStatuses.get(machine) ?? UNKNOWN_USAGE,
-    usageStatuses: () => allUsage,
-    subscribeUsage(listener: () => void) {
-      usageListeners.add(listener);
-      return () => void usageListeners.delete(listener);
-    },
+    usage: (machine: string) => usage.or(machine),
+    usageStatuses: usage.all,
+    subscribeUsage: usage.subscribe,
 
     /**
      * Asks a Machine for one Agent's Memory (`agent-memory-page`). The page keeps the answer and
@@ -445,7 +272,7 @@ export function createMachineLinks({
      */
     requestMemory(machine: Machine, agent: string) {
       const key = memoryKey(machine.id, agent);
-      const current = memoryStatuses.get(key);
+      const current = memory.get(key);
       if (current?.loading) return current.request;
       const request = newId();
       setMemory(key, { request, machine: machine.id, agent, loading: true, error: null });
@@ -456,12 +283,9 @@ export function createMachineLinks({
       return request;
     },
 
-    memory: (machine: string, agent: string) => memoryStatuses.get(memoryKey(machine, agent)) ?? UNKNOWN_MEMORY,
-    memoryStatuses: () => allMemory,
-    subscribeMemory(listener: () => void) {
-      memoryListeners.add(listener);
-      return () => void memoryListeners.delete(listener);
-    },
+    memory: (machine: string, agent: string) => memory.or(memoryKey(machine, agent)),
+    memoryStatuses: memory.all,
+    subscribeMemory: memory.subscribe,
 
     /** The new Agent's id, or null when the Machine's Hub is not connected and nothing went. The Machine keeps `character` with it. */
     createAgent(machine: Machine, agent: Omit<AgentCreateBody, "id">) {
@@ -522,38 +346,8 @@ export function createMachineLinks({
      * Machine answers `file.get` with `file.chunk`, and the card waits until the
      * file is written and handed to the OS.
      */
-    async openFile(machine: Machine, task: string, agent: string, path: string, hash: string, name: string) {
-      if (!isFileHash(hash)) throw new Error("attachment.invalid");
-      const cached = cachedFile(hash, name);
-      if (cached.exists) {
-        try {
-          if (hashBytes(await cached.bytes()) === hash) return await openDownloadedFile(cached);
-        } catch {
-          // A cache file we cannot read is no better than none.
-        }
-        cached.delete();
-      }
-      return new Promise<void>((resolve, reject) => {
-        const alreadyAsked = downloadWaiters.has(hash);
-        const waiters = downloadWaiters.get(hash) ?? new Set<{ resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
-        const waiter = {
-          resolve,
-          reject,
-          timer: setTimeout(() => settleDownload(hash, new Error("attachment.timeout")), 120_000),
-        };
-        waiters.add(waiter);
-        downloadWaiters.set(hash, waiters);
-        if (alreadyAsked) return;
-        downloadNames.set(hash, safeFileName(name));
-        downloads.delete(hash);
-        if (!sendTo(machine, "download", { type: "file.get", task, body: { agent, path, hash } }, hash)) {
-          clearTimeout(waiter.timer);
-          waiters.delete(waiter);
-          downloadNames.delete(hash);
-          if (waiters.size === 0) downloadWaiters.delete(hash);
-          reject(new Error("hub.machine_offline"));
-        }
-      });
+    openFile(machine: Machine, task: string, agent: string, path: string, hash: string, name: string) {
+      return files.open(hash, name, () => sendTo(machine, "download", { type: "file.get", task, body: { agent, path, hash } }, hash) !== null);
     },
 
     /** Give this Controller's Expo token to the Machine (ADR 0044); null when nothing went. */
@@ -642,8 +436,6 @@ export function createMachineLinks({
       for (const { client } of clients.values()) client.stop();
       clients.clear();
       statuses.clear();
-      all = {};
-      for (const listener of [...listeners]) listener();
     },
   };
 }

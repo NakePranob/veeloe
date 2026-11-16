@@ -1,37 +1,10 @@
 {
   "create": "สร้าง Agent",
-  "createShort": "สร้าง",
-  "new": "Agent ใหม่",
-  "shuffle": "สุ่ม Character ใหม่",
   "offline": "ออฟไลน์",
-  "online": "ออนไลน์",
   "none": {
     "title": "ยังไม่มี Agent",
     "body": "สร้าง Agent ตัวแรกบน Machine ที่ผูกไว้"
   },
-  "missing": {
-    "title": "ไม่พบ Agent นี้",
-    "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
-  },
-  "name": "ชื่อ",
-  "namePlaceholder": "เช่น Deployer",
-  "machine": {
-    "heading": "อยู่บน Machine",
-    "footer": "Agent อยู่ Machine เดียวตลอดและแตะได้แค่ไฟล์กับ tool ของเครื่องนั้น Runtime สร้าง Workdir ให้ที่ ~/.veeloe/agents/<id>/workdir เลือก path เองไม่ได้ (ADR 0002, 0032)",
-    "offline": "Machine นี้ออฟไลน์ ให้รัน veeloe ที่เครื่องนั้นก่อน"
-  },
-  "asking": "กำลังถาม Machine ว่ามี Provider อะไร",
-  "provider": {
-    "heading": "Provider และ model",
-    "footer": "รายชื่อ model มาจาก Provider ที่ตั้งบน Machine นี้ คนที่มี Manage เปลี่ยนทีหลังได้ และมีผลตั้งแต่ Task ถัดไป (ADR 0042)",
-    "none": "Machine นี้ยังไม่มี Provider",
-    "command": "veeloe provider add --name <ชื่อ> --url <base url>",
-    "nextTask": "เปลี่ยนแล้วมีผลตั้งแต่ Task ถัดไป Task ที่กำลังทำอยู่ใช้ model เดิมจนจบ เพราะเปลี่ยนกลาง Task ทำให้ prompt cache เริ่มใหม่ และ thinking ใช้ต่อไม่ได้ ถ้า Provider ล่ม Agent ทุกตัวบนเครื่องที่ใช้ตัวนั้นหยุดพร้อมกัน (ADR 0042)"
-  },
-  "modelFilter": "ค้นหา model",
-  "noMatch": "ไม่มี model ที่ตรง",
-  "context": "context {{count}}K",
-  "creating": "กำลังสร้างบน Machine",
   "budget": {
     "heading": "Budget วันนี้",
     "footer": "นับทุก token ที่ Provider รายงาน วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine พอหมด Turn ที่ทำอยู่จบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนขึ้นวันใหม่หรือมีคนเพิ่ม ควรตั้ง spend limit ที่ Provider ไว้อีกชั้นด้วย (ADR 0043)",
@@ -42,42 +15,7 @@
     "default": "Budget เริ่มต้นที่ 10M token ต่อวัน ตั้งทีหลังได้ที่หน้าของ Agent (ADR 0043)",
     "list": "Budget วันนี้ {{percent}}%"
   },
-  "tasks": {
-    "new": "Task ใหม่",
-    "footer": "แสดงเฉพาะ Task ที่คุณเริ่ม (ADR 0060)",
-    "untitled": "ยังไม่มีข้อความ"
-  },
-  "approval": {
-    "heading": "Approval",
-    "footer": "Approval ที่ไม่มีใครตอบจนเกินเวลานี้นับว่าถูกปฏิเสธ (ADR 0003)",
-    "waiting": "Approval หมดอายุใน",
-    "minutes_one": "{{count}} นาที",
-    "minutes_other": "{{count}} นาที",
-    "hours_one": "{{count}} ชั่วโมง",
-    "hours_other": "{{count}} ชั่วโมง"
-  },
-  "more": {
-    "heading": "ตั้งค่าเพิ่มเติม"
-  },
-  "allowlist": {
-    "heading": "คำสั่งที่รันได้เลยไม่ต้องขอ Approval",
-    "footer": "ชุดอ่านอย่างเดียวติ๊กไว้ให้ เอาออกได้ก่อนเซ็น ไม่มี find เพราะมี -exec กับ -delete ไม่มี sed เพราะมี -i และไม่มี git หรือ npm ทั้งตัว (ADR 0030)",
-    "row": "Allowlist",
-    "count_one": "{{count}} รายการ",
-    "count_other": "{{count}} รายการ"
-  },
-  "save": "บันทึก",
-  "saving": "กำลังบันทึกบน Machine",
   "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",
-  "characterLater": "Character แก้ทีหลังได้ที่หน้าของ Agent",
-  "character": {
-    "detail": "หน้าตาและท่าทางที่แสดงใน Inbox"
-  },
-  "problem": {
-    "provider": "Provider {{provider}} ไม่อยู่บน Machine แล้ว Agent นี้จึงตอบไม่ได้ เลือก Provider ใหม่ด้านล่าง",
-    "model": "Provider {{provider}} ไม่มี model {{model}} ในรายชื่อแล้ว เลือก model ใหม่ด้านล่าง",
-    "choose": "เลือก Provider ใหม่"
-  },
   "delete": {
     "heading": "โซนอันตราย",
     "action": "ลบ Agent นี้",
@@ -97,8 +35,5 @@
     "confirmTitle": "กู้คืน {{name}}?",
     "confirmBody": "Agent จะกลับไปทำงานด้วย setting เดิม และ Task เดิมจะคุยต่อได้",
     "failed": "กู้คืน Agent นี้ไม่สำเร็จ"
-  },
-  "memory": {
-    "detail": "อ่าน MEMORY.md ที่ Agent จดไว้"
   }
 }

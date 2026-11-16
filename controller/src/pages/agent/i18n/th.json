@@ -1,0 +1,73 @@
+{
+  "missing": {
+    "title": "ไม่พบ Agent นี้",
+    "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
+  },
+  "name": "ชื่อ",
+  "provider": {
+    "heading": "Provider และ model",
+    "footer": "รายชื่อ model มาจาก Provider ที่ตั้งบน Machine นี้ คนที่มี Manage เปลี่ยนทีหลังได้ และมีผลตั้งแต่ Task ถัดไป (ADR 0042)",
+    "none": "Machine นี้ยังไม่มี Provider",
+    "command": "veeloe provider add --name <ชื่อ> --url <base url>",
+    "nextTask": "เปลี่ยนแล้วมีผลตั้งแต่ Task ถัดไป Task ที่กำลังทำอยู่ใช้ model เดิมจนจบ เพราะเปลี่ยนกลาง Task ทำให้ prompt cache เริ่มใหม่ และ thinking ใช้ต่อไม่ได้ ถ้า Provider ล่ม Agent ทุกตัวบนเครื่องที่ใช้ตัวนั้นหยุดพร้อมกัน (ADR 0042)"
+  },
+  "budget": {
+    "heading": "Budget วันนี้",
+    "footer": "นับทุก token ที่ Provider รายงาน วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine พอหมด Turn ที่ทำอยู่จบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนขึ้นวันใหม่หรือมีคนเพิ่ม ควรตั้ง spend limit ที่ Provider ไว้อีกชั้นด้วย (ADR 0043)",
+    "label": "Budget วันนี้",
+    "used": "{{used}} จาก {{budget}} token ({{percent}}%)",
+    "spent": " · หมดแล้ว",
+    "field": "Budget ต่อวัน (ล้าน token)",
+    "default": "Budget เริ่มต้นที่ 10M token ต่อวัน ตั้งทีหลังได้ที่หน้าของ Agent (ADR 0043)",
+    "list": "Budget วันนี้ {{percent}}%"
+  },
+  "tasks": {
+    "new": "Task ใหม่",
+    "footer": "แสดงเฉพาะ Task ที่คุณเริ่ม (ADR 0060)",
+    "untitled": "ยังไม่มีข้อความ"
+  },
+  "approval": {
+    "heading": "Approval",
+    "footer": "Approval ที่ไม่มีใครตอบจนเกินเวลานี้นับว่าถูกปฏิเสธ (ADR 0003)",
+    "waiting": "Approval หมดอายุใน",
+    "minutes_one": "{{count}} นาที",
+    "minutes_other": "{{count}} นาที",
+    "hours_one": "{{count}} ชั่วโมง",
+    "hours_other": "{{count}} ชั่วโมง"
+  },
+  "more": {
+    "heading": "ตั้งค่าเพิ่มเติม"
+  },
+  "allowlist": {
+    "heading": "คำสั่งที่รันได้เลยไม่ต้องขอ Approval",
+    "footer": "ชุดอ่านอย่างเดียวติ๊กไว้ให้ เอาออกได้ก่อนเซ็น ไม่มี find เพราะมี -exec กับ -delete ไม่มี sed เพราะมี -i และไม่มี git หรือ npm ทั้งตัว (ADR 0030)",
+    "row": "Allowlist",
+    "count_one": "{{count}} รายการ",
+    "count_other": "{{count}} รายการ"
+  },
+  "save": "บันทึก",
+  "saving": "กำลังบันทึกบน Machine",
+  "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",
+  "character": {
+    "detail": "หน้าตาและท่าทางที่แสดงใน Inbox"
+  },
+  "problem": {
+    "provider": "Provider {{provider}} ไม่อยู่บน Machine แล้ว Agent นี้จึงตอบไม่ได้ เลือก Provider ใหม่ด้านล่าง",
+    "model": "Provider {{provider}} ไม่มี model {{model}} ในรายชื่อแล้ว เลือก model ใหม่ด้านล่าง",
+    "choose": "เลือก Provider ใหม่"
+  },
+  "delete": {
+    "heading": "โซนอันตราย",
+    "action": "ลบ Agent นี้",
+    "title": "ลบ {{name}}?",
+    "body": "Agent จะหยุดและย้ายไปอยู่ใน Agent ที่ถูกลบ Workdir กับประวัติ Task ยังอยู่บน Machine และกู้คืนได้ภายใน 30 วัน",
+    "cancel": "ยกเลิก",
+    "prompt": "ลบ {{name}}",
+    "failed": "ลบ Agent นี้ไม่สำเร็จ"
+  },
+  "memory": {
+    "detail": "อ่าน MEMORY.md ที่ Agent จดไว้"
+  },
+  "online": "ออนไลน์",
+  "offline": "ออฟไลน์"
+}

@@ -1,1 +1,1 @@
-export { AllowlistPage as default } from "../../../src/pages/allowlist";
+export { AllowlistPage as default } from "../../../src/pages/agent-allowlist";

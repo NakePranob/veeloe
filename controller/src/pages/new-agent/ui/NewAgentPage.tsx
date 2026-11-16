@@ -9,13 +9,12 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { Button, Field, Icon, Note, Row, Screen, Section, space, ToggleRow, useColors } from "../../../shared/ui";
-import { modelsOf } from "../model/providers";
-import { ProviderModelSections } from "./ProviderModelSections";
+import { modelsOf, ProviderModelSections } from "../../../widgets/provider-models";
 
 // controller-prototype's NewAgentPage, with what this version sends: a Character, a name, a Machine, a Provider and a model.
 // ponytail: no description or instructions yet; each comes with the change that uses it.
 export function NewAgentPage() {
-  const t = useT("agents");
+  const t = useT("new-agent");
   const colors = useColors();
   const machines = useMachines() ?? [];
   const statuses = useMachineStatuses();
