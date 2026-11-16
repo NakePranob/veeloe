@@ -38,3 +38,14 @@ Agent ต้องทำงาน dev ได้จริง คือรัน d
 - dev server ที่ Member จะเปิดดูจากมือถือต้องให้ supervisor forward port ผ่าน Hub เฉพาะคนที่มีสิทธิ์ ข้อนี้ยังไม่มี ADR
 - headless browser บน macOS วัดแล้ว (Chrome for Testing `chrome-headless-shell` 156 บน macOS 27): ไม่ต้องเพิ่ม service ของระบบเลย ขาดแค่ชื่อ Mach ของตัวเอง `<bundle>.MachPortRendezvousServer.<pid>` ซึ่ง profile อนุญาตเป็น regex เฉพาะ namespace ของ Chrome/Chromium และอนุญาตทั้ง `mach-register` กับ `mach-lookup`; `com.apple.*` ที่ browser ยังขอ (diagnosticd, windowserver.active, tccd.system, pasteboard) ถูกปฏิเสธและไม่จำเป็นต่อการเปิดหน้า/อ่าน DOM ส่วน Chrome app เต็มต้องใช้ service ของ GUI session จึงไม่เปิดให้
 - ต้องทดลองก่อนเปิดใช้: worker ใต้ sandbox ครบหนึ่ง Turn, network namespace คงอยู่ข้าม Turn ได้, AppArmor profile ของ bwrap และ VM ที่ไม่มี NIC ของชั้น 2
+
+## สิ่งที่สร้างจริงตอนปิด issue #32
+
+ชั้น 1 ครบตามนี้ ส่วนที่ต่างจากข้อความข้างบนบันทึกไว้พร้อมเวลาที่ต้องกลับมาทำ:
+
+- **proxy ต่อ Agent ที่รู้ Turn ปัจจุบัน แทน proxy ใหม่ทุก Turn:** listener หนึ่งตัวต่อ Agent และตอบเฉพาะระหว่างที่มี Turn รันอยู่ ผูกกับ Member ของ Turn นั้น ใช้ได้เพราะ Agent หนึ่งตัวรันได้ทีละ Turn ต้องแยกเป็นต่อ Turn เมื่อมี Member คนที่สองและขอบเขตต่อ Turn (v0.3)
+- **branch ที่ push ได้เป็นของ Agent ไม่ใช่ของ Task:** git broker ยอมเฉพาะ branch ใต้ `veeloe/<agent>/` ห้ามลบ branch ห้าม push tag ต้องแคบลงเป็น branch ของ Task เมื่อ Project และ Worktree มีจริง
+- **PAT ของ Owner แทน GitHub App token อายุสั้น:** ตามที่บันทึกไว้ในส่วน proxy และ git broker ด้านบน ต้องเปลี่ยนก่อนเปิดให้ Workspace ที่มีหลายคน
+- **credential ที่ผูกกับโดเมนมีแค่ GitHub ผ่าน git broker:** proxy ไม่ถอดรหัส TLS จึงใส่ header ให้โดเมนอื่นไม่ได้ ที่เหลือมาพร้อม Connector
+- **seccomp ติดตั้งโดย worker เอง แทน `bwrap --seccomp`:** worker ติดตั้งก่อนทำอย่างอื่น ทุกคำสั่งสืบทอดไป ไม่ต้องส่ง fd ผ่าน `bwrap` และ `systemd-run --scope` ผลคือ Chromium บน Linux ต้องรันด้วย `--no-sandbox` เพราะสร้าง user namespace ของตัวเองไม่ได้ (issue #50)
+- **proxy ตรวจ SNI:** ClientHello ใน tunnel ต้องมีชื่อตรงกับ host ของ CONNECT, ClientHello ที่ไม่มีชื่อถูกปฏิเสธ ส่วน traffic ที่ไม่ใช่ TLS ผ่านได้เหมือนเดิม ปลายทางเป็น IP ที่ proxy resolve เองอยู่แล้ว

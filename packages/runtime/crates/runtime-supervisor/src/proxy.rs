@@ -450,6 +450,13 @@ where
             client
                 .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 .await?;
+            // The name in the TLS ClientHello is where a CDN sends the
+            // connection, so an allowed domain must not carry another one
+            // (ADR 0069, issue #32 story 24).
+            let Some(opening) = read_opening(&mut client, &host).await else {
+                return Ok(());
+            };
+            upstream.write_all(&opening).await?;
         }
         Some(path) => {
             upstream
@@ -459,6 +466,134 @@ where
     }
     tokio::io::copy_bidirectional(&mut client, &mut upstream).await?;
     Ok(())
+}
+
+/// The most a ClientHello may take: one TLS record.
+const MAX_HELLO: usize = 5 + 16 * 1024;
+
+/// What a tunnel's first bytes say about where they are going.
+#[derive(Debug, PartialEq, Eq)]
+enum Opening {
+    NeedMore,
+    NotTls,
+    /// A ClientHello, with the server name it asks for, if any.
+    Tls(Option<String>),
+    Malformed,
+}
+
+/// Reads the first bytes a client sends through a tunnel. TLS must name the
+/// host it was allowed for; anything else passes as it did, and so does a
+/// client that waits for the server to speak first. `None` refuses.
+async fn read_opening<S>(client: &mut S, host: &str) -> Option<Vec<u8>>
+where
+    S: AsyncRead + Unpin,
+{
+    let mut buffer = Vec::new();
+    let mut chunk = [0u8; 4096];
+    loop {
+        match opening(&buffer) {
+            Opening::NotTls => return Some(buffer),
+            Opening::Tls(Some(name)) => {
+                let name = name.trim_end_matches('.').to_ascii_lowercase();
+                return (name == host).then_some(buffer);
+            }
+            // A client that resolves a name always sends it; one that
+            // does not is hiding where it goes.
+            Opening::Tls(None) | Opening::Malformed => return None,
+            Opening::NeedMore => {}
+        }
+        // Only the first byte may be waited on for long: SSH and SMTP wait for
+        // the server instead.
+        let wait = if buffer.is_empty() { 3 } else { 10 };
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(wait),
+            client.read(&mut chunk),
+        )
+        .await
+        {
+            Err(_) if buffer.is_empty() => return Some(buffer),
+            Err(_) | Ok(Err(_)) | Ok(Ok(0)) => return None,
+            Ok(Ok(read)) => buffer.extend_from_slice(&chunk[..read]),
+        }
+    }
+}
+
+/// Reads a TLS record holding a ClientHello far enough to find its
+/// `server_name` (RFC 8446 4.1.2, RFC 6066 3).
+fn opening(bytes: &[u8]) -> Opening {
+    let Some(&first) = bytes.first() else {
+        return Opening::NeedMore;
+    };
+    if first != 0x16 {
+        return Opening::NotTls;
+    }
+    if bytes.len() < 5 {
+        return Opening::NeedMore;
+    }
+    let length = u16::from_be_bytes([bytes[3], bytes[4]]) as usize;
+    if 5 + length > MAX_HELLO {
+        return Opening::Malformed;
+    }
+    if bytes.len() < 5 + length {
+        return Opening::NeedMore;
+    }
+    match hello_server_name(&bytes[5..5 + length]) {
+        Some(name) => Opening::Tls(name),
+        None => Opening::Malformed,
+    }
+}
+
+/// The server name of one ClientHello handshake message: `Some(None)` when it
+/// has none, `None` when it cannot be read (or does not fit one record).
+fn hello_server_name(handshake: &[u8]) -> Option<Option<String>> {
+    struct Cursor<'a>(&'a [u8]);
+    impl<'a> Cursor<'a> {
+        fn take(&mut self, count: usize) -> Option<&'a [u8]> {
+            let (head, rest) = (self.0.get(..count)?, self.0.get(count..)?);
+            self.0 = rest;
+            Some(head)
+        }
+        fn number(&mut self, width: usize) -> Option<usize> {
+            Some(
+                self.take(width)?
+                    .iter()
+                    .fold(0, |sum, byte| sum << 8 | *byte as usize),
+            )
+        }
+        fn block(&mut self, width: usize) -> Option<Cursor<'a>> {
+            let length = self.number(width)?;
+            Some(Cursor(self.take(length)?))
+        }
+    }
+    let mut message = Cursor(handshake);
+    if message.number(1)? != 1 {
+        return None;
+    }
+    let mut hello = message.block(3)?;
+    hello.take(2 + 32)?;
+    hello.block(1)?;
+    hello.block(2)?;
+    hello.block(1)?;
+    if hello.0.is_empty() {
+        return Some(None);
+    }
+    let mut extensions = hello.block(2)?;
+    while !extensions.0.is_empty() {
+        let kind = extensions.number(2)?;
+        let mut data = extensions.block(2)?;
+        if kind != 0 {
+            continue;
+        }
+        let mut names = data.block(2)?;
+        while !names.0.is_empty() {
+            let name_type = names.number(1)?;
+            let name = names.block(2)?;
+            if name_type == 0 {
+                return Some(Some(String::from_utf8(name.0.to_vec()).ok()?));
+            }
+        }
+    }
+    Some(None)
 }
 
 /// One plain HTTP request in origin-form, with the proxy's own headers dropped
@@ -959,5 +1094,81 @@ mod tests {
             "",
             "a tunnel to the broker is refused"
         );
+    }
+
+    /// A ClientHello as a TLS client sends it, with this server name or none.
+    fn client_hello(name: Option<&str>) -> Vec<u8> {
+        let with_length = |width: usize, body: &[u8]| -> Vec<u8> {
+            let mut out = body.len().to_be_bytes()[8 - width..].to_vec();
+            out.extend_from_slice(body);
+            out
+        };
+        let mut extensions = Vec::new();
+        // A key_share-like extension first, so the name is not the only one.
+        extensions.extend_from_slice(&[0x00, 0x33]);
+        extensions.extend(with_length(2, &[7u8; 40]));
+        if let Some(name) = name {
+            let mut entry = vec![0u8];
+            entry.extend(with_length(2, name.as_bytes()));
+            extensions.extend_from_slice(&[0x00, 0x00]);
+            extensions.extend(with_length(2, &with_length(2, &entry)));
+        }
+        let mut hello = vec![0x03, 0x03];
+        hello.extend([1u8; 32]);
+        hello.extend(with_length(1, &[2u8; 32]));
+        hello.extend(with_length(2, &[0x13, 0x01, 0x13, 0x02]));
+        hello.extend(with_length(1, &[0]));
+        hello.extend(with_length(2, &extensions));
+        let mut handshake = vec![1u8];
+        handshake.extend(with_length(3, &hello));
+        let mut record = vec![0x16, 0x03, 0x01];
+        record.extend(with_length(2, &handshake));
+        record
+    }
+
+    #[test]
+    fn a_client_hello_says_the_name_it_asks_for() {
+        let hello = client_hello(Some("api.example.com"));
+        assert_eq!(
+            opening(&hello),
+            Opening::Tls(Some("api.example.com".into()))
+        );
+        assert_eq!(opening(&client_hello(None)), Opening::Tls(None));
+        assert_eq!(opening(&hello[..hello.len() - 1]), Opening::NeedMore);
+        assert_eq!(opening(b"SSH-2.0-OpenSSH_9.6\r\n"), Opening::NotTls);
+        // A record that claims more than TLS allows, or a handshake that is
+        // not a ClientHello, is not read as one.
+        assert_eq!(opening(&[0x16, 3, 1, 0xff, 0xff]), Opening::Malformed);
+        assert_eq!(opening(&[0x16, 3, 1, 0, 4, 2, 0, 0, 0]), Opening::Malformed);
+    }
+
+    /// Issue #32 story 24: an allowed domain cannot carry a connection to
+    /// another host by naming it in the ClientHello.
+    #[tokio::test]
+    async fn a_tunnel_goes_only_where_its_client_hello_says_it_goes() {
+        async fn decide(first: Vec<u8>, host: &str) -> Option<Vec<u8>> {
+            let (mut ours, mut theirs) = tokio::io::duplex(1 << 16);
+            ours.write_all(&first).await.expect("write");
+            read_opening(&mut theirs, host).await
+        }
+        let allowed = client_hello(Some("API.example.com."));
+        assert_eq!(
+            decide(allowed.clone(), "api.example.com").await,
+            Some(allowed)
+        );
+        assert_eq!(
+            decide(client_hello(Some("evil.example.net")), "api.example.com").await,
+            None
+        );
+        assert_eq!(decide(client_hello(None), "api.example.com").await, None);
+        let plain = b"GET / HTTP/1.1\r\n\r\n".to_vec();
+        assert_eq!(decide(plain.clone(), "api.example.com").await, Some(plain));
+        // A ClientHello cut short by a closed connection opens nothing.
+        let mut cut = client_hello(Some("api.example.com"));
+        cut.truncate(20);
+        let (mut ours, mut theirs) = tokio::io::duplex(1 << 16);
+        ours.write_all(&cut).await.expect("write");
+        drop(ours);
+        assert_eq!(read_opening(&mut theirs, "api.example.com").await, None);
     }
 }
