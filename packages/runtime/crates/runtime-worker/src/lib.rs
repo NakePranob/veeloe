@@ -3,5 +3,6 @@
 pub mod bridge;
 pub mod entry;
 pub mod llm;
+pub mod seccomp;
 pub mod tools;
 pub mod worker;

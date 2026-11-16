@@ -48,6 +48,10 @@ impl SupervisorLink for StdioLink {
 }
 
 pub async fn run_stdio() -> Result<(), Box<dyn std::error::Error>> {
+    // Before anything else, so every command this worker starts inherits it.
+    // Without it the worker does not start (ADR 0069).
+    crate::seccomp::confine_self()
+        .map_err(|error| format!("the worker could not install its seccomp filter: {error}"))?;
     let (Ok(dir), Ok(name)) = (
         std::env::var("VEELOE_AGENT_DIR"),
         std::env::var("VEELOE_AGENT_NAME"),

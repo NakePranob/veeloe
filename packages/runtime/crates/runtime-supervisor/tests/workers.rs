@@ -1589,6 +1589,75 @@ async fn without_a_cgroup_every_worker_runs_and_the_fallback_is_said_once() {
     );
 }
 
+/// Issue #32: a sandboxed worker's command runs under the worker's seccomp
+/// filter. io_uring answers ENOSYS only because of that filter: AppArmor and
+/// bwrap leave it open, so this tells the filter apart from them.
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn a_sandboxed_workers_command_runs_under_its_seccomp_filter() {
+    let home = tempdir().expect("home");
+    let home_path = std::fs::canonicalize(home.path()).expect("real home");
+    let mut agent = agent();
+    agent.allowlist = vec!["python3".into()];
+    let registry = AgentRegistry::open(&home_path).expect("registry");
+    registry.add(&agent).expect("add");
+
+    let heard: Arc<Mutex<Vec<FromWorker>>> = Arc::new(Mutex::new(Vec::new()));
+    let recording = Arc::clone(&heard);
+    let lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let logging = Arc::clone(&lines);
+    let workers = Workers::new(
+        home_path.clone(),
+        worker_binary(),
+        Arc::new(OneCommandLlm {
+            // One expression, so the Allowlist sees one command: io_uring_setup
+            // and the errno it left.
+            command: "python3 -c \"print((lambda c: (lambda l: (l.syscall(425, 1, c.create_string_buffer(120)), c.get_errno()))(c.CDLL(None, use_errno=True)))(__import__('ctypes')))\"".into(),
+            requests: Mutex::new(0),
+        }) as Arc<dyn SupervisorLlm>,
+        Arc::new(move |_agent, message| {
+            recording.lock().expect("heard").push(message);
+        }),
+        Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
+        sandboxed_for(&home_path).await,
+    );
+
+    workers.start(&agent);
+    assert!(
+        until(|| workers.is_ready("a1"), 10_000).await,
+        "the worker never said ready under its filter: {:?}",
+        lines.lock().expect("lines")
+    );
+    assert!(workers.send(
+        "a1",
+        ToWorker::Message {
+            task: "t1".into(),
+            id: "m-go".into(),
+            member: "m_owner".into(),
+            text: "go".into(),
+            reference: "sig-go".into(),
+        }
+    ));
+    assert!(
+        until(|| task_ended(&heard, "t1"), 20_000).await,
+        "the Turn never ended: {:?} {:?}",
+        heard.lock().expect("heard"),
+        lines.lock().expect("lines")
+    );
+    workers.stop_all();
+
+    let results = tool_results(&heard);
+    let (_, content, is_error) = results
+        .iter()
+        .find(|(seen, _, _)| seen == "t-limit")
+        .unwrap_or_else(|| panic!("no result for the command: {results:?}"));
+    assert!(!is_error, "the probe did not run: {content}");
+    assert!(
+        content.contains("(-1, 38)"),
+        "io_uring was not refused with ENOSYS inside the sandbox: {content}"
+    );
+}
+
 /// Issue #48 (review): a scope that opens and then fails before the worker says
 /// Ready — `systemd-run` spawned, its scope refused — must not be tried again
 /// on every restart. The scope is dropped, the log says once why, and the
