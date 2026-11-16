@@ -10,6 +10,8 @@ target/
 # QA screenshots and the working notes a session keeps; not part of the product
 media/
 memory/
+# ...but not a Hub module's in-memory adapter, its template included
+!hub/**/adapters/outbound/memory/
 
 # Worktrees that Claude Code agents work in
 .claude/worktrees/
