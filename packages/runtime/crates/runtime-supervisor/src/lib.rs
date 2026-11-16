@@ -1,15 +1,12 @@
 //! The supervisor process: hub-link, trust, provider key custody and worker
 //! lifecycle (ADR 0020, 0042). The port fills this in one service at a time.
 
-mod agent_config;
 pub mod agents;
 pub mod approval;
 pub mod cgroup;
 pub mod denials;
 pub mod doctor;
 pub mod egress;
-mod egress_set;
-mod file_transfer;
 pub mod git_broker;
 pub mod help;
 pub mod hub_link;
@@ -17,28 +14,23 @@ pub mod json_file;
 pub mod limits;
 pub mod llm;
 pub mod logs;
-mod machine_status;
 pub mod memory;
-mod memory_get;
+mod messages;
 pub mod models;
 pub mod pair;
 pub mod ports;
 pub mod preflight;
-mod provider_add;
 pub mod providers;
 pub mod proxy;
 pub mod push;
-mod push_register;
 pub mod push_tokens;
 pub mod service;
 pub mod status;
 pub mod task_log;
-mod task_message;
 pub mod task_routes;
 pub mod tasks;
 pub mod toolchain;
 pub mod trust;
 pub mod uploads;
 pub mod usage;
-mod usage_list;
 pub mod workers;

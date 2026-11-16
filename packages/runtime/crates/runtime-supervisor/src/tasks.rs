@@ -17,14 +17,14 @@ use crate::approval::Approvals;
 use crate::egress::Egress;
 use crate::hub_link::HubSender;
 use crate::llm::HttpClient;
+use crate::messages::{
+    agent_config, egress_set, file_transfer, machine_status, memory_get, provider_add,
+    push_register, task_message, usage_list,
+};
 use crate::providers::Provider;
 use crate::proxy::Proxies;
 use crate::trust::{FileSeenSequences, Trust, TrustError};
 use crate::workers::Workers;
-use crate::{
-    agent_config, egress_set, file_transfer, machine_status, memory_get, provider_add,
-    push_register, task_message, usage_list,
-};
 
 /// How many events one `task.events` frame carries.
 ///

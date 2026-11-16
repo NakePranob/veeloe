@@ -3,29 +3,9 @@
 
 use serde_json::{json, Value};
 
+use crate::messages::shared::listed;
 use crate::models;
-use crate::tasks::{agents_listed, Inbound, Machine, Outbox};
-
-/// Every Agent, after purging the trash past its 30 days.
-pub(crate) async fn listed(machine: &Machine<'_>) -> Value {
-    let registry = machine.registry;
-    // A list is the only clock the trash needs: no timer, and a Machine that
-    // was off past the 30 days purges as soon as it is asked (`agent-trash`).
-    if let Ok(purged) = registry.purge_expired(crate::usage::now_ms()) {
-        if purged > 0 {
-            let _ = crate::logs::record(
-                registry.home(),
-                "warn",
-                "agent.purge",
-                json!({ "agents": purged }),
-            );
-        }
-    }
-    agents_listed(
-        registry,
-        &models::info(machine.providers, machine.http).await,
-    )
-}
+use crate::tasks::{Inbound, Machine, Outbox};
 
 /// Lists the Agents.
 pub(crate) async fn list(

@@ -2,8 +2,8 @@
 
 use serde_json::Value;
 
-use crate::agent_config::listed;
 use crate::egress::is_valid_egress;
+use crate::messages::shared::listed;
 use crate::tasks::{Inbound, Machine, Outbox};
 
 /// Changes the Egress and answers with the new `agent.listed`.

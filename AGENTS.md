@@ -80,8 +80,9 @@ Read first:
 - `controller/.conventions/`: Feature-Sliced Design slices
   (`controller/AGENTS.md` for the app's own rules).
 - `hub/.conventions/`: modules and their hexagonal layers (`hub/AGENTS.md`).
-- `packages/.conventions/`: the Runtime's crates (it sits in `packages/`
-  because the workspace builds against `packages/protocol`).
+- `packages/.conventions/`: the Runtime's crates, `packages/protocol`,
+  `packages/protocol-ts` and rustfmt (ADR 0071); run `cargo fmt` before
+  committing Rust.
 - `.conventions/`: the git rules for the whole repo.
 - `openspec/`: specs and changes.
 
