@@ -65,7 +65,10 @@ pub fn pairing_request_bytes(
 }
 
 pub fn pairing_proof_text(machine: &str, controller: &str, member: &str) -> String {
-    format!("veeloe-pairing-proof/1\n{}\n{}\n{}", machine, controller, member)
+    format!(
+        "veeloe-pairing-proof/1\n{}\n{}\n{}",
+        machine, controller, member
+    )
 }
 
 fn hmac_base64url(secret: &str, text: &str) -> Result<String, ()> {
@@ -116,7 +119,10 @@ pub fn build_pairing_link(
 ) -> Result<String, HubUrlError> {
     let hub = normalize_hub_url(hub)?;
     let machine = public_key_base64url(machine_secret_key);
-    let sig = sign_base64url(machine_secret_key, &pairing_link_bytes(&hub, &machine, expires)?);
+    let sig = sign_base64url(
+        machine_secret_key,
+        &pairing_link_bytes(&hub, &machine, expires)?,
+    );
     Ok(format!(
         "{}hub={}&machine={}&secret={}&expires={}&sig={}",
         PREFIX,
@@ -177,7 +183,8 @@ pub fn parse_pairing_link(text: &str, now_ms: u64) -> Result<PairingLink, Pairin
         .parse()
         .map_err(|_| PairingLinkError::Malformed)?;
 
-    let bytes = pairing_link_bytes(&hub, machine, expires).map_err(|_| PairingLinkError::Malformed)?;
+    let bytes =
+        pairing_link_bytes(&hub, machine, expires).map_err(|_| PairingLinkError::Malformed)?;
     if !verify_signature(sig, &bytes, machine) {
         return Err(PairingLinkError::BadSignature);
     }
@@ -251,4 +258,3 @@ pub fn check_pairing_request(request: &Value, hub: &str) -> bool {
 pub fn hub_http_url(hub: &str) -> Result<String, HubUrlError> {
     Ok(normalize_hub_url(hub)?.replacen("ws", "http", 1))
 }
-

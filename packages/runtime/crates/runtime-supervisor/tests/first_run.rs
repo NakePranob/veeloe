@@ -86,7 +86,9 @@ impl Terminal {
             let mut reader = BufReader::new(stdout);
             let mut buffer = [0u8; 512];
             loop {
-                let Ok(read) = reader.read(&mut buffer) else { break };
+                let Ok(read) = reader.read(&mut buffer) else {
+                    break;
+                };
                 if read == 0 {
                     break;
                 }
@@ -94,7 +96,10 @@ impl Terminal {
                 for (at, part) in text.split('\n').enumerate() {
                     if at > 0 {
                         let mut held = fragment.lock().expect("pending");
-                        recorded.lock().expect("lines").push(std::mem::take(&mut *held));
+                        recorded
+                            .lock()
+                            .expect("lines")
+                            .push(std::mem::take(&mut *held));
                     }
                     fragment.lock().expect("pending").push_str(part);
                 }
@@ -115,7 +120,9 @@ impl Terminal {
 
     /// One key, no Enter: what an arrow pick takes.
     fn send(&mut self, keys: &str) {
-        self.input.write_all(keys.as_bytes()).expect("send to the terminal");
+        self.input
+            .write_all(keys.as_bytes())
+            .expect("send to the terminal");
         self.input.flush().expect("flush");
     }
 
@@ -210,7 +217,13 @@ async fn an_unpaired_machine_is_asked_for_its_hub_pairs_offers_a_provider_and_th
 
     // 1. It asks, because nothing knows the Hub yet.
     assert!(
-        until(|| terminal.seen("Hub URL (wss://... from the Veeloe app):").is_some(), 10_000).await,
+        until(
+            || terminal
+                .seen("Hub URL (wss://... from the Veeloe app):")
+                .is_some(),
+            10_000
+        )
+        .await,
         "no Hub URL prompt: {:?}",
         terminal.lines.lock().expect("lines")
     );
@@ -247,23 +260,26 @@ async fn an_unpaired_machine_is_asked_for_its_hub_pairs_offers_a_provider_and_th
         .lock()
         .expect("lines")
         .iter()
-        .find_map(|line| line.split("veeloe://pair?").nth(1).map(|rest| format!("veeloe://pair?{rest}")))
+        .find_map(|line| {
+            line.split("veeloe://pair?")
+                .nth(1)
+                .map(|rest| format!("veeloe://pair?{rest}"))
+        })
         .expect("link");
     let link = link.split_whitespace().next().expect("link").to_string();
     let parsed = parse_pairing_link(&link, now_ms()).expect("a link the Machine signed");
 
     // 3. The Hub URL it asked for is on disk before anything else happens.
-    let config: Value = serde_json::from_str(
-        &fs::read_to_string(home.path().join("config.json")).expect("config"),
-    )
-    .expect("json");
+    let config: Value =
+        serde_json::from_str(&fs::read_to_string(home.path().join("config.json")).expect("config"))
+            .expect("json");
     assert_eq!(config["hubUrl"], hub.url);
 
     // 4. The Controller claims the link, the way the app does after a scan.
     let mut controller = Controller::connect(&hub.url).await;
     let controller_key = to_base64url(&public_key_of(&CONTROLLER_SEED));
-    let proof = pairing_proof(&parsed.secret, &parsed.machine, &controller_key, "member-1")
-        .expect("proof");
+    let proof =
+        pairing_proof(&parsed.secret, &parsed.machine, &controller_key, "member-1").expect("proof");
     let claim = Signer::new(&CONTROLLER_SEED).sign(
         Outgoing {
             type_: "pairing.claim".into(),
@@ -280,7 +296,9 @@ async fn an_unpaired_machine_is_asked_for_its_hub_pairs_offers_a_provider_and_th
         },
         1,
     );
-    controller.send(serde_json::to_value(claim).expect("claim")).await;
+    controller
+        .send(serde_json::to_value(claim).expect("claim"))
+        .await;
     let done = controller.next().await;
     assert_eq!(done["type"], "pairing.done");
 
@@ -319,7 +337,11 @@ async fn an_unpaired_machine_is_asked_for_its_hub_pairs_offers_a_provider_and_th
     // 4 is "Custom (enter a URL)"; a pick is one keypress, no Enter.
     terminal.send("4");
     assert!(
-        until(|| terminal.seen("Name for this Provider: ").is_some(), 15_000).await,
+        until(
+            || terminal.seen("Name for this Provider: ").is_some(),
+            15_000
+        )
+        .await,
         "no name prompt: {:?}",
         terminal.lines.lock().expect("lines")
     );
@@ -346,10 +368,7 @@ async fn an_unpaired_machine_is_asked_for_its_hub_pairs_offers_a_provider_and_th
     // 7. The Provider is written, and the Supervisor starts with it.
     assert!(
         until(
-            || home
-                .path()
-                .join("runtime/providers.json")
-                .exists(),
+            || home.path().join("runtime/providers.json").exists(),
             15_000
         )
         .await,
@@ -367,7 +386,12 @@ async fn an_unpaired_machine_is_asked_for_its_hub_pairs_offers_a_provider_and_th
     // The key is in the file, never on the terminal.
     assert_eq!(providers[0]["key"], "sk-test-only");
     assert!(
-        !terminal.lines.lock().expect("lines").iter().any(|line| line.contains("sk-test-only")),
+        !terminal
+            .lines
+            .lock()
+            .expect("lines")
+            .iter()
+            .any(|line| line.contains("sk-test-only")),
         "the key was echoed: {:?}",
         terminal.lines.lock().expect("lines")
     );
@@ -417,8 +441,11 @@ fn without_a_terminal_the_first_run_names_the_commands_and_writes_nothing() {
     assert!(stderr.contains("no Hub URL"), "{stderr}");
     assert!(!empty.join("config.json").exists());
 
-    fs::write(empty.join("config.json"), json!({ "hubUrl": "wss://hub.test" }).to_string())
-        .expect("config");
+    fs::write(
+        empty.join("config.json"),
+        json!({ "hubUrl": "wss://hub.test" }).to_string(),
+    )
+    .expect("config");
     let output = Command::new(env!("CARGO_BIN_EXE_veeloe"))
         .env("VEELOE_HOME", &empty)
         .stdin(Stdio::null())
@@ -426,7 +453,10 @@ fn without_a_terminal_the_first_run_names_the_commands_and_writes_nothing() {
         .expect("run veeloe");
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("this Machine is not paired yet"), "{stderr}");
+    assert!(
+        stderr.contains("this Machine is not paired yet"),
+        "{stderr}"
+    );
     assert!(stderr.contains("veeloe pair"), "{stderr}");
     assert!(stderr.contains("veeloe provider add"), "{stderr}");
     assert!(!empty.join("runtime/trust.json").exists());
@@ -440,7 +470,13 @@ async fn a_hub_url_that_is_not_a_websocket_url_is_refused() {
     let home = tempdir().expect("home");
     let mut terminal = Terminal::start(home.path());
     assert!(
-        until(|| terminal.seen("Hub URL (wss://... from the Veeloe app):").is_some(), 10_000).await
+        until(
+            || terminal
+                .seen("Hub URL (wss://... from the Veeloe app):")
+                .is_some(),
+            10_000
+        )
+        .await
     );
     terminal.answer("not a url");
     let exit = tokio::time::timeout(Duration::from_secs(15), async {

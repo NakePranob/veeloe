@@ -22,9 +22,9 @@ pub enum JsonFileError {
 /// or parsed is an error, never an empty answer.
 pub fn read_json_file(path: &Path) -> Result<Option<Value>, JsonFileError> {
     match fs::read_to_string(path) {
-        Ok(text) => serde_json::from_str(&text)
-            .map(Some)
-            .map_err(|error| JsonFileError::Broken(format!("cannot read {}: {error}", path.display()))),
+        Ok(text) => serde_json::from_str(&text).map(Some).map_err(|error| {
+            JsonFileError::Broken(format!("cannot read {}: {error}", path.display()))
+        }),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(JsonFileError::Broken(format!(
             "cannot read {}: {error}",

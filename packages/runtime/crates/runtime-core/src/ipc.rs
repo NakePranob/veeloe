@@ -21,8 +21,8 @@ pub enum ApprovalDecision {
 /// Headers travel as a JSON object, the way the legacy IPC sends them.
 pub mod header_pairs {
     use serde::de::Deserializer;
-    use serde::Deserialize;
     use serde::ser::{SerializeMap, Serializer};
+    use serde::Deserialize;
     use std::collections::BTreeMap;
 
     pub fn serialize<S: Serializer>(
@@ -207,11 +207,7 @@ pub enum FromWorker {
         #[serde(rename = "eventKind")]
         kind: String,
         body: Value,
-        #[serde(
-            rename = "messageId",
-            default,
-            skip_serializing_if = "Option::is_none"
-        )]
+        #[serde(rename = "messageId", default, skip_serializing_if = "Option::is_none")]
         message_id: Option<String>,
     },
     /// One read of the log, which the worker cannot open itself.

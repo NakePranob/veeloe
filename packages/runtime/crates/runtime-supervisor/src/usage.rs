@@ -5,15 +5,15 @@
 //! file (ADR 0014, 0066). The same rows are what today's Budget is enforced
 //! against, so there is never a second tally.
 
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::Mutex;
-use std::os::unix::fs::PermissionsExt;
 
+use crate::agents::Agent;
+use crate::trust::TrustError;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use serde_json::Value;
-use crate::agents::Agent;
-use crate::trust::TrustError;
 
 /// The tokens an Agent gets when no one set a Budget (ADR 0043).
 pub const DEFAULT_BUDGET: u64 = 10_000_000;
@@ -145,10 +145,7 @@ impl UsageStore {
              CREATE INDEX IF NOT EXISTS usage_by_day ON usage (day);",
         )?;
         // The tally is the owner's alone, and the folder is already 0700.
-        let _ = std::fs::set_permissions(
-            path,
-            std::fs::Permissions::from_mode(0o600),
-        );
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
         let store = Self {
             conn: Mutex::new(conn),
         };
@@ -350,7 +347,8 @@ impl Budgets {
         tokens: u64,
     ) -> Result<Usage, UsageError> {
         let usage = self.usage_of(agent, now_ms)?;
-        self.store.add(&agent.id, &usage.day, "task", task, tokens)?;
+        self.store
+            .add(&agent.id, &usage.day, "task", task, tokens)?;
         // The oldest day leaves when a new one is written (ADR 0043).
         self.store.prune(&shift_day(&usage.day, -29))?;
         self.usage_of(agent, now_ms)

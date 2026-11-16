@@ -92,7 +92,12 @@ pub async fn list_models(
         let Ok(body) = serde_json::from_str::<Value>(&answer.body) else {
             return Err("provider.failed");
         };
-        for entry in body.get("data").and_then(Value::as_array).into_iter().flatten() {
+        for entry in body
+            .get("data")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             let Some(id) = entry.get("id").and_then(Value::as_str) else {
                 continue;
             };
@@ -118,7 +123,10 @@ pub async fn list_models(
             .get("last_id")
             .and_then(Value::as_str)
             .filter(|next| !next.is_empty());
-        if body.get("has_more") != Some(&Value::Bool(true)) || next.is_none() || next == after.as_deref() {
+        if body.get("has_more") != Some(&Value::Bool(true))
+            || next.is_none()
+            || next == after.as_deref()
+        {
             break;
         }
         after = next.map(str::to_string);
@@ -178,9 +186,18 @@ mod tests {
 
     #[test]
     fn context_comes_from_common_provider_fields() {
-        assert_eq!(context_of(&json!({ "context_length": 200000 })), Some(200000));
-        assert_eq!(context_of(&json!({ "max_input_tokens": "128000" })), Some(128000));
-        assert_eq!(context_of(&json!({ "top_provider": { "context_length": 64000 } })), Some(64000));
+        assert_eq!(
+            context_of(&json!({ "context_length": 200000 })),
+            Some(200000)
+        );
+        assert_eq!(
+            context_of(&json!({ "max_input_tokens": "128000" })),
+            Some(128000)
+        );
+        assert_eq!(
+            context_of(&json!({ "top_provider": { "context_length": 64000 } })),
+            Some(64000)
+        );
         assert_eq!(context_of(&json!({ "id": "unknown" })), None);
     }
 }

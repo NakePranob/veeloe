@@ -57,7 +57,12 @@ impl From<TrustError> for ProviderError {
 /// auth is fixed, not detected: OpenRouter lists models without a key, so
 /// detection would pick `x-api-key` for it.
 pub const PRESETS: [(&str, &str, &str, Auth); 3] = [
-    ("anthropic", "Anthropic", "https://api.anthropic.com", Auth::ApiKey),
+    (
+        "anthropic",
+        "Anthropic",
+        "https://api.anthropic.com",
+        Auth::ApiKey,
+    ),
     // Go answers 400 MissingSessionID without a session that stays the same for
     // one conversation.
     (
@@ -66,7 +71,12 @@ pub const PRESETS: [(&str, &str, &str, Auth); 3] = [
         "https://opencode.ai/inference/go",
         Auth::ApiKey,
     ),
-    ("openrouter", "OpenRouter", "https://openrouter.ai/api", Auth::Bearer),
+    (
+        "openrouter",
+        "OpenRouter",
+        "https://openrouter.ai/api",
+        Auth::Bearer,
+    ),
 ];
 
 /// How the Runtime names itself to every Provider; OpenCode asks clients to.

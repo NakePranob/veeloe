@@ -234,9 +234,7 @@ impl Ports {
         let dir = supervisor_dir(&self.home).ok()?;
         let (assigned, unreadable) = load(&dir);
         note_unreadable(&self.home, unreadable.as_deref());
-        assigned
-            .get(agent)
-            .map(|start| Range { start: *start })
+        assigned.get(agent).map(|start| Range { start: *start })
     }
 }
 
@@ -351,11 +349,12 @@ mod tests {
 
         // A third gets its own again, and the file holds one first port each.
         let third = range_of(home.path(), "a3", None);
-        assert!(!third.ports().iter().any(|port| {
-            first.contains(*port) || second.contains(*port)
-        }));
-        let file = std::fs::read_to_string(home.path().join("runtime/ports.json"))
-            .expect("ports.json");
+        assert!(!third
+            .ports()
+            .iter()
+            .any(|port| { first.contains(*port) || second.contains(*port) }));
+        let file =
+            std::fs::read_to_string(home.path().join("runtime/ports.json")).expect("ports.json");
         let value: Value = serde_json::from_str(&file).expect("json");
         assert_eq!(value.as_object().map(|entries| entries.len()), Some(3));
     }
@@ -436,8 +435,8 @@ mod tests {
         let range = ports.range("a1", None).expect("range");
         assert_eq!(range.start(), FIRST);
         // The file is whole again, so the next start keeps this range.
-        let file = std::fs::read_to_string(home.path().join("runtime/ports.json"))
-            .expect("ports.json");
+        let file =
+            std::fs::read_to_string(home.path().join("runtime/ports.json")).expect("ports.json");
         let value: Value = serde_json::from_str(&file).expect("rewritten json");
         assert_eq!(
             value.get("a1").and_then(Value::as_u64),
@@ -446,7 +445,9 @@ mod tests {
         // And the Runtime log holds the warning, not just the return value.
         let logged = logs::recent(home.path()).expect("logs");
         assert!(
-            logged.iter().any(|line| line.contains("runtime.ports_unreadable")),
+            logged
+                .iter()
+                .any(|line| line.contains("runtime.ports_unreadable")),
             "{logged:?}"
         );
         // The same range is handed back after the rewrite.
@@ -489,9 +490,7 @@ mod tests {
             sent.send(range.is_ok()).expect("send");
         });
         assert!(
-            received
-                .recv_timeout(Duration::from_millis(200))
-                .is_err(),
+            received.recv_timeout(Duration::from_millis(200)).is_err(),
             "the allocation did not wait for the OS lock"
         );
         drop(held);

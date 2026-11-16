@@ -47,11 +47,15 @@ fn paired_home(home: &std::path::Path) {
         json!({ "owners": [{ "member": "member-1", "keys": ["k"] }] }).to_string(),
     )
     .expect("trust");
-    fs::write(home.join("config.json"), json!({ "hubUrl": "wss://hub.test" }).to_string())
-        .expect("config");
+    fs::write(
+        home.join("config.json"),
+        json!({ "hubUrl": "wss://hub.test" }).to_string(),
+    )
+    .expect("config");
     fs::write(
         home.join("runtime/agents.json"),
-        json!([{ "id": "a1", "name": "Deployer", "provider": "main", "model": "model-a" }]).to_string(),
+        json!([{ "id": "a1", "name": "Deployer", "provider": "main", "model": "model-a" }])
+            .to_string(),
     )
     .expect("agents");
 }
@@ -84,8 +88,14 @@ fn help_names_every_command_and_each_command_has_its_own_text() {
     // `help <command>` prints that command alone, as the legacy `help.ts` did.
     let (code, out) = veeloe(home.path(), &["help", "provider"]);
     assert_eq!(code, 0);
-    assert!(out.starts_with("veeloe provider add [--preset <id>"), "{out}");
-    assert!(out.contains("Built-in: anthropic, opencode-go, openrouter"), "{out}");
+    assert!(
+        out.starts_with("veeloe provider add [--preset <id>"),
+        "{out}"
+    );
+    assert!(
+        out.contains("Built-in: anthropic, opencode-go, openrouter"),
+        "{out}"
+    );
 
     let (code, out) = veeloe(home.path(), &["status", "--help"]);
     assert_eq!(code, 0);
@@ -154,7 +164,9 @@ fn unpair_without_a_terminal_changes_nothing() {
     // The question is asked anyway; a closed stdin is a no, and a no exits 1.
     assert_eq!(code, 1, "{out}");
     assert!(
-        out.contains("This Machine will stop trusting every Controller and get a new key. Continue? [y/N] "),
+        out.contains(
+            "This Machine will stop trusting every Controller and get a new key. Continue? [y/N] "
+        ),
         "{out}"
     );
     assert!(out.contains("nothing was changed"), "{out}");
@@ -196,7 +208,8 @@ fn status_says_what_the_machine_is_before_and_after_pairing() {
     );
     assert!(out.contains("  Deployer  main  model-a"), "{out}");
     assert!(
-        out.trim_end().ends_with("Next: start the Runtime with veeloe"),
+        out.trim_end()
+            .ends_with("Next: start the Runtime with veeloe"),
         "{out}"
     );
     // A key is never printed.
@@ -234,7 +247,10 @@ fn a_provider_is_checked_saved_listed_and_removed_without_ever_printing_its_key(
     // Nothing set up yet reads as the legacy `provider list` did.
     let (code, out) = veeloe(home.path(), &["provider", "list"]);
     assert_eq!(code, 0);
-    assert!(out.contains("no Provider yet. Add one with: veeloe provider add"), "{out}");
+    assert!(
+        out.contains("no Provider yet. Add one with: veeloe provider add"),
+        "{out}"
+    );
 
     let (code, out) = veeloe_stdin(
         home.path(),
@@ -244,7 +260,10 @@ fn a_provider_is_checked_saved_listed_and_removed_without_ever_printing_its_key(
     assert_eq!(code, 0, "{out}");
     assert!(out.contains(&format!("checking {} ...", stub.url)), "{out}");
     assert!(out.contains("saved main with 2 models"), "{out}");
-    assert!(out.contains("Next: create an Agent with it in the Veeloe app."), "{out}");
+    assert!(
+        out.contains("Next: create an Agent with it in the Veeloe app."),
+        "{out}"
+    );
 
     let (code, out) = veeloe(home.path(), &["provider", "list"]);
     assert_eq!(code, 0);
@@ -254,7 +273,16 @@ fn a_provider_is_checked_saved_listed_and_removed_without_ever_printing_its_key(
     // A key in an argument is refused before anything is read.
     let (code, _) = veeloe_stdin(
         home.path(),
-        &["provider", "add", "--name", "other", "--url", "https://x.test", "--key", "sk"],
+        &[
+            "provider",
+            "add",
+            "--name",
+            "other",
+            "--url",
+            "https://x.test",
+            "--key",
+            "sk",
+        ],
         "",
     );
     assert_eq!(code, 2);
@@ -300,13 +328,22 @@ fn without_a_terminal_the_missing_flag_is_named_and_no_preset_url_can_be_overrid
     let (code, stderr) = stderr_of(home.path(), &["provider", "add", "--preset", "deploy"]);
     assert_eq!(code, 1, "{stderr}");
     assert!(
-        stderr.contains("no built-in Provider deploy. Pick one of: anthropic, opencode-go, openrouter"),
+        stderr.contains(
+            "no built-in Provider deploy. Pick one of: anthropic, opencode-go, openrouter"
+        ),
         "{stderr}"
     );
 
     let (code, stderr) = stderr_of(
         home.path(),
-        &["provider", "add", "--preset", "openrouter", "--url", "https://x.test"],
+        &[
+            "provider",
+            "add",
+            "--preset",
+            "openrouter",
+            "--url",
+            "https://x.test",
+        ],
     );
     assert_eq!(code, 1, "{stderr}");
     assert!(

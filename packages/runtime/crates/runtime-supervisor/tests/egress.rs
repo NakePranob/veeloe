@@ -72,7 +72,10 @@ fn a_permanent_yes_adds_one_domain_to_one_agent() {
     );
     // An address is not a domain, and an unknown Agent is not written.
     assert_eq!(egress.add_domain("a1", "10.0.0.1").expect("bad"), None);
-    assert_eq!(egress.add_domain("nobody", "example.org").expect("none"), None);
+    assert_eq!(
+        egress.add_domain("nobody", "example.org").expect("none"),
+        None
+    );
 }
 
 #[test]
@@ -94,7 +97,12 @@ fn each_agent_keeps_its_own_list() {
     );
     // B gets nothing from A's list, in memory or on disk (ADR 0029).
     assert!(egress.current("a2").is_empty());
-    assert!(registry.get("a2").expect("get").expect("a2").egress.is_empty());
+    assert!(registry
+        .get("a2")
+        .expect("get")
+        .expect("a2")
+        .egress
+        .is_empty());
 
     // The file is the source of truth, and `egress.json` is the union view.
     let reopened = Egress::open(home.path()).expect("reopen");
@@ -115,7 +123,10 @@ fn a_list_the_protocol_refuses_is_not_kept() {
         .set_agent("a1", domains(&["not a domain"]))
         .expect("set")
         .is_none());
-    assert!(egress.set_all(domains(&["not a domain"])).expect("set").is_none());
+    assert!(egress
+        .set_all(domains(&["not a domain"]))
+        .expect("set")
+        .is_none());
     assert!(egress.current("a1").is_empty());
     assert!(!is_valid_egress(&domains(&["localhost"])));
     assert!(is_valid_egress(&domains(&["*.example.com"])));
@@ -218,10 +229,7 @@ fn a_list_without_an_agent_reaches_every_agent_and_the_legacy_file() {
         .expect("accepted");
     for id in ["a1", "a2"] {
         assert_eq!(egress.current(id), next);
-        assert_eq!(
-            registry.get(id).expect("get").expect("agent").egress,
-            next
-        );
+        assert_eq!(registry.get(id).expect("get").expect("agent").egress, next);
     }
     assert_eq!(load_egress(home.path()).expect("legacy"), next);
 
@@ -256,10 +264,7 @@ fn the_old_machine_list_is_copied_to_every_agent_once() {
 
     let egress = Egress::open(home.path()).expect("open");
     for id in ["a1", "a2"] {
-        assert_eq!(
-            egress.current(id),
-            domains(&["github.com", "*.npmjs.org"])
-        );
+        assert_eq!(egress.current(id), domains(&["github.com", "*.npmjs.org"]));
     }
     assert!(
         home.path().join("runtime/egress.json.migrated").exists(),
@@ -309,11 +314,8 @@ fn a_row_this_build_cannot_read_survives_a_whole_file_write() {
     let future = serde_json::json!({ "id": "future", "name": "From another Runtime" });
     rows.push(future.clone());
     fs::write(&file, serde_json::to_string(&rows).expect("json")).expect("agents.json");
-    fs::write(
-        home.path().join("runtime/egress.json"),
-        r#"["github.com"]"#,
-    )
-    .expect("old egress.json");
+    fs::write(home.path().join("runtime/egress.json"), r#"["github.com"]"#)
+        .expect("old egress.json");
 
     // The migration copies the old list to every Agent it understands.
     let egress = Egress::open(home.path()).expect("open");

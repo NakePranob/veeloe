@@ -12,9 +12,15 @@ use crate::ports::LlmMessage;
 pub fn conversation(events: &[TaskEvent]) -> Vec<LlmMessage> {
     // The newest compaction owns the model's view: its summary, then only the
     // events after it. The transcript itself keeps every original event.
-    if let Some(index) = events.iter().rposition(|event| event.kind == "context.compacted") {
+    if let Some(index) = events
+        .iter()
+        .rposition(|event| event.kind == "context.compacted")
+    {
         let body = &events[index].body;
-        let summary = body.get("summary").and_then(Value::as_str).unwrap_or_default();
+        let summary = body
+            .get("summary")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         if !summary.is_empty() {
             let through = body.get("throughSeq").and_then(Value::as_i64).unwrap_or(0);
             let after: Vec<TaskEvent> = events

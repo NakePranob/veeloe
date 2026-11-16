@@ -14,7 +14,8 @@ static TEMP: AtomicU64 = AtomicU64::new(0);
 /// character cap, not a token count, so every Provider reads it the same.
 pub const MEMORY_LIMIT: usize = 4_000;
 
-const TRUNCATED: &str = "\n\n(Memory is over the 4,000 character cap. Keep only what every Task needs.)";
+const TRUNCATED: &str =
+    "\n\n(Memory is over the 4,000 character cap. Keep only what every Task needs.)";
 
 /// What `MEMORY.md` holds, read once: the whole file's size and the capped text
 /// the prompt gets. `exists` tells an absent file apart from an empty one.
@@ -83,7 +84,9 @@ pub enum Mode {
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum MemoryWriteError {
-    #[error("memory.too_long: {chars} characters, the cap is {MEMORY_LIMIT}; shorten it and try again")]
+    #[error(
+        "memory.too_long: {chars} characters, the cap is {MEMORY_LIMIT}; shorten it and try again"
+    )]
     TooLong { chars: usize },
     #[error("memory.bad: {0}")]
     Bad(String),
@@ -129,7 +132,11 @@ pub fn daily_note_path(workdir: &Path, date: &str) -> PathBuf {
 
 /// Append to a day's note, creating `memory/` when it is missing. Daily notes are
 /// not capped like `MEMORY.md`: they are the scratch layer, not the pinned one.
-pub fn append_daily_note(workdir: &Path, date: &str, text: &str) -> Result<usize, MemoryWriteError> {
+pub fn append_daily_note(
+    workdir: &Path,
+    date: &str,
+    text: &str,
+) -> Result<usize, MemoryWriteError> {
     if date.len() != 10
         || !date.bytes().enumerate().all(|(index, byte)| {
             if index == 4 || index == 7 {
@@ -202,7 +209,10 @@ fn write_atomic(path: &Path, text: &str) -> Result<(), MemoryWriteError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("memory");
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("memory");
     let temp = path.with_file_name(format!(
         ".{name}.{}.{}.tmp",
         std::process::id(),
@@ -271,7 +281,10 @@ mod tests {
     #[test]
     fn an_append_keeps_the_old_text_and_a_replace_drops_it() {
         let dir = tempdir().expect("dir");
-        assert_eq!(write_memory(dir.path(), "owner likes tea", Mode::Append).expect("append"), 15);
+        assert_eq!(
+            write_memory(dir.path(), "owner likes tea", Mode::Append).expect("append"),
+            15
+        );
         assert_eq!(
             write_memory(dir.path(), "answers in Thai", Mode::Append).expect("append"),
             15 + 2 + 15
@@ -291,7 +304,8 @@ mod tests {
     fn a_write_that_would_pass_the_cap_is_refused_and_changes_nothing() {
         let dir = tempdir().expect("dir");
         write_memory(dir.path(), "kept", Mode::Append).expect("append");
-        let error = write_memory(dir.path(), &"a".repeat(MEMORY_LIMIT), Mode::Append).expect_err("too long");
+        let error = write_memory(dir.path(), &"a".repeat(MEMORY_LIMIT), Mode::Append)
+            .expect_err("too long");
         assert_eq!(
             error,
             MemoryWriteError::TooLong {
@@ -307,7 +321,10 @@ mod tests {
     #[test]
     fn a_daily_note_is_its_own_file_and_has_no_cap() {
         let dir = tempdir().expect("dir");
-        assert_eq!(append_daily_note(dir.path(), "2026-11-12", "first").expect("note"), 5);
+        assert_eq!(
+            append_daily_note(dir.path(), "2026-11-12", "first").expect("note"),
+            5
+        );
         append_daily_note(dir.path(), "2026-11-12", "second").expect("note");
         assert_eq!(
             fs::read_to_string(daily_note_path(dir.path(), "2026-11-12")).expect("read"),
@@ -409,7 +426,14 @@ mod tests {
     #[test]
     fn no_file_is_an_empty_memory() {
         let dir = tempdir().expect("dir");
-        assert_eq!(read_memory(dir.path()), Memory { exists: false, chars: 0, text: String::new() });
+        assert_eq!(
+            read_memory(dir.path()),
+            Memory {
+                exists: false,
+                chars: 0,
+                text: String::new()
+            }
+        );
         assert_eq!(memory_prompt(dir.path()), "");
     }
 }

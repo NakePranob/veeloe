@@ -26,7 +26,9 @@ const REVOKED: u16 = 4404;
 
 fn close_reason(code: u16) -> Option<&'static str> {
     match code {
-        AUTH_FAILED => Some("the Hub does not know this Machine's key, or the answer did not check out"),
+        AUTH_FAILED => {
+            Some("the Hub does not know this Machine's key, or the answer did not check out")
+        }
         HANDSHAKE_TIMEOUT => Some("the handshake took too long"),
         REPLACED => Some("another connection with this Machine's key took over"),
         REVOKED => Some("the Hub says this key was revoked"),
@@ -116,13 +118,7 @@ impl HubLink {
             commands,
             connected: watching,
         };
-        let task = tokio::spawn(run(
-            options,
-            sink,
-            queue,
-            connected,
-            sender.clone(),
-        ));
+        let task = tokio::spawn(run(options, sink, queue, connected, sender.clone()));
         Self {
             sender,
             task: Mutex::new(Some(task)),
@@ -174,10 +170,10 @@ async fn run(
                     return;
                 }
                 let why = close_reason(ended.code).unwrap_or(if ended.ready {
-                        "connection lost"
-                    } else {
-                        "could not connect"
-                    });
+                    "connection lost"
+                } else {
+                    "could not connect"
+                });
                 let delay = backoff.next_with(random());
                 sink.log(&format!(
                     "hub {}: {why} ({}); retrying in {delay} ms",

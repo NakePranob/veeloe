@@ -39,7 +39,13 @@ pub enum UploadError {
 impl Uploads {
     /// Add one chunk. Returns the finished bytes once every chunk is present
     /// and the hash matches.
-    pub fn add(&self, file: &str, index: usize, total: usize, data: &[u8]) -> Result<Option<Vec<u8>>, UploadError> {
+    pub fn add(
+        &self,
+        file: &str,
+        index: usize,
+        total: usize,
+        data: &[u8],
+    ) -> Result<Option<Vec<u8>>, UploadError> {
         if total == 0 || index >= total || data.is_empty() {
             return Err(UploadError::BadChunk);
         }
@@ -70,7 +76,10 @@ impl Uploads {
             return Err(UploadError::Hash);
         }
         files.remove(file);
-        self.done.lock().expect("uploads").insert(file.to_string(), bytes.clone());
+        self.done
+            .lock()
+            .expect("uploads")
+            .insert(file.to_string(), bytes.clone());
         Ok(Some(bytes))
     }
 
@@ -80,12 +89,24 @@ impl Uploads {
     }
 
     /// Write a completed upload into `workdir/attachments/<task>/<name>`.
-    pub fn place(&self, bytes: &[u8], workdir: &Path, task: &str, name: &str) -> Result<PathBuf, UploadError> {
+    pub fn place(
+        &self,
+        bytes: &[u8],
+        workdir: &Path,
+        task: &str,
+        name: &str,
+    ) -> Result<PathBuf, UploadError> {
         let dir = workdir.join("attachments").join(task);
         fs::create_dir_all(&dir).map_err(|_| UploadError::Io)?;
         let safe: String = name
             .chars()
-            .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') { c } else { '_' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         let path = dir.join(if safe.is_empty() { "file" } else { &safe });
         fs::write(&path, bytes).map_err(|_| UploadError::Io)?;
@@ -107,8 +128,14 @@ mod tests {
         let uploads = Uploads::default();
         let bytes = b"hello attachment";
         let file = hash(bytes);
-        assert!(uploads.add(&file, 0, 2, &bytes[..5]).expect("chunk").is_none());
-        assert_eq!(uploads.add(&file, 1, 2, &bytes[5..]).expect("chunk"), Some(bytes.to_vec()));
+        assert!(uploads
+            .add(&file, 0, 2, &bytes[..5])
+            .expect("chunk")
+            .is_none());
+        assert_eq!(
+            uploads.add(&file, 1, 2, &bytes[5..]).expect("chunk"),
+            Some(bytes.to_vec())
+        );
     }
 
     #[test]

@@ -26,8 +26,7 @@ use veeloe_runtime_supervisor::workers::{sandboxed, SupervisorLlm, Workers};
 /// here reaches the network, but the listener and the Linux socket have to be
 /// there before the worker says ready (ADR 0069, issue #43).
 async fn sandboxed_for(home: &std::path::Path) -> veeloe_runtime_supervisor::workers::Wrap {
-    let egress =
-        Arc::new(veeloe_runtime_supervisor::egress::Egress::open(home).expect("egress"));
+    let egress = Arc::new(veeloe_runtime_supervisor::egress::Egress::open(home).expect("egress"));
     let proxies = Arc::new(veeloe_runtime_supervisor::proxy::Proxies::new(
         home.to_path_buf(),
         egress,
@@ -282,9 +281,7 @@ impl SupervisorLlm for ScriptedLlm {
             *seen == 1
         };
         let body = if first {
-            let bash = |id: &str, command: String| {
-                json!({ "type": "tool_use", "id": id, "name": "bash", "input": { "command": command } })
-            };
+            let bash = |id: &str, command: String| json!({ "type": "tool_use", "id": id, "name": "bash", "input": { "command": command } });
             json!({
                 "id": "msg_1",
                 "type": "message",
@@ -388,15 +385,21 @@ async fn a_sandboxed_worker_runs_a_turn_and_its_tools_stay_in_the_agents_folder(
         .expect("heard")
         .iter()
         .filter_map(|message| match message {
-            FromWorker::Event { event, .. } if event.kind == "tool.result" => {
-                Some(event.body["content"].as_array().cloned().unwrap_or_default())
-            }
+            FromWorker::Event { event, .. } if event.kind == "tool.result" => Some(
+                event.body["content"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default(),
+            ),
             _ => None,
         })
         .flatten()
         .map(|block| {
             (
-                block["tool_use_id"].as_str().unwrap_or_default().to_string(),
+                block["tool_use_id"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
                 block["content"].to_string(),
             )
         })
@@ -487,15 +490,21 @@ async fn a_sandboxed_worker_runs_a_turn_with_git_and_bun() {
         .expect("heard")
         .iter()
         .filter_map(|message| match message {
-            FromWorker::Event { event, .. } if event.kind == "tool.result" => {
-                Some(event.body["content"].as_array().cloned().unwrap_or_default())
-            }
+            FromWorker::Event { event, .. } if event.kind == "tool.result" => Some(
+                event.body["content"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default(),
+            ),
             _ => None,
         })
         .flatten()
         .map(|block| {
             (
-                block["tool_use_id"].as_str().unwrap_or_default().to_string(),
+                block["tool_use_id"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
                 block.clone(),
             )
         })
@@ -508,18 +517,21 @@ async fn a_sandboxed_worker_runs_a_turn_with_git_and_bun() {
             .unwrap_or_else(|| panic!("no result for {id}: {results:?}"))
     };
     // Each command ran and said its version: no refusal, no missing library.
-    for (id, expected) in [
-        ("t-git", "git version"),
-        ("t-bun-run", "bun-ok"),
-    ] {
+    for (id, expected) in [("t-git", "git version"), ("t-bun-run", "bun-ok")] {
         let block = result(id);
         assert!(
             block.get("is_error").is_none(),
             "`{id}` failed under the narrowed service list: {block}"
         );
         let content = block["content"].as_str().unwrap_or_default();
-        assert!(content.contains(expected), "`{id}` answered without `{expected}`: {block}");
-        assert!(content.contains("exit code: 0"), "`{id}` did not exit cleanly: {block}");
+        assert!(
+            content.contains(expected),
+            "`{id}` answered without `{expected}`: {block}"
+        );
+        assert!(
+            content.contains("exit code: 0"),
+            "`{id}` did not exit cleanly: {block}"
+        );
     }
     // `bun --version` answers with the version alone, which is what a version
     // check looks like when it works.
@@ -531,7 +543,10 @@ async fn a_sandboxed_worker_runs_a_turn_with_git_and_bun() {
     let text = bun["content"].as_str().unwrap_or_default();
     let version = text.lines().next().unwrap_or_default();
     assert!(
-        version.chars().next().is_some_and(|first| first.is_ascii_digit())
+        version
+            .chars()
+            .next()
+            .is_some_and(|first| first.is_ascii_digit())
             && version.contains('.')
             && text.contains("exit code: 0"),
         "`bun --version` answered without a version: {bun}"
@@ -606,11 +621,7 @@ async fn a_command_sees_the_agents_ports_and_can_serve_on_them() {
             }
         ));
     };
-    let answered = |tool: &str| {
-        tool_results(&heard)
-            .iter()
-            .any(|(seen, _, _)| seen == tool)
-    };
+    let answered = |tool: &str| tool_results(&heard).iter().any(|(seen, _, _)| seen == tool);
 
     say("t1");
     assert!(
@@ -736,9 +747,7 @@ impl SupervisorLlm for ToolchainLlm {
             *seen == 1
         };
         let body = if first {
-            let bash = |id: &str, command: &str| {
-                json!({ "type": "tool_use", "id": id, "name": "bash", "input": { "command": command } })
-            };
+            let bash = |id: &str, command: &str| json!({ "type": "tool_use", "id": id, "name": "bash", "input": { "command": command } });
             json!({
                 "id": "msg_1",
                 "type": "message",
@@ -870,15 +879,21 @@ fn tool_results(heard: &Arc<Mutex<Vec<FromWorker>>>) -> Vec<(String, String, boo
         .expect("heard")
         .iter()
         .filter_map(|message| match message {
-            FromWorker::Event { event, .. } if event.kind == "tool.result" => {
-                Some(event.body["content"].as_array().cloned().unwrap_or_default())
-            }
+            FromWorker::Event { event, .. } if event.kind == "tool.result" => Some(
+                event.body["content"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default(),
+            ),
             _ => None,
         })
         .flatten()
         .map(|block| {
             (
-                block["tool_use_id"].as_str().unwrap_or_default().to_string(),
+                block["tool_use_id"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
                 block["content"].to_string(),
                 block["is_error"].as_bool().unwrap_or(false),
             )
@@ -1109,7 +1124,10 @@ async fn the_events_of_a_running_turn_outlive_the_worker_that_ran_it() {
     assert!(kinds.contains(&"member.message"), "{kinds:?}");
     assert!(kinds.contains(&"turn.started"), "{kinds:?}");
     assert!(kinds.contains(&"llm.message"), "{kinds:?}");
-    assert!(!kinds.contains(&"turn.ended"), "the Turn had not ended: {kinds:?}");
+    assert!(
+        !kinds.contains(&"turn.ended"),
+        "the Turn had not ended: {kinds:?}"
+    );
 
     // A new worker reads that history and closes the Turn it finds open.
     workers.start(&agent);

@@ -24,9 +24,11 @@ pub fn usage_in(text: &str) -> Option<u64> {
         let Ok(event) = serde_json::from_str::<Value>(data) else {
             continue;
         };
-        let usage = event
-            .get("usage")
-            .or_else(|| event.get("message").and_then(|message| message.get("usage")));
+        let usage = event.get("usage").or_else(|| {
+            event
+                .get("message")
+                .and_then(|message| message.get("usage"))
+        });
         let Some(usage) = usage else {
             continue;
         };
@@ -44,7 +46,6 @@ pub fn usage_in(text: &str) -> Option<u64> {
     }
     Some(latest.into_iter().map(|(_, value)| value).sum())
 }
-
 
 const USAGE_FIELDS: [&str; 4] = [
     "input_tokens",

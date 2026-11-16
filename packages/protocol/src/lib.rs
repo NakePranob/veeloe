@@ -5,8 +5,8 @@
 //! both, in the same commit.
 
 pub mod allowlist;
-pub mod base64url;
 pub mod backoff;
+pub mod base64url;
 pub mod certificate;
 pub mod crypto;
 pub mod envelope;

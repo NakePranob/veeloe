@@ -309,7 +309,9 @@ mod tests {
         assert!(!is_unsafe_command("echo \"a > b\""));
         assert!(!is_unsafe_command("echo a\\>b"));
         assert!(!is_unsafe_command("[[ $x > 1 ]] && echo big"));
-        assert!(!is_unsafe_command("for ((i = 0; i < 10; i++)); do echo $i; done"));
+        assert!(!is_unsafe_command(
+            "for ((i = 0; i < 10; i++)); do echo $i; done"
+        ));
     }
 
     #[test]
@@ -345,9 +347,15 @@ mod tests {
     #[test]
     fn unsafe_commands_always_need_approval() {
         assert!(!matches_allowlist("echo $(rm -rf dist)", &owned(&["echo"])));
-        assert!(!matches_allowlist("eval echo hi", &owned(&["echo", "eval"])));
+        assert!(!matches_allowlist(
+            "eval echo hi",
+            &owned(&["echo", "eval"])
+        ));
         assert!(!matches_allowlist("ls > out.txt", &owned(&["ls"])));
-        assert!(!matches_allowlist("exec node server.js", &owned(&["exec", "node"])));
+        assert!(!matches_allowlist(
+            "exec node server.js",
+            &owned(&["exec", "node"])
+        ));
     }
 
     #[test]

@@ -14,8 +14,8 @@ use serde_json::{json, Value};
 use tempfile::tempdir;
 use veeloe_plugin_api::{Cancel, ToolDefinition, ToolError, ToolRegistry, ToolRunner};
 use veeloe_runtime_core::{
-    AgentCore, EventStore, FromWorker, Llm, LlmError, LlmReply, LlmRequest, LogAnswer,
-    LogQuery, StoreError, SupervisorLink, TaskEvent, ToWorker,
+    AgentCore, EventStore, FromWorker, Llm, LlmError, LlmReply, LlmRequest, LogAnswer, LogQuery,
+    StoreError, SupervisorLink, TaskEvent, ToWorker,
 };
 use veeloe_runtime_worker::worker::{Config, Worker};
 
@@ -112,7 +112,8 @@ async fn the_worker_loop_runs_a_task_end_to_end_with_a_fake_supervisor() {
     // worker asked for.
     let answering = worker.clone();
     let log = FakeLog::new(root.path());
-    let requests: Arc<Mutex<Vec<(Vec<(String, String)>, String)>>> = Arc::new(Mutex::new(Vec::new()));
+    let requests: Arc<Mutex<Vec<(Vec<(String, String)>, String)>>> =
+        Arc::new(Mutex::new(Vec::new()));
     let heard = Arc::clone(&requests);
     let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let stopping = Arc::clone(&done);
@@ -275,7 +276,9 @@ async fn the_same_conversation_writes_the_log_the_legacy_runtime_writes() {
     let llm = CannedLlm {
         replies: Mutex::new(VecDeque::from([
             LlmReply {
-                content: vec![json!({ "type": "tool_use", "id": "tu1", "name": "echo", "input": { "a": 1 } })],
+                content: vec![
+                    json!({ "type": "tool_use", "id": "tu1", "name": "echo", "input": { "a": 1 } }),
+                ],
                 stop_reason: Some("tool_use".into()),
             },
             LlmReply {
@@ -315,7 +318,11 @@ async fn the_same_conversation_writes_the_log_the_legacy_runtime_writes() {
         .iter()
         .filter(|event| event.kind != "context.usage")
         .collect();
-    assert_eq!(actual.len(), expected.len(), "the port wrote a different number of events");
+    assert_eq!(
+        actual.len(),
+        expected.len(),
+        "the port wrote a different number of events"
+    );
     for (index, (port, legacy)) in actual.iter().zip(expected.iter()).enumerate() {
         assert_eq!(port.kind, legacy.kind, "event {index}: different kind");
         assert_eq!(port.body, legacy.body, "event {index}: different body");

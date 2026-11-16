@@ -47,7 +47,11 @@ impl LlmTransport for FakeTransport {
             .lock()
             .expect("answers")
             .pop_front()
-            .unwrap_or_else(|| Ok(json_answer(json!({ "content": [], "stop_reason": "end_turn" }))))
+            .unwrap_or_else(|| {
+                Ok(json_answer(
+                    json!({ "content": [], "stop_reason": "end_turn" }),
+                ))
+            })
     }
 }
 
@@ -75,7 +79,10 @@ fn request() -> LlmRequest {
     }
 }
 
-fn send(llm: &AnthropicLlm, request: LlmRequest) -> Result<veeloe_runtime_core::LlmReply, LlmError> {
+fn send(
+    llm: &AnthropicLlm,
+    request: LlmRequest,
+) -> Result<veeloe_runtime_core::LlmReply, LlmError> {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

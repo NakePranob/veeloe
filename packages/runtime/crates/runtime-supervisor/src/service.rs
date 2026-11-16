@@ -14,7 +14,11 @@ const UNIT: &str = "veeloe.service";
 
 /// Install and start the service for `home` using this executable.
 pub fn install(home: &Path) -> Result<(), String> {
-    if load_trust(home).map_err(|error| error.to_string())?.owners.is_empty() {
+    if load_trust(home)
+        .map_err(|error| error.to_string())?
+        .owners
+        .is_empty()
+    {
         return Err("this Machine is not paired: run veeloe pair first".into());
     }
     let exe = std::env::current_exe().map_err(|error| error.to_string())?;
@@ -25,13 +29,17 @@ pub fn install(home: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let home_dir = user_home()?;
-        let plist = home_dir.join("Library/LaunchAgents").join(format!("{LABEL}.plist"));
+        let plist = home_dir
+            .join("Library/LaunchAgents")
+            .join(format!("{LABEL}.plist"));
         if let Some(parent) = plist.parent() {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
         fs::write(&plist, launchd_plist(&exe, home, &log)).map_err(|error| error.to_string())?;
         let uid = uid()?;
-        let _ = Command::new("launchctl").args(["bootout", &format!("gui/{uid}/{LABEL}")]).status();
+        let _ = Command::new("launchctl")
+            .args(["bootout", &format!("gui/{uid}/{LABEL}")])
+            .status();
         let plist_path = path(&plist)?;
         run(Command::new("launchctl").args(["bootstrap", &format!("gui/{uid}"), &plist_path]))?;
         println!("installed {LABEL}; run: launchctl print gui/{uid}/{LABEL}");
@@ -60,9 +68,13 @@ pub fn install(home: &Path) -> Result<(), String> {
 pub fn uninstall(_home: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        let plist = user_home()?.join("Library/LaunchAgents").join(format!("{LABEL}.plist"));
+        let plist = user_home()?
+            .join("Library/LaunchAgents")
+            .join(format!("{LABEL}.plist"));
         let uid = uid()?;
-        let _ = Command::new("launchctl").args(["bootout", &format!("gui/{uid}/{LABEL}")]).status();
+        let _ = Command::new("launchctl")
+            .args(["bootout", &format!("gui/{uid}/{LABEL}")])
+            .status();
         if plist.exists() {
             fs::remove_file(&plist).map_err(|error| error.to_string())?;
         }
@@ -72,11 +84,15 @@ pub fn uninstall(_home: &Path) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         let unit = user_home()?.join(".config/systemd/user").join(UNIT);
-        let _ = Command::new("systemctl").args(["--user", "disable", "--now", UNIT]).status();
+        let _ = Command::new("systemctl")
+            .args(["--user", "disable", "--now", UNIT])
+            .status();
         if unit.exists() {
             fs::remove_file(&unit).map_err(|error| error.to_string())?;
         }
-        let _ = Command::new("systemctl").args(["--user", "daemon-reload"]).status();
+        let _ = Command::new("systemctl")
+            .args(["--user", "daemon-reload"])
+            .status();
         println!("removed {UNIT}");
         Ok(())
     }
@@ -114,7 +130,12 @@ pub fn systemd_unit(exe: &Path, home: &Path, log: &Path) -> String {
     writeln!(out, "\n[Service]").unwrap();
     writeln!(out, "Type=simple").unwrap();
     writeln!(out, "ExecStart={}", quote(&path(exe).unwrap_or_default())).unwrap();
-    writeln!(out, "Environment=VEELOE_HOME={}", quote(&home.display().to_string())).unwrap();
+    writeln!(
+        out,
+        "Environment=VEELOE_HOME={}",
+        quote(&home.display().to_string())
+    )
+    .unwrap();
     writeln!(out, "Restart=always").unwrap();
     writeln!(out, "RestartSec=5").unwrap();
     writeln!(out, "StandardOutput=append:{}", log.display()).unwrap();
@@ -125,16 +146,23 @@ pub fn systemd_unit(exe: &Path, home: &Path, log: &Path) -> String {
 }
 
 fn path(path: &Path) -> Result<String, String> {
-    path.to_str().map(str::to_string).ok_or_else(|| format!("path is not UTF-8: {}", path.display()))
+    path.to_str()
+        .map(str::to_string)
+        .ok_or_else(|| format!("path is not UTF-8: {}", path.display()))
 }
 
 fn user_home() -> Result<PathBuf, String> {
-    std::env::var("HOME").map(PathBuf::from).map_err(|_| "HOME is not set".into())
+    std::env::var("HOME")
+        .map(PathBuf::from)
+        .map_err(|_| "HOME is not set".into())
 }
 
 #[cfg(target_os = "macos")]
 fn uid() -> Result<String, String> {
-    let output = Command::new("id").arg("-u").output().map_err(|error| error.to_string())?;
+    let output = Command::new("id")
+        .arg("-u")
+        .output()
+        .map_err(|error| error.to_string())?;
     if !output.status.success() {
         return Err("could not read the current user id".into());
     }
@@ -147,11 +175,22 @@ fn run(command: &mut Command) -> Result<(), String> {
         return Ok(());
     }
     let stderr = String::from_utf8_lossy(&output.stderr);
-    Err(format!("command failed: {}{}", command.get_program().to_string_lossy(), if stderr.trim().is_empty() { String::new() } else { format!(": {}", stderr.trim()) }))
+    Err(format!(
+        "command failed: {}{}",
+        command.get_program().to_string_lossy(),
+        if stderr.trim().is_empty() {
+            String::new()
+        } else {
+            format!(": {}", stderr.trim())
+        }
+    ))
 }
 
 fn xml(text: &str) -> String {
-    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 fn quote(text: &str) -> String {
@@ -164,7 +203,11 @@ mod tests {
 
     #[test]
     fn a_launch_agent_names_the_runtime_home_and_log() {
-        let text = launchd_plist(Path::new("/Applications/Veeloe & Co/veeloe"), Path::new("/tmp/home"), Path::new("/tmp/home/runtime/logs/service.log"));
+        let text = launchd_plist(
+            Path::new("/Applications/Veeloe & Co/veeloe"),
+            Path::new("/tmp/home"),
+            Path::new("/tmp/home/runtime/logs/service.log"),
+        );
         assert!(text.contains("<string>dev.veeloe.runtime</string>"));
         assert!(text.contains("Veeloe &amp; Co"));
         assert!(text.contains("<key>VEELOE_HOME</key><string>/tmp/home</string>"));
@@ -173,7 +216,11 @@ mod tests {
 
     #[test]
     fn a_systemd_unit_names_the_runtime_home_and_log() {
-        let text = systemd_unit(Path::new("/opt/veeloe"), Path::new("/tmp/home"), Path::new("/tmp/home/runtime/logs/service.log"));
+        let text = systemd_unit(
+            Path::new("/opt/veeloe"),
+            Path::new("/tmp/home"),
+            Path::new("/tmp/home/runtime/logs/service.log"),
+        );
         assert!(text.contains("ExecStart=\"/opt/veeloe\""));
         assert!(text.contains("Environment=VEELOE_HOME=\"/tmp/home\""));
         assert!(text.contains("StandardOutput=append:/tmp/home/runtime/logs/service.log"));

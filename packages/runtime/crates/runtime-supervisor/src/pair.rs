@@ -20,8 +20,8 @@ use veeloe_protocol::signer::{Outgoing, Signer};
 
 use crate::hub_link::{HubLink, HubLinkOptions, HubLinkSink, HubSender};
 use crate::trust::{
-    load_or_create_machine_key, load_trust, machine_name, save_hub_url, save_trust, FileSeenSequences,
-    Owner, Trust, TrustError,
+    load_or_create_machine_key, load_trust, machine_name, save_hub_url, save_trust,
+    FileSeenSequences, Owner, Trust, TrustError,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,7 +112,10 @@ impl HubLinkSink for PairSink {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string();
-        let proof = body.get("proof").and_then(Value::as_str).unwrap_or_default();
+        let proof = body
+            .get("proof")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let keys: Vec<String> = body
             .get("keys")
             .and_then(Value::as_array)
@@ -126,7 +129,13 @@ impl HubLinkSink for PairSink {
             .get("workspace")
             .and_then(Value::as_str)
             .map(str::to_string);
-        if !check_pairing_proof(&self.secret, &self.machine_key, &verified.from, &member, proof) {
+        if !check_pairing_proof(
+            &self.secret,
+            &self.machine_key,
+            &verified.from,
+            &member,
+            proof,
+        ) {
             (self.log)("ignored a claim whose proof did not match this link");
             return;
         }

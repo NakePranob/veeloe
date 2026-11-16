@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
-use veeloe_runtime_core::{FromWorker, SupervisorLink, ToWorker};
 use crate::worker::{Config, Worker};
+use veeloe_runtime_core::{FromWorker, SupervisorLink, ToWorker};
 
 /// The Allowlist the supervisor packed into the environment; empty when it is
 /// missing or broken.

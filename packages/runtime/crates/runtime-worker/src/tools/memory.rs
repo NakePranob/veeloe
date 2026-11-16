@@ -100,8 +100,15 @@ impl ToolRunner for MemoryTool {
             .get("text")
             .and_then(Value::as_str)
             .ok_or_else(|| ToolError::Failed("memory.bad: text is required".into()))?;
-        let scope = object.get("scope").and_then(Value::as_str).unwrap_or("long");
-        let mode = match object.get("mode").and_then(Value::as_str).unwrap_or("append") {
+        let scope = object
+            .get("scope")
+            .and_then(Value::as_str)
+            .unwrap_or("long");
+        let mode = match object
+            .get("mode")
+            .and_then(Value::as_str)
+            .unwrap_or("append")
+        {
             "append" => Mode::Append,
             "replace" => Mode::Replace,
             other => {
@@ -252,7 +259,11 @@ mod tests {
             .await
             .is_err());
         assert!(tool
-            .run("memory", &json!({ "text": "x", "scope": "week" }), &Cancel::new())
+            .run(
+                "memory",
+                &json!({ "text": "x", "scope": "week" }),
+                &Cancel::new()
+            )
             .await
             .is_err());
     }

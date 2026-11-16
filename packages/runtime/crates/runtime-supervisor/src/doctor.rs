@@ -283,7 +283,16 @@ mod tests {
         assert_eq!(PROFILE.matches("/usr/").count(), 1, "{PROFILE}");
         assert!(!PROFILE.contains("flags=(enforce)"), "{PROFILE}");
         // One rule only: a later edit that grants more must fail this test.
-        for rule in ["capability", "network", "file,", "dbus", "mount", "signal", "ptrace", "unix"] {
+        for rule in [
+            "capability",
+            "network",
+            "file,",
+            "dbus",
+            "mount",
+            "signal",
+            "ptrace",
+            "unix",
+        ] {
             assert!(!PROFILE.contains(rule), "{rule} is granted: {PROFILE}");
         }
     }

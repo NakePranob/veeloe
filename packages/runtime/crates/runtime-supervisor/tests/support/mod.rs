@@ -53,9 +53,7 @@ impl ModelsStub {
     pub fn start() -> Self {
         use std::io::{Read, Write};
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind a stub Provider");
-        listener
-            .set_nonblocking(true)
-            .expect("non-blocking accept");
+        listener.set_nonblocking(true).expect("non-blocking accept");
         let url = format!("http://{}", listener.local_addr().expect("address"));
         let shutdown = Arc::new(AtomicBool::new(false));
         let stopping = Arc::clone(&shutdown);
@@ -164,6 +162,8 @@ pub async fn until(condition: impl Fn() -> bool, millis: u64) -> bool {
 /// it into a worker (ADR 0020). Cargo names the file itself, so where a runner
 /// keeps its target folder is not the test's business.
 pub fn worker_binary() -> Vec<String> {
-    vec![env!("CARGO_BIN_EXE_veeloe").to_string(), "worker".to_string()]
+    vec![
+        env!("CARGO_BIN_EXE_veeloe").to_string(),
+        "worker".to_string(),
+    ]
 }
-

@@ -299,7 +299,8 @@ fn requested_of(harness: &Harness) -> Option<String> {
         .take()
         .into_iter()
         .find_map(|message| match message {
-            FromWorker::Event { event, .. } if event.kind == "approval.requested" => event.body
+            FromWorker::Event { event, .. } if event.kind == "approval.requested" => event
+                .body
                 .get("request")
                 .and_then(Value::as_str)
                 .map(str::to_string),
@@ -345,7 +346,12 @@ async fn a_message_starts_a_task_and_a_turn_and_every_event_reaches_the_member_w
     let events = harness.core.events("t1").expect("events");
     assert_eq!(
         kinds(&events),
-        vec!["member.message", "turn.started", "llm.message", "turn.ended"]
+        vec![
+            "member.message",
+            "turn.started",
+            "llm.message",
+            "turn.ended"
+        ]
     );
     let seqs: Vec<i64> = events
         .iter()
@@ -357,7 +363,10 @@ async fn a_message_starts_a_task_and_a_turn_and_every_event_reaches_the_member_w
         message,
         FromWorker::Event { starter, .. } if starter == "m_owner"
     )));
-    assert_eq!(events.last().expect("last").body, json!({ "reason": "done" }));
+    assert_eq!(
+        events.last().expect("last").body,
+        json!({ "reason": "done" })
+    );
 }
 
 #[tokio::test]
@@ -423,11 +432,17 @@ async fn a_message_during_a_turn_waits_and_then_becomes_the_next_turn() {
         .collect();
     assert_eq!(texts, vec!["first", "second", "third"]);
     assert_eq!(
-        events.iter().filter(|event| event.kind == "turn.started").count(),
+        events
+            .iter()
+            .filter(|event| event.kind == "turn.started")
+            .count(),
         3
     );
     assert_eq!(
-        events.iter().filter(|event| event.kind == "turn.ended").count(),
+        events
+            .iter()
+            .filter(|event| event.kind == "turn.ended")
+            .count(),
         3
     );
     assert_eq!(harness.llm.requests().len(), 3);
@@ -501,7 +516,10 @@ async fn before_compaction_the_turn_saves_memory_and_still_summarizes() {
             _ => None,
         })
         .collect();
-    let saved = kinds.iter().position(|kind| kind == "memory.saved").expect("saved");
+    let saved = kinds
+        .iter()
+        .position(|kind| kind == "memory.saved")
+        .expect("saved");
     let compacted = kinds
         .iter()
         .position(|kind| kind == "context.compacted")
@@ -581,7 +599,11 @@ async fn a_failed_flush_does_not_fail_the_turn() {
 #[tokio::test]
 async fn a_new_name_reaches_the_next_turn_and_the_turn_running_keeps_the_old_one() {
     let harness = setup(Setup {
-        replies: vec![Ok(tool_use("u1", "echo", json!({}))), Ok(text("done")), Ok(text("done"))],
+        replies: vec![
+            Ok(tool_use("u1", "echo", json!({}))),
+            Ok(text("done")),
+            Ok(text("done")),
+        ],
         runners: vec![Arc::new(Echo)],
         allowlist: vec!["echo".into()],
         gated: true,
@@ -591,7 +613,8 @@ async fn a_new_name_reaches_the_next_turn_and_the_turn_running_keeps_the_old_one
     harness.core.rename("Builder");
     let _ = harness.gate.send(true);
     harness.core.idle().await;
-    harness.core
+    harness
+        .core
         .receive(message_in("t2", "second", "m_owner"))
         .expect("second");
     harness.core.idle().await;
@@ -600,7 +623,14 @@ async fn a_new_name_reaches_the_next_turn_and_the_turn_running_keeps_the_old_one
         .llm
         .requests()
         .iter()
-        .map(|request| request.system.split(',').next().unwrap_or_default().to_string())
+        .map(|request| {
+            request
+                .system
+                .split(',')
+                .next()
+                .unwrap_or_default()
+                .to_string()
+        })
         .collect();
     assert_eq!(
         systems,
@@ -689,7 +719,11 @@ async fn a_turn_that_keeps_asking_for_tools_stops_at_the_ceiling() {
 
     assert_eq!(harness.llm.requests().len(), rounds);
     assert_eq!(
-        core.events("t1").expect("events").last().expect("last").body,
+        core.events("t1")
+            .expect("events")
+            .last()
+            .expect("last")
+            .body,
         json!({ "reason": "error", "code": "turn.too_many_rounds" })
     );
 }
@@ -836,7 +870,10 @@ async fn a_turn_its_worker_never_finished_keeps_the_members_words_and_drops_its_
     assert_eq!(messages[1].content[0]["text"], "two");
 }
 
-fn bash_harness(replies: Vec<Result<LlmReply, LlmError>>, allowlist: Vec<String>) -> (Harness, Arc<Mutex<Vec<String>>>) {
+fn bash_harness(
+    replies: Vec<Result<LlmReply, LlmError>>,
+    allowlist: Vec<String>,
+) -> (Harness, Arc<Mutex<Vec<String>>>) {
     let ran = Arc::new(Mutex::new(Vec::new()));
     let harness = setup(Setup {
         replies,
@@ -862,14 +899,19 @@ async fn a_bash_command_in_the_allowlist_runs_without_asking() {
     harness.core.idle().await;
 
     assert_eq!(*ran.lock().expect("ran"), vec!["ls -la"]);
-    assert!(!kinds(&harness.core.events("t1").expect("events")).contains(&"approval.requested".to_string()));
+    assert!(!kinds(&harness.core.events("t1").expect("events"))
+        .contains(&"approval.requested".to_string()));
 }
 
 #[tokio::test]
 async fn an_approved_command_runs_and_the_log_holds_the_approval_pair() {
     let (harness, ran) = bash_harness(
         vec![
-            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
             Ok(text("done")),
         ],
         Vec::new(),
@@ -918,7 +960,11 @@ async fn an_approved_command_runs_and_the_log_holds_the_approval_pair() {
 async fn a_denied_command_comes_back_as_an_error_result_and_the_turn_goes_on() {
     let (harness, ran) = bash_harness(
         vec![
-            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
             Ok(text("sorry")),
         ],
         Vec::new(),
@@ -940,7 +986,13 @@ async fn a_denied_command_comes_back_as_an_error_result_and_the_turn_goes_on() {
         .expect("content")
         .contains("denied"));
     assert_eq!(
-        harness.core.events("t1").expect("events").last().expect("last").body,
+        harness
+            .core
+            .events("t1")
+            .expect("events")
+            .last()
+            .expect("last")
+            .body,
         json!({ "reason": "done" })
     );
 }
@@ -949,7 +1001,11 @@ async fn a_denied_command_comes_back_as_an_error_result_and_the_turn_goes_on() {
 async fn a_redirect_tells_the_llm_what_to_do_instead() {
     let (harness, ran) = bash_harness(
         vec![
-            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
             Ok(text("ok")),
         ],
         Vec::new(),
@@ -983,7 +1039,11 @@ async fn an_approval_no_one_answers_expires_and_the_command_does_not_run() {
     let ran = Arc::new(Mutex::new(Vec::new()));
     let harness = setup(Setup {
         replies: vec![
-            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
             Ok(text("ok")),
         ],
         runners: vec![Arc::new(Bash {
@@ -1025,7 +1085,11 @@ async fn an_approval_expiry_comes_from_the_cores_clock() {
     }
     let harness = setup(Setup {
         replies: vec![
-            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
             Ok(text("ok")),
         ],
         runners: vec![Arc::new(Bash {
@@ -1083,7 +1147,8 @@ async fn a_new_allowlist_reaches_the_next_tool_call() {
     harness.core.idle().await;
 
     assert_eq!(*ran.lock().expect("ran"), vec!["ls"]);
-    assert!(!kinds(&harness.core.events("t1").expect("events")).contains(&"approval.requested".to_string()));
+    assert!(!kinds(&harness.core.events("t1").expect("events"))
+        .contains(&"approval.requested".to_string()));
 }
 
 #[tokio::test]
@@ -1091,11 +1156,7 @@ async fn a_connector_tool_outside_the_allowlist_waits_too_and_an_exact_name_runs
     let ran = Arc::new(Mutex::new(Vec::new()));
     let harness = setup(Setup {
         replies: vec![
-            Ok(tool_use(
-                "tu-pr",
-                "github/create_pull_request",
-                json!({}),
-            )),
+            Ok(tool_use("tu-pr", "github/create_pull_request", json!({}))),
             Ok(text("done")),
         ],
         runners: vec![Arc::new(Connector {
@@ -1154,14 +1215,19 @@ async fn a_connector_tool_named_in_the_allowlist_runs_without_asking_and_file_to
         *ran.lock().expect("ran"),
         vec!["github/create_pull_request".to_string(), "read".to_string()]
     );
-    assert!(!kinds(&harness.core.events("t1").expect("events")).contains(&"approval.requested".to_string()));
+    assert!(!kinds(&harness.core.events("t1").expect("events"))
+        .contains(&"approval.requested".to_string()));
 }
 
 #[tokio::test]
 async fn an_answer_for_another_task_is_approval_unknown() {
     let (harness, _ran) = bash_harness(
         vec![
-            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
             Ok(text("ok")),
         ],
         Vec::new(),
@@ -1194,7 +1260,13 @@ async fn an_answer_for_another_task_is_approval_unknown() {
         .expect("deny");
     harness.core.idle().await;
     assert_eq!(
-        harness.core.events("t1").expect("events").last().expect("last").body,
+        harness
+            .core
+            .events("t1")
+            .expect("events")
+            .last()
+            .expect("last")
+            .body,
         json!({ "reason": "done" })
     );
 }
@@ -1204,7 +1276,11 @@ async fn a_new_timeout_reaches_the_next_wait_and_a_bad_value_keeps_the_old_one()
     let ran = Arc::new(Mutex::new(Vec::new()));
     let harness = setup(Setup {
         replies: vec![
-            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
             Ok(text("ok")),
         ],
         runners: vec![Arc::new(Bash {
@@ -1236,7 +1312,8 @@ async fn a_new_timeout_reaches_the_next_wait_and_a_bad_value_keeps_the_old_one()
 }
 
 #[tokio::test]
-async fn a_stop_ends_the_turn_with_who_stopped_it_and_the_task_goes_on_from_the_same_conversation() {
+async fn a_stop_ends_the_turn_with_who_stopped_it_and_the_task_goes_on_from_the_same_conversation()
+{
     let harness = setup(Setup {
         replies: vec![
             Ok(tool_use(
@@ -1276,7 +1353,13 @@ async fn a_stop_ends_the_turn_with_who_stopped_it_and_the_task_goes_on_from_the_
         .expect("stopped");
     assert_eq!(stopped.body, json!({ "member": "m_owner" }));
     assert_eq!(
-        harness.core.events("t1").expect("events").last().expect("last").body,
+        harness
+            .core
+            .events("t1")
+            .expect("events")
+            .last()
+            .expect("last")
+            .body,
         json!({ "reason": "stopped" })
     );
 
@@ -1302,7 +1385,13 @@ async fn a_stop_ends_the_turn_with_who_stopped_it_and_the_task_goes_on_from_the_
         .collect();
     assert_eq!(roles, vec!["user", "assistant", "user"]);
     assert_eq!(
-        harness.core.events("t1").expect("events").last().expect("last").body,
+        harness
+            .core
+            .events("t1")
+            .expect("events")
+            .last()
+            .expect("last")
+            .body,
         json!({ "reason": "done" })
     );
 }
@@ -1321,25 +1410,38 @@ async fn a_stop_while_waiting_on_the_llm_drops_the_answer_that_arrives_after_it(
 
     assert_eq!(
         kinds(&harness.core.events("t1").expect("events")),
-        vec!["member.message", "turn.started", "turn.stopped", "turn.ended"]
+        vec![
+            "member.message",
+            "turn.started",
+            "turn.stopped",
+            "turn.ended"
+        ]
     );
     assert_eq!(
-        harness.core.events("t1").expect("events").last().expect("last").body,
+        harness
+            .core
+            .events("t1")
+            .expect("events")
+            .last()
+            .expect("last")
+            .body,
         json!({ "reason": "stopped" })
     );
     // The answer is not written as this Turn's words.
-    assert!(!harness
-        .link
-        .take()
-        .iter()
-        .any(|message| matches!(message, FromWorker::Event { event, .. } if event.kind == "llm.message")));
+    assert!(!harness.link.take().iter().any(
+        |message| matches!(message, FromWorker::Event { event, .. } if event.kind == "llm.message")
+    ));
 }
 
 #[tokio::test]
 async fn a_stop_while_an_approval_waits_ends_the_turn_and_a_late_answer_is_approval_unknown() {
     let (harness, _ran) = bash_harness(
         vec![
-            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
             Ok(text("ok")),
         ],
         Vec::new(),
@@ -1356,7 +1458,13 @@ async fn a_stop_while_an_approval_waits_ends_the_turn_and_a_late_answer_is_appro
         .iter()
         .any(|event| event.kind == "approval.answered"));
     assert_eq!(
-        harness.core.events("t1").expect("events").last().expect("last").body,
+        harness
+            .core
+            .events("t1")
+            .expect("events")
+            .last()
+            .expect("last")
+            .body,
         json!({ "reason": "stopped" })
     );
     harness
@@ -1375,7 +1483,8 @@ async fn a_stop_while_an_approval_waits_ends_the_turn_and_a_late_answer_is_appro
 }
 
 #[tokio::test]
-async fn a_stop_with_no_turn_running_is_turn_not_running_and_one_for_another_task_is_task_not_found() {
+async fn a_stop_with_no_turn_running_is_turn_not_running_and_one_for_another_task_is_task_not_found(
+) {
     let dir = tempdir().expect("tempdir");
     let store = EventStore::open(dir.path().join("tasks.db")).expect("store");
     // A Task someone else started, with no Turn running in it.
@@ -1454,11 +1563,21 @@ async fn a_worker_that_starts_again_closes_every_turn_left_open_and_nothing_runs
         )
         .expect("message");
     store
-        .append("t-open", "turn.started", &json!({ "member": "m_owner" }), None)
+        .append(
+            "t-open",
+            "turn.started",
+            &json!({ "member": "m_owner" }),
+            None,
+        )
         .expect("start");
     store.create_task("t-done", "m_owner").expect("task");
     store
-        .append("t-done", "turn.started", &json!({ "member": "m_owner" }), None)
+        .append(
+            "t-done",
+            "turn.started",
+            &json!({ "member": "m_owner" }),
+            None,
+        )
         .expect("start");
     store
         .append("t-done", "turn.ended", &json!({ "reason": "done" }), None)
@@ -1486,7 +1605,10 @@ async fn a_worker_that_starts_again_closes_every_turn_left_open_and_nothing_runs
     );
     let open = core.events("t-open").expect("events");
     assert_eq!(open[open.len() - 2].body, json!({ "reason": "restart" }));
-    assert_eq!(open[open.len() - 1].body, json!({ "reason": "interrupted" }));
+    assert_eq!(
+        open[open.len() - 1].body,
+        json!({ "reason": "interrupted" })
+    );
     // A Task that had ended is left alone.
     assert_eq!(
         kinds(&core.events("t-done").expect("events")),
@@ -1498,7 +1620,11 @@ async fn a_worker_that_starts_again_closes_every_turn_left_open_and_nothing_runs
         .expect("continue");
     core.idle().await;
     assert_eq!(
-        core.events("t-open").expect("events").last().expect("last").body,
+        core.events("t-open")
+            .expect("events")
+            .last()
+            .expect("last")
+            .body,
         json!({ "reason": "done" })
     );
 }
@@ -1546,18 +1672,26 @@ async fn a_second_stop_for_the_same_turn_writes_no_second_turn_stopped_and_the_t
 #[tokio::test]
 async fn a_long_turn_is_summarized_and_the_next_request_sees_the_summary() {
     let harness = setup(Setup {
-        replies: vec![Ok(text("The earlier work was about a release.")), Ok(text("done"))],
+        replies: vec![
+            Ok(text("The earlier work was about a release.")),
+            Ok(text("done")),
+        ],
         context_window: Some(100),
         ..Setup::default()
     });
-    harness.core.receive(message(&"x".repeat(500))).expect("receive");
+    harness
+        .core
+        .receive(message(&"x".repeat(500)))
+        .expect("receive");
     harness.core.idle().await;
 
     let requests = harness.llm.requests();
     assert_eq!(requests.len(), 2);
     assert!(requests[0].system.contains("compact"));
     let second = &requests[1].messages[0];
-    assert!(second.content.iter().any(|block| block["text"].as_str().is_some_and(|text| text.contains("The earlier work"))));
+    assert!(second.content.iter().any(|block| block["text"]
+        .as_str()
+        .is_some_and(|text| text.contains("The earlier work"))));
     let events = harness.core.events("t1").expect("events");
     assert!(events.iter().any(|event| event.kind == "context.compacted"));
 }

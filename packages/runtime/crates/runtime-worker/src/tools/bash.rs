@@ -94,7 +94,6 @@ impl BashTool {
             sandbox,
         }
     }
-
 }
 
 #[async_trait]
@@ -205,11 +204,12 @@ impl ToolRunner for BashTool {
         // hold the output open. One that left the group (setsid) still may, so
         // the output is read for a moment longer at most.
         kill_group(pid);
-        let mut tail = match tokio::time::timeout(Duration::from_millis(self.second_ms), reading).await {
-            Ok(Ok(tail)) => tail,
-            Ok(Err(_)) => Tail::default(),
-            Err(_) => Tail::default(),
-        };
+        let mut tail =
+            match tokio::time::timeout(Duration::from_millis(self.second_ms), reading).await {
+                Ok(Ok(tail)) => tail,
+                Ok(Err(_)) => Tail::default(),
+                Err(_) => Tail::default(),
+            };
         let text = tail.trim();
         let cut = if tail.dropped > 0 {
             format!("[the first {} characters were cut]\n", tail.dropped)

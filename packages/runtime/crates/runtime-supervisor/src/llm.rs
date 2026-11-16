@@ -62,11 +62,7 @@ pub struct HttpAnswer {
 #[async_trait]
 pub trait HttpClient: Send + Sync {
     /// A read that changes nothing: what a Provider offers, and nothing else.
-    async fn get(
-        &self,
-        url: &str,
-        headers: Vec<(String, String)>,
-    ) -> Result<HttpAnswer, String>;
+    async fn get(&self, url: &str, headers: Vec<(String, String)>) -> Result<HttpAnswer, String>;
     async fn post(
         &self,
         url: &str,
@@ -164,11 +160,7 @@ impl LlmProxy {
         body["model"] = json!(target.model);
 
         let url = format!("{}{}{}", target.url, pathname, search);
-        let answer = match self
-            .client
-            .post(&url, headers, body.to_string())
-            .await
-        {
+        let answer = match self.client.post(&url, headers, body.to_string()).await {
             Ok(answer) => answer,
             Err(_) => return refuse(502, "provider.unreachable"),
         };

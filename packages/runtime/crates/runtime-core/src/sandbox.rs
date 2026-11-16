@@ -100,7 +100,10 @@ const MACOS_SERVICES: &[(&str, Reason)] = &[
     ("com.apple.system.opendirectoryd.libinfo", Reason::Os),
     // `git` checks group membership to decide who owns a repository, so a
     // checkout it is allowed to read is not refused as someone else's.
-    ("com.apple.system.opendirectoryd.membership", Reason::Toolchain),
+    (
+        "com.apple.system.opendirectoryd.membership",
+        Reason::Toolchain,
+    ),
 ];
 
 /// The one Mach name a headless browser registers for the processes it starts.
@@ -198,7 +201,8 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
             .map(|(prefix, _)| prefix.replace('.', "\\."))
             .collect::<Vec<_>>()
             .join("|");
-        let name = format!("(global-name-regex #\"^({names})\\.MachPortRendezvousServer\\.[0-9]+$\")");
+        let name =
+            format!("(global-name-regex #\"^({names})\\.MachPortRendezvousServer\\.[0-9]+$\")");
         profile.push_str(&format!("(allow mach-register {name})\n"));
         profile.push_str(&format!("(allow mach-lookup {name})\n"));
     }

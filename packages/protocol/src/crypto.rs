@@ -12,7 +12,9 @@ pub fn generate_secret_key() -> [u8; 32] {
 }
 
 pub fn public_key_of(secret_key: &[u8; 32]) -> [u8; 32] {
-    *SigningKey::from_bytes(secret_key).verifying_key().as_bytes()
+    *SigningKey::from_bytes(secret_key)
+        .verifying_key()
+        .as_bytes()
 }
 
 pub fn public_key_base64url(secret_key: &[u8; 32]) -> String {

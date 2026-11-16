@@ -93,7 +93,9 @@ fn a_refused_service_is_named_in_the_runtime_log() {
     assert_eq!(value["event"], "sandbox.denied");
     assert_eq!(value["fields"]["service"], SERVICE);
     assert!(
-        value["fields"]["process"].as_str().is_some_and(|name| !name.is_empty()),
+        value["fields"]["process"]
+            .as_str()
+            .is_some_and(|name| !name.is_empty()),
         "the line does not say which program asked: {line}"
     );
     // The log says a name, not what the tool was doing or where it was reading.
@@ -101,5 +103,8 @@ fn a_refused_service_is_named_in_the_runtime_log() {
         !line.contains(home.to_str().expect("home")),
         "the denial line carries a path: {line}"
     );
-    assert!(!line.contains("/Users/"), "the denial line carries a path: {line}");
+    assert!(
+        !line.contains("/Users/"),
+        "the denial line carries a path: {line}"
+    );
 }

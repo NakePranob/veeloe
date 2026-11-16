@@ -26,10 +26,7 @@ fn every_envelope_vector_reaches_its_expected_result() {
         .iter()
         .map(|destination| destination.as_str().expect("destination").to_string())
         .collect();
-    let member = doc["self"]["member"]
-        .as_str()
-        .expect("member")
-        .to_string();
+    let member = doc["self"]["member"].as_str().expect("member").to_string();
     let is_for_me = |route: &Route| match route {
         Route::To(to) => destinations.iter().any(|destination| destination == to),
         Route::Recipients(recipients) => recipients.iter().any(|recipient| recipient == &member),

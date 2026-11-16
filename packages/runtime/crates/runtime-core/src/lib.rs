@@ -6,8 +6,8 @@ pub mod conversation;
 pub mod event_store;
 pub mod ipc;
 pub mod memory;
-pub mod sandbox;
 pub mod ports;
+pub mod sandbox;
 pub mod usage;
 
 pub use agent::{AgentCore, AgentError, APPROVAL_TIMEOUT_MS, MAX_ROUNDS};

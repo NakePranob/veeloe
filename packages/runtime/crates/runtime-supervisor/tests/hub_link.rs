@@ -65,7 +65,10 @@ fn options(hub: &TestHub, seed: [u8; 32]) -> HubLinkOptions {
 async fn the_machine_answers_the_hubs_challenge_and_is_ready() {
     let hub = TestHub::start();
     let sink = Arc::new(Recording::default());
-    let link = HubLink::start(options(&hub, MACHINE_SEED), Arc::clone(&sink) as Arc<dyn HubLinkSink>);
+    let link = HubLink::start(
+        options(&hub, MACHINE_SEED),
+        Arc::clone(&sink) as Arc<dyn HubLinkSink>,
+    );
 
     assert!(
         until(|| !sink.ready().is_empty(), 5_000).await,
@@ -120,7 +123,10 @@ async fn a_key_the_hub_does_not_know_is_refused_with_its_code_and_retried() {
 async fn a_frame_sent_before_the_handshake_is_not_kept() {
     let hub = TestHub::start();
     let sink = Arc::new(Recording::default());
-    let link = HubLink::start(options(&hub, MACHINE_SEED), Arc::clone(&sink) as Arc<dyn HubLinkSink>);
+    let link = HubLink::start(
+        options(&hub, MACHINE_SEED),
+        Arc::clone(&sink) as Arc<dyn HubLinkSink>,
+    );
 
     // Nothing is accepted yet, so the frame is dropped rather than queued.
     let early = link.send(serde_json::json!({ "type": "task.message", "to": "machine-1" }));

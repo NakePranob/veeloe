@@ -61,7 +61,11 @@ fn bash_tool(workdir: &Path) -> BashTool {
     env.insert("NODE_CHANNEL_SERIALIZATION_MODE".into(), "json".into());
     // One "second" is 20 ms here, so the 120 s default is 2.4 s and the 600 s
     // ceiling 12 s.
-    let sandbox = Sandbox::new(Policy::new(workdir, &workdir.join("tmp"), Path::new("/bin")));
+    let sandbox = Sandbox::new(Policy::new(
+        workdir,
+        &workdir.join("tmp"),
+        Path::new("/bin"),
+    ));
     BashTool::new(workdir, env, 20, sandbox)
 }
 
@@ -70,7 +74,11 @@ fn bash(tool: &BashTool, command: &str) -> Result<String, ToolError> {
 }
 
 fn bash_with_timeout(tool: &BashTool, command: &str, timeout: u64) -> Result<String, ToolError> {
-    run(tool, "bash", json!({ "command": command, "timeout": timeout }))
+    run(
+        tool,
+        "bash",
+        json!({ "command": command, "timeout": timeout }),
+    )
 }
 
 fn failure(result: Result<String, ToolError>) -> String {
@@ -133,7 +141,10 @@ fn output_past_the_limit_keeps_its_end_and_says_how_much_was_cut() {
     let tool = bash_tool(&workdir);
     let out = bash(
         &tool,
-        &format!("head -c {} /dev/zero | tr '\\0' a; echo END", OUTPUT_LIMIT + 5_000),
+        &format!(
+            "head -c {} /dev/zero | tr '\\0' a; echo END",
+            OUTPUT_LIMIT + 5_000
+        ),
     )
     .expect("output");
     assert!(out.starts_with("[the first 5004 characters were cut]\n"));
@@ -153,7 +164,10 @@ fn a_command_past_its_time_is_stopped_with_everything_it_started() {
         5,
     ));
     assert!(started.elapsed() < Duration::from_secs(2));
-    assert_eq!(message, "started\ntimed out after 5 seconds, so it was stopped");
+    assert_eq!(
+        message,
+        "started\ntimed out after 5 seconds, so it was stopped"
+    );
     std::thread::sleep(Duration::from_millis(100));
     assert!(pgrep(&marker).is_empty());
 }
@@ -296,7 +310,9 @@ fn a_path_is_relative_to_the_workdir_or_absolute_inside_it_and_never_outside() {
     .expect("absolute")
     .contains("1\thello"));
     assert!(failure(run(&files.tools, "read", json!({ "path": "../a.txt" }))).contains("outside"));
-    assert!(failure(run(&files.tools, "read", json!({ "path": "/etc/hosts" }))).contains("outside"));
+    assert!(
+        failure(run(&files.tools, "read", json!({ "path": "/etc/hosts" }))).contains("outside")
+    );
 }
 
 #[test]
@@ -335,7 +351,11 @@ fn glob_and_grep_skip_a_symlink_that_leaves_the_workdir() {
     let (_root, files) = files();
     let outside = tempdir().expect("outside");
     fs::write(outside.path().join("leak.ts"), "NEEDLE").expect("write");
-    symlink(outside.path().join("leak.ts"), files.workdir.join("leak.ts")).expect("link");
+    symlink(
+        outside.path().join("leak.ts"),
+        files.workdir.join("leak.ts"),
+    )
+    .expect("link");
 
     let found = run(&files.tools, "glob", json!({ "pattern": "**/*.ts" })).expect("glob");
     assert!(!found.contains("leak.ts"));
@@ -395,29 +415,20 @@ fn read_stops_at_256kb_of_text_and_says_where_to_continue() {
 fn read_refuses_a_binary_file_a_missing_file_and_one_over_10mb() {
     let (_root, files) = files();
     fs::write(files.workdir.join("binary.bin"), [0x41u8, 0x00, 0x42]).expect("write");
-    assert!(failure(run(
-        &files.tools,
-        "read",
-        json!({ "path": "binary.bin" })
-    ))
-    .contains("binary"));
-    assert!(failure(run(
-        &files.tools,
-        "read",
-        json!({ "path": "missing.txt" })
-    ))
-    .contains("no such file"));
+    assert!(failure(run(&files.tools, "read", json!({ "path": "binary.bin" }))).contains("binary"));
+    assert!(
+        failure(run(&files.tools, "read", json!({ "path": "missing.txt" })))
+            .contains("no such file")
+    );
     fs::write(
         files.workdir.join("huge.bin"),
         vec![0x41u8; 10 * 1024 * 1024 + 1],
     )
     .expect("write");
-    assert!(failure(run(
-        &files.tools,
-        "read",
-        json!({ "path": "huge.bin" })
-    ))
-    .contains("larger than 10MB"));
+    assert!(
+        failure(run(&files.tools, "read", json!({ "path": "huge.bin" })))
+            .contains("larger than 10MB")
+    );
 }
 
 #[test]
@@ -620,12 +631,7 @@ fn glob_finds_files_by_pattern_skips_git_and_node_modules_and_caps_the_answer() 
         run(&files.tools, "glob", json!({ "pattern": "**/*.nope" })).expect("none"),
         "no files matched"
     );
-    assert!(failure(run(
-        &files.tools,
-        "glob",
-        json!({ "pattern": "../*" })
-    ))
-    .contains("inside"));
+    assert!(failure(run(&files.tools, "glob", json!({ "pattern": "../*" }))).contains("inside"));
 
     fs::create_dir(files.workdir.join("lots")).expect("lots");
     for index in 0..205 {
@@ -673,8 +679,10 @@ fn grep_returns_path_and_line_respects_include_and_case_skips_binary_and_caps_re
         run(&files.tools, "grep", json!({ "pattern": "nothing-here" })).expect("none"),
         "no matches"
     );
-    assert!(failure(run(&files.tools, "grep", json!({ "pattern": "(" })))
-        .contains("invalid regular expression"));
+    assert!(
+        failure(run(&files.tools, "grep", json!({ "pattern": "(" })))
+            .contains("invalid regular expression")
+    );
     assert!(failure(run(
         &files.tools,
         "grep",

@@ -15,8 +15,8 @@ use async_trait::async_trait;
 use regex::RegexBuilder;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use walkdir::WalkDir;
 use veeloe_plugin_api::{Cancel, ToolDefinition, ToolError, ToolRunner};
+use walkdir::WalkDir;
 
 pub const READ_MAX_LINES: usize = 2_000;
 pub const READ_MAX_BYTES: usize = 256 * 1024;
@@ -152,8 +152,13 @@ impl ToolRunner for FileTools {
 fn send_file(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String, ToolError> {
     let path = text(input, "path")?;
     let real = resolve_in_workdir(workdir, &path)?;
-    let name = real.file_name().and_then(|name| name.to_str()).unwrap_or("file");
-    let size = fs::metadata(&real).map_err(|error| ToolError::Failed(error.to_string()))?.len();
+    let name = real
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("file");
+    let size = fs::metadata(&real)
+        .map_err(|error| ToolError::Failed(error.to_string()))?
+        .len();
     if size > SEND_FILE_MAX_BYTES {
         return Err(ToolError::Failed(format!(
             "{name} is {size} bytes; send_file is limited to 20 MB. Put it in git or share it through a Connector instead."
@@ -165,7 +170,8 @@ fn send_file(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<S
         "size": bytes.len(),
         "hash": veeloe_protocol::base64url::to_base64url(&Sha256::digest(&bytes)),
         "path": real.display().to_string(),
-    }).to_string())
+    })
+    .to_string())
 }
 
 fn text(input: &serde_json::Map<String, Value>, name: &str) -> Result<String, ToolError> {
@@ -201,8 +207,8 @@ fn resolve_for_write(workdir: &Path, input: &str) -> Result<PathBuf, ToolError> 
     // An existing target is written through its real path, so a symlink inside
     // the folder keeps pointing at its file.
     if target.exists() {
-        let real = fs::canonicalize(&target)
-            .map_err(|error| ToolError::Failed(error.to_string()))?;
+        let real =
+            fs::canonicalize(&target).map_err(|error| ToolError::Failed(error.to_string()))?;
         if !inside(workdir, &real) {
             return Err(ToolError::Failed(format!(
                 "path is outside the working folder: {input}"
@@ -303,7 +309,10 @@ fn read(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String
     if !stat.is_file() {
         return Err(ToolError::Failed(format!(
             "not a file: {}",
-            input.get("path").and_then(Value::as_str).unwrap_or_default()
+            input
+                .get("path")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
         )));
     }
     if stat.len() > READ_MAX_FILE {
@@ -319,7 +328,10 @@ fn read(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String
     if raw.iter().take(8_192).any(|byte| *byte == 0) {
         return Err(ToolError::Failed(format!(
             "binary file: {}",
-            input.get("path").and_then(Value::as_str).unwrap_or_default()
+            input
+                .get("path")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
         )));
     }
 
@@ -336,12 +348,7 @@ fn read(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String
         .filter(|limit| *limit > 0)
         .map(|limit| (limit as usize).min(READ_MAX_LINES))
         .unwrap_or(READ_MAX_LINES);
-    let chosen: Vec<&str> = lines
-        .iter()
-        .skip(start - 1)
-        .take(asked)
-        .copied()
-        .collect();
+    let chosen: Vec<&str> = lines.iter().skip(start - 1).take(asked).copied().collect();
 
     let mut shown: Vec<String> = Vec::new();
     let mut bytes = 0usize;
@@ -354,9 +361,7 @@ fn read(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String
         shown.push(rendered);
         bytes += size;
     }
-    let left = lines
-        .len()
-        .saturating_sub(start - 1 + shown.len());
+    let left = lines.len().saturating_sub(start - 1 + shown.len());
     let cut_by_bytes = shown.len() < chosen.len();
     // Say what is left when a cap cut the answer, not when the caller asked for
     // a short slice.
@@ -385,7 +390,10 @@ fn write(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<Strin
     if target.is_dir() {
         return Err(ToolError::Failed(format!(
             "not a file: {}",
-            input.get("path").and_then(Value::as_str).unwrap_or_default()
+            input
+                .get("path")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
         )));
     }
     let mode = if target.exists() {
@@ -420,7 +428,8 @@ fn edit(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String
             WRITE_MAX_BYTES / 1024 / 1024
         )));
     }
-    let content = fs::read_to_string(&file).map_err(|error| ToolError::Failed(error.to_string()))?;
+    let content =
+        fs::read_to_string(&file).map_err(|error| ToolError::Failed(error.to_string()))?;
 
     let count = content.matches(&old_string).count();
     if count == 0 {
@@ -485,7 +494,9 @@ fn glob(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String
     let shown: Vec<String> = found.into_iter().take(GLOB_MAX).collect();
     let mut answer = shown.join("\n");
     if more {
-        answer.push_str(&format!("\n[more files match; showing the first {GLOB_MAX}]"));
+        answer.push_str(&format!(
+            "\n[more files match; showing the first {GLOB_MAX}]"
+        ));
     }
     Ok(answer)
 }
@@ -547,8 +558,9 @@ fn grep(workdir: &Path, input: &serde_json::Map<String, Value>) -> Result<String
             }
             matches.push(format!("{relative}:{}: {line}", index + 1));
             if matches.len() >= GREP_MAX {
-                return Ok(matches.join("\n")
-                    + &format!("\n[more matches; showing the first {GREP_MAX}]"));
+                return Ok(
+                    matches.join("\n") + &format!("\n[more matches; showing the first {GREP_MAX}]")
+                );
             }
         }
     }
@@ -578,10 +590,7 @@ fn walk(root: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-fn pattern_of(
-    input: &serde_json::Map<String, Value>,
-    name: &str,
-) -> Result<String, ToolError> {
+fn pattern_of(input: &serde_json::Map<String, Value>, name: &str) -> Result<String, ToolError> {
     let pattern = text(input, name)?;
     let path = Path::new(&pattern);
     if path.is_absolute()

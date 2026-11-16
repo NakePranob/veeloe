@@ -265,7 +265,13 @@ impl<C: Clock> EventStore<C> {
                 ORDER BY seq DESC LIMIT 1) = ?5",
         )?;
         let rows = statement.query_map(
-            params!["turn.started", "turn.ended", "turn.started", "turn.ended", "turn.started"],
+            params![
+                "turn.started",
+                "turn.ended",
+                "turn.started",
+                "turn.ended",
+                "turn.started"
+            ],
             |row| row.get::<_, String>(0),
         )?;
         let mut tasks = Vec::new();

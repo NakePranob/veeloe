@@ -71,7 +71,9 @@ impl Drop for Proxy {
 /// `<VEELOE_HOME>/runtime/egress/<agent>.sock`, in the Runtime's own folder,
 /// out of reach of what a command may write (ADR 0069).
 pub fn socket_path(home: &Path, agent: &str) -> PathBuf {
-    home.join("runtime").join("egress").join(format!("{agent}.sock"))
+    home.join("runtime")
+        .join("egress")
+        .join(format!("{agent}.sock"))
 }
 
 /// The one Machine-wide socket a Runtime before #43 listened on. It is only
@@ -268,8 +270,9 @@ impl Proxies {
             return Ok(view);
         }
         // An id that is not a folder name never names a socket.
-        crate::agents::agent_root(&self.home, agent)
-            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string()))?;
+        crate::agents::agent_root(&self.home, agent).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
         let ports = crate::ports::Ports::open(&self.home)
             .map_err(|error| std::io::Error::other(error.to_string()))?;
         #[cfg(target_os = "linux")]
@@ -399,8 +402,7 @@ where
                 // worth asking about. An address, `localhost` or a malformed
                 // name is refused as before: a permanent yes could never cover
                 // it (ADR 0029).
-                let askable =
-                    crate::egress::is_valid_egress(std::slice::from_ref(&host));
+                let askable = crate::egress::is_valid_egress(std::slice::from_ref(&host));
                 if !askable || !approvals.ask(&agent, &host).await {
                     // No answer at all: a 403 is still an HTTP response a
                     // command could treat as success. Dropping the connection
@@ -608,8 +610,7 @@ mod tests {
     #[test]
     fn a_plain_request_keeps_its_body_and_drops_proxy_headers() {
         let head = b"POST http://example.com/x HTTP/1.1\r\nHost: example.com\r\nProxy-Authorization: Basic x\r\nContent-Length: 5\r\n\r\nhello";
-        let out =
-            String::from_utf8(plain_request(head, "POST", "/x", "example.com", 80)).unwrap();
+        let out = String::from_utf8(plain_request(head, "POST", "/x", "example.com", 80)).unwrap();
         assert!(out.starts_with("POST /x HTTP/1.1\r\n"));
         assert!(out.contains("Host: example.com\r\n"));
         assert!(!out.to_ascii_lowercase().contains("proxy-authorization"));
@@ -640,11 +641,7 @@ mod tests {
     fn approvals_for(home: &Path, egress: &Arc<Egress>, agent: &str, task: &str) -> Arc<Approvals> {
         std::fs::create_dir_all(crate::task_log::dir(home, agent)).expect("task log");
         let logs = Arc::new(TaskLogs::new(home));
-        let approvals = Arc::new(Approvals::new(
-            home.to_path_buf(),
-            Arc::clone(egress),
-            logs,
-        ));
+        let approvals = Arc::new(Approvals::new(home.to_path_buf(), Arc::clone(egress), logs));
         approvals.observe(
             agent,
             &FromWorker::Event {
@@ -674,15 +671,9 @@ mod tests {
             Arc::clone(&egress),
             logs,
         ));
-        let proxy = start_with_socket(
-            Arc::clone(&egress),
-            "a1",
-            &|_| false,
-            None,
-            Some(approvals),
-        )
-        .await
-        .expect("proxy");
+        let proxy = start_with_socket(Arc::clone(&egress), "a1", &|_| false, None, Some(approvals))
+            .await
+            .expect("proxy");
         let mut client = TcpStream::connect(("127.0.0.1", proxy.port))
             .await
             .expect("connect");
@@ -721,9 +712,12 @@ mod tests {
         // It waits instead of answering or dropping.
         let mut answer = [0u8; 16];
         assert!(
-            tokio::time::timeout(std::time::Duration::from_millis(100), client.read(&mut answer))
-                .await
-                .is_err(),
+            tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                client.read(&mut answer)
+            )
+            .await
+            .is_err(),
             "the proxy answered a domain it had not been allowed"
         );
         // The request is in the Task's log, of the domain kind.
@@ -761,13 +755,7 @@ mod tests {
         let home = tempfile::tempdir().expect("home");
         let egress = egress_with(home.path(), &[("a1", &[])]);
         let socket = home.path().join("egress.sock");
-        let proxy = start_with_socket(
-            Arc::clone(&egress),
-            "a1",
-            &|_| false,
-            Some(&socket),
-            None,
-        )
+        let proxy = start_with_socket(Arc::clone(&egress), "a1", &|_| false, Some(&socket), None)
             .await
             .expect("proxy");
         assert_eq!(proxy.socket.as_deref(), Some(socket.as_path()));

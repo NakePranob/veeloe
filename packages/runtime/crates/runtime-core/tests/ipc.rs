@@ -11,7 +11,8 @@ fn same(left: &str, right: &Value) {
 
 #[test]
 fn a_members_message_is_read_and_written_as_the_legacy_line() {
-    let line = r#"{"kind":"message","task":"t1","id":"m1","member":"m_owner","text":"hi","ref":"sig-m1"}"#;
+    let line =
+        r#"{"kind":"message","task":"t1","id":"m1","member":"m_owner","text":"hi","ref":"sig-m1"}"#;
     let message: ToWorker = serde_json::from_str(line).expect("message");
     assert_eq!(
         message,
@@ -23,7 +24,10 @@ fn a_members_message_is_read_and_written_as_the_legacy_line() {
             reference: "sig-m1".into(),
         }
     );
-    same(&serde_json::to_string(&message).expect("json"), &serde_json::from_str(line).expect("line"));
+    same(
+        &serde_json::to_string(&message).expect("json"),
+        &serde_json::from_str(line).expect("line"),
+    );
 }
 
 #[test]
@@ -38,7 +42,10 @@ fn an_agent_update_leaves_out_what_it_does_not_carry() {
             approval_timeout_s: None,
         }
     );
-    same(&serde_json::to_string(&message).expect("json"), &serde_json::from_str(line).expect("line"));
+    same(
+        &serde_json::to_string(&message).expect("json"),
+        &serde_json::from_str(line).expect("line"),
+    );
 }
 
 #[test]
@@ -56,7 +63,10 @@ fn an_approval_answer_names_its_decision_and_task() {
             task: Some("t1".into()),
         }
     );
-    same(&serde_json::to_string(&message).expect("json"), &serde_json::from_str(line).expect("line"));
+    same(
+        &serde_json::to_string(&message).expect("json"),
+        &serde_json::from_str(line).expect("line"),
+    );
 }
 
 #[test]

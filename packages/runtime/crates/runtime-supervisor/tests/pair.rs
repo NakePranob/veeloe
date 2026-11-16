@@ -142,8 +142,8 @@ async fn a_controller_pairs_this_machine_through_the_real_hub() {
 
     let mut controller = Controller::connect(&hub.url).await;
     let controller_key = to_base64url(&public_key_of(&CONTROLLER_SEED));
-    let proof = pairing_proof(&parsed.secret, &parsed.machine, &controller_key, "member-1")
-        .expect("proof");
+    let proof =
+        pairing_proof(&parsed.secret, &parsed.machine, &controller_key, "member-1").expect("proof");
     let claim = Signer::new(&CONTROLLER_SEED).sign(
         Outgoing {
             type_: "pairing.claim".into(),
@@ -160,13 +160,16 @@ async fn a_controller_pairs_this_machine_through_the_real_hub() {
         },
         1,
     );
-    controller.send(serde_json::to_value(claim).expect("claim")).await;
+    controller
+        .send(serde_json::to_value(claim).expect("claim"))
+        .await;
 
     // The Machine answers `pairing.done` on the same connection.
     let done = controller.next().await;
     assert_eq!(done["type"], "pairing.done");
     // The body rides inside the signed part, never beside it.
-    let signed: Value = serde_json::from_str(done["signed"].as_str().expect("signed")).expect("json");
+    let signed: Value =
+        serde_json::from_str(done["signed"].as_str().expect("signed")).expect("json");
     assert_eq!(signed["body"]["name"], "test-machine");
 
     assert_eq!(
@@ -232,7 +235,9 @@ async fn a_claim_whose_proof_does_not_match_the_link_is_ignored() {
         },
         1,
     );
-    controller.send(serde_json::to_value(claim).expect("claim")).await;
+    controller
+        .send(serde_json::to_value(claim).expect("claim"))
+        .await;
 
     assert!(
         until(
@@ -270,12 +275,9 @@ async fn a_machine_that_is_already_paired_does_not_pair_again() {
     let recorded = Arc::clone(&lines);
     let log: veeloe_runtime_supervisor::pair::PairLog =
         Arc::new(move |line: &str| recorded.lock().expect("lines").push(line.to_string()));
-    let result = run_pair(
-        PairOptions::new(home.path(), "ws://127.0.0.1:1"),
-        log,
-    )
-    .await
-    .expect("pair");
+    let result = run_pair(PairOptions::new(home.path(), "ws://127.0.0.1:1"), log)
+        .await
+        .expect("pair");
     assert_eq!(result, PairResult::AlreadyPaired);
     assert!(lines
         .lock()

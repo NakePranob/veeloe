@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest};
 use veeloe_runtime_supervisor::llm::{
-    answer, HttpClient, HttpAnswer, LlmProxy, Route, Target, PROXY_ERROR_HEADER,
+    answer, HttpAnswer, HttpClient, LlmProxy, Route, Target, PROXY_ERROR_HEADER,
 };
 
 #[derive(Default)]
@@ -38,11 +38,7 @@ impl FakeClient {
 
 #[async_trait]
 impl HttpClient for FakeClient {
-    async fn get(
-        &self,
-        _url: &str,
-        _headers: Vec<(String, String)>,
-    ) -> Result<HttpAnswer, String> {
+    async fn get(&self, _url: &str, _headers: Vec<(String, String)>) -> Result<HttpAnswer, String> {
         Err("the proxy only posts".into())
     }
 
@@ -121,10 +117,7 @@ fn only_the_messages_paths_are_allowed_and_only_by_post() {
     let proxy = proxy(Arc::clone(&client));
     let mut get = request();
     get.method = "GET".into();
-    assert_eq!(
-        block().block_on(proxy.handle("a1", &get)).status,
-        404
-    );
+    assert_eq!(block().block_on(proxy.handle("a1", &get)).status, 404);
     let mut elsewhere = request();
     elsewhere.path = "/v1/complete".into();
     let response = block().block_on(proxy.handle("a1", &elsewhere));
@@ -231,7 +224,8 @@ fn an_answer_that_reported_usage_is_counted_with_its_task() {
     let client = FakeClient::answering(HttpAnswer {
         status: 200,
         headers: Vec::new(),
-        body: json!({ "content": [], "usage": { "input_tokens": 10, "output_tokens": 5 } }).to_string(),
+        body: json!({ "content": [], "usage": { "input_tokens": 10, "output_tokens": 5 } })
+            .to_string(),
     });
     let counted: Arc<Mutex<Vec<(String, Option<String>, u64)>>> = Arc::new(Mutex::new(Vec::new()));
     let sink = Arc::clone(&counted);

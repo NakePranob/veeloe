@@ -87,17 +87,15 @@ impl ExpoPush {
             .http
             .post(
                 EXPO_PUSH,
-                vec![(
-                    "content-type".to_string(),
-                    "application/json".to_string(),
-                )],
+                vec![("content-type".to_string(), "application/json".to_string())],
                 json!(messages).to_string(),
             )
             .await?;
         if answer.status != 200 {
             return Err(format!("expo.status.{}", answer.status));
         }
-        let body: Value = serde_json::from_str(&answer.body).map_err(|_| "expo.invalid".to_string())?;
+        let body: Value =
+            serde_json::from_str(&answer.body).map_err(|_| "expo.invalid".to_string())?;
         let Some(entries) = body.get("data").and_then(Value::as_array) else {
             return Ok(Vec::new());
         };
@@ -132,7 +130,11 @@ mod tests {
 
     #[async_trait]
     impl HttpClient for Fake {
-        async fn get(&self, _url: &str, _headers: Vec<(String, String)>) -> Result<HttpAnswer, String> {
+        async fn get(
+            &self,
+            _url: &str,
+            _headers: Vec<(String, String)>,
+        ) -> Result<HttpAnswer, String> {
             Err("no".into())
         }
 

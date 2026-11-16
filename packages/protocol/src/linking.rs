@@ -134,12 +134,7 @@ pub fn link_request_proof_text(id: &str, key: &str, name: &str) -> String {
     format!("veeloe-link-request/1\n{}\n{}\n{}", id, key, name)
 }
 
-pub fn link_request_proof(
-    secret: &str,
-    id: &str,
-    key: &str,
-    name: &str,
-) -> Result<String, ()> {
+pub fn link_request_proof(secret: &str, id: &str, key: &str, name: &str) -> Result<String, ()> {
     hmac_base64url(secret, &link_request_proof_text(id, key, name))
 }
 

@@ -20,7 +20,10 @@ pub fn normalize_hub_url(hub: &str) -> Result<String, HubUrlError> {
     if !url.username().is_empty()
         || url.password().is_some()
         || url.query().map(|query| !query.is_empty()).unwrap_or(false)
-        || url.fragment().map(|fragment| !fragment.is_empty()).unwrap_or(false)
+        || url
+            .fragment()
+            .map(|fragment| !fragment.is_empty())
+            .unwrap_or(false)
     {
         return Err(HubUrlError);
     }
@@ -46,12 +49,7 @@ pub fn normalize_hub_url(hub: &str) -> Result<String, HubUrlError> {
 /// The bytes a client signs to answer a challenge. The nonce goes in as its
 /// base64url text.
 pub fn handshake_bytes(hub: &str, nonce: &str) -> Result<Vec<u8>, HubUrlError> {
-    Ok(format!(
-        "veeloe-hub-auth/1\n{}\n{}",
-        normalize_hub_url(hub)?,
-        nonce
-    )
-    .into_bytes())
+    Ok(format!("veeloe-hub-auth/1\n{}\n{}", normalize_hub_url(hub)?, nonce).into_bytes())
 }
 
 pub fn answer_challenge(

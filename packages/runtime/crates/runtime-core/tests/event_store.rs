@@ -27,7 +27,12 @@ fn numbers_events_in_order_and_pages_after_a_sequence() {
     store.create_task("t1", "m1").expect("create task");
 
     let first = store
-        .append("t1", "member.message", &json!({ "text": "hi" }), Some("msg-1"))
+        .append(
+            "t1",
+            "member.message",
+            &json!({ "text": "hi" }),
+            Some("msg-1"),
+        )
         .expect("first event");
     let second = store
         .append("t1", "turn.started", &json!({ "member": "m1" }), None)
@@ -48,12 +53,22 @@ fn a_resent_message_id_is_refused_by_the_unique_constraint() {
     let (_dir, mut store) = open();
     store.create_task("t1", "m1").expect("create task");
     store
-        .append("t1", "member.message", &json!({ "text": "hi" }), Some("msg-1"))
+        .append(
+            "t1",
+            "member.message",
+            &json!({ "text": "hi" }),
+            Some("msg-1"),
+        )
         .expect("first append");
 
     assert!(store.has_message("msg-1").expect("has message"));
     assert!(store
-        .append("t1", "member.message", &json!({ "text": "again" }), Some("msg-1"))
+        .append(
+            "t1",
+            "member.message",
+            &json!({ "text": "again" }),
+            Some("msg-1")
+        )
         .is_err());
     assert!(!store.has_message("msg-2").expect("has message"));
 }

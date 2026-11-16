@@ -9,10 +9,10 @@
 //! them already.
 
 use std::collections::{HashMap, VecDeque};
+use std::hash::{BuildHasher, Hasher};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::hash::{BuildHasher, Hasher};
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -252,7 +252,14 @@ impl AgentCore {
                 member,
                 reference,
                 task,
-            } => self.answer_approval(&request, decision, message, &member, &reference, task.as_deref()),
+            } => self.answer_approval(
+                &request,
+                decision,
+                message,
+                &member,
+                &reference,
+                task.as_deref(),
+            ),
             ToWorker::Agent {
                 name,
                 allowlist,
@@ -436,13 +443,7 @@ impl AgentCore {
         Ok(())
     }
 
-    fn stop(
-        &self,
-        task: &str,
-        id: &str,
-        member: &str,
-        reference: &str,
-    ) -> Result<(), AgentError> {
+    fn stop(&self, task: &str, id: &str, member: &str, reference: &str) -> Result<(), AgentError> {
         if self
             .state
             .stopped_ids
@@ -512,8 +513,13 @@ impl AgentCore {
         if let Some(message) = &message {
             body["message"] = json!(message);
         }
-        self.state
-            .append(&waiter.task, &waiter.starter, "approval.answered", body, None)?;
+        self.state.append(
+            &waiter.task,
+            &waiter.starter,
+            "approval.answered",
+            body,
+            None,
+        )?;
         // A closed receiver means the Turn already stopped; nothing to answer.
         let _ = waiter.answer.send(Answer {
             request: request.to_string(),
@@ -650,7 +656,13 @@ async fn run_turn(
         if cancel.is_cancelled() {
             return end(&state, &task, &starter, "stopped", None);
         }
-        state.append(&task, &starter, "llm.message", json!({ "content": reply.content }), None)?;
+        state.append(
+            &task,
+            &starter,
+            "llm.message",
+            json!({ "content": reply.content }),
+            None,
+        )?;
 
         let uses: Vec<&Value> = reply
             .content
@@ -703,7 +715,13 @@ async fn run_turn(
         if cancel.is_cancelled() {
             return end(&state, &task, &starter, "stopped", None);
         }
-        state.append(&task, &starter, "tool.result", json!({ "content": results }), None)?;
+        state.append(
+            &task,
+            &starter,
+            "tool.result",
+            json!({ "content": results }),
+            None,
+        )?;
     }
 
     end(
@@ -787,7 +805,10 @@ async fn compact_if_needed(
     events: &[TaskEvent],
 ) -> Option<Compacted> {
     // A tool round is not a safe split: its call would lose its result.
-    if events.last().is_some_and(|event| event.kind == "llm.message") {
+    if events
+        .last()
+        .is_some_and(|event| event.kind == "llm.message")
+    {
         return None;
     }
     let window = state.context_window.load(Ordering::SeqCst);
@@ -796,7 +817,10 @@ async fn compact_if_needed(
     }
     // Keep the message that started this Turn outside the summary, so the
     // model still sees the exact request beside the summary.
-    let split = if events.last().is_some_and(|event| event.kind == "member.message") {
+    let split = if events
+        .last()
+        .is_some_and(|event| event.kind == "member.message")
+    {
         events.len().saturating_sub(1)
     } else {
         events.len()
@@ -815,7 +839,13 @@ async fn compact_if_needed(
     // Turn (ADR 0017).
     if !flushed_since_compaction(events) {
         if let Some(chars) = flush_memory(state, task, &transcript).await {
-            let _ = state.append(task, starter, "memory.saved", json!({ "chars": chars }), None);
+            let _ = state.append(
+                task,
+                starter,
+                "memory.saved",
+                json!({ "chars": chars }),
+                None,
+            );
         }
     }
     let request = LlmRequest {
@@ -1075,12 +1105,12 @@ fn denial(answer: &Answer) -> ToolError {
                 answer.request
             ))
         }
-        _ if answer.message.as_deref() == Some("expired without an answer") => ToolError::Failed(
-            format!(
+        _ if answer.message.as_deref() == Some("expired without an answer") => {
+            ToolError::Failed(format!(
                 "approval {} expired without an answer, so it did not run",
                 answer.request
-            ),
-        ),
+            ))
+        }
         _ => ToolError::Failed(format!(
             "the owner denied approval {}, so it did not run",
             answer.request
@@ -1102,7 +1132,12 @@ fn request_id(state: &State) -> String {
         base36(count),
         // A salt so two workers that start in the same millisecond never hand
         // out the same id. It is not a time: std's hasher keys are random.
-        base36(std::collections::hash_map::RandomState::new().build_hasher().finish() % 36u64.pow(6))
+        base36(
+            std::collections::hash_map::RandomState::new()
+                .build_hasher()
+                .finish()
+                % 36u64.pow(6)
+        )
     )
 }
 
@@ -1119,7 +1154,6 @@ fn base36(mut value: u64) -> String {
     out.reverse();
     String::from_utf8(out).expect("base36 is ascii")
 }
-
 
 #[cfg(test)]
 mod tests {

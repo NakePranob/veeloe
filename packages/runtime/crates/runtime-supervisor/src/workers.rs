@@ -134,9 +134,7 @@ pub fn rules(
     // these rules too, so it sees what the worker sees. A range that cannot be
     // read leaves the Agent without ports, never without a worker.
     policy.ports = crate::ports::Ports::open(home)
-        .and_then(|ports| {
-            ports.range_avoiding(&agent.id, &|port| proxy_ports.contains(&port))
-        })
+        .and_then(|ports| ports.range_avoiding(&agent.id, &|port| proxy_ports.contains(&port)))
         .map(|range| range.ports())
         .unwrap_or_default();
     Some(policy)

@@ -6,8 +6,7 @@ use veeloe_protocol::messages::message_is_valid;
 
 #[test]
 fn every_message_vector_is_read_as_expected() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("vectors/messages.json");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("vectors/messages.json");
     let text = fs::read_to_string(path).expect("read messages.json");
     let doc: Value = serde_json::from_str(&text).expect("parse messages.json");
 

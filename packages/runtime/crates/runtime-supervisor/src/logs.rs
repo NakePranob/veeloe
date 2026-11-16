@@ -2,11 +2,11 @@
 //! file per day, kept for 14 days. Callers pass codes and identifiers only;
 //! task text, tool output and file names never belong here.
 
+use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::collections::HashMap;
 
 use serde_json::{json, Value};
 
@@ -19,18 +19,29 @@ fn day_at(seconds: u64) -> u64 {
 }
 
 fn dir(home: &Path) -> Result<PathBuf, io::Error> {
-    let dir = supervisor_dir(home).map_err(|error| io::Error::other(error.to_string()))?.join("logs");
+    let dir = supervisor_dir(home)
+        .map_err(|error| io::Error::other(error.to_string()))?
+        .join("logs");
     fs::create_dir_all(&dir)?;
     Ok(dir)
 }
 
 /// Append one event. `fields` must hold identifiers, codes and numbers only.
 pub fn record(home: &Path, level: &str, event: &str, fields: Value) -> io::Result<()> {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
     record_at(home, now, level, event, fields)
 }
 
-pub fn record_at(home: &Path, seconds: u64, level: &str, event: &str, fields: Value) -> io::Result<()> {
+pub fn record_at(
+    home: &Path,
+    seconds: u64,
+    level: &str,
+    event: &str,
+    fields: Value,
+) -> io::Result<()> {
     let dir = dir(home)?;
     purge_at(&dir, day_at(seconds))?;
     let file = dir.join(format!("{}.log", day_at(seconds)));
@@ -86,7 +97,11 @@ fn log_files(dir: &Path) -> io::Result<Vec<(u64, PathBuf)>> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        let Some(day) = path.file_stem().and_then(|name| name.to_str()).and_then(|name| name.parse::<u64>().ok()) else {
+        let Some(day) = path
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .and_then(|name| name.parse::<u64>().ok())
+        else {
             continue;
         };
         if path.extension().is_some_and(|ext| ext == "log") {
@@ -113,7 +128,14 @@ mod tests {
     #[test]
     fn an_event_is_one_json_line_with_only_the_fields_given() {
         let home = tempdir().expect("home");
-        record_at(home.path(), 86_400 * 20, "info", "task.turn", json!({ "agent": "a1", "turn": 2 })).expect("record");
+        record_at(
+            home.path(),
+            86_400 * 20,
+            "info",
+            "task.turn",
+            json!({ "agent": "a1", "turn": 2 }),
+        )
+        .expect("record");
         let lines = recent(home.path()).expect("recent");
         assert_eq!(lines.len(), 1);
         let value: Value = serde_json::from_str(&lines[0]).expect("json");

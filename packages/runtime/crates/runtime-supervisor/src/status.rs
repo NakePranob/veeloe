@@ -170,7 +170,10 @@ mod tests {
             out.ends_with("Next: run veeloe to pair this Machine and add a Provider"),
             "{out}"
         );
-        assert!(!out.contains("sk-secret-value"), "the key was printed: {out}");
+        assert!(
+            !out.contains("sk-secret-value"),
+            "the key was printed: {out}"
+        );
     }
 
     #[test]
@@ -179,7 +182,11 @@ mod tests {
         let mut gone = Command::new("true").spawn().expect("true");
         let pid = gone.id();
         let _ = gone.wait();
-        std::fs::write(dir.path().join("runtime/supervisor.pid"), format!("{pid}\n")).expect("pid");
+        std::fs::write(
+            dir.path().join("runtime/supervisor.pid"),
+            format!("{pid}\n"),
+        )
+        .expect("pid");
         assert_eq!(supervisor_pid(dir.path()), None);
 
         // Alive and named like the supervisor: this is the one it is.
@@ -188,7 +195,11 @@ mod tests {
             .spawn()
             .expect("bash");
         let pid = alive.id();
-        std::fs::write(dir.path().join("runtime/supervisor.pid"), format!("{pid}\n")).expect("pid");
+        std::fs::write(
+            dir.path().join("runtime/supervisor.pid"),
+            format!("{pid}\n"),
+        )
+        .expect("pid");
         assert_eq!(supervisor_pid(dir.path()), Some(pid));
         let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
     }
@@ -198,7 +209,11 @@ mod tests {
         let dir = home();
         let other = Command::new("/bin/sleep").arg("30").spawn().expect("sleep");
         let pid = other.id();
-        std::fs::write(dir.path().join("runtime/supervisor.pid"), format!("{pid}\n")).expect("pid");
+        std::fs::write(
+            dir.path().join("runtime/supervisor.pid"),
+            format!("{pid}\n"),
+        )
+        .expect("pid");
         assert_eq!(supervisor_pid(dir.path()), None);
         let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
     }
@@ -233,7 +248,10 @@ mod tests {
         assert!(out.contains("paired as "), "{out}");
         assert!(out.contains("with hub wss://hub.test"), "{out}");
         assert!(out.contains("  Deployer  gone (removed)  model-a"), "{out}");
-        assert!(out.ends_with("Next: start the Runtime with veeloe"), "{out}");
+        assert!(
+            out.ends_with("Next: start the Runtime with veeloe"),
+            "{out}"
+        );
 
         // A process named like the compiled supervisor, with its pid on file.
         let running = Command::new("/bin/bash")

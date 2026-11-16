@@ -91,7 +91,10 @@ pub fn machine_name() -> String {
     let mut buffer = [0u8; 256];
     let name = unsafe {
         if libc::gethostname(buffer.as_mut_ptr() as *mut libc::c_char, buffer.len()) == 0 {
-            let end = buffer.iter().position(|byte| *byte == 0).unwrap_or(buffer.len());
+            let end = buffer
+                .iter()
+                .position(|byte| *byte == 0)
+                .unwrap_or(buffer.len());
             String::from_utf8_lossy(&buffer[..end]).to_string()
         } else {
             "machine".to_string()
@@ -266,11 +269,7 @@ pub fn save_trust(home: &Path, trust: &Trust) -> Result<(), TrustError> {
 /// list again changes nothing.
 ///
 /// Ported from `packages/runtime-legacy/src/supervisor/trust/certificates.ts`.
-pub fn apply_certificates(
-    trust: &Trust,
-    certificates: &[Value],
-    log: &dyn Fn(&str),
-) -> Trust {
+pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&str)) -> Trust {
     use veeloe_protocol::certificate::{revoked_with, verify_certificate};
 
     let mut next = Trust {
@@ -294,7 +293,11 @@ pub fn apply_certificates(
         let Some(workspace) = body.get("workspace").and_then(Value::as_str) else {
             continue;
         };
-        if next.workspace.as_deref().is_some_and(|own| own != workspace) {
+        if next
+            .workspace
+            .as_deref()
+            .is_some_and(|own| own != workspace)
+        {
             log("ignored a certificate: other-workspace");
             continue;
         }
@@ -508,10 +511,7 @@ mod tests {
         let once = apply_certificates(&paired(), &[link(0x41, 0x42)], &quiet);
         assert_eq!(once.owners[0].keys, vec![key(0x41), key(0x42)]);
         assert_eq!(once.links, vec![(key(0x42), key(0x41))]);
-        assert_eq!(
-            apply_certificates(&once, &[link(0x41, 0x42)], &quiet),
-            once
-        );
+        assert_eq!(apply_certificates(&once, &[link(0x41, 0x42)], &quiet), once);
     }
 
     #[test]
@@ -529,10 +529,7 @@ mod tests {
             ],
             0x41,
         );
-        assert_eq!(
-            apply_certificates(&paired(), &[other], &quiet),
-            paired()
-        );
+        assert_eq!(apply_certificates(&paired(), &[other], &quiet), paired());
     }
 
     #[test]

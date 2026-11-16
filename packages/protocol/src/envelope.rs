@@ -32,11 +32,7 @@ pub struct Envelope {
 
 impl Envelope {
     fn validate(&self) -> Result<(), Rejection> {
-        if self.v != 1
-            || self.type_.is_empty()
-            || self.from.is_empty()
-            || self.sig.is_empty()
-        {
+        if self.v != 1 || self.type_.is_empty() || self.from.is_empty() || self.sig.is_empty() {
             return Err(Rejection::Malformed);
         }
         if let Some(to) = &self.to {
@@ -157,12 +153,7 @@ pub fn verify<F>(
 where
     F: Fn(&Route) -> bool,
 {
-    verify_with(
-        envelope,
-        |key| trusted_keys.contains(key),
-        is_for_me,
-        seen,
-    )
+    verify_with(envelope, |key| trusted_keys.contains(key), is_for_me, seen)
 }
 
 /// A sender's key checked by something other than the trust list, for the one

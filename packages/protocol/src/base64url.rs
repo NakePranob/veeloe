@@ -18,9 +18,7 @@ pub fn from_base64url(text: &str) -> Result<Vec<u8>, Base64UrlError> {
     if text.len() % 4 == 1 {
         return Err(Base64UrlError);
     }
-    URL_SAFE_NO_PAD
-        .decode(text)
-        .map_err(|_| Base64UrlError)
+    URL_SAFE_NO_PAD.decode(text).map_err(|_| Base64UrlError)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]

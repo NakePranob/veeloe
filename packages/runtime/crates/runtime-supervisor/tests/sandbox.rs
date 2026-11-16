@@ -268,7 +268,9 @@ mod running {
             String::from_utf8_lossy(&out.stderr)
         );
         assert!(
-            std::fs::metadata(&shot).map(|meta| meta.len() > 0).unwrap_or(false),
+            std::fs::metadata(&shot)
+                .map(|meta| meta.len() > 0)
+                .unwrap_or(false),
             "no screenshot was written"
         );
         // The browser used its own profile, and the owner's home is still

@@ -8,11 +8,11 @@ use tempfile::tempdir;
 use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::{Agent, AgentRegistry};
 use veeloe_runtime_supervisor::egress::Egress;
-use veeloe_runtime_supervisor::trust::{Owner, Trust};
 use veeloe_runtime_supervisor::llm::{HttpAnswer, HttpClient};
 use veeloe_runtime_supervisor::providers::{Auth, Provider};
 use veeloe_runtime_supervisor::push_tokens::PushTokens;
 use veeloe_runtime_supervisor::tasks::{agents_listed, dispatch, Inbound, Machine, Outbox};
+use veeloe_runtime_supervisor::trust::{Owner, Trust};
 use veeloe_runtime_supervisor::workers::{SupervisorLlm, Workers};
 
 /// The one Provider on this test Machine, and what it lists.

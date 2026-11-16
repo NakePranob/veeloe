@@ -86,10 +86,7 @@ impl Turns {
             }
             "turn.ended" => {
                 let mut running = self.running.lock().expect("turns");
-                if running
-                    .get(agent)
-                    .is_some_and(|turn| turn.task == task)
-                {
+                if running.get(agent).is_some_and(|turn| turn.task == task) {
                     running.remove(agent);
                 }
             }
@@ -203,10 +200,7 @@ impl Approvals {
     /// Whether `request` is a domain approval this supervisor is holding. Used
     /// to answer it here instead of forwarding it to the worker.
     pub fn is_pending(&self, request: &str) -> bool {
-        self.pending
-            .lock()
-            .expect("pending")
-            .contains_key(request)
+        self.pending.lock().expect("pending").contains_key(request)
     }
 
     /// Holds one connection until this Agent's Member answers, or the wait ends.
@@ -298,18 +292,27 @@ impl Approvals {
             return false;
         };
         // A request the worker is holding is not ours: it goes on to the worker.
-        let Some(pending) = self.pending.lock().expect("pending").get(request).map(|pending| {
-            (
-                pending.agent.clone(),
-                pending.task.clone(),
-                pending.member.clone(),
-                pending.domain.clone(),
-            )
-        }) else {
+        let Some(pending) = self
+            .pending
+            .lock()
+            .expect("pending")
+            .get(request)
+            .map(|pending| {
+                (
+                    pending.agent.clone(),
+                    pending.task.clone(),
+                    pending.member.clone(),
+                    pending.domain.clone(),
+                )
+            })
+        else {
             return false;
         };
         let (agent, task, member, domain) = pending;
-        let decision = body.get("decision").and_then(Value::as_str).unwrap_or_default();
+        let decision = body
+            .get("decision")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         if !matches!(decision, "approve" | "deny" | "always") {
             outbox.error(from, "approval.unknown");
             return true;
@@ -491,7 +494,6 @@ mod tests {
                 errors: Mutex::new(Vec::new()),
             }
         }
-
     }
 
     impl Outbox for Seen {
@@ -604,10 +606,13 @@ mod tests {
 
     fn answered_events(logs: &TaskLogs, agent: &str, task: &str) -> Vec<Value> {
         let LogAnswer::Events { events } = logs
-            .answer(agent, &LogQuery::Events {
-                task: task.into(),
-                after: 0,
-            })
+            .answer(
+                agent,
+                &LogQuery::Events {
+                    task: task.into(),
+                    after: 0,
+                },
+            )
             .expect("events")
         else {
             panic!("an events answer");
@@ -632,14 +637,19 @@ mod tests {
         // The request is written into the Turn's log and sent to its Member.
         let mut request = String::new();
         for _ in 0..100 {
-            let found = fixture.seen.events.lock().expect("events").iter().find_map(
-                |(agent, message)| match message {
-                    FromWorker::Event { event, .. } if event.kind == "approval.requested" => {
-                        Some((agent.clone(), event.body.clone()))
-                    }
-                    _ => None,
-                },
-            );
+            let found =
+                fixture
+                    .seen
+                    .events
+                    .lock()
+                    .expect("events")
+                    .iter()
+                    .find_map(|(agent, message)| match message {
+                        FromWorker::Event { event, .. } if event.kind == "approval.requested" => {
+                            Some((agent.clone(), event.body.clone()))
+                        }
+                        _ => None,
+                    });
             if let Some((agent, body)) = found {
                 assert_eq!(agent, "a1");
                 assert_eq!(body["kind"], "domain");
@@ -661,7 +671,10 @@ mod tests {
             Some(&trust()),
             &outbox,
         ));
-        assert!(asking.await.expect("join"), "an approve did not open the connection");
+        assert!(
+            asking.await.expect("join"),
+            "an approve did not open the connection"
+        );
         // One connection only: the Egress is exactly as it was.
         assert!(fixture.egress.current("a1").is_empty());
         let answered = answered_events(&fixture.logs, "a1", "t1");
@@ -684,14 +697,12 @@ mod tests {
             &outbox,
         ));
         assert!(asking.await.expect("join"));
-        assert_eq!(fixture.egress.current("a1"), vec!["example.com".to_string()]);
+        assert_eq!(
+            fixture.egress.current("a1"),
+            vec!["example.com".to_string()]
+        );
         assert!(fixture.egress.current("a2").is_empty());
-        let reopened = Egress::open(
-            fixture
-                ._home
-                .path(),
-        )
-        .expect("reopen");
+        let reopened = Egress::open(fixture._home.path()).expect("reopen");
         assert_eq!(reopened.current("a1"), vec!["example.com".to_string()]);
         assert_eq!(
             answered_events(&fixture.logs, "a1", "t1")[0]["decision"],
@@ -701,18 +712,19 @@ mod tests {
 
     async fn wait_for_request(fixture: &Fixture) -> String {
         for _ in 0..100 {
-            let found = fixture
-                .seen
-                .events
-                .lock()
-                .expect("events")
-                .iter()
-                .find_map(|(_, message)| match message {
-                    FromWorker::Event { event, .. } if event.kind == "approval.requested" => {
-                        event.body["request"].as_str().map(str::to_string)
-                    }
-                    _ => None,
-                });
+            let found =
+                fixture
+                    .seen
+                    .events
+                    .lock()
+                    .expect("events")
+                    .iter()
+                    .find_map(|(_, message)| match message {
+                        FromWorker::Event { event, .. } if event.kind == "approval.requested" => {
+                            event.body["request"].as_str().map(str::to_string)
+                        }
+                        _ => None,
+                    });
             if let Some(request) = found {
                 return request;
             }

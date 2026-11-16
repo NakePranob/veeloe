@@ -250,10 +250,12 @@ mod tests {
         assert!(tokens
             .register("m_1", "key-1", "not-a-token", "th", 1)
             .is_err());
-        assert!(tokens
-            .register("m_1", "key-1", "ExponentPushToken[ok]", "fr", 1)
-            .expect("register")
-            .language
-            == "en");
+        assert!(
+            tokens
+                .register("m_1", "key-1", "ExponentPushToken[ok]", "fr", 1)
+                .expect("register")
+                .language
+                == "en"
+        );
     }
 }

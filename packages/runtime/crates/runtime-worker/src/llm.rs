@@ -110,8 +110,7 @@ impl Llm for AnthropicLlm {
             })?;
 
         if answer.status != 200 {
-            let code = header(&answer.headers, PROXY_ERROR_HEADER)
-                .unwrap_or("provider.failed");
+            let code = header(&answer.headers, PROXY_ERROR_HEADER).unwrap_or("provider.failed");
             return Err(LlmError::Failed(code.to_string()));
         }
         final_message(&answer.body)
@@ -183,7 +182,10 @@ fn stream_message(body: &str) -> Result<LlmReply, LlmError> {
                 }
                 match delta.get("type").and_then(Value::as_str) {
                     Some("text_delta") => {
-                        let text = delta.get("text").and_then(Value::as_str).unwrap_or_default();
+                        let text = delta
+                            .get("text")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default();
                         let current = blocks[index]
                             .get("text")
                             .and_then(Value::as_str)
@@ -216,7 +218,8 @@ fn stream_message(body: &str) -> Result<LlmReply, LlmError> {
     }
 
     for (index, block) in blocks.iter_mut().enumerate() {
-        if block.get("type").and_then(Value::as_str) == Some("tool_use") && !partial[index].is_empty()
+        if block.get("type").and_then(Value::as_str) == Some("tool_use")
+            && !partial[index].is_empty()
         {
             if let Ok(input) = serde_json::from_str::<Value>(&partial[index]) {
                 block["input"] = input;
@@ -224,7 +227,10 @@ fn stream_message(body: &str) -> Result<LlmReply, LlmError> {
         }
     }
     Ok(LlmReply {
-        content: blocks.into_iter().filter(|block| !block.is_null()).collect(),
+        content: blocks
+            .into_iter()
+            .filter(|block| !block.is_null())
+            .collect(),
         stop_reason,
     })
 }
