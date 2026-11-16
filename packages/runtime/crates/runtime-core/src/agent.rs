@@ -12,7 +12,8 @@ use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::hash::{BuildHasher, Hasher};
+use std::time::Duration;
 
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
@@ -21,7 +22,7 @@ use veeloe_plugin_api::{Cancel, PluginError, ToolError, ToolRegistry};
 use veeloe_protocol::{matches_allowlist, split_command};
 
 use crate::conversation::conversation;
-use crate::event_store::{EventLog, EventStore, StoreError, TaskEvent};
+use crate::event_store::{Clock, EventLog, EventStore, StoreError, SystemClock, TaskEvent};
 use crate::ipc::{ApprovalDecision, FromWorker, SupervisorLink, ToWorker};
 use crate::ports::{Llm, LlmError, LlmMessage, LlmRequest};
 
@@ -89,6 +90,7 @@ struct State {
     llm: Arc<dyn Llm>,
     tools: Arc<ToolRegistry>,
     link: Arc<dyn SupervisorLink>,
+    clock: RwLock<Arc<dyn Clock + Send + Sync>>,
     allowlist: RwLock<Vec<String>>,
     approval_timeout_ms: AtomicU64,
     running: Mutex<Option<RunningTurn>>,
@@ -168,6 +170,7 @@ impl AgentCore {
                 llm,
                 tools: Arc::new(tools),
                 link,
+                clock: RwLock::new(Arc::new(SystemClock)),
                 allowlist: RwLock::new(Vec::new()),
                 approval_timeout_ms: AtomicU64::new(APPROVAL_TIMEOUT_MS),
                 running: Mutex::new(None),
@@ -191,6 +194,13 @@ impl AgentCore {
     /// Pin this Workdir's `MEMORY.md` into each new Turn (ADR 0036).
     pub fn with_workdir(self, workdir: impl Into<PathBuf>) -> Self {
         *self.state.workdir.lock().expect("workdir") = Some(workdir.into());
+        self
+    }
+
+    /// The clock the core reads "now" from; the Machine's own unless a test
+    /// gives another (ADR 0022).
+    pub fn with_clock(self, clock: Arc<dyn Clock + Send + Sync>) -> Self {
+        *self.state.clock.write().expect("clock") = clock;
         self
     }
 
@@ -979,7 +989,7 @@ async fn ask_approval(
 ) -> Answer {
     let request = request_id(state);
     let timeout = state.approval_timeout();
-    let expires_at = now_ms() + timeout.as_millis() as i64;
+    let expires_at = state.now_ms() + timeout.as_millis() as i64;
     let _ = state.append(
         task,
         starter,
@@ -1078,16 +1088,21 @@ fn denial(answer: &Answer) -> ToolError {
     }
 }
 
+impl State {
+    fn now_ms(&self) -> i64 {
+        self.clock.read().expect("clock").now()
+    }
+}
+
 fn request_id(state: &State) -> String {
     let count = state.approvals.fetch_add(1, Ordering::SeqCst) + 1;
     format!(
         "ap_{}_{}_{}",
-        base36(now_ms() as u64),
+        base36(state.now_ms() as u64),
         base36(count),
-        base36(SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|elapsed| elapsed.subsec_nanos() as u64)
-            .unwrap_or_default())
+        // A salt so two workers that start in the same millisecond never hand
+        // out the same id. It is not a time: std's hasher keys are random.
+        base36(std::collections::hash_map::RandomState::new().build_hasher().finish() % 36u64.pow(6))
     )
 }
 
@@ -1105,12 +1120,6 @@ fn base36(mut value: u64) -> String {
     String::from_utf8(out).expect("base36 is ascii")
 }
 
-fn now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_millis() as i64)
-        .unwrap_or_default()
-}
 
 #[cfg(test)]
 mod tests {

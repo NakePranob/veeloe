@@ -13,7 +13,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use veeloe_runtime_core::preflight::{Platform, APPARMOR_PROFILE, APPARMOR_RESTRICT};
+use crate::preflight::{Platform, APPARMOR_PROFILE, APPARMOR_RESTRICT};
 
 /// The same file as `packaging/apparmor/veeloe-bwrap`, so a release installs
 /// the profile without a repository beside it.

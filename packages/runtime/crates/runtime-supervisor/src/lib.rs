@@ -22,6 +22,7 @@ mod memory_get;
 pub mod models;
 pub mod pair;
 pub mod ports;
+pub mod preflight;
 mod provider_add;
 pub mod providers;
 pub mod proxy;

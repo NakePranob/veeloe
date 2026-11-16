@@ -338,7 +338,7 @@ fn without_a_terminal_the_missing_flag_is_named_and_no_preset_url_can_be_overrid
 /// package, exit non-zero, and leave no supervisor behind — no pid file and no
 /// Hub link, which would otherwise keep the process running until Ctrl-C.
 ///
-/// The other OS states are unit tests in `runtime-core/src/preflight.rs`, where
+/// The other OS states are unit tests in `runtime-supervisor/src/preflight.rs`, where
 /// the Probe is a table instead of this Machine.
 #[cfg(target_os = "linux")]
 #[test]

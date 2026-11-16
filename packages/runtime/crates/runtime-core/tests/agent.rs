@@ -1013,6 +1013,40 @@ async fn an_approval_no_one_answers_expires_and_the_command_does_not_run() {
     assert_eq!(answered.body["message"], json!("expired without an answer"));
 }
 
+/// ADR 0022: the core reads "now" from its Clock, so an Approval's expiry is
+/// stamped from the clock it was given, not the Machine's.
+#[tokio::test]
+async fn an_approval_expiry_comes_from_the_cores_clock() {
+    struct Fixed;
+    impl veeloe_runtime_core::event_store::Clock for Fixed {
+        fn now(&self) -> i64 {
+            1_000_000
+        }
+    }
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use("tu-rm", "bash", json!({ "command": "rm -rf dist" }))),
+            Ok(text("ok")),
+        ],
+        runners: vec![Arc::new(Bash {
+            ran: Arc::new(Mutex::new(Vec::new())),
+        })],
+        timeout_ms: Some(20),
+        ..Setup::default()
+    });
+    let core = harness.core.with_clock(Arc::new(Fixed));
+    core.receive(message("go")).expect("receive");
+    core.idle().await;
+
+    let requested = core
+        .events("t1")
+        .expect("events")
+        .into_iter()
+        .find(|event| event.kind == "approval.requested")
+        .expect("requested");
+    assert_eq!(requested.body["expiresAt"], json!(1_000_020));
+}
+
 #[tokio::test]
 async fn an_answer_to_no_waiting_approval_is_approval_unknown() {
     let harness = setup(Setup::default());

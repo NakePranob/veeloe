@@ -18,7 +18,7 @@ use veeloe_protocol::envelope::{verify, Route};
 use veeloe_protocol::hub_auth::normalize_hub_url;
 use veeloe_protocol::pairing::PAIRING_TTL_SECONDS;
 use veeloe_runtime_core::ipc::LlmHttpRequest;
-use veeloe_runtime_core::preflight;
+use veeloe_runtime_supervisor::preflight;
 use veeloe_runtime_core::{FromWorker, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
 use veeloe_runtime_supervisor::approval::Approvals;
