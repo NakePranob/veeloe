@@ -1,6 +1,6 @@
 import type { UsageListedBody } from "@veeloe/protocol-ts";
 import type { Database } from "../../../shared/db";
-import { shiftDay } from "../../../shared/lib/days";
+import { shiftDay } from "../../../shared/lib";
 
 export const USAGE_TOPIC = "usage";
 

@@ -1,0 +1,33 @@
+{
+  "title": "Token usage",
+  "retry": "Try again",
+  "window": {
+    "1": "1 day",
+    "3": "3 days",
+    "7": "7 days",
+    "30": "30 days"
+  },
+  "note": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. No money is shown (ADR 0043).",
+  "loading": "Asking the Machine",
+  "machine": {
+    "total": "{{tokens}} tokens used",
+    "fetched": "As of {{when}}",
+    "online": "Online",
+    "offline": "Offline",
+    "none": "No numbers from this Machine yet"
+  },
+  "chart": {
+    "label": "Daily tokens for {{machine}}",
+    "bar": "{{day}}: {{tokens}} tokens",
+    "none": "{{day}}: no data"
+  },
+  "tasks": {
+    "heading": "Tasks that used the most tokens",
+    "other": "Other",
+    "unknown": "Task {{id}}"
+  },
+  "empty": {
+    "title": "No data yet",
+    "body": "Start the Machine and try again."
+  }
+}

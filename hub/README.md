@@ -1,39 +1,13 @@
 # hub
 
-Gin + GORM backend, scaffolded by [go-scaffold](https://github.com/nakedev/go-scaffold). Organized by feature (domain), Postgres-backed, schema managed with [golang-migrate](https://github.com/golang-migrate/migrate).
+The Veeloe Hub: Gin + GORM on Postgres, schema managed with
+[golang-migrate](https://github.com/golang-migrate/migrate). Each business
+capability is a module under `internal/app/<name>/` with a hexagonal inside
+(ADR 0014, 0070). It began from go-scaffold; that CLI is no longer used, and
+`internal/archtest` holds the structure (`.conventions/rules.json`).
 
-This project starts as a bare skeleton. Its defaults for future modules resolve
-to `none` surface + `service` application
-style. The `generate module` wizard presents this as a named Lean, CRUD, CQRS,
-or Advanced profile so you can choose by intent instead of memorising two
-implementation axes. Add a domain with:
-
-```bash
-go-scaffold generate module orders
-```
-
-The `generate module` wizard starts from those defaults. Add endpoints one at a
-time with `generate method`, pass `--profile crud` for a CRUD skeleton, or use
-`--profile cqrs` when commands and queries deserve separate application
-handlers. DTO fields and business rules remain explicit TODOs. Run
-`go-scaffold config` later to change defaults for future modules; existing
-modules are unchanged. The older `--full` and `--cqrs` flags remain supported
-for scripts.
-
-See `docs/architect/` for the conventions every generated module follows, and `AGENTS.md`/`CLAUDE.md` if you're working with an AI coding agent in this repo.
-
-## Installed optional features
-
-This project records its generated capabilities in `go-scaffold.config.json`:
-
-- authentication: not installed — use `go-scaffold add auth` when needed
-- background jobs: not installed — use `go-scaffold add worker` when needed
-- RBAC: not installed — use `go-scaffold add rbac` after auth when needed
-- metrics and tracing: not installed — use `go-scaffold add observability` when needed
-
-The `add` commands refresh untouched generated architecture docs and this
-section. If a maintainer has edited a document, the command leaves it alone
-and reports that it needs a manual update.
+A new module copies `.conventions/templates/table-module` (it owns a table) or
+`no-table-module` (it does not), renamed; see `AGENTS.md`.
 
 ## Layout
 
@@ -50,11 +24,8 @@ internal/
 │   ├── config/                # loads config from env
 │   ├── apperror/              # central error type (status + payload)
 │   ├── dberr/                 # maps DB errors to constraint kind — shared by every domain
-│   ├── dbq/                   # the SQL every list repeats: escaped contains-search
-│   ├── httpx/                 # HTTP helpers shared by every domain
 │   ├── id/                    # UUID v7 generation (id.New)
 │   ├── middleware/            # RequestID, Logger, Error, CORS
-│   ├── pagination/            # parses ?limit=&offset=&q=, response envelope
 │   └── tx/                    # carries a transaction on the context
 └── app/                       # one package per domain, added with `generate module`
 ```
@@ -133,11 +104,7 @@ make docker-down     # docker compose down
 
 ## Migrations
 
-Schema is managed with [golang-migrate](https://github.com/golang-migrate/migrate), files live in `migrations/`, named `<version>_<name>.{up,down}.sql`. `version` is a 14-digit UTC timestamp, not an incrementing counter — two people adding a migration off the same base branch get different filenames instead of both claiming the same number and colliding on merge. (`generate module` names its own migration the same way; existing sequential `0000NN_*` files from before this convention sort fine alongside timestamped ones either way.)
-
-```bash
-go-scaffold generate migration add_status_to_orders   # reserves migrations/<version>_add_status_to_orders.{up,down}.sql, TODO-stubbed — you write the SQL
-```
+Schema is managed with [golang-migrate](https://github.com/golang-migrate/migrate), files live in `migrations/`, named `<version>_<name>.{up,down}.sql`. `version` is a 14-digit UTC timestamp, not an incrementing counter — two people adding a migration off the same base branch get different filenames instead of both claiming the same number and colliding on merge.
 
 ```bash
 brew install golang-migrate
@@ -145,7 +112,7 @@ brew install golang-migrate
 
 migrate -path migrations -database "$DB_DSN" up
 migrate -path migrations -database "$DB_DSN" down 1
-migrate create -ext sql -dir migrations -seq=false add_something   # same as `go-scaffold generate migration`, if you'd rather not use the CLI
+migrate create -ext sql -dir migrations -seq=false add_something   # writes the up/down pair; archtest refuses an up without its down
 ```
 
 **Every environment:** the schema comes from `migrations/`. Nothing
@@ -178,71 +145,8 @@ make migrate-verify   # up -> down-to-zero -> up, catches a broken down.sql befo
 | `DB_MAX_IDLE_CONNS` | `10` | |
 | `DB_CONN_MAX_LIFETIME_MIN` | `5` | minutes |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | comma-separated frontend origins allowed to call this API with credentials (cookies) |
-| `JWT_ISSUER`, `JWT_AUDIENCE` | `go-scaffold`, `api` | claims that bind access and reauthentication JWTs to this application/resource server |
 
-After `go-scaffold add auth`, `.env.example` also contains
-`GOOGLE_OAUTH_REDIRECT_URI` (the exact browser callback URI registered with
-Google), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_REFRESH_MAX_TTL_MIN`, `OAUTH_STATE_TTL_MIN`, and
-`AUTH_BROWSER_TOPOLOGY`. For production auth, set `PASSWORD_RESET_URL` and
-`EMAIL_VERIFY_URL` to absolute `https://` URLs, and set `AUTH_COMMON_PASSWORDS_FILE`
-to a newline-delimited corpus containing at least the top 3000 passwords that
-match this application's policy; L2 also requires
-`AUTH_CONTEXT_PASSWORDS_FILE` (context-derived password entries such as
-product-name/year or username variants; compare complete entries, not arbitrary
-substrings) and
-`AUTH_BREACHED_PASSWORDS_FILE`.
-Refresh rotation uses the configured inactivity TTL
-but never moves a token past its absolute lifetime. The backend stores a
-one-time OAuth transaction binding provider, server-generated state, S256
-challenge, and OIDC nonce; the state is also bound to an HttpOnly browser
-cookie. The frontend still owns the callback route and sends the code and
-returned state to the exchange endpoint. The provider redirect URI is separate from
-`CORS_ALLOWED_ORIGINS`; the latter remains an exact-origin credentialed API
-policy. Token responses use `Cache-Control: no-store` and `Pragma: no-cache`.
-When Google/OIDC authentication strength or recentness matters, configure
-`GOOGLE_OIDC_MAX_AGE_SEC`, `GOOGLE_OIDC_REQUIRED_ACR`, and
-`GOOGLE_OIDC_REQUIRED_AMR` (comma-separated). The generated adapter sends the
-corresponding OIDC request claims and rejects a verified ID token that does not
-satisfy the configured policy; claim meanings remain provider-specific and
-must be documented by the deploying application.
-Authenticated users can list active device sessions with
-`GET /users/me/sessions` and revoke an individual session with
-`DELETE /users/me/sessions/:id`; safe parsed device metadata and session
-lifecycle timestamps are returned, never the raw User-Agent or IP address. Protected
-bearer routes also validate that the access token's session is still active, so
-logout, session revoke, password change, and password reset invalidate existing
-access tokens immediately. If the session store is unavailable, protected
-requests fail closed. In production, secure mode reads only the `__Host-`
-cookie names; the legacy unprefixed names are development-only and are cleared
-during logout.
-The generated `cmd/auth-cleanup` command (also available as `make auth-cleanup`)
-removes expired Postgres auth rows, MFA challenges, and stale Redis session-index
-members. Schedule it as a CronJob/cron task; request correctness does not depend
-on the cleanup running.
-They can also list safe login-provider metadata with
-`GET /users/me/identities`, link a provider through the authenticated
-`/users/me/identities/:provider/link` start/exchange flow, and unlink a
-provider with `DELETE /users/me/identities/:provider`. For a Google/OIDC-only
-account, `POST /users/me/identities/local` adds an email/password credential to
-the same account; it does not create a second user. The last login method
-cannot be removed.
-Sensitive account operations require a short-lived `X-Reauth-Token` from
-`POST /users/me/reauth`; password changes, session revocation, MFA changes, and
-identity changes revoke or protect the affected session state as documented in
-the generated OpenAPI files. `DELETE /users/me` is a recent-authenticated
-soft-disable: it revokes every refresh session before setting `disabled_at`,
-and protected requests fail closed after the state change. Hard deletion,
-retention, anonymization, and any helpdesk/admin re-enable policy remain
-application-specific; when RBAC is enabled, `PATCH /users/:id/status` is
-available to a recent-authenticated caller with `user:manage-status`.
-If a user loses the authenticator, `POST /users/me/mfa/recover` requires the
-current authenticated session and one unused recovery code, revokes refresh
-sessions, removes the old factor atomically, and returns a setup-only token for
-fresh MFA enrollment. Treat recovery codes as one-time credentials and define
-the helpdesk escalation policy separately.
-For `cross-site`, configure HTTPS origins, `COOKIE_SAMESITE=none`,
-`COOKIE_SECURE=true`, and an exact allowed Origin; the API applies an Origin
-guard independently of CORS.
+The Hub has no password auth: Controllers and Machines prove a key (ADR 0013).
 
 ## Tests
 
@@ -286,22 +190,15 @@ Then open `docs/openapi.bundled.yaml` — it needs no network and no running ser
 
 ## Adding a domain
 
-```bash
-go-scaffold generate module orders
-```
-
-Scaffolds an `internal/app/order/` module using the project defaults
-(`none` + `service`), wires its route
-into `cmd/api/wiring.go`, and appends a migration file. Add endpoints
-with `generate method`; use `--profile crud` for a CRUD skeleton or
-`--profile cqrs` for separate command/query handlers. See
-`docs/architect/patterns.md` for the module shape and foreign-key rules.
+Copy `.conventions/templates/table-module` (or `no-table-module` for a module
+that owns no table) to `internal/app/<name>/`, rename `machine`/`relay` in it,
+wire it in `cmd/api/wiring.go` and, when it talks to another module,
+`internal/composition/`. A table gets its migration pair in `migrations/`.
+`go test ./internal/archtest/` checks the result (ADR 0070).
 
 ## Deploying
 
-The base project has one long-running `cmd/api` image. A worker target becomes
-available after `go-scaffold add worker`; do not deploy a worker that has not
-been generated.
+The Hub is one long-running `cmd/api` image; it has no worker (ADR 0014).
 
 Both stages are distroless and run as `nonroot`, so there is no shell in either
 image. Debug against the `build` stage instead:
@@ -317,10 +214,7 @@ Before the first deploy of a release:
 | migrations | `migrate -path migrations -database "$DB_DSN" up` as its own step, before the new binaries roll |
 | `TRUSTED_PROXIES` | the CIDRs of your ingress; otherwise ClientIP-based rate limiting and audit decisions may be spoofable |
 | `COOKIE_SECURE` | `true` · `COOKIE_SAMESITE=none` as well if your frontend is on a different site |
-| `JWT_REFRESH_MAX_TTL_MIN` | `43200` | absolute refresh-token lifetime; rotation cannot extend beyond it |
-| `OAUTH_STATE_TTL_MIN` | `10` | lifetime of the one-time server-side OAuth state transaction |
 | `/metrics` | registered only outside production; expose a protected scrape target deliberately if production needs one |
-| `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`, `SMTP_HOST` | the app refuses to start in production without real, service-specific values |
 
 The migration check is what makes the rollout order safe: a binary whose
 embedded migrations are ahead of the database refuses to start, while one

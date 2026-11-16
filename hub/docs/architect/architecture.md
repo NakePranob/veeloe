@@ -1,3 +1,5 @@
+> go-scaffold wrote this file. Its CLI and `go-scaffold check` are no longer used (ADR 0070): where this says to run go-scaffold, copy a template from `.conventions/templates/`, and `internal/archtest` is the check.
+
 # Architecture Decision Record: hub
 
 ## Composition root
@@ -47,8 +49,8 @@ internal/
 ├── platform/                # talks to real external systems
 │   └── database/             # PostgreSQL connection and pool
 ├── shared/                  # pure logic/framework glue, no I/O
-│   ├── config/  apperror/  dberr/  dbq/  httpx/  id/
-│   └── middleware/  pagination/  tx/
+│   ├── config/  apperror/  dberr/  id/
+│   └── middleware/  tx/
 └── app/                     # domain packages (one per feature)
     └── <domain>/
         ├── domain/          # business entities and errors
@@ -126,13 +128,9 @@ call site, no error-shape drift between domains.
 
 ## 6. Pagination and Filtering
 
-**Decision:** Shared `limit`/`offset`/`q` parsing and response envelope
-(`shared/pagination`), used by every list endpoint, with the SQL a filter
-repeats in `shared/dbq`. A list takes one filter struct from `ports/` and
-answers a page plus its total.
-**Rationale:** One implementation, one response shape (`{data, limit, offset,
-total}`) — no per-domain reinvention, and no per-domain LIKE escaping to get
-wrong. See `patterns.md`, "Filtered Lists".
+**Decision:** none yet. The Hub has no list endpoint; the shared paging
+packages go-scaffold generated were removed unused. The first list decides
+its parameters and envelope.
 
 ## 7. Persistence
 

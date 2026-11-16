@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "shared": "../docs/adr/0070-keel-holds-the-structure.md",
+  "check": [
+    "sh",
+    "-c",
+    "cd runtime && cargo test -q -p veeloe-runtime-core --test structure"
+  ],
+  "units": {
+    "kind": "crate",
+    "at": "runtime/crates/{name}",
+    "shared": [],
+    "wiring": [
+      "runtime/Cargo.toml"
+    ],
+    "note": "this .conventions covers packages/runtime only; it sits in packages/ because the Runtime workspace builds against packages/protocol"
+  },
+  "templates": [
+    {
+      "name": "crate",
+      "dir": ".conventions/templates/crate",
+      "placeholder": "sample",
+      "templateFrom": "proposal: a new crate is rare; the skeleton holds only the shape"
+    }
+  ],
+  "rules": [
+    {
+      "id": "worker-never-supervisor",
+      "statement": "runtime-worker and runtime-core never use the supervisor crate, and runtime-core never uses the worker crate: they talk to the supervisor over ipc only.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-worker/src/zz_probe.rs",
+          "content": "use veeloe_runtime_supervisor as _;\n"
+        },
+        {
+          "path": "runtime/crates/runtime-core/src/zz_probe.rs",
+          "content": "use veeloe_runtime_worker as _;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-worker/src/zz_probe.rs",
+          "content": "use veeloe_runtime_core as _;\n"
+        }
+      ]
+    },
+    {
+      "id": "supervisor-uses-worker-entry-only",
+      "statement": "The supervisor uses the worker crate only through veeloe_runtime_worker::entry, which runs `veeloe worker` in the same binary.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-supervisor/src/zz_probe.rs",
+          "content": "use veeloe_runtime_worker::tools as _;\n"
+        },
+        {
+          "path": "runtime/crates/runtime-supervisor/src/zz_probe.rs",
+          "content": "use veeloe_runtime_worker::{entry, worker};\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-supervisor/src/zz_probe.rs",
+          "content": "use veeloe_runtime_worker::entry as _;\n"
+        }
+      ]
+    },
+    {
+      "id": "known-places",
+      "statement": "Every file lives in a crate's src/ or tests/, is a crate's Cargo.toml, or sits at the workspace root.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-worker/zz_probe.rs",
+          "content": "\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-worker/tests/zz_probe.rs",
+          "content": "\n"
+        }
+      ]
+    },
+    {
+      "id": "unit-shape",
+      "statement": "A crate has only the top-level folders its template (runtime-core) has: src/ and tests/.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-worker/helpers/zz_probe.rs",
+          "content": "\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-worker/src/zz_probe.rs",
+          "content": "\n"
+        }
+      ]
+    },
+    {
+      "id": "supervisor-slices",
+      "notApplicable": "ADR 0022 planned supervisor slices that never import each other; the supervisor is flat modules in one crate sharing through crate::, and ADR 0070 keeps it that way instead of rewriting it"
+    },
+    {
+      "id": "worker-core-hexagonal",
+      "proseOnly": "ADR 0022's pure worker core behind ports is a design rule inside runtime-worker/runtime-core with no module boundary a test can see yet, ADR 0070"
+    }
+  ]
+}

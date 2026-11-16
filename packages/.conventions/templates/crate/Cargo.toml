@@ -1,0 +1,9 @@
+[package]
+name = "veeloe-sample"
+description = "One crate of the Veeloe Runtime."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]

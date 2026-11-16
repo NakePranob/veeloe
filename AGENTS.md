@@ -33,11 +33,11 @@ bun run check
 bun run test
 ```
 
-`check` runs the type check and Steiger on the Controller and its prototype
-(ADR 0022), checks that the Controller's Thai and English words match
-(ADR 0065), runs the Rust Runtime's `cargo test --workspace`, checks the Protocol
-against its vectors on both sides (`check:protocol`: Rust, TypeScript fixtures
-and the Hub's copy) and runs `go-scaffold check` on the Hub. `test` runs the
+`check` runs every step and fails at the end: the type check, the structure
+of the Controller, Hub and Runtime (`check:structure`, ADR 0070), checks that
+the Controller's Thai and English words match (ADR 0065), the Rust Runtime's
+`cargo test --workspace`, and the Protocol against its vectors on both sides
+(`check:protocol`: Rust, TypeScript fixtures and the Hub's copy). `test` runs the
 unit tests of `packages/protocol-ts`, the Controller and its prototype; the Rust
 crates are tested by `check`, one test at a time (`--test-threads=1`): they start
 real supervisor, Hub and worker processes, and parallel runs flaked on timing.
@@ -57,6 +57,33 @@ needs a migrated Postgres in `TEST_DB_DSN`, and skips without one unless
 
 Write tests where there is a rule or a security check, not for coverage
 (ADR 0022).
+
+## Structure
+
+keel holds the structure (ADR 0070). Each independently built half keeps
+`.conventions/rules.json`: the rules, the files each rule must refuse and
+accept, and where a new unit's template is.
+
+- Add a unit (a Controller slice, a Hub module, a Runtime crate):
+  `/keel:add-unit`. Change a unit, even slightly: `/keel:change-unit`.
+- Before editing a unit, read its half's `.conventions/rules.json` and the
+  ADRs it names. `bun run check:structure` must pass; each failure names its
+  rule and file.
+- Changing a rule is a new ADR, then the rule, its check and its templates
+  together, proven with
+  `python3 <keel>/skills/conventions/scripts/prove.py --root <half>`.
+
+Read first:
+
+- `CONTEXT.md`: the glossary.
+- `docs/adr/`: the decisions; ADR 0070 is how structure is held.
+- `controller/.conventions/`: Feature-Sliced Design slices
+  (`controller/AGENTS.md` for the app's own rules).
+- `hub/.conventions/`: modules and their hexagonal layers (`hub/AGENTS.md`).
+- `packages/.conventions/`: the Runtime's crates (it sits in `packages/`
+  because the workspace builds against `packages/protocol`).
+- `.conventions/`: the git rules for the whole repo.
+- `openspec/`: specs and changes.
 
 ## Local stack
 

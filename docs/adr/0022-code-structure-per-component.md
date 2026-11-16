@@ -1,5 +1,7 @@
 # โครงโค้ดของแต่ละส่วน และทุกส่วนมีตัวตรวจโครงสร้างใน CI
 
+> **ADR 0070 แก้ไข** ตัวตรวจของทุกส่วนเปลี่ยนเป็น keel (`.conventions/rules.json`) แทน Steiger, `go-scaffold check` และ dependency-cruiser และ supervisor เป็น module แบน ไม่ได้แบ่ง slice
+
 โค้ดส่วนใหญ่จะเขียนโดย agent ถ้าโครงสร้างไม่มีตัวบังคับ โค้ดจะค่อยๆ เละ ทุกส่วนจึงต้องมีตัวตรวจทิศทางการ import ใน CI แต่ละส่วนเลือกรูปแบบตามลักษณะงานของตัวเอง ไม่ได้ใช้แบบเดียวกันทั้งหมด
 
 - **Controller**: ใช้ Feature-Sliced Design เต็มรูปแบบ ชั้นต่างๆ (app, pages, widgets, features, entities, shared) อยู่ใต้ `src/` ส่วน `app/` ที่ root เป็นไฟล์ route บางๆ ของ Expo Router ที่ import มาจาก pages การคำนวณ Mood อยู่ใน entities/character ส่วน db, sync, protocol client และ keystore อยู่ใน shared ตัวตรวจคือ Steiger

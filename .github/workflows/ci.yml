@@ -46,12 +46,15 @@ jobs:
               echo "== $file"; \
               timeout 60 bun test --timeout 15000 "$file" || exit 1; \
             done)
-      - name: Steiger (Controller prototype, Feature-Sliced Design)
-        run: bun run check:prototype
-      - name: Steiger and i18n keys (Controller)
+      - name: i18n keys (Controller)
         run: bun run check:controller
-      - name: go-scaffold check (Hub)
-        run: bun run check:hub
+      - name: Structure (keel, ADR 0070)
+        run: bun run check:structure
+      - name: keel rules still match their proven coverage
+        run: |
+          for half in controller hub packages .; do
+            python3 .conventions/prove.py --root "$half" --verify || exit 1
+          done
 
   hub:
     name: Hub

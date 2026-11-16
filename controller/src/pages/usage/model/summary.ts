@@ -1,4 +1,4 @@
-import { shiftDay } from "../../../shared/lib/days";
+import { shiftDay } from "../../../shared/lib";
 
 /** One Agent's tokens on one Budget day, as the Machine reported them. */
 export type UsageRow = { agent_id: string; day: string; tokens: number };

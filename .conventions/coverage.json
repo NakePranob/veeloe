@@ -1,0 +1,9 @@
+{
+  "clean": "pass",
+  "rules": {
+    "commit-subject-english": "caught",
+    "known-places": "not applicable: the root holds independently built halves (controller, hub, packages/runtime) that each keep their own .conventions; the rest (docs, e2e, scripts, packaging, openspec, controller-prototype) is not unit code, ADR 0070",
+    "pr-title-english": "prose only: the PR title is checked on GitHub by .github/workflows/pr-title.yml and in Claude Code by .claude/hooks/pr-title-english.py; neither runs on a file in the tree, AGENTS.md",
+    "unit-shape": "not applicable: the root has no units of its own, ADR 0070"
+  }
+}

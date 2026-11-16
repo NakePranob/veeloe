@@ -28,7 +28,7 @@ Run lint and typecheck before declaring any task done.
 ## Navigation & Routing
 
 - Use **Expo Router** for all navigation. Routes live in `app/` at the root of this package — every file there is a screen, `_layout.tsx` files define navigators. A route file stays thin: it re-exports a page from `src/pages/`.
-- Everything else is laid out with **Feature-Sliced Design** under `src/` (app, pages, widgets, features, entities, shared — ADR 0022), checked by Steiger (`bun run check:prototype` from the repo root). `src/app/` is the FSD app layer, not routes: `app.json` pins the router root to `./app` so Expo never takes `src/app/` for routes.
+- Everything else is laid out with **Feature-Sliced Design** under `src/` (app, pages, widgets, features, entities, shared — ADR 0022). It is a throwaway, so no check holds its structure (ADR 0070). `src/app/` is the FSD app layer, not routes: `app.json` pins the router root to `./app` so Expo never takes `src/app/` for routes.
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
 - Docs: https://docs.expo.dev/router/introduction.md
 

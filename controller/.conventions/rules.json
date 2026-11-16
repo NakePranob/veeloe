@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "shared": "../docs/adr/0070-keel-holds-the-structure.md",
+  "check": [
+    "bun",
+    "scripts/check-structure.ts"
+  ],
+  "units": {
+    "kind": "slice",
+    "at": "src/{layer}/{name}",
+    "layers": [
+      "pages",
+      "widgets",
+      "features",
+      "entities"
+    ],
+    "shared": [
+      "src/shared/"
+    ],
+    "wiring": [
+      "src/app/",
+      "app/"
+    ]
+  },
+  "templates": [
+    {
+      "name": "page",
+      "dir": ".conventions/templates/page",
+      "placeholder": "usage",
+      "like": "src/pages/usage"
+    },
+    {
+      "name": "entity",
+      "dir": ".conventions/templates/entity",
+      "placeholder": "task",
+      "like": "src/entities/task"
+    }
+  ],
+  "rules": [
+    {
+      "id": "fsd-layer-direction",
+      "statement": "A file imports only from layers below its own: app > pages > widgets > features > entities > shared. Re-exports and require() count.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "import \"../../../pages/task\";\n"
+        },
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "export { x } from \"../../../features/machine-link\";\n"
+        },
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "const page = require(\"../../../pages/task\");\nexport default page;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/task/model/zz_probe.ts",
+          "content": "import \"../../../entities/task\";\n"
+        }
+      ]
+    },
+    {
+      "id": "fsd-no-cross-slice",
+      "statement": "A slice never imports a sibling slice of the same layer, tests included.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "import \"../../agent\";\n"
+        },
+        {
+          "path": "src/entities/task/model/zz_probe.test.ts",
+          "content": "import \"../../agent\";\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "import \"../../../shared/db\";\n"
+        }
+      ]
+    },
+    {
+      "id": "fsd-public-api",
+      "statement": "Another slice is imported through its index.ts, never a deep path; tests are exempt.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/pages/home/model/zz_probe.ts",
+          "content": "import \"../../../entities/task/model/tasks\";\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/model/zz_probe.ts",
+          "content": "import \"../../../entities/task\";\n"
+        },
+        {
+          "path": "src/pages/home/model/zz_probe.test.ts",
+          "content": "import \"../../../entities/task/model/tasks\";\n"
+        }
+      ]
+    },
+    {
+      "id": "routes-import-pages",
+      "statement": "A route file in app/ imports only a page from src/pages/<name> or src/app.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "app/zz_probe.tsx",
+          "content": "import \"../src/entities/task\";\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "app/zz_probe.tsx",
+          "content": "import \"../src/pages/usage\";\n"
+        }
+      ]
+    },
+    {
+      "id": "known-places",
+      "statement": "Every file lives in a slice, src/shared/<segment>, src/app, app/, scripts/, assets/ or at the root.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/helpers/zz_probe.ts",
+          "content": "export const x = 1;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "export const x = 1;\n"
+        }
+      ]
+    },
+    {
+      "id": "unit-shape",
+      "statement": "A slice has only the folders its templates have (ui, model, i18n).",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/pages/home/helpers/zz_probe.ts",
+          "content": "export const x = 1;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/model/zz_probe.ts",
+          "content": "export const x = 1;\n"
+        }
+      ]
+    }
+  ]
+}

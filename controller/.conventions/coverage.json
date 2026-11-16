@@ -1,0 +1,11 @@
+{
+  "clean": "pass",
+  "rules": {
+    "fsd-layer-direction": "caught",
+    "fsd-no-cross-slice": "caught",
+    "fsd-public-api": "caught",
+    "known-places": "caught",
+    "routes-import-pages": "caught",
+    "unit-shape": "caught"
+  }
+}

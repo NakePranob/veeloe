@@ -1,0 +1,11 @@
+{
+  "clean": "pass",
+  "rules": {
+    "known-places": "caught",
+    "layer-direction": "caught",
+    "migration-pairs": "caught",
+    "module-isolation": "caught",
+    "no-cmd-import": "caught",
+    "unit-shape": "caught"
+  }
+}
