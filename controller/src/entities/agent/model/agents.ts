@@ -21,6 +21,8 @@ export type AgentRow = {
   approval_timeout_s: number | null;
   /** This Agent's own Egress as JSON, empty from a Machine older than per-Agent Egress. */
   egress: string;
+  /** The GitHub repos this Agent may use through the git broker, as JSON; null from a Machine older than the broker (issue #32). */
+  git_repos: string | null;
 };
 
 /** The Approval timeout the Machine last sent, in seconds, or null when it never sent one. */
@@ -44,6 +46,17 @@ export function egressOf(row: Pick<AgentRow, "egress">): string[] {
   try {
     const parsed: unknown = JSON.parse(row.egress);
     return Array.isArray(parsed) ? parsed.filter((domain): domain is string => typeof domain === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The repos the Machine last sent, or null when it never sent any: its Runtime has no git broker yet. */
+export function gitReposOf(row: Pick<AgentRow, "git_repos">): string[] | null {
+  if (row.git_repos === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(row.git_repos);
+    return Array.isArray(parsed) ? parsed.filter((repo): repo is string => typeof repo === "string") : [];
   } catch {
     return [];
   }
@@ -92,7 +105,7 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
       // Null when the Machine is older than per-Agent Egress, so what is kept stays.
       const egress = agent.egress ? JSON.stringify(agent.egress) : null;
       await transaction.run(
-        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress, git_repos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            machine_id = excluded.machine_id,
            name = excluded.name,
@@ -102,8 +115,9 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
            budget = COALESCE(excluded.budget, agent.budget),
            allowlist = COALESCE(excluded.allowlist, agent.allowlist),
            approval_timeout_s = COALESCE(excluded.approval_timeout_s, agent.approval_timeout_s),
-           egress = COALESCE(?, agent.egress)`,
-        [agent.id, machineId, agent.name, agent.provider, agent.model, agent.character ? JSON.stringify(agent.character) : null, agent.budget ?? null, agent.allowlist ? JSON.stringify(agent.allowlist) : null, agent.approvalTimeoutS ?? null, egress ?? "[]", egress],
+           egress = COALESCE(?, agent.egress),
+           git_repos = COALESCE(excluded.git_repos, agent.git_repos)`,
+        [agent.id, machineId, agent.name, agent.provider, agent.model, agent.character ? JSON.stringify(agent.character) : null, agent.budget ?? null, agent.allowlist ? JSON.stringify(agent.allowlist) : null, agent.approvalTimeoutS ?? null, egress ?? "[]", agent.gitRepos ? JSON.stringify(agent.gitRepos) : null, egress],
       );
       if (agent.usage) await writeUsage(transaction, { agent: agent.id, ...agent.usage });
     }

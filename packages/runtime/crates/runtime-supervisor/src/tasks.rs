@@ -125,6 +125,7 @@ pub fn agents_listed(registry: &AgentRegistry, providers: &[Value]) -> Value {
             "model": agent.model,
             "allowlist": agent.allowlist,
             "egress": agent.egress,
+            "gitRepos": agent.git_repos,
             "approvalTimeoutS": agent.approval_timeout_s,
         });
         if let Some(character) = &agent.character {

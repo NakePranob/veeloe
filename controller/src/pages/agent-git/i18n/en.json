@@ -1,0 +1,38 @@
+{
+  "title": "Git repos",
+  "remove": "Remove",
+  "offline": "The Machine is offline. You can change repos when it is back online",
+  "unsupported": "The Runtime on this Machine has no git broker yet. Update the Runtime to set repos",
+  "missing": {
+    "title": "Agent not found",
+    "body": "The Machine may not have listed its Agents yet, or this Agent is gone"
+  },
+  "repos": {
+    "heading": "Repos it may use",
+    "footer": "The Agent can clone, fetch and push only these repos, through a broker on the Machine that holds the token, so the Agent never sees it. It can push only branches under veeloe/{{id}}/, and cannot delete a branch, push a tag or touch main",
+    "empty": "No repos yet",
+    "emptyDetail": "This Agent can't use git with GitHub"
+  },
+  "add": {
+    "heading": "Add a repo",
+    "footer": "Type owner/name or paste a GitHub link. The Machine needs a token, set with veeloe git token on that computer",
+    "label": "Repo on GitHub",
+    "placeholder": "e.g. acme/shop",
+    "action": "Add repo"
+  },
+  "invalid": {
+    "title": "Can't add this",
+    "body": "Enter one GitHub repo, as owner/name or the repo's link"
+  },
+  "duplicate": {
+    "title": "This repo is already added"
+  },
+  "full": {
+    "title": "Can't add more",
+    "body": "One Agent can use up to {{count}} repos"
+  },
+  "authenticate": {
+    "add": "Let {{name}} use {{repo}}",
+    "remove": "Remove {{repo}} from {{name}}"
+  }
+}

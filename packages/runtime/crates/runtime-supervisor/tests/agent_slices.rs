@@ -779,3 +779,105 @@ async fn a_malformed_egress_request_is_refused_and_changes_no_agent() {
 
     workers.stop_all();
 }
+
+/// Issue #32: an Owner sets an Agent's git repos with `agent.update`, the list
+/// comes back in `agent.listed`, and anyone without Manage changes nothing.
+#[tokio::test]
+async fn git_repos_change_only_by_an_owner_and_come_back_listed() {
+    let home = tempdir().expect("home");
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    registry
+        .add(&veeloe_runtime_supervisor::agents::Agent {
+            id: "a1".into(),
+            name: "a1".into(),
+            provider: "main".into(),
+            model: "model-a".into(),
+            character: None,
+            allowlist: Vec::new(),
+            egress: Vec::new(),
+            approval_timeout_s: 3_600,
+            budget: None,
+            deleted_at: None,
+            git_repos: Vec::new(),
+        })
+        .expect("add");
+    let workers = Workers::new(
+        home.path().to_path_buf(),
+        vec!["/bin/true".into()],
+        Arc::new(Silent) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent: &str, _message: FromWorker| {}),
+        Arc::new(|_line: &str| {}),
+        Arc::new(|_agent, command| command),
+    );
+    let trust = owners();
+    let outbox = Recording::default();
+    let providers = providers();
+    let http = Models;
+    let machine = Machine {
+        registry: &registry,
+        workers: &workers,
+        routes: None,
+        secret_key: None,
+        uploads: None,
+        push_tokens: None,
+        providers: &providers,
+        egress: None,
+        trust: Some(&trust),
+        proxies: None,
+        approvals: None,
+        budgets: None,
+        http: &http,
+    };
+    let repos = |registry: &AgentRegistry| registry.get("a1").expect("get").expect("a1").git_repos;
+
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.update",
+        &json!({ "id": "a1", "gitRepos": ["acme/shop", "acme/api"] }),
+    )
+    .await;
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "agent.listed", "{body}");
+    assert_eq!(
+        body["agents"][0]["gitRepos"],
+        json!(["acme/api", "acme/shop"])
+    );
+    assert_eq!(repos(&registry), vec!["acme/api", "acme/shop"]);
+
+    // A Member who is not an Owner, or a key that is not the Owner's: refused.
+    for stranger in [
+        Inbound {
+            member: "m_2".into(),
+            ..from()
+        },
+        Inbound {
+            key: Some("someone-else".into()),
+            ..from()
+        },
+    ] {
+        dispatch(
+            &machine,
+            &outbox,
+            &stranger,
+            "agent.update",
+            &json!({ "id": "a1", "gitRepos": [] }),
+        )
+        .await;
+        assert_eq!(outbox.last().1["code"], "git.forbidden");
+    }
+    assert_eq!(repos(&registry), vec!["acme/api", "acme/shop"]);
+
+    // Another setting leaves the repos as they were.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.update",
+        &json!({ "id": "a1", "name": "Builder" }),
+    )
+    .await;
+    assert_eq!(repos(&registry), vec!["acme/api", "acme/shop"]);
+    workers.stop_all();
+}

@@ -69,5 +69,11 @@
     "detail": "อ่าน MEMORY.md ที่ Agent จดไว้"
   },
   "online": "ออนไลน์",
-  "offline": "ออฟไลน์"
+  "offline": "ออฟไลน์",
+  "git": {
+    "row": "git repo",
+    "unsupported": "ยังไม่รองรับ",
+    "count_one": "{{count}} repo",
+    "count_other": "{{count}} repo"
+  }
 }

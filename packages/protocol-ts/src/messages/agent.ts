@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AllowlistSchema } from "./allowlist";
 import { EgressSchema } from "./egress";
+import { GitReposSchema } from "./git-repos";
 import { AgentIdSchema } from "./ids";
 
 /** Also a folder name on the Machine (ADR 0032), so nothing that could leave it. */
@@ -45,8 +46,8 @@ export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
  * belongs to its Provider, so a new Provider comes with its model.
  */
 export const AgentUpdateBodySchema = z
-  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional(), allowlist: AllowlistSchema.optional(), approvalTimeoutS: approvalTimeoutS.optional() })
-  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined || b.allowlist !== undefined || b.approvalTimeoutS !== undefined, "nothing to change")
+  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional(), allowlist: AllowlistSchema.optional(), approvalTimeoutS: approvalTimeoutS.optional(), gitRepos: GitReposSchema.optional() })
+  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined || b.allowlist !== undefined || b.approvalTimeoutS !== undefined || b.gitRepos !== undefined, "nothing to change")
   .refine((b) => b.provider === undefined || b.model !== undefined, "a provider needs its model");
 export type AgentUpdateBody = z.infer<typeof AgentUpdateBodySchema>;
 
@@ -78,6 +79,8 @@ const AgentSchema = z.looseObject({
    * send one top-level `egress` for a Controller that knows only that shape.
    */
   egress: EgressSchema.optional(),
+  /** The GitHub repos this Agent may use through the git broker (issue #32). Absent from an older Machine. */
+  gitRepos: GitReposSchema.optional(),
   /** Today's tokens, as of this answer. Absent from a Machine older than `daily-budget`. */
   usage: usage.optional(),
 });

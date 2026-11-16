@@ -69,5 +69,11 @@
     "detail": "The MEMORY.md this Agent keeps"
   },
   "online": "Online",
-  "offline": "Offline"
+  "offline": "Offline",
+  "git": {
+    "row": "Git repos",
+    "unsupported": "Not supported",
+    "count_one": "{{count}} repo",
+    "count_other": "{{count}} repos"
+  }
 }

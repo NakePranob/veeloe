@@ -157,6 +157,7 @@ function placeholderAgent(id: string, machineId: string | undefined, name: strin
     allowlist: null,
     approval_timeout_s: null,
     egress: "[]",
+    git_repos: null,
   };
 }
 

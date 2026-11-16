@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Keyboard, View } from "react-native";
 import { APPROVAL_TIMEOUT_S_DEFAULT, APPROVAL_TIMEOUT_S_MAX, APPROVAL_TIMEOUT_S_MIN } from "@veeloe/protocol-ts";
-import { allowlistOf, approvalTimeoutOf, useAgents, type AgentRow } from "../../../entities/agent";
+import { allowlistOf, approvalTimeoutOf, gitReposOf, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { previewOf, statusOf, useTaskSummaries } from "../../../entities/task";
@@ -142,6 +142,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
 
       <Section title={t("more.heading")}>
         <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} />
+        <Row icon="branch" title={t("git.row")} value={gitReposOf(agent) === null ? t("git.unsupported") : t("git.count", { count: gitReposOf(agent)!.length })} href={`/agents/${agent.id}/git`} />
       </Section>
 
       <Section title={t("provider.heading")} footer={t("provider.nextTask")}>

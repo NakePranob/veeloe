@@ -36,6 +36,8 @@ const SYMBOLS = {
   usage: { ios: "chart.bar", android: "bar_chart", web: "bar_chart" },
   trash: { ios: "trash", android: "delete", web: "delete" },
   memory: { ios: "brain.head.profile", android: "psychology", web: "psychology" },
+  // A git repo an Agent may use (issue #32).
+  branch: { ios: "arrow.triangle.branch", android: "fork_right", web: "fork_right" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 
 export type IconName = keyof typeof SYMBOLS;

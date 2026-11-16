@@ -91,4 +91,7 @@ export const MIGRATIONS = [
   // Each Agent's own Egress as the Machine last said, a JSON list of domains; empty
   // for one from a Machine older than per-Agent Egress (`agent-egress-ui`).
   `ALTER TABLE agent ADD COLUMN egress TEXT NOT NULL DEFAULT '[]'`,
+  // The GitHub repos the Agent may use through the git broker, as JSON; null from a
+  // Machine older than the broker (issue #32).
+  `ALTER TABLE agent ADD COLUMN git_repos TEXT`,
 ] as const;

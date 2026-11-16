@@ -196,6 +196,11 @@ fn is_agent(value: &Value) -> bool {
             return false;
         }
     }
+    if let Some(repos) = object.get("gitRepos") {
+        if !is_git_repos(repos) {
+            return false;
+        }
+    }
     true
 }
 
@@ -235,7 +240,8 @@ fn is_agent_update(object: &Map<String, Value>) -> bool {
         || object.contains_key("character")
         || object.contains_key("budget")
         || object.contains_key("allowlist")
-        || object.contains_key("approvalTimeoutS");
+        || object.contains_key("approvalTimeoutS")
+        || object.contains_key("gitRepos");
     if !has_change {
         return false;
     }
@@ -274,6 +280,11 @@ fn is_agent_update(object: &Map<String, Value>) -> bool {
     }
     if let Some(timeout) = object.get("approvalTimeoutS") {
         if !is_approval_timeout(timeout) {
+            return false;
+        }
+    }
+    if let Some(repos) = object.get("gitRepos") {
+        if !is_git_repos(repos) {
             return false;
         }
     }
@@ -550,6 +561,30 @@ fn is_egress(value: &Value) -> bool {
                 && entries
                     .iter()
                     .all(|entry| text(Some(entry)).map(is_egress_domain).unwrap_or(false))
+        })
+        .unwrap_or(false)
+}
+
+/// The GitHub repos one Agent may use through the git broker (issue #32):
+/// at most 20 lowercase `owner/name`, neither part `.` or `..`.
+fn is_git_repos(value: &Value) -> bool {
+    let part = |part: &str| {
+        (1..=100).contains(&part.len())
+            && part != "."
+            && part != ".."
+            && part.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"_.-".contains(&byte)
+            })
+    };
+    value
+        .as_array()
+        .map(|repos| {
+            repos.len() <= 20
+                && repos.iter().all(|repo| {
+                    text(Some(repo))
+                        .and_then(|repo| repo.split_once('/'))
+                        .is_some_and(|(owner, name)| part(owner) && part(name))
+                })
         })
         .unwrap_or(false)
 }

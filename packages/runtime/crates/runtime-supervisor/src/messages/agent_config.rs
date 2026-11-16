@@ -144,6 +144,36 @@ async fn save(
     if !create && existing.as_ref().is_some_and(|agent| agent.deleted()) {
         return outbox.error(from, "agent.unknown");
     }
+    // Which repos an Agent may push to is a Manage action, like its Egress
+    // (ADR 0029, 0069): in v0.1 an Owner whose key signed.
+    let git_repos: Option<Vec<String>> = match body.get("gitRepos") {
+        None => None,
+        Some(repos) => {
+            if !machine
+                .trust
+                .is_some_and(|trust| trust.manages(&from.member, from.key.as_deref()))
+            {
+                return outbox.error(from, "git.forbidden");
+            }
+            let repos: Option<Vec<String>> = repos.as_array().and_then(|repos| {
+                repos
+                    .iter()
+                    .map(|repo| {
+                        repo.as_str()
+                            .filter(|repo| crate::git_broker::is_repo(repo))
+                            .map(str::to_ascii_lowercase)
+                    })
+                    .collect()
+            });
+            // One bad entry refuses the whole list, as Egress does.
+            let Some(mut repos) = repos else {
+                return outbox.error(from, "git.invalid_repo");
+            };
+            repos.sort();
+            repos.dedup();
+            Some(repos)
+        }
+    };
     let base = existing.unwrap_or_else(|| crate::agents::Agent {
         id: id.to_string(),
         name: id.to_string(),
@@ -190,8 +220,7 @@ async fn save(
             .unwrap_or(base.approval_timeout_s),
         budget: body.get("budget").and_then(Value::as_u64).or(base.budget),
         deleted_at: base.deleted_at,
-        // Repos change only through `veeloe git repos` on the Machine (issue #32).
-        git_repos: base.git_repos,
+        git_repos: git_repos.unwrap_or(base.git_repos),
     };
     // A new Agent must name a Provider on this Machine and a model that
     // Provider lists; an update may move either, so both are checked again.

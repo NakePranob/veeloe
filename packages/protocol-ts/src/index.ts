@@ -75,6 +75,7 @@ export {
   type TaskStopBody,
   type TaskSyncBody,
 } from "./messages/task";
+export { GIT_REPOS_MAX, GitRepoSchema, GitReposSchema } from "./messages/git-repos";
 export { EGRESS_MAX, EgressDomainSchema, EgressSchema, EgressSetBodySchema, type EgressSetBody } from "./messages/egress";
 export {
   ALLOWLIST_MAX,

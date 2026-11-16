@@ -258,6 +258,102 @@
       "valid": false
     },
     {
+      "name": "update the git repos",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "acme/shop",
+          "acme/api.v2"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "update the git repos to none",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": []
+      },
+      "valid": true
+    },
+    {
+      "name": "update with a git repo that is not owner/name",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "shop"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a git repo that is a URL",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "https://github.com/acme/shop"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a git repo in capitals",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "Acme/Shop"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a git repo that climbs out",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "../shop"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with more git repos than the ceiling",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "acme/r0",
+          "acme/r1",
+          "acme/r2",
+          "acme/r3",
+          "acme/r4",
+          "acme/r5",
+          "acme/r6",
+          "acme/r7",
+          "acme/r8",
+          "acme/r9",
+          "acme/r10",
+          "acme/r11",
+          "acme/r12",
+          "acme/r13",
+          "acme/r14",
+          "acme/r15",
+          "acme/r16",
+          "acme/r17",
+          "acme/r18",
+          "acme/r19",
+          "acme/r20"
+        ]
+      },
+      "valid": false
+    },
+    {
       "name": "update with nothing to change",
       "type": "agent.update",
       "body": {
@@ -370,6 +466,44 @@
         "providers": []
       },
       "valid": true
+    },
+    {
+      "name": "listed, with an Agent's git repos",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "gitRepos": [
+              "acme/shop"
+            ]
+          }
+        ],
+        "providers": []
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with a git repo that is not owner/name",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "gitRepos": [
+              "acme"
+            ]
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
     },
     {
       "name": "listed, with a Budget and today's usage",
