@@ -4,23 +4,13 @@ import (
 	"context"
 	"errors"
 
-	httpadapter "hub/internal/app/machine/adapters/inbound/http"
 	"hub/internal/app/machine/adapters/outbound/postgres"
 	"hub/internal/app/machine/application"
 	"hub/internal/app/machine/domain"
-	"hub/internal/app/machine/ports"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
-
-// NewHandlerFromDB is this module's composition root. The process root owns
-// the database handle; this package owns the feature's adapter graph.
-func NewHandlerFromDB(db *gorm.DB) *httpadapter.Handler {
-	repo := postgres.NewRepository(db)
-	var service ports.Repository = repo
-	return httpadapter.NewHandler(application.NewService(service))
-}
 
 // Lookup is this module's public capability for other features: which Machine
 // a public key belongs to, and its Workspace. ok is false when no Machine holds

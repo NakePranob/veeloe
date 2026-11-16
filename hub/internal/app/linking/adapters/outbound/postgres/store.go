@@ -40,6 +40,11 @@ type certificateRow struct {
 
 func (certificateRow) TableName() string { return "controller_svc.certificates" }
 
+// controllerRow is this module's view of controller_svc.controllers. Writers:
+// pairing inserts a Pairing's first Controller and linking inserts and removes
+// linked ones, each inside its own transaction. The controller module only reads.
+// Module isolation (ADR 0070) keeps each its own struct: sharing one would mean
+// a table row in internal/shared or one module importing another.
 type controllerRow struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
 	WorkspaceID uuid.UUID `gorm:"type:uuid"`

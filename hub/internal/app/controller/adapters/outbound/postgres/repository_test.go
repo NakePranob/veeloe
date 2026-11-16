@@ -1,8 +1,6 @@
 package postgres
 
 import (
-	"context"
-	"errors"
 	"os"
 	"testing"
 
@@ -69,56 +67,9 @@ func workspaceForTest(t *testing.T, db *gorm.DB) uuid.UUID {
 	return id
 }
 
-func TestRepository_CreateFindDelete(t *testing.T) {
-	db := repositoryDBForTest(t)
-	repo := NewRepository(db)
-	workspace := workspaceForTest(t, db)
-	ctx := context.Background()
-	id := uuid.New()
-	item := &domain.Controller{ID: id, Version: 1, WorkspaceID: workspace, MemberID: "m-1", PublicKey: testKey(1)}
-
-	if err := repo.Create(ctx, item); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	found, err := repo.FindByID(ctx, id)
-	if err != nil {
-		t.Fatalf("find by id: %v", err)
-	}
-	if found.ID != id {
-		t.Fatalf("want id %s, got %s", id, found.ID)
-	}
-	if err := repo.Delete(ctx, id); err != nil {
-		t.Fatalf("delete: %v", err)
-	}
-}
-
-// Two clients both hold version 1; the second save must be refused instead of
-// overwriting the first. Runs against the real database because the guard is
-// a WHERE clause — a stub would only be testing itself.
-func TestRepository_Update_RefusesStaleVersion(t *testing.T) {
-	db := repositoryDBForTest(t)
-	repo := NewRepository(db)
-	workspace := workspaceForTest(t, db)
-	ctx := context.Background()
-	item := &domain.Controller{ID: uuid.New(), Version: 1, WorkspaceID: workspace, MemberID: "m-1", PublicKey: testKey(2)}
-
-	if err := repo.Create(ctx, item); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-
-	first := &domain.Controller{ID: item.ID, Version: item.Version, WorkspaceID: item.WorkspaceID, MemberID: item.MemberID, PublicKey: item.PublicKey}
-	if err := repo.Update(ctx, first); err != nil {
-		t.Fatalf("first update: %v", err)
-	}
-	if first.Version != item.Version+1 {
-		t.Fatalf("want version bumped to %d, got %d", item.Version+1, first.Version)
-	}
-
-	stale := &domain.Controller{ID: item.ID, Version: item.Version, WorkspaceID: item.WorkspaceID, MemberID: item.MemberID, PublicKey: item.PublicKey}
-	if err := repo.Update(ctx, stale); !errors.Is(err, domain.ErrStaleVersion) {
-		t.Fatalf("want ErrStaleVersion for the second writer, got %v", err)
-	}
-	if stale.Version != item.Version {
-		t.Fatalf("a refused update must leave the caller's version alone, got %d", stale.Version)
-	}
+// insertForTest writes a row the way Pairing does; this module only reads.
+func insertForTest(t *testing.T, db *gorm.DB, c *domain.Controller) error {
+	t.Helper()
+	row := ControllerModel{ID: c.ID, Version: c.Version, WorkspaceID: c.WorkspaceID, MemberID: c.MemberID, PublicKey: c.PublicKey}
+	return db.Create(&row).Error
 }

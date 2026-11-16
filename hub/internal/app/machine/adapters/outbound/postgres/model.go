@@ -29,10 +29,3 @@ func toDomain(m *MachineModel) *domain.Machine {
 	}
 	return &domain.Machine{ID: m.ID, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt, Version: m.Version, WorkspaceID: m.WorkspaceID, PublicKey: m.PublicKey}
 }
-
-func fromDomain(m *domain.Machine) *MachineModel {
-	if m == nil {
-		return nil
-	}
-	return &MachineModel{ID: m.ID, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt, Version: m.Version, WorkspaceID: m.WorkspaceID, PublicKey: m.PublicKey}
-}

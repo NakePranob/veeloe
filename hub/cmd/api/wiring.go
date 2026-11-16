@@ -118,8 +118,6 @@ func run() error {
 		MaxQueueBytes:     cfg.HubMaxQueueBytes,
 	})
 	hub.Register(api)
-	machine.NewHandlerFromDB(db).Register(api)
-	controller.NewHandlerFromDB(db).Register(api)
 	// The two routes that need no account: a stranger gets a minute's worth, not a flood.
 	open := api.Group("/", middleware.RateLimit(60))
 	pairing.NewHandlerFromDB(db, cfg.HubPublicURL).Register(open)

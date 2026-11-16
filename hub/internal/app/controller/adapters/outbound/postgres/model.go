@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// ControllerModel reads controller_svc.controllers. Pairing and linking own
+// its writes (see their controllerRow); this module never writes it.
 type ControllerModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
 	CreatedAt   time.Time
@@ -29,11 +31,4 @@ func toDomain(m *ControllerModel) *domain.Controller {
 		return nil
 	}
 	return &domain.Controller{ID: m.ID, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt, Version: m.Version, WorkspaceID: m.WorkspaceID, MemberID: m.MemberID, PublicKey: m.PublicKey}
-}
-
-func fromDomain(m *domain.Controller) *ControllerModel {
-	if m == nil {
-		return nil
-	}
-	return &ControllerModel{ID: m.ID, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt, Version: m.Version, WorkspaceID: m.WorkspaceID, MemberID: m.MemberID, PublicKey: m.PublicKey}
 }
