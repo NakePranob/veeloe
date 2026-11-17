@@ -13,12 +13,12 @@ use std::hash::{BuildHasher, Hasher};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use veeloe_plugin_api::{Cancel, PluginError, ToolError, ToolRegistry};
+use veeloe_plugin_api::{with_progress, Cancel, PluginError, Progress, ToolError, ToolRegistry};
 use veeloe_protocol::{matches_allowlist, split_command};
 
 use crate::conversation::conversation;
@@ -48,6 +48,12 @@ pub const APPROVAL_TIMEOUT_MS: u64 = 3_600_000;
 /// Stop ids already obeyed: the same command sent again stops nothing twice.
 /// The oldest fall away.
 const STOPPED_IDS_KEPT: usize = 100;
+/// How long a Turn may go with no event and no command output before it is
+/// written down as stalled (ADR 0073).
+const STALL_AFTER_MS: u64 = 5 * 60 * 1000;
+/// How much of a running command's output, from its end, goes out live, and how often.
+const OUTPUT_TAIL: usize = 2048;
+const OUTPUT_EVERY: Duration = Duration::from_secs(1);
 
 #[derive(Debug, thiserror::Error)]
 pub enum AgentError {
@@ -104,6 +110,13 @@ struct State {
     max_rounds: AtomicUsize,
     context_window: AtomicUsize,
     turn: Mutex<Option<JoinHandle<()>>>,
+    /// When the running Turn last did anything: an event, or command output.
+    activity: Mutex<Instant>,
+    /// The current quiet stretch is already written down as stalled.
+    stalled: AtomicBool,
+    /// Approvals waiting on a person: that wait is not a stall.
+    waiting_for_person: AtomicUsize,
+    stall_after_ms: AtomicU64,
 }
 
 impl State {
@@ -116,12 +129,22 @@ impl State {
         message_id: Option<&str>,
     ) -> Result<TaskEvent, AgentError> {
         let event = self.log().record(task, starter, kind, &body, message_id)?;
+        // Any event but the stall itself ends a quiet stretch.
+        if kind != "turn.stalled" {
+            self.touch();
+        }
         self.link.send(FromWorker::Event {
             task: task.to_string(),
             starter: starter.to_string(),
             event: event.clone(),
         });
         Ok(event)
+    }
+
+    /// The Turn just did something, so it is not stalled.
+    fn touch(&self) {
+        *self.activity.lock().expect("activity") = Instant::now();
+        self.stalled.store(false, Ordering::SeqCst);
     }
 
     fn log(&self) -> Arc<dyn EventLog> {
@@ -182,6 +205,10 @@ impl AgentCore {
                 max_rounds: AtomicUsize::new(MAX_ROUNDS),
                 context_window: AtomicUsize::new(128_000),
                 turn: Mutex::new(None),
+                activity: Mutex::new(Instant::now()),
+                stalled: AtomicBool::new(false),
+                waiting_for_person: AtomicUsize::new(0),
+                stall_after_ms: AtomicU64::new(STALL_AFTER_MS),
             }),
         }
     }
@@ -192,6 +219,14 @@ impl AgentCore {
     }
 
     /// Pin this Workdir's `MEMORY.md` into each new Turn (ADR 0036).
+    /// How long a quiet Turn waits before `turn.stalled`; tests make it short.
+    pub fn with_stall_after(self, after: Duration) -> Self {
+        self.state
+            .stall_after_ms
+            .store(after.as_millis() as u64, Ordering::SeqCst);
+        self
+    }
+
     pub fn with_workdir(self, workdir: impl Into<PathBuf>) -> Self {
         *self.state.workdir.lock().expect("workdir") = Some(workdir.into());
         self
@@ -412,6 +447,8 @@ impl AgentCore {
             starter: owner.clone(),
             cancel: cancel.clone(),
         });
+        self.state.touch();
+        tokio::spawn(watch_stall(Arc::clone(&self.state), task.to_string()));
 
         let state = Arc::clone(&self.state);
         let started = task.to_string();
@@ -687,7 +724,7 @@ async fn run_turn(
             let result = if !state.tools.has(name) {
                 Err(ToolError::Unknown(name.to_string()))
             } else {
-                run_tool(&state, &task, &starter, name, &input, &cancel).await
+                run_tool(&state, &task, &starter, id, name, &input, &cancel).await
             };
             match result {
                 Ok(content) => {
@@ -972,6 +1009,7 @@ async fn run_tool(
     state: &Arc<State>,
     task: &str,
     starter: &str,
+    id: &str,
     name: &str,
     input: &Value,
     cancel: &Cancel,
@@ -980,10 +1018,10 @@ async fn run_tool(
     if name == "bash" {
         let command = input.get("command").and_then(Value::as_str);
         let Some(command) = command else {
-            return state.tools.run(name, input, cancel).await;
+            return call_tool(state, task, starter, id, name, input, cancel).await;
         };
         if matches_allowlist(command, &allowlist) {
-            return state.tools.run(name, input, cancel).await;
+            return call_tool(state, task, starter, id, name, input, cancel).await;
         }
         let answer = ask_approval(
             state,
@@ -995,18 +1033,110 @@ async fn run_tool(
         )
         .await;
         if answer.decision == ApprovalDecision::Approve {
-            return state.tools.run(name, input, cancel).await;
+            return call_tool(state, task, starter, id, name, input, cancel).await;
         }
         return Err(denial(&answer));
     }
     if FILE_TOOL_NAMES.contains(&name) || allowlist.iter().any(|entry| entry == name) {
-        return state.tools.run(name, input, cancel).await;
+        return call_tool(state, task, starter, id, name, input, cancel).await;
     }
     let answer = ask_approval(state, task, starter, name, vec![name.to_string()], cancel).await;
     if answer.decision == ApprovalDecision::Approve {
-        return state.tools.run(name, input, cancel).await;
+        return call_tool(state, task, starter, id, name, input, cancel).await;
     }
     Err(denial(&answer))
+}
+
+/// Runs one tool. A `bash` call's output also goes out live to whoever started
+/// the Task (ADR 0073); the model still reads only the result.
+async fn call_tool(
+    state: &Arc<State>,
+    task: &str,
+    starter: &str,
+    id: &str,
+    name: &str,
+    input: &Value,
+    cancel: &Cancel,
+) -> Result<String, ToolError> {
+    if name != "bash" {
+        return state.tools.run(name, input, cancel).await;
+    }
+    let sink = output_sink(
+        Arc::clone(state),
+        task.to_string(),
+        starter.to_string(),
+        id.to_string(),
+    );
+    with_progress(sink, state.tools.run(name, input, cancel)).await
+}
+
+/// Keeps the end of a command's output and sends it at most once a second.
+/// Output keeps the Turn from counting as stalled.
+fn output_sink(state: Arc<State>, task: String, starter: String, id: String) -> Progress {
+    let started = Instant::now();
+    let seen: Mutex<(Vec<u8>, u64, Option<Instant>)> = Mutex::new((Vec::new(), 0, None));
+    Arc::new(move |chunk: &[u8]| {
+        state.touch();
+        let mut seen = seen.lock().expect("output");
+        seen.0.extend_from_slice(chunk);
+        if seen.0.len() > OUTPUT_TAIL {
+            let cut = seen.0.len() - OUTPUT_TAIL;
+            seen.0.drain(..cut);
+        }
+        seen.1 += chunk.len() as u64;
+        if seen.2.is_some_and(|at| at.elapsed() < OUTPUT_EVERY) {
+            return;
+        }
+        seen.2 = Some(Instant::now());
+        state.link.send(FromWorker::ToolOutput {
+            task: task.clone(),
+            starter: starter.clone(),
+            tool_use_id: id.clone(),
+            tail: String::from_utf8_lossy(&seen.0).into_owned(),
+            bytes: seen.1,
+            elapsed_ms: started.elapsed().as_millis() as u64,
+        });
+    })
+}
+
+/// Writes `turn.stalled` once per quiet stretch of the running Turn: no event
+/// and no output for the stall time, an Approval wait aside (ADR 0073). Ends
+/// with the Turn.
+async fn watch_stall(state: Arc<State>, task: String) {
+    loop {
+        let after = Duration::from_millis(state.stall_after_ms.load(Ordering::SeqCst));
+        tokio::time::sleep((after / 5).clamp(Duration::from_millis(10), Duration::from_secs(5)))
+            .await;
+        let starter = match state.running.lock().expect("running").as_ref() {
+            Some(turn) if turn.task == task => turn.starter.clone(),
+            _ => return,
+        };
+        if state.waiting_for_person.load(Ordering::SeqCst) > 0 {
+            state.touch();
+            continue;
+        }
+        let quiet = state.activity.lock().expect("activity").elapsed();
+        if quiet < after || state.stalled.swap(true, Ordering::SeqCst) {
+            continue;
+        }
+        let since = state.now_ms() - quiet.as_millis() as i64;
+        let _ = state.append(
+            &task,
+            &starter,
+            "turn.stalled",
+            json!({ "since": since }),
+            None,
+        );
+    }
+}
+
+/// Counts an Approval waiting on a person for as long as it lives.
+struct WaitingForPerson(Arc<State>);
+
+impl Drop for WaitingForPerson {
+    fn drop(&mut self) {
+        self.0.waiting_for_person.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 async fn ask_approval(
@@ -1017,6 +1147,8 @@ async fn ask_approval(
     parts: Vec<String>,
     cancel: &Cancel,
 ) -> Answer {
+    state.waiting_for_person.fetch_add(1, Ordering::SeqCst);
+    let _waiting = WaitingForPerson(Arc::clone(state));
     let request = request_id(state);
     let timeout = state.approval_timeout();
     let expires_at = state.now_ms() + timeout.as_millis() as i64;

@@ -8,7 +8,7 @@ import type { Database } from "../../../shared/db";
 import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
 import { MAX_ATTACHMENT_BYTES } from "./downloads";
 import { createFileCache } from "./file-cache";
-import { createStatusStore, memoryKey, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, UNKNOWN_USAGE, type MachineStatus, type MemoryStatus, type UsageStatus } from "./statuses";
+import { createStatusStore, memoryKey, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, UNKNOWN_USAGE, type MachineStatus, type MemoryStatus, type UsageStatus, NO_OUTPUT } from "./statuses";
 
 export type { MachineStatus, MemoryStatus, UsageStatus };
 export { UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY };
@@ -49,6 +49,8 @@ export function createMachineLinks({
   const statuses = createStatusStore(UNKNOWN_MACHINE_STATUS);
   const usage = createStatusStore(UNKNOWN_USAGE);
   const memory = createStatusStore(UNKNOWN_MEMORY);
+  // The live end of each running command's output; tool.result carries the whole of it.
+  const outputs = createStatusStore(NO_OUTPUT);
   const files = createFileCache();
   /** Which Machine an envelope went to, by its sig, so an answer about it finds its way back. */
   const sentTo = new Map<string, { machine: string; kind: Kind; request?: string }>();
@@ -146,6 +148,8 @@ export function createMachineLinks({
         memory: { exists: message.body.exists, chars: message.body.chars, text: message.body.text },
         fetchedAt: Date.now(),
       });
+    } else if (message.type === "tool.output") {
+      outputs.set(message.body.toolUseId, { tail: message.body.tail, bytes: message.body.bytes, elapsedMs: message.body.elapsedMs, at: Date.now() });
     } else if ((message.type === "task.event" || message.type === "task.events") && signed.task) {
       const events = message.type === "task.event" ? [message.body] : message.body.events;
       await saveTaskEvents(database, { task: signed.task, agent: message.body.agent, machine: machine.id }, events);
@@ -284,6 +288,8 @@ export function createMachineLinks({
     },
 
     memory: (machine: string, agent: string) => memory.or(memoryKey(machine, agent)),
+    output: (toolUseId: string) => outputs.or(toolUseId),
+    subscribeOutput: outputs.subscribe,
     memoryStatuses: memory.all,
     subscribeMemory: memory.subscribe,
 

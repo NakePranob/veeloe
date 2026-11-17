@@ -21,6 +21,7 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "task.message" => object.map(is_task_message).unwrap_or(false),
         "task.stop" => object.map(is_task_stop).unwrap_or(false),
         "task.event" => object.map(is_task_event_body).unwrap_or(false),
+        "tool.output" => object.map(is_tool_output).unwrap_or(false),
         "task.events" => object.map(is_task_events).unwrap_or(false),
         "task.sync" => object.map(is_task_sync).unwrap_or(false),
         "task.list" => object.is_some(),
@@ -456,6 +457,25 @@ fn is_task_event(value: &Value) -> bool {
         && non_empty(object.get("kind"))
         && object.get("at").map(is_non_negative_int).unwrap_or(false)
         && object.contains_key("body")
+}
+
+/// The latest output of a running command (ADR 0073): not an event, never in the log.
+fn is_tool_output(object: &Map<String, Value>) -> bool {
+    text(object.get("agent")).map(is_agent_id).unwrap_or(false)
+        && text(object.get("toolUseId"))
+            .map(|id| (1..=128).contains(&chars(id)))
+            .unwrap_or(false)
+        && text(object.get("tail"))
+            .map(|tail| chars(tail) <= 4096)
+            .unwrap_or(false)
+        && object
+            .get("bytes")
+            .map(is_non_negative_int)
+            .unwrap_or(false)
+        && object
+            .get("elapsedMs")
+            .map(is_non_negative_int)
+            .unwrap_or(false)
 }
 
 fn is_task_event_body(object: &Map<String, Value>) -> bool {

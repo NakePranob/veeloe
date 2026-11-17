@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
-use veeloe_plugin_api::{Cancel, ToolDefinition, ToolError, ToolRunner};
+use veeloe_plugin_api::{progress, Cancel, ToolDefinition, ToolError, ToolRunner};
 use veeloe_runtime_core::sandbox::Sandbox;
 
 pub const DEFAULT_TIMEOUT_S: u64 = 120;
@@ -160,13 +160,21 @@ impl ToolRunner for BashTool {
         let pid = child.id().unwrap_or_default();
 
         let mut stdout = child.stdout.take().expect("stdout is piped");
+        // Whoever runs the Turn may watch the output as it comes (ADR 0073); the
+        // model still gets only the result at the end.
+        let sink = progress();
         let reading = tokio::spawn(async move {
             let mut tail = Tail::default();
             let mut buffer = [0u8; 8192];
             loop {
                 match stdout.read(&mut buffer).await {
                     Ok(0) | Err(_) => break,
-                    Ok(read) => tail.add(&buffer[..read]),
+                    Ok(read) => {
+                        if let Some(sink) = &sink {
+                            sink(&buffer[..read]);
+                        }
+                        tail.add(&buffer[..read])
+                    }
                 }
             }
             tail

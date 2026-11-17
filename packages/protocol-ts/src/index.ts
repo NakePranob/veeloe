@@ -66,6 +66,7 @@ export {
   TaskListedBodySchema,
   TaskMessageBodySchema,
   TaskStopBodySchema,
+  ToolOutputBodySchema,
   TaskSyncBodySchema,
   type TaskEvent,
   type TaskEventBody,

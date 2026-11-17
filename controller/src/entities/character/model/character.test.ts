@@ -52,6 +52,9 @@ test("a failed Turn is failed, a stopped or interrupted one idle, a tool result 
   expect(moodOf([e("turn.started"), e("turn.ended", { reason: "stopped" })], true)).toBe("idle");
   expect(moodOf([e("turn.started"), e("turn.ended", { reason: "interrupted" })], true)).toBe("idle");
   expect(moodOf([e("turn.ended", { reason: "error" })], false)).toBe("offline");
+  expect(moodOf([e("turn.started"), e("turn.stalled", { since: 1 })], true)).toBe("stuck");
+  expect(moodOf([e("turn.stalled", { since: 1 }), e("llm.message", { content: [] })], true)).toBe("thinking");
+  expect(moodOf([e("turn.stalled", { since: 1 })], false)).toBe("offline");
   const tool = [e("turn.started"), e("llm.message", { content: [{ type: "tool_use", id: "t", name: "bash", input: {} }] })];
   expect(moodOf(tool, true)).toBe("working");
   expect(moodOf([...tool, e("tool.result", { content: [{ type: "tool_result", tool_use_id: "t" }] })], true)).toBe("thinking");

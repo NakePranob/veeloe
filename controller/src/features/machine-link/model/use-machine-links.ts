@@ -5,6 +5,7 @@ import { useMachines } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";
 import { deviceName } from "../../../shared/device-name";
 import { keySession, useKeyStatus } from "../../../shared/keystore";
+import { NO_OUTPUT, type ToolOutput } from "./statuses";
 import { createMachineLinks, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, type MachineLinks, type MachineStatus, type MemoryStatus, type UsageStatus } from "./links";
 
 let current: MachineLinks | null = null;
@@ -98,6 +99,15 @@ export function useUsageStatuses(): Record<string, UsageStatus> {
 }
 
 /** One Agent's Memory as its Machine last answered, for the Memory page (`agent-memory-page`). */
+/** The live output of one running command, as the Machine last sent it (ADR 0073). */
+export function useToolOutput(toolUseId: string): ToolOutput {
+  const links = useCurrent();
+  return useSyncExternalStore(
+    (listener) => links?.subscribeOutput(listener) ?? (() => {}),
+    () => links?.output(toolUseId) ?? NO_OUTPUT,
+  );
+}
+
 export function useMemoryStatus(machine: string, agent: string): MemoryStatus {
   const links = useCurrent();
   return useSyncExternalStore(

@@ -5,5 +5,6 @@
   "done": "เสร็จแล้ว",
   "offline": "ออฟไลน์",
   "new": "ยังไม่ได้เริ่ม",
-  "interrupted": "Turn ถูกขัดจังหวะ"
+  "interrupted": "Turn ถูกขัดจังหวะ",
+  "stuck": "Turn ค้าง"
 }

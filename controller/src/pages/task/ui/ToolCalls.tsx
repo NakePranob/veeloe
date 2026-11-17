@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { View } from "react-native";
+import { useToolOutput } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
 import { Card, Chip, Icon, icon, space, Spinner, Tap, Text } from "../../../shared/ui";
 import { summaryOf, type ToolCall } from "../model/items";
@@ -45,6 +46,25 @@ function CallRow({ call }: { call: ToolCall }) {
   );
 }
 
+const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+
+// A running command's latest line of output and how long it has run, as the Machine streams it (ADR 0073).
+function Live({ id }: { id: string }) {
+  const output = useToolOutput(id);
+  if (!output.at) return null;
+  const line = output.tail.split("\n").filter((l: string) => l.trim()).at(-1) ?? "";
+  return (
+    <View style={{ flexDirection: "row", gap: space.sm, paddingLeft: space.sm + icon.md + space.sm, paddingRight: space.sm, paddingBottom: space.sm }}>
+      <Text variant="caption" tone="secondary" mono numberOfLines={1} style={{ flex: 1 }}>
+        {line}
+      </Text>
+      <Text variant="caption" tone="secondary" style={{ fontVariant: ["tabular-nums"] }}>
+        {clock(output.elapsedMs)}
+      </Text>
+    </View>
+  );
+}
+
 // The tools an Agent used back to back, folded by default (task-thread-redesign): the one running,
 // else the latest that failed with its last error line, else the last, and how many more it hides.
 export function ToolCalls({ calls }: { calls: ToolCall[] }) {
@@ -65,6 +85,7 @@ export function ToolCalls({ calls }: { calls: ToolCall[] }) {
         {hiddenFailed && <Icon name="failed" size="xs" color="red" />}
         <Icon name={open ? "collapse" : "expand"} size="xs" weight="semibold" />
       </Tap>
+      {!open && call.state === "running" && <Live id={call.id} />}
       {!open && error && (
         <View style={{ paddingLeft: space.sm + icon.md + space.sm, paddingRight: space.sm, paddingBottom: space.sm }}>
           <Text variant="caption" tone="secondary" mono numberOfLines={2} selectable>

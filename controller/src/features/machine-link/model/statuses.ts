@@ -61,6 +61,11 @@ export type MemoryStatus = {
 
 export const UNKNOWN_MEMORY: MemoryStatus = { request: null, machine: null, agent: null, loading: false, error: null, memory: null, fetchedAt: null };
 
+/** The latest output of a command still running, by its tool call's id (ADR 0073). Only in memory, never saved. */
+export type ToolOutput = { tail: string; bytes: number; elapsedMs: number; at: number };
+
+export const NO_OUTPUT: ToolOutput = { tail: "", bytes: 0, elapsedMs: 0, at: 0 };
+
 /** One Agent's Memory belongs to one Machine, so the key carries both. */
 export const memoryKey = (machine: string, agent: string) => `${machine}:${agent}`;
 

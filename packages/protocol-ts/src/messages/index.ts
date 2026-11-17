@@ -9,7 +9,7 @@ import { MemoryGetBodySchema, MemoryGotBodySchema } from "./memory";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
 import { ProviderAddBodySchema } from "./provider";
 import { PushRegisterBodySchema, PushRegisteredBodySchema, PushUnregisterBodySchema, PushUnregisteredBodySchema } from "./push";
-import { FileChunkBodySchema, FileGetBodySchema, TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskStopBodySchema, TaskSyncBodySchema } from "./task";
+import { FileChunkBodySchema, FileGetBodySchema, TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskStopBodySchema, TaskSyncBodySchema, ToolOutputBodySchema } from "./task";
 import { UsageGetBodySchema, UsageListedBodySchema } from "./usage";
 
 const known = {
@@ -31,6 +31,7 @@ const known = {
   "file.get": FileGetBodySchema,
   "task.stop": TaskStopBodySchema,
   "task.event": TaskEventBodySchema,
+  "tool.output": ToolOutputBodySchema,
   "task.sync": TaskSyncBodySchema,
   "task.events": TaskEventsBodySchema,
   "egress.set": EgressSetBodySchema,

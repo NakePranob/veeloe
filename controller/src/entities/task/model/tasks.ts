@@ -129,7 +129,7 @@ export function latestOf(events: readonly Pick<TaskEventRow, "kind" | "body">[])
 export const latestEvents = ({ latest_kind, latest_body }: Latest) => (latest_kind ? [{ kind: latest_kind, body: latest_body }] : []);
 
 /** What a Task is doing, in the prototype's words for it. `failed`: its latest Turn ended in an error. */
-export type TaskStatus = "waiting" | "working" | "interrupted" | "failed" | "done" | "offline" | "new";
+export type TaskStatus = "waiting" | "working" | "stuck" | "interrupted" | "failed" | "done" | "offline" | "new";
 
 /**
  * Offline first; then from the latest known event: none is not started, an Approval
@@ -142,6 +142,8 @@ export function statusOf(latest: Latest | undefined, online: boolean | null): Ta
   if (latest.latest_kind === TaskEventKind.ApprovalRequested) return "waiting";
   // A restart cut this Turn off (ADR 0033): the files are there, and a word carries it on.
   if (latest.latest_kind === TaskEventKind.TurnInterrupted) return "interrupted";
+  // The Runtime saw the Turn go quiet past its stall time (ADR 0073); the next event clears it.
+  if (latest.latest_kind === TaskEventKind.TurnStalled) return "stuck";
   if (latest.latest_kind !== TaskEventKind.TurnEnded) return "working";
   try {
     const reason = (JSON.parse(latest.latest_body ?? "null") as { reason?: unknown } | null)?.reason;

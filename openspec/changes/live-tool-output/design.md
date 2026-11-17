@@ -1,3 +1,5 @@
+> **หลังลงมือทำ (ADR 0073):** การจำกัดอัตรา `tool.output` และนาฬิกาค้างอยู่ที่ worker ไม่ใช่ supervisor เพราะ worker เป็นที่เดียวที่รู้ทั้ง output ของคำสั่งและ Approval ที่รอคนอยู่ ส่วน supervisor แค่ส่งต่อ `tool.output` ถึง Member ที่เริ่ม Task และ push ตอนค้างยังรอ `push-notifications`
+
 ## Context
 
 ดู proposal.md (Why)

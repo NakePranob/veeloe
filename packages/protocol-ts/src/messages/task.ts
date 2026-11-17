@@ -56,6 +56,21 @@ export type TaskEvent = z.infer<typeof TaskEventSchema>;
 export const TaskEventBodySchema = TaskEventSchema.extend({ agent });
 export type TaskEventBody = z.infer<typeof TaskEventBodySchema>;
 
+/**
+ * Machine → Member: the latest output of a command still running, at most once a second (ADR 0073).
+ * Not an event: it is not in the Task log, and `tool.result` still carries the whole output.
+ */
+export const ToolOutputBodySchema = z.looseObject({
+  agent,
+  toolUseId: z.string().min(1).max(128),
+  /** The end of the output so far, at most 2 KB. */
+  tail: z.string().max(4096),
+  /** How many bytes the command has written in all. */
+  bytes: z.number().int().nonnegative(),
+  elapsedMs: z.number().int().nonnegative(),
+});
+export type ToolOutputBody = z.infer<typeof ToolOutputBodySchema>;
+
 /** Controller → Machine: the Task's events after `after`. */
 export const TaskSyncBodySchema = z.looseObject({ agent, after: z.number().int().nonnegative() });
 export type TaskSyncBody = z.infer<typeof TaskSyncBodySchema>;
@@ -91,6 +106,8 @@ export const TaskEventKind = {
   TurnStopped: "turn.stopped",
   /** `{ reason: "restart" }`: the worker started again with this Turn still open (ADR 0033). */
   TurnInterrupted: "turn.interrupted",
+  /** `{ since }`: the Turn has been quiet for the stall time, no event and no output since `since` (ADR 0073). */
+  TurnStalled: "turn.stalled",
   /** `{ request, command, parts, expiresAt }`: the worker asks for an Approval and waits. */
   ApprovalRequested: "approval.requested",
   /** `{ request, member, decision, message? }`: who answered and how. */

@@ -170,6 +170,26 @@ impl PluginHost {
     }
 }
 
+/// Where a tool reports output while it is still running (ADR 0073). The caller
+/// sets it around one call with [`with_progress`]; a tool takes it with
+/// [`progress`] before it spawns its readers, since a spawned task does not
+/// inherit it. A tool with no caller watching just gets `None`.
+pub type Progress = Arc<dyn Fn(&[u8]) + Send + Sync>;
+
+tokio::task_local! {
+    static PROGRESS: Progress;
+}
+
+/// Runs `call` with `sink` as the place its tool reports output.
+pub async fn with_progress<F: std::future::Future>(sink: Progress, call: F) -> F::Output {
+    PROGRESS.scope(sink, call).await
+}
+
+/// The sink the caller set for this call, if any.
+pub fn progress() -> Option<Progress> {
+    PROGRESS.try_with(Arc::clone).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

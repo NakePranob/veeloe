@@ -34,6 +34,7 @@ test("an Agent waiting on its Owner, failed or interrupted needs you; not starte
   expect(tabOf("waiting")).toBe("needsYou");
   expect(tabOf("failed")).toBe("needsYou");
   expect(tabOf("interrupted")).toBe("needsYou");
+  expect(tabOf("stuck")).toBe("needsYou");
   expect(tabOf("working")).toBe("working");
   expect(tabOf("done")).toBe("done");
   expect(tabOf("new")).toBeNull();

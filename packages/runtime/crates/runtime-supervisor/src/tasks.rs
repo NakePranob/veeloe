@@ -237,6 +237,25 @@ pub fn forward(outbox: &dyn Outbox, agent: &str, message: FromWorker) {
             }),
             Some(&task),
         ),
+        FromWorker::ToolOutput {
+            task,
+            starter,
+            tool_use_id,
+            tail,
+            bytes,
+            elapsed_ms,
+        } => outbox.to_member(
+            &starter,
+            "tool.output",
+            json!({
+                "agent": agent,
+                "toolUseId": tool_use_id,
+                "tail": tail,
+                "bytes": bytes,
+                "elapsedMs": elapsed_ms,
+            }),
+            Some(&task),
+        ),
         FromWorker::Error {
             member,
             reference,

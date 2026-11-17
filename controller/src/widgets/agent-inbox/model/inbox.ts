@@ -5,7 +5,7 @@ export type InboxTask = Latest & { id: string; agent_id: string; updated_at: num
 
 // The prototype's order: an Approval waiting or a Turn a restart cut off needs a person, so it comes
 // first; then a Turn still running; then the finished ones, by time; then the ones never started.
-const ORDER: Record<TaskStatus, number> = { waiting: 0, interrupted: 0, working: 1, failed: 2, done: 2, new: 3, offline: 4 };
+const ORDER: Record<TaskStatus, number> = { waiting: 0, interrupted: 0, stuck: 0, working: 1, failed: 2, done: 2, new: 3, offline: 4 };
 
 /**
  * One row per Agent, as the prototype's Inbox has it: the Agent's latest Task,
@@ -25,7 +25,7 @@ export type InboxTab = "all" | "needsYou" | "working" | "done";
 
 /** Which tab an Agent shows in besides All: one waiting on an Approval, failed or interrupted needs its Owner; one not started or offline is in All only. */
 export function tabOf(status: TaskStatus): Exclude<InboxTab, "all"> | null {
-  if (status === "waiting" || status === "failed" || status === "interrupted") return "needsYou";
+  if (status === "waiting" || status === "stuck" || status === "failed" || status === "interrupted") return "needsYou";
   if (status === "working") return "working";
   if (status === "done") return "done";
   return null;

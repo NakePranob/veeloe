@@ -1695,3 +1695,137 @@ async fn a_long_turn_is_summarized_and_the_next_request_sees_the_summary() {
     let events = harness.core.events("t1").expect("events");
     assert!(events.iter().any(|event| event.kind == "context.compacted"));
 }
+
+/// A bash tool that writes three lines of output as it runs (ADR 0073).
+struct Chatty;
+
+#[async_trait]
+impl ToolRunner for Chatty {
+    fn definitions(&self) -> Vec<ToolDefinition> {
+        vec![definition("bash")]
+    }
+
+    async fn run(
+        &self,
+        _name: &str,
+        _input: &Value,
+        _cancel: &Cancel,
+    ) -> Result<String, ToolError> {
+        let sink = veeloe_plugin_api::progress().expect("the worker watches bash output");
+        for line in ["line 1\n", "line 2\n", "line 3\n"] {
+            sink(line.as_bytes());
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        Ok("line 1\nline 2\nline 3\nexit code: 0".into())
+    }
+}
+
+fn outputs(harness: &Harness) -> Vec<(String, String, u64)> {
+    harness
+        .link
+        .take()
+        .into_iter()
+        .filter_map(|message| match message {
+            FromWorker::ToolOutput {
+                tool_use_id,
+                tail,
+                bytes,
+                ..
+            } => Some((tool_use_id, tail, bytes)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_running_command_sends_its_output_live_at_most_once_a_second_and_none_of_it_is_logged() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "tu-test",
+                "bash",
+                json!({ "command": "cargo test" }),
+            )),
+            Ok(text("done")),
+        ],
+        runners: vec![Arc::new(Chatty)],
+        allowlist: vec!["cargo test".into()],
+        ..Setup::default()
+    });
+    harness.core.receive(message("test")).expect("receive");
+    harness.core.idle().await;
+
+    // Three chunks inside one second: only the first goes out, and the result still has them all.
+    assert_eq!(
+        outputs(&harness),
+        vec![("tu-test".to_string(), "line 1\n".to_string(), 7)]
+    );
+    let events = harness.core.events("t1").expect("events");
+    assert!(events.iter().all(|event| event.kind != "tool.output"));
+    let result = events
+        .iter()
+        .find(|event| event.kind == "tool.result")
+        .expect("result");
+    assert!(result.body.to_string().contains("line 3"));
+}
+
+#[tokio::test]
+async fn a_turn_quiet_past_the_stall_time_is_written_down_once() {
+    let mut harness = setup(Setup {
+        replies: vec![Ok(tool_use(
+            "tu-sleep",
+            "bash",
+            json!({ "command": "sleep 1000" }),
+        ))],
+        runners: vec![Arc::new(Hanging)],
+        allowlist: vec!["sleep 1000".into()],
+        ..Setup::default()
+    });
+    harness.core = harness.core.with_stall_after(Duration::from_millis(40));
+    harness.core.receive(message("run")).expect("receive");
+    wait_for_kind(&harness, "t1", "turn.stalled").await;
+    // Still quiet: no second stall for the same stretch.
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let events = harness.core.events("t1").expect("events");
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.kind == "turn.stalled")
+            .count(),
+        1
+    );
+    assert!(events
+        .iter()
+        .any(|event| event.kind == "turn.stalled" && event.body.get("since").is_some()));
+    harness.core.receive(stop("stop-1")).expect("stop");
+    harness.core.idle().await;
+}
+
+#[tokio::test]
+async fn waiting_on_an_approval_is_not_a_stall() {
+    let ran = Arc::new(Mutex::new(Vec::new()));
+    let mut harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "tu-rm",
+                "bash",
+                json!({ "command": "rm -rf dist" }),
+            )),
+            Ok(text("ok")),
+        ],
+        runners: vec![Arc::new(Bash { ran })],
+        timeout_ms: Some(60_000),
+        ..Setup::default()
+    });
+    harness.core = harness.core.with_stall_after(Duration::from_millis(30));
+    harness.core.receive(message("clean")).expect("receive");
+    let request = wait_for_requested(&harness).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let events = harness.core.events("t1").expect("events");
+    assert!(events.iter().all(|event| event.kind != "turn.stalled"));
+    harness
+        .core
+        .receive(approval(&request, ApprovalDecision::Deny))
+        .expect("answer");
+    harness.core.idle().await;
+}

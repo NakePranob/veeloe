@@ -159,6 +159,17 @@ pub enum FromWorker {
     /// The worker has closed every Turn a restart left open and takes work now.
     #[serde(rename = "ready")]
     Ready,
+    /// The latest output of a command still running, for the Member who
+    /// started the Task. Not an event: it goes out live and is never logged (ADR 0073).
+    #[serde(rename = "tool.output")]
+    ToolOutput {
+        task: String,
+        starter: String,
+        tool_use_id: String,
+        tail: String,
+        bytes: u64,
+        elapsed_ms: u64,
+    },
     /// A new event, for the Member who started the Task.
     #[serde(rename = "event")]
     Event {

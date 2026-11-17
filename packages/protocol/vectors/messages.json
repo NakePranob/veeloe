@@ -169,6 +169,41 @@
       "valid": true
     },
     {
+      "name": "the output of a running command",
+      "type": "tool.output",
+      "body": {
+        "agent": "agent-1",
+        "toolUseId": "toolu_1",
+        "tail": "test relay::timeout ... ok\n",
+        "bytes": 5120,
+        "elapsedMs": 42000
+      },
+      "valid": true
+    },
+    {
+      "name": "output with no tool id",
+      "type": "tool.output",
+      "body": {
+        "agent": "agent-1",
+        "tail": "x",
+        "bytes": 1,
+        "elapsedMs": 0
+      },
+      "valid": false
+    },
+    {
+      "name": "output with a negative byte count",
+      "type": "tool.output",
+      "body": {
+        "agent": "agent-1",
+        "toolUseId": "toolu_1",
+        "tail": "x",
+        "bytes": -1,
+        "elapsedMs": 0
+      },
+      "valid": false
+    },
+    {
       "name": "update the name",
       "type": "agent.update",
       "body": {

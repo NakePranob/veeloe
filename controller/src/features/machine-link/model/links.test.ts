@@ -519,3 +519,14 @@ test("a Machine's error about a memory request fails that request and leaves the
   expect(links.memory("machine-1", "a1").loading).toBe(false);
   expect(links.memory("machine-1", "a1").memory).toBeNull();
 });
+
+test("a running command's output is kept in memory by its tool call and the newest one wins", async () => {
+  const { fake, links } = await setup();
+  await until(() => fake.hub.frames.length >= 2);
+  expect(links.output("toolu_1").at).toBe(0);
+  fake.push(signed("tool.output", { agent: "a1", toolUseId: "toolu_1", tail: "test a ... ok\n", bytes: 14, elapsedMs: 1000 }, { seq: 1 }));
+  await until(() => links.output("toolu_1").at > 0);
+  fake.push(signed("tool.output", { agent: "a1", toolUseId: "toolu_1", tail: "test b ... ok\n", bytes: 28, elapsedMs: 2000 }, { seq: 2 }));
+  await until(() => links.output("toolu_1").bytes === 28);
+  expect(links.output("toolu_1")).toMatchObject({ tail: "test b ... ok\n", elapsedMs: 2000 });
+});
