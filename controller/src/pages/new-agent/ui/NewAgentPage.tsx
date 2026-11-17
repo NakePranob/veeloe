@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
-import { Character, lookOfJson, shuffleLook } from "../../../entities/character";
+import { Character, lookOfJson, shuffleLook, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
@@ -65,11 +65,16 @@ export function NewAgentPage() {
 
   const tick = <Icon name="check" size="md" color="label" weight="semibold" />;
   return (
-    <Screen title={t("new")} right={{ label: t("createShort"), onPress: create, disabled: !ready }}>
-      <View style={{ alignItems: "center", gap: space.sm }}>
-        <Character look={look} mood="idle" size={96} />
-        <Button label={t("shuffle")} onPress={() => setLook(shuffleLook(others()))} />
-      </View>
+    <Screen title={t("new")} bottom={<Button label={t("create")} variant="primary" onPress={create} disabled={!ready} />}>
+      {/* The new Agent's head on a stage in its colour, the dice floating beside it, as on the board. */}
+      <Stage color={look.color}>
+        <View style={{ alignSelf: "stretch", alignItems: "center" }}>
+          <Character look={look} mood="idle" size={120} />
+          <View style={{ position: "absolute", right: space.sm, top: space.sm }}>
+            <Button label={t("shuffle")} icon="shuffle" variant="floating" onPress={() => setLook(shuffleLook(others()))} />
+          </View>
+        </View>
+      </Stage>
       <Section footer={t("characterLater")}>
         <Field label={t("name")} value={name} onChangeText={setName} placeholder={t("namePlaceholder")} />
       </Section>

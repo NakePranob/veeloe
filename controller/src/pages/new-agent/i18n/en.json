@@ -35,5 +35,6 @@
     "count_one": "{{count}} entry",
     "count_other": "{{count}} entries"
   },
-  "characterLater": "You can change the Character later on the Agent's page."
+  "characterLater": "You can change the Character later on the Agent's page.",
+  "create": "Create Agent"
 }

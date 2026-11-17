@@ -6,7 +6,7 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus, useMemoryStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Empty, Note, Screen, Section, Spinner, Text, space } from "../../../shared/ui";
+import { Empty, Note, Screen, Section, Spinner, Text, space , Icon } from "../../../shared/ui";
 
 // The count is shown against the same cap `runtime-core` applies to the prompt. It is fixed in
 // v0.1 (ADR 0036), so it lives here as a constant: when `MEMORY_LIMIT` moves, this must move too.
@@ -46,7 +46,7 @@ export function MemoryPage() {
       title={t("title")}
       right={
         machine && agent
-          ? { label: t("refresh"), variant: "ghost", onPress: () => void link?.requestMemory(machine, agent.id) }
+          ? { label: t("refresh"), icon: "refresh", onPress: () => void link?.requestMemory(machine, agent.id) }
           : undefined
       }
     >
@@ -73,9 +73,13 @@ export function MemoryPage() {
       {memory?.exists && (
         <Section title={t("heading")}>
           <View style={{ gap: space.sm, padding: space.sm }}>
-            <Text variant="footnote" tone="secondary">
-              {t("count", { chars: memory.chars, limit: MEMORY_LIMIT })}
-            </Text>
+            {/* The file it is, as on the board's Memory card. */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
+              <Icon name="memory" size="sm" color="secondaryLabel" />
+              <Text variant="footnote" mono tone="secondary">
+                MEMORY.md
+              </Text>
+            </View>
             {memory.chars > MEMORY_LIMIT && (
               <Text variant="footnote" tone="secondary">
                 {t("capped", { limit: MEMORY_LIMIT })}
@@ -95,6 +99,7 @@ export function MemoryPage() {
       )}
       {memory && status.fetchedAt ? (
         <Text variant="footnote" tone="secondary" style={{ paddingHorizontal: space.sm }}>
+          {memory.exists ? `${t("count", { chars: memory.chars, limit: MEMORY_LIMIT })} · ` : ""}
           {t("fetched", { when: when(status.fetchedAt, language, now) })}
         </Text>
       ) : null}

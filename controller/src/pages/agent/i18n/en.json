@@ -19,7 +19,8 @@
     "spent": " · used up",
     "field": "Budget per day (million tokens)",
     "default": "The Budget starts at 10M tokens a day. You can change it later on the Agent's page (ADR 0043).",
-    "list": "Today's Budget {{percent}}%"
+    "list": "Today's Budget {{percent}}%",
+    "of": "of {{budget}} tokens"
   },
   "tasks": {
     "new": "New Task",
@@ -49,7 +50,8 @@
   "saving": "Saving on the Machine",
   "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",
   "character": {
-    "detail": "How it looks and moves in the Inbox"
+    "detail": "How it looks and moves in the Inbox",
+    "edit": "Edit the Character"
   },
   "problem": {
     "provider": "Provider {{provider}} is no longer on the Machine, so this Agent can't answer. Pick a new Provider below.",

@@ -76,6 +76,7 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
         {allowlist.map((item) => (
           <Row key={item} title={item} mono icon="shield" accessory={<Button
             label={t("remove")}
+            variant="destructive"
             disabled={offline}
             onPress={() => void save(
               allowlist.filter((other) => other !== item),
@@ -86,10 +87,7 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
       </Section>
 
       <Section title={t("add.heading")} footer={t("add.footer")}>
-        <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono />
-        <View style={{ alignItems: "flex-start", padding: space.sm }}>
-          <Button label={t("add.action")} variant="primary" disabled={!draft || offline} onPress={add} />
-        </View>
+        <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono action={{ label: t("add.action"), onPress: () => void add(), disabled: !draft || offline }} />
       </Section>
 
       <Section title={t("try.heading")} footer={draft && !validDraft ? t("try.invalidDraft") : t("try.footer")}>

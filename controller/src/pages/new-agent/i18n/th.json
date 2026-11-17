@@ -35,5 +35,6 @@
     "count_one": "{{count}} รายการ",
     "count_other": "{{count}} รายการ"
   },
-  "characterLater": "Character แก้ทีหลังได้ที่หน้าของ Agent"
+  "characterLater": "Character แก้ทีหลังได้ที่หน้าของ Agent",
+  "create": "สร้าง Agent"
 }

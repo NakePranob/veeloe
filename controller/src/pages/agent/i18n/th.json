@@ -19,7 +19,8 @@
     "spent": " · หมดแล้ว",
     "field": "Budget ต่อวัน (ล้าน token)",
     "default": "Budget เริ่มต้นที่ 10M token ต่อวัน ตั้งทีหลังได้ที่หน้าของ Agent (ADR 0043)",
-    "list": "Budget วันนี้ {{percent}}%"
+    "list": "Budget วันนี้ {{percent}}%",
+    "of": "จาก {{budget}} token"
   },
   "tasks": {
     "new": "Task ใหม่",
@@ -49,7 +50,8 @@
   "saving": "กำลังบันทึกบน Machine",
   "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",
   "character": {
-    "detail": "หน้าตาและท่าทางที่แสดงใน Inbox"
+    "detail": "หน้าตาและท่าทางที่แสดงใน Inbox",
+    "edit": "แต่ง Character"
   },
   "problem": {
     "provider": "Provider {{provider}} ไม่อยู่บน Machine แล้ว Agent นี้จึงตอบไม่ได้ เลือก Provider ใหม่ด้านล่าง",

@@ -37,6 +37,8 @@ const SYMBOLS = {
   trash: { ios: "trash", android: "delete", web: "delete" },
   memory: { ios: "brain.head.profile", android: "psychology", web: "psychology" },
   // A git repo an Agent may use (issue #32).
+  refresh: { ios: "arrow.clockwise", android: "refresh", web: "refresh" },
+  edit: { ios: "pencil", android: "edit", web: "edit" },
   // Draw a new random look.
   shuffle: { ios: "dice", android: "casino", web: "casino" },
   branch: { ios: "arrow.triangle.branch", android: "fork_right", web: "fork_right" },

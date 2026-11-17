@@ -7,9 +7,9 @@
 
 ## 2. กลุ่ม Agent
 
-- [ ] 2.1 ทำกระดานของหน้า Agent, แก้ Character, Memory, Provider และ model, Allowlist, git repo และสร้าง Agent ให้ครบทุก state จาก i18n ของแต่ละ slice และลบข้อมูลแต่ง (บันทึกของวันนี้ใน Memory); ตรวจตามรายการใน design.md ข้อ 2
-- [ ] 2.2 ปรับหน้า Agent ตามกระดาน: Character พร้อมปุ่มแก้, บรรทัด Machine และ model ใต้หัว, Task พร้อมไอคอนสถานะ และ Section ที่ใช้ `Row` ไอคอนเปล่าแบบหน้าอื่น; ตรวจบน iOS Simulator และ web ทั้งสองโหมดและสองภาษา
-- [ ] 2.3 ปรับหน้า Memory, Provider และ model, Allowlist, git repo และสร้าง Agent ตามกระดาน (ใช้ `Field` คู่ปุ่มในหน้ารายการ); ตรวจแต่ละหน้าบน iOS Simulator และ web ทั้งสองโหมดและสองภาษา
+- [x] 2.1 ทำกระดานของหน้า Agent, แก้ Character, Memory, Provider และ model, Allowlist, git repo และสร้าง Agent ให้ครบทุก state จาก i18n ของแต่ละ slice และลบข้อมูลแต่ง (บันทึกของวันนี้ใน Memory); ตรวจตามรายการใน design.md ข้อ 2
+- [x] 2.2 ปรับหน้า Agent ตามกระดาน: Character พร้อมปุ่มแก้, บรรทัด Machine และ model ใต้หัว, Task พร้อมไอคอนสถานะ และ Section ที่ใช้ `Row` ไอคอนเปล่าแบบหน้าอื่น; ตรวจบน iOS Simulator และ web ทั้งสองโหมดและสองภาษา
+- [x] 2.3 ปรับหน้า Memory, Provider และ model, Allowlist, git repo และสร้าง Agent ตามกระดาน (ใช้ `Field` คู่ปุ่มในหน้ารายการ); ตรวจแต่ละหน้าบน iOS Simulator และ web ทั้งสองโหมดและสองภาษา
 
 ## 3. กลุ่ม Workspace
 

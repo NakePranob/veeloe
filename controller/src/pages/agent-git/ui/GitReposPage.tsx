@@ -75,6 +75,7 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
         {repos.map((repo) => (
           <Row key={repo} title={repo} mono icon="branch" accessory={<Button
             label={t("remove")}
+            variant="destructive"
             disabled={locked}
             onPress={() => void save(
               repos.filter((other) => other !== repo),
@@ -85,10 +86,7 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
       </Section>
 
       <Section title={t("add.heading")} footer={t("add.footer")}>
-        <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono />
-        <View style={{ alignItems: "flex-start", padding: space.sm }}>
-          <Button label={t("add.action")} variant="primary" disabled={!entry.trim() || locked} onPress={add} />
-        </View>
+        <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono action={{ label: t("add.action"), onPress: add, disabled: !entry.trim() || locked }} />
       </Section>
     </Screen>
   );

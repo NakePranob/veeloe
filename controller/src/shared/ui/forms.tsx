@@ -1,4 +1,5 @@
 import { Link, Stack } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, Switch, TextInput, View, type KeyboardTypeOptions } from "react-native";
 import { Card } from "./card";
@@ -12,12 +13,15 @@ interface ScreenProps {
   title: string;
   // Goes on the header's right, such as a save or add action.
   right?: { label: string; onPress: () => void; disabled?: boolean; icon?: IconName; variant?: "primary" | "chip" | "ghost" };
+  // The one action the screen is for, pinned under the content, clear of the home indicator.
+  bottom?: ReactNode;
   children: ReactNode;
 }
 
 // A settings-style screen: the platform's header over a scrolling column of sections.
-export function Screen({ title, right, children }: ScreenProps) {
-  return (
+export function Screen({ title, right, bottom, children }: ScreenProps) {
+  const insets = useSafeAreaInsets();
+  const scroll = (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       // Room for the keyboard on iOS, so a field near the end of a screen can scroll above it.
@@ -30,6 +34,13 @@ export function Screen({ title, right, children }: ScreenProps) {
       {right && <HeaderAction {...right} />}
       {children}
     </ScrollView>
+  );
+  if (!bottom) return scroll;
+  return (
+    <View style={{ flex: 1 }}>
+      {scroll}
+      <View style={[column, { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm }]}>{bottom}</View>
+    </View>
   );
 }
 

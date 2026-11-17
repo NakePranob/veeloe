@@ -6,17 +6,29 @@ import { APPROVAL_TIMEOUT_S_DEFAULT, APPROVAL_TIMEOUT_S_MAX, APPROVAL_TIMEOUT_S_
 import { allowlistOf, approvalTimeoutOf, gitReposOf, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { previewOf, statusOf, useTaskSummaries } from "../../../entities/task";
+import { previewOf, statusOf, useTaskSummaries, type TaskStatus } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatTokens, useNow, when } from "../../../shared/lib";
-import { Empty, Field, Icon, Meter, Note, Row, Screen, Section, Spinner, Text, confirm, inform, space } from "../../../shared/ui";
+import { Button, Empty, Field, Icon, Meter, Note, Row, Screen, Section, Spinner, Text, confirm, font, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
 
-// controller-prototype's AgentPage: the Agent's Tasks first, then its settings.
+// What each Task is doing, as an icon on its row (the redesign's Agent board).
+function TaskIcon({ status }: { status: TaskStatus }) {
+  if (status === "working") return <Spinner />;
+  if (status === "done") return <Icon name="done" size="md" color="green" />;
+  if (status === "failed") return <Icon name="failed" size="md" color="red" />;
+  if (status === "waiting") return <Icon name="approval" size="md" color="orange" />;
+  if (status === "stuck") return <Icon name="warning" size="md" color="orange" />;
+  if (status === "interrupted") return <Icon name="stopped" size="md" color="secondaryLabel" />;
+  if (status === "offline") return <Icon name="offline" size="md" color="secondaryLabel" />;
+  return <Icon name="thread" size="md" color="secondaryLabel" />;
+}
+
+// The redesign's Agent board: the Agent's Tasks first, then its settings.
 // ponytail: only what this version has. Description, instructions, Memory, Skill and the rest come with their changes.
 function AgentView({ agent }: { agent: AgentRow }) {
   const t = useT("agent");
@@ -91,12 +103,25 @@ function AgentView({ agent }: { agent: AgentRow }) {
 
   return (
     <Screen title={agent.name} right={{ label: t("save"), onPress: save, disabled: !canSave }}>
-      <View style={{ alignItems: "center", gap: space.xs }}>
-        <Character look={lookOfJson(agent.character)} mood={moodOf([], online)} size={96} />
-        <Text variant="footnote" tone="secondary">
-          {machine?.name}
-          {online === null ? "" : ` · ${t(online ? "online" : "offline")}`}
-        </Text>
+      <View style={{ alignItems: "center", gap: space.sm }}>
+        <View>
+          <Character look={lookOfJson(agent.character)} mood={moodOf([], online)} size={120} />
+          {/* The pencil opens the Character editor, as the Character row does. */}
+          <View style={{ position: "absolute", right: 0, bottom: space.md }}>
+            <Button label={t("character.edit")} icon="edit" variant="primary" onPress={() => router.push(`/agents/${agent.id}/character`)} />
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
+          {online !== null && <Icon name={online ? "done" : "offline"} size="xs" color={online ? "green" : "tertiaryLabel"} />}
+          <Text variant="footnote" tone="secondary">
+            {machine?.name}
+            {online === null ? "" : ` · ${t(online ? "online" : "offline")}`}
+            {" · "}
+          </Text>
+          <Text variant="caption" tone="secondary" mono>
+            {agent.model}
+          </Text>
+        </View>
       </View>
       {offline && (
         <Note icon="offline" iconColor="orange">
@@ -114,10 +139,9 @@ function AgentView({ agent }: { agent: AgentRow }) {
         {tasks.map((task) => (
           <Row
             key={task.id}
-            icon="thread"
+            leading={<TaskIcon status={statusOf(task, online)} />}
             title={previewOf(task) || t("tasks.untitled")}
-            detail={status(statusOf(task, online))}
-            value={task.events ? when(task.updated_at, language, now) : undefined}
+            detail={task.events ? `${status(statusOf(task, online))} · ${when(task.updated_at, language, now)}` : status(statusOf(task, online))}
             href={`/tasks/${task.id}?agent=${agent.id}`}
           />
         ))}
@@ -139,18 +163,22 @@ function AgentView({ agent }: { agent: AgentRow }) {
         />
       </Section>
 
-      <Section title={t("more.heading")}>
+      <Section title={t("more.heading")} footer={t("provider.nextTask")}>
         <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} />
         <Row icon="branch" title={t("git.row")} value={gitReposOf(agent) === null ? t("git.unsupported") : t("git.count", { count: gitReposOf(agent)!.length })} href={`/agents/${agent.id}/git`} />
-      </Section>
-
-      <Section title={t("provider.heading")} footer={t("provider.nextTask")}>
-        <Row icon="key" title={problem === "provider" ? t("problem.choose") : agent.provider} detail={agent.model} href={`/agents/${agent.id}/model`} />
+        <Row icon="key" title={t("provider.heading")} detail={problem === "provider" ? t("problem.choose") : `${agent.provider} · ${agent.model}`} href={`/agents/${agent.id}/model`} />
       </Section>
 
       <Section title={t("budget.heading")} footer={t("budget.footer")}>
         {agent.budget !== null && (
           <View style={{ gap: space.sm, padding: space.sm }}>
+            {/* The day so far, large, then the bar: the board's Budget card. */}
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.xs }}>
+              <Text style={{ fontFamily: font.display, fontSize: 26 }}>{formatTokens(agent.usage_tokens ?? 0)}</Text>
+              <Text variant="subheadline" tone="secondary">
+                {t("budget.of", { budget: formatTokens(agent.budget) })}
+              </Text>
+            </View>
             <Meter value={share} label={t("budget.label")} />
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
               {share >= 0.8 && <Icon name="info" size="sm" color={share >= 1 ? "red" : "orange"} />}
