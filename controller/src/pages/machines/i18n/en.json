@@ -68,5 +68,6 @@
       "body": "Enter a domain name only, such as github.com or *.npmjs.org, without https:// or a path."
     },
     "duplicate": "This domain is already listed"
-  }
+  },
+  "listLine": "Runtime {{version}} · {{agents}}"
 }

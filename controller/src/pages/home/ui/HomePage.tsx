@@ -1,18 +1,31 @@
 import { router, Stack } from "expo-router";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Character, COLORS, type Look } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { useT } from "../../../shared/i18n";
-import { Button, HeaderAction, Icon, space, Text, useSplit } from "../../../shared/ui";
+import { Button, Centered, Icon, space, Text, useSplit } from "../../../shared/ui";
 import { AgentInbox } from "../../../widgets/agent-inbox";
+
+// The board's Character on the Welcome state: Veeloe's own head, not an Agent's.
+const WELCOME: Look = { color: COLORS[0], shell: "box", top: "antenna", sides: "none", decal: "none" };
 
 export function HomePage() {
   const t = useT("home");
   const machines = useMachines();
   const split = useSplit();
+  const insets = useSafeAreaInsets();
+  // The board's own header: "Veeloe" large on the left, Workspace and a new Agent as round buttons on the right.
   const header = (
     <>
-      <Stack.Screen options={{ title: t("title") }} />
-      <HeaderAction label="Workspace" icon="settings" onPress={() => router.navigate("/workspace")} />
+      <Stack.Screen options={{ title: t("title"), headerShown: false }} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingTop: insets.top + space.xs, paddingLeft: 22, paddingRight: space.lg, paddingBottom: space.md }}>
+        <Text variant="largeTitle" style={{ flex: 1 }}>
+          {t("title")}
+        </Text>
+        <Button label="Workspace" icon="settings" onPress={() => router.navigate("/workspace")} />
+        {machines && machines.length > 0 && <Button label={t("newAgent")} icon="add" variant="primary" onPress={() => router.push("/agents/new")} />}
+      </View>
     </>
   );
 
@@ -21,25 +34,22 @@ export function HomePage() {
   // Mail with no accounts: the screen says what will be here, and how to get it there.
   if (machines.length === 0) {
     return (
-      // "automatic" adds the header's height on top of a container already as tall as the screen, which pushes centred content down on iOS.
-      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: space.xl }}>
+      <Centered>
         {!split && header}
-        <View style={{ alignItems: "center", gap: space.lg }}>
-          <View style={{ alignItems: "center", gap: space.sm }}>
-            <Icon name="machine" size="xl" />
-            <Text variant="headline" style={{ textAlign: "center" }}>
-              {t("empty.title")}
-            </Text>
-            <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
-              {t("empty.body")}
-            </Text>
-          </View>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: space.sm }}>
-            <Button label={t("add")} variant="primary" onPress={() => router.navigate("/add-machine")} />
-            <Button label={t("link")} onPress={() => router.navigate("/link")} />
-          </View>
+        <View style={{ flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.md }}>
+          <Character look={WELCOME} mood="idle" size={150} />
+          <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
+            {t("empty.title")}
+          </Text>
+          <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
+            {t("empty.body")}
+          </Text>
         </View>
-      </ScrollView>
+        <View style={{ alignSelf: "stretch", gap: 10, paddingBottom: insets.bottom }}>
+          <Button label={t("add")} variant="primary" size="large" onPress={() => router.navigate("/add-machine")} />
+          <Button label={t("link")} size="large" onPress={() => router.navigate("/link")} />
+        </View>
+      </Centered>
     );
   }
 

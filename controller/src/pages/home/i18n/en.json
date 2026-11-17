@@ -6,5 +6,6 @@
   },
   "add": "Add Machine",
   "link": "Use with a device I already have",
-  "pick": "Pick an Agent on the left to open its Task"
+  "pick": "Pick an Agent on the left to open its Task",
+  "newAgent": "New Agent"
 }

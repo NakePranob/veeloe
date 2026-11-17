@@ -5,14 +5,15 @@ import { FlatList, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { latestEvents, previewOf, TaskStatusLabel, useTaskSummaries, type TaskStatus, type TaskSummary } from "../../../entities/task";
+import { latestEvents, previewOf, useTaskSummaries, type TaskStatus, type TaskSummary } from "../../../entities/task";
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Button, Empty, Icon, Tabs, Tap, Text, column, radius, space } from "../../../shared/ui";
+import { Button, Empty, Tabs, Tap, Text, column, font, space } from "../../../shared/ui";
 import { countsOf, inboxRows, rowsOf, type InboxTab } from "../model/inbox";
 
-const AVATAR = 44;
+// The board's row: a 60pt head, the name, one line, and on the right the answer pill or the time.
+const AVATAR = 60;
 
 interface RowProps {
   agent: AgentRow;
@@ -26,7 +27,6 @@ interface RowProps {
   replace?: boolean;
 }
 
-// Laid out like Mail: sender and time, a status line, then two lines of preview.
 function InboxRow({ agent, machine, online, task, status, now, selected, replace }: RowProps) {
   const t = useT("agent-inbox");
   const language = useLanguage();
@@ -36,10 +36,10 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
     if (replace) router.replace(href);
     else router.push(href);
   };
+  const quiet = status === "working" || status === "offline";
+  const line = status === "offline" ? t("offline", { machine }) : (task && previewOf(task)) || t("start", { name: agent.name });
   return (
-    // An inset rounded highlight, as in an iPadOS sidebar, so it sits inside the card's
-    // curve rather than cutting across it; content still lines up at space.lg.
-    <Tap onPress={open} selected={selected} style={{ flexDirection: "row", gap: space.md, marginHorizontal: space.sm, paddingHorizontal: space.sm, paddingVertical: space.md }}>
+    <Tap onPress={open} selected={selected} style={{ flexDirection: "row", alignItems: "center", gap: space.md, marginHorizontal: 10, paddingHorizontal: space.md, paddingVertical: space.sm }}>
       {({ pressed }) => (
         <>
           <Character
@@ -49,26 +49,24 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
             // What the row is painted with: the sidebar card in split view, else the screen.
             backdrop={pressed ? "chipPressed" : selected ? "chip" : replace ? "card" : "background"}
           />
-          <View style={{ flex: 1, gap: space.xs / 2 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-              <Text variant="headline" numberOfLines={1} style={{ flexShrink: 1 }}>
-                {agent.name}
-              </Text>
-              <Text variant="subheadline" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
-                {machine}
-              </Text>
-              {task && task.events > 0 && (
-                <Text variant="subheadline" tone="secondary">
-                  {when(task.updated_at, language, now)}
-                </Text>
-              )}
-              {!replace && <Icon name="disclosure" size="xs" color="tertiaryLabel" weight="semibold" />}
-            </View>
-            <TaskStatusLabel status={status} />
-            <Text variant="subheadline" tone="secondary" numberOfLines={2}>
-              {(task && previewOf(task)) || t("start", { name: agent.name })}
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text strong numberOfLines={1} tone={status === "offline" ? "secondary" : "label"} style={{ fontFamily: font.bold }}>
+              {agent.name}
+            </Text>
+            <Text variant="subheadline" tone={quiet ? "secondary" : "label"} numberOfLines={1} style={{ fontSize: 14 }}>
+              {line}
             </Text>
           </View>
+          {/* Waiting on an Approval: the answer is one tap away, as the board's pill says; the row opens the chat. */}
+          {status === "waiting" ? (
+            <View pointerEvents="none">
+              <Button label={t("answer")} variant="primary" onPress={open} />
+            </View>
+          ) : task && task.events > 0 ? (
+            <Text variant="caption" tone="secondary">
+              {when(task.updated_at, language, now)}
+            </Text>
+          ) : null}
         </>
       )}
     </Tap>
@@ -100,7 +98,7 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
   const counts = countsOf(rows);
   const tabs =
     rows.length > 0 ? (
-      <View style={{ paddingHorizontal: space.lg, paddingBottom: space.md }}>
+      <View style={{ paddingHorizontal: space.lg, paddingBottom: 14 }}>
         <Tabs
           value={tab}
           onChange={setTab}
@@ -115,8 +113,9 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
     ) : null;
   return (
     <FlatList
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={column}
+      // The page's own header pads for the status bar, so the list adds no inset of its own.
+      contentInsetAdjustmentBehavior="never"
+      contentContainerStyle={[column, { paddingBottom: 40 }]}
       data={rowsOf(rows, tab)}
       keyExtractor={(row) => row.agent.id}
       ListHeaderComponent={

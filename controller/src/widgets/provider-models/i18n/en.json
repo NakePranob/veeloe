@@ -14,5 +14,6 @@
   },
   "modelFilter": "Search models",
   "noMatch": "No model matches",
-  "context": "{{count}}K context"
+  "context": "{{count}}K context",
+  "modelHeading": "{{provider}} models"
 }

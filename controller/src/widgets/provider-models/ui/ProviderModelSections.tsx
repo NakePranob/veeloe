@@ -60,7 +60,7 @@ export function ProviderModelSections({
       </Section>
 
       {models.length > 0 && (
-        <Section title="model">
+        <Section title={t("modelHeading", { provider: chosen?.name ?? "" })}>
           {models.length > 8 && <Field label={t("modelFilter")} value={filter} onChangeText={setFilter} mono />}
           {matching.map((m) => {
             const context = m.contextWindow ? t("context", { count: Math.round(m.contextWindow / 1000) }) : undefined;

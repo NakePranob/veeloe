@@ -63,9 +63,6 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
 
   return (
     <Screen title={t("title")}>
-      <Note icon="info" iconColor="orange">
-        {t("notAWall")}
-      </Note>
       {offline && (
         <Note icon="offline" iconColor="orange">
           {t("offline")}
@@ -74,7 +71,7 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
       <Section title={t("runs.heading")} footer={t("runs.footer")}>
         {allowlist.length === 0 && <Row title={t("runs.empty")} detail={t("runs.emptyDetail")} />}
         {allowlist.map((item) => (
-          <Row key={item} title={item} mono icon="shield" accessory={<Button
+          <Row key={item} title={item} mono accessory={<Button
             label={t("remove")}
             variant="destructive"
             disabled={offline}
@@ -113,6 +110,10 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
           </Text>
         </View>
       </Section>
+      {/* The board closes with this warning, under the sections. */}
+      <Note icon="info" iconColor="orange">
+        {t("notAWall")}
+      </Note>
     </Screen>
   );
 }

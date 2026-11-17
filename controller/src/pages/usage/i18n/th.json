@@ -29,5 +29,12 @@
   "empty": {
     "title": "ยังไม่มีข้อมูล",
     "body": "เปิด Machine แล้วกดลองใหม่อีกครั้ง"
-  }
+  },
+  "today": "วันนี้ · ทุก Machine",
+  "all": "ทุก Machine",
+  "byMachine": "ตาม Machine",
+  "byAgent": "ตาม Agent",
+  "of": "{{used}} จาก {{limit}}",
+  "budget": "Budget วันนี้ {{percent}}%",
+  "spent": " · หมดแล้ว"
 }

@@ -1,7 +1,8 @@
 import { parsePairingLink, type PairingLink } from "@veeloe/protocol-ts";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { describeError, useT } from "../../../shared/i18n";
 import { Button, Card, Field, Icon, QrScanner, Spinner, Text, column, space } from "../../../shared/ui";
 import { usePairMachine } from "../model/use-pair-machine";
@@ -22,6 +23,7 @@ function openedLink({ link, machine, secret, expires, sig }: OpenedParams): stri
 
 export function AddMachinePage() {
   const t = useT("add-machine");
+  const insets = useSafeAreaInsets();
   const pair = usePairMachine();
   // Filled when the phone's camera or another app opened a veeloe://pair link.
   const params = useLocalSearchParams<OpenedParams>();
@@ -62,82 +64,117 @@ export function AddMachinePage() {
     </View>
   );
 
-  return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      contentInsetAdjustmentBehavior="automatic"
-      automaticallyAdjustKeyboardInsets
-      keyboardDismissMode="interactive"
-      contentContainerStyle={{ gap: space.lg, padding: space.xl, ...column }}
-    >
-      <Stack.Screen options={{ title: t("title") }} />
-      {pairing ? (
-        <View style={{ alignItems: "center", gap: space.sm, paddingVertical: space.xl }}>
-          <Spinner />
-          <Text variant="headline" role="heading">
-            {t("pairing.heading")}
+  const title = <Stack.Screen options={{ title: t("title") }} />;
+  const foot = (children: ReactNode) => <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm, ...column }}>{children}</View>;
+  const wide = (button: ReactNode) => <View style={{ flex: 1 }}>{button}</View>;
+
+  if (pairing) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: 36 }}>
+        {title}
+        <Spinner size="large" />
+        <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
+          {t("pairing.heading")}
+        </Text>
+        <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
+          {t("pairing.body")}
+        </Text>
+      </View>
+    );
+  }
+
+  if (link) {
+    return (
+      <View style={{ flex: 1 }}>
+        {title}
+        <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ gap: space.lg, padding: 20, ...column }}>
+          <Text variant="headline" role="heading" style={{ fontSize: 22 }}>
+            {t("confirm.heading")}
           </Text>
-          <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
-            {t("pairing.body")}
+          <Text variant="subheadline" tone="secondary">
+            {t("confirm.body")}
           </Text>
-        </View>
-      ) : link ? (
-        <>
-          <View style={{ gap: space.xs }}>
-            <Text variant="headline" role="heading">
-              {t("confirm.heading")}
-            </Text>
-            <Text variant="subheadline" tone="secondary">
-              {t("confirm.body")}
-            </Text>
-          </View>
-          <Card>
+          <Card style={{ gap: space.xs }}>
             <Text variant="footnote" tone="secondary">
               {t("confirm.hub")}
             </Text>
-            <Text selectable mono>
+            <Text selectable mono variant="footnote" style={{ marginBottom: 10 }}>
               {link.hub}
             </Text>
             <Text variant="footnote" tone="secondary">
               {t("confirm.machine")}
             </Text>
-            <Text selectable mono>
+            <Text selectable mono variant="footnote">
               {link.machine}
             </Text>
           </Card>
           {problemText}
-          <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: space.sm }}>
-            <Button
-              label={t("confirm.cancel")}
-              onPress={() => {
-                setLink(null);
-                setProblem(null);
-              }}
-            />
-            <Button label={t("confirm.action")} variant="primary" onPress={() => void confirm()} />
-          </View>
-        </>
-      ) : (
-        <>
-          <View style={{ gap: space.xs }}>
-            <Text variant="headline" role="heading">
-              {t("enter.heading")}
-            </Text>
-            <Text selectable mono>
+        </ScrollView>
+        {foot(
+          <>
+            {wide(
+              <Button
+                size="large"
+                label={t("confirm.cancel")}
+                onPress={() => {
+                  setLink(null);
+                  setProblem(null);
+                }}
+              />,
+            )}
+            {wide(<Button size="large" label={t("confirm.action")} variant="primary" onPress={() => void confirm()} />)}
+          </>,
+        )}
+      </View>
+    );
+  }
+
+  const step = (n: number, heading: string, children: ReactNode) => (
+    <View style={{ flexDirection: "row", gap: space.md }}>
+      <Card style={{ width: 26, height: 26, borderRadius: 13, padding: 0, alignItems: "center", justifyContent: "center" }}>
+        <Text variant="footnote" strong>
+          {n}
+        </Text>
+      </Card>
+      <View style={{ flex: 1, gap: space.sm, paddingTop: 2 }}>
+        <Text variant="subheadline" strong>
+          {heading}
+        </Text>
+        {children}
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      {title}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentInsetAdjustmentBehavior="automatic"
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+        contentContainerStyle={{ gap: 20, paddingHorizontal: 20, paddingTop: space.md, paddingBottom: space.xl, ...column }}
+      >
+        {step(
+          1,
+          t("enter.heading"),
+          <Card style={{ paddingVertical: space.sm }}>
+            <Text selectable mono variant="footnote">
               {t("enter.command")}
             </Text>
-            <Text variant="subheadline" tone="secondary">
-              {t("enter.body")}
-            </Text>
-          </View>
-          <QrScanner labels={{ scan: t("enter.scan"), stop: t("enter.stopScan") }} onScan={accept} onNoCamera={() => setProblem(t("enter.noCamera"))} />
-          <Field label={t("enter.paste")} value={text} onChangeText={setText} multiline mono />
-          {problemText}
-          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-            <Button label={t("enter.continue")} variant="primary" disabled={!text.trim()} onPress={() => accept(text)} />
-          </View>
-        </>
-      )}
-    </ScrollView>
+          </Card>,
+        )}
+        {step(
+          2,
+          t("enter.body"),
+          <>
+            <QrScanner labels={{ scan: t("enter.scan"), stop: t("enter.stopScan") }} onScan={accept} onNoCamera={() => setProblem(t("enter.noCamera"))} />
+            <Field label={t("enter.paste")} value={text} onChangeText={setText} placeholder="veeloe://pair?hub=…" multiline mono />
+          </>,
+        )}
+        {problemText}
+      </ScrollView>
+      {foot(wide(<Button size="large" label={t("enter.continue")} variant="primary" disabled={!text.trim()} onPress={() => accept(text)} />))}
+    </View>
   );
 }

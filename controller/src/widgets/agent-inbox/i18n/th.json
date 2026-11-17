@@ -16,5 +16,7 @@
     "needsYou": "ไม่มี Agent ที่รอคุณ",
     "working": "ไม่มี Agent ที่กำลังทำงาน",
     "done": "ยังไม่มี Agent ที่ทำเสร็จ"
-  }
+  },
+  "answer": "ตอบ",
+  "offline": "{{machine}} ออฟไลน์"
 }

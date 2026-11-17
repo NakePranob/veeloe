@@ -4,5 +4,9 @@
     "web": "If this is a private window, open Veeloe in a normal window. Your browser may also be out of storage space.",
     "app": "Your device may be out of storage space. Free up some space and try again."
   },
-  "retry": "Try again"
+  "retry": "Try again",
+  "on": {
+    "web": "On the web",
+    "app": "In the app"
+  }
 }

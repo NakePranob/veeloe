@@ -13,7 +13,7 @@
   },
   "budget": {
     "heading": "Today's Budget",
-    "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget. Set a spend limit at the Provider as well (ADR 0043).",
+    "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget (ADR 0043).",
     "label": "Today's Budget",
     "used": "{{used}} of {{budget}} tokens ({{percent}}%)",
     "spent": " · used up",
@@ -37,7 +37,8 @@
     "hours_other": "{{count}} hours"
   },
   "more": {
-    "heading": "More settings"
+    "heading": "More settings",
+    "footer": "A new model takes effect from the next Task; a Task already running keeps its model to the end (ADR 0042)"
   },
   "allowlist": {
     "heading": "Commands that run without asking for an Approval",

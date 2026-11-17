@@ -68,5 +68,6 @@
       "body": "ใส่ชื่อโดเมนอย่างเดียว เช่น github.com หรือ *.npmjs.org ไม่ต้องมี https:// หรือ path"
     },
     "duplicate": "มีโดเมนนี้แล้ว"
-  }
+  },
+  "listLine": "Runtime {{version}} · {{agents}}"
 }

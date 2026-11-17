@@ -3,11 +3,11 @@
   "agent": "Agent settings",
   "deletedAgent": "Deleted Agent",
   "readOnly": "This Agent was deleted. Its Task history stays readable, but nothing new can be sent.",
-  "empty": "Send {{name}} a message to start this Task.",
+  "empty": "Send a message to start this Task. {{name}} can read files only in its own Workdir.",
   "working": "Working…",
   "sending": "Sending…",
   "dismiss": "Remove",
-  "placeholder": "Message {{name}}",
+  "placeholder": "Talk to {{name}}",
   "send": "Send",
   "offline": "The Machine is offline. Send once it's back.",
   "tools": {
@@ -29,7 +29,7 @@
     "collapse": "Collapse"
   },
   "busy": "You can send once this Turn ends",
-  "queued": "This Turn is running. Your message will wait for it to end.",
+  "queued": "You can send; it waits until this Turn ends",
   "queuedNote": "Waiting for the running Turn",
   "queuedPosition": "Queued #{{position}} for the running Turn",
   "attach": "Attach a file",
@@ -58,13 +58,13 @@
     "add": "Add Budget"
   },
   "approval": {
-    "title": "{{name}} wants to run this",
-    "domainTitle": "{{name}} wants to reach this domain",
+    "title": "Can I run this?",
+    "domainTitle": "Can I go out to this?",
     "domainBody": "This domain is not in {{name}}'s Egress.",
-    "expiresIn_one": "Expires in {{count}} minute",
-    "expiresIn_other": "Expires in {{count}} minutes",
-    "expiresInHours_one": "Expires in {{count}} hour",
-    "expiresInHours_other": "Expires in {{count}} hours",
+    "expiresIn_one": "{{count}} min left",
+    "expiresIn_other": "{{count}} min left",
+    "expiresInHours_one": "{{count}} hr left",
+    "expiresInHours_other": "{{count}} hr left",
     "by": " by {{member}}",
     "approved": "Approved",
     "denied": "Denied",
@@ -83,7 +83,8 @@
     "covers": "Trim the end to leave the prefix you mean. This entry covers every command that starts that way.",
     "doesNotCover": "This does not cover the command, so it still asks.",
     "signAndApprove": "Sign and approve",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "more": "Other options"
   },
   "openAgent": "Open {{name}}",
   "started": "{{machine}} · {{when}}",
@@ -111,5 +112,7 @@
   },
   "changes_one": "Changed {{count}} file",
   "changes_other": "Changed {{count}} files",
-  "changesNote": "Counts only files the Agent changed with its edit and write tools"
+  "changesNote": "Counts only files the Agent changed with its edit and write tools",
+  "failedTitle": "Turn failed",
+  "emptyTitle": "What should {{name}} help with?"
 }

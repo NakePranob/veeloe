@@ -75,7 +75,7 @@ export function MemoryPage() {
           <View style={{ gap: space.sm, padding: space.sm }}>
             {/* The file it is, as on the board's Memory card. */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-              <Icon name="memory" size="sm" color="secondaryLabel" />
+              <Icon name="file" size="sm" color="secondaryLabel" />
               <Text variant="footnote" mono tone="secondary">
                 MEMORY.md
               </Text>

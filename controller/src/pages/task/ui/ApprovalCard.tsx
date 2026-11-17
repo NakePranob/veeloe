@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, useColorScheme, View } from "react-native";
 import { covers, missingParts } from "../../../entities/agent";
 import { useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { fromNow } from "../../../shared/lib";
 import { AgentCard, Character, type Look } from "../../../entities/character";
-import { Button, Field, Inset, Label, space, Text, type IconName } from "../../../shared/ui";
+import { Button, Card, Field, font, Icon, Inset, Label, radius, space, Text, type IconName } from "../../../shared/ui";
 import type { Approval, ApprovalStatus } from "../model/items";
 
 interface Props {
@@ -45,6 +45,7 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   // Member means. Each is checked against the part it came from, not the whole command (ADR 0030).
   const [entries, setEntries] = useState<{ entry: string; part: string }[] | null>(null);
   const [sent, setSent] = useState(false);
+  const dark = useColorScheme() === "dark";
   const by = approval.answeredBy ? t("approval.by", { member: approval.answeredBy.member }) : "";
 
   // Answering takes a fresh unlock, so a phone left open cannot approve (ADR 0012).
@@ -73,75 +74,82 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   }
 
   const outcome = open ? null : OUTCOME[approval.status as Exclude<ApprovalStatus, "open">];
-  return (
-    <AgentCard color={look.color}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-        <Character look={look} mood={open ? "waiting" : "idle"} size={44} still />
-        <Text variant="headline" style={{ flex: 1 }}>
-          {domain ? t("approval.domainTitle", { name: agentName }) : t("approval.title", { name: agentName })}
+  const target = (domain ? approval.domain : approval.command) ?? "";
+  // Answered, it settles into the log as a small grey pill: the outcome, who, and what.
+  if (outcome) {
+    return (
+      <Card style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, paddingVertical: 7, borderRadius: radius.md }}>
+        <Icon name={outcome.icon} size="sm" color={outcome.color} />
+        <Text variant="footnote" style={{ flexShrink: 1 }}>
+          <Text variant="footnote" strong>
+            {t(outcome.key as "approval.approved" | "approval.denied" | "approval.expired" | "approval.closed")}
+          </Text>
+          {by}
+          {approval.status !== "closed" && " · "}
+          {approval.status !== "closed" && (
+            <Text variant="caption" mono>
+              {target}
+            </Text>
+          )}
         </Text>
-        {open && (
-          <Label icon="time" iconColor="orange">
-            {fromNow(approval.expiresAt, now).unit === "hour"
-              ? t("approval.expiresInHours", { count: fromNow(approval.expiresAt, now).count })
-              : t("approval.expiresIn", { count: fromNow(approval.expiresAt, now).count })}
-          </Label>
-        )}
-      </View>
-      {approval.reason && <Text selectable>{approval.reason}</Text>}
+      </Card>
+    );
+  }
+  const left = fromNow(approval.expiresAt, now);
+  const body = (
+    <>
+      <Text strong style={{ fontSize: 21, fontFamily: font.bold, letterSpacing: -0.4, textAlign: "center" }}>
+        {domain ? t("approval.domainTitle", { name: agentName }) : t("approval.title", { name: agentName })}
+      </Text>
+      {approval.reason && (
+        <Text variant="footnote" selectable style={{ textAlign: "center" }}>
+          {approval.reason}
+        </Text>
+      )}
+      <Inset chip>
+        <Text variant="subheadline" mono selectable style={{ fontSize: 14 }}>
+          {target}
+        </Text>
+      </Inset>
       {domain && (
-        <Text variant="footnote" tone="secondary">
+        <Text variant="footnote" style={{ textAlign: "center" }}>
           {t("approval.domainBody", { name: agentName })}
         </Text>
       )}
-      <Inset>
-        <Text variant="footnote" mono selectable>
-          {domain ? approval.domain : approval.command}
-        </Text>
-      </Inset>
-      {outcome && (
-        <Label icon={outcome.icon} iconColor={outcome.color}>
-          {t(outcome.key as "approval.approved" | "approval.denied" | "approval.expired" | "approval.closed")}
-          {by}
-        </Label>
-      )}
-      {open && !canAnswer && (
+      {!canAnswer && (
         <Text variant="footnote" tone="secondary">
           {t("approval.waitingForApprover")}
         </Text>
       )}
-      {open && canAnswer && sent && (
-        <Label icon="time" iconColor="orange">
+      {canAnswer && sent && (
+        <Label icon="time" iconColor="label" tone="label">
           {t("approval.sent")}
         </Label>
       )}
-      {open && canAnswer && !sent && entries === null && (
+      {canAnswer && !sent && entries === null && (
         <>
-          {!domain && (
-            <Text variant="footnote" tone="secondary">
-              {t("approval.notInAllowlist")}
-            </Text>
-          )}
-          {/* One ink pill for the answer the card asks for; quiet chips beside it. "Tell it what to do
-              instead" is Codex's "Tell Codex what to do": a no that steers instead of ending the conversation. */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginTop: space.xs }}>
-            <Button label={t(domain ? "approval.allowOnce" : "approval.approve")} variant="primary" disabled={!online} onPress={() => void respond("approve")} />
-            {domain && canManage && <Button label={t("approval.allowAlways")} disabled={!online} onPress={() => void respond("always")} />}
-            <Button label={t("approval.deny")} disabled={!online} onPress={() => void respond("deny")} />
-            {canManage && !domain && (
-              <Button
-                label={t("approval.always")}
-                disabled={!online}
-                // The Protocol takes at most 20, so the card offers at most that many.
-                onPress={() => setEntries(missingParts(approval.command, allowlist).slice(0, 20).map((part) => ({ entry: part, part })))}
-              />
+          <View style={{ alignSelf: "stretch", flexDirection: "row", gap: space.sm }}>
+            <View style={{ flex: 1 }}>
+              <Button size="large" label={t(domain ? "approval.allowOnce" : "approval.approve")} variant="primary" disabled={!online} onPress={() => void respond("approve")} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button size="large" label={t("approval.deny")} variant="surface" disabled={!online} onPress={() => void respond("deny")} />
+            </View>
+          </View>
+          {/* The board's expiry line; the rarer answers sit behind its link, as on the board. */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: space.sm }}>
+            <Text variant="caption">{left.unit === "hour" ? t("approval.expiresInHours", { count: left.count }) : t("approval.expiresIn", { count: left.count })}</Text>
+            {domain && canManage && <Link label={t("approval.allowAlways")} disabled={!online} onPress={() => void respond("always")} />}
+            {!domain && canManage && (
+              // The Protocol takes at most 20, so the card offers at most that many.
+              <Link label={t("approval.always")} disabled={!online} onPress={() => setEntries(missingParts(approval.command, allowlist).slice(0, 20).map((part) => ({ entry: part, part })))} />
             )}
-            {!domain && <Button label={t("approval.steer")} disabled={!online} onPress={onSteer} />}
+            {!domain && <Link label={t("approval.steer")} disabled={!online} onPress={onSteer} />}
           </View>
         </>
       )}
-      {open && canAnswer && !sent && entries !== null && (
-        <>
+      {canAnswer && !sent && entries !== null && (
+        <View style={{ alignSelf: "stretch", gap: space.sm }}>
           {entries.map((item, index) => (
             <Field
               key={item.part}
@@ -152,12 +160,42 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
               footer={t(covers(item.entry, item.part) ? "approval.covers" : "approval.doesNotCover")}
             />
           ))}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
-            <Button label={t("approval.signAndApprove")} variant="primary" disabled={!online} onPress={() => void allowAlways()} />
-            <Button label={t("approval.cancel")} onPress={() => setEntries(null)} />
+          <View style={{ flexDirection: "row", gap: space.sm }}>
+            <View style={{ flex: 1 }}>
+              <Button size="large" label={t("approval.signAndApprove")} variant="primary" disabled={!online} onPress={() => void allowAlways()} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button size="large" label={t("approval.cancel")} onPress={() => setEntries(null)} />
+            </View>
           </View>
-        </>
+        </View>
       )}
-    </AgentCard>
+    </>
+  );
+  // The board's card: the Agent's colour, solid, radius 30, with its 112pt head waiting over the top edge.
+  // Dark keeps the entity's tint, since the ink text would not read on the solid colour there.
+  return (
+    <View style={{ marginTop: 54 }}>
+      {dark ? (
+        <AgentCard color={look.color}>
+          <View style={{ alignItems: "center", gap: space.md, paddingTop: 42 }}>{body}</View>
+        </AgentCard>
+      ) : (
+        <View style={{ backgroundColor: look.color, borderRadius: 30, borderCurve: "continuous", paddingTop: 58, paddingHorizontal: 18, paddingBottom: 18, alignItems: "center", gap: space.md }}>{body}</View>
+      )}
+      <View style={{ position: "absolute", top: -62, left: 0, right: 0, alignItems: "center", pointerEvents: "none" }}>
+        <Character look={look} mood="waiting" size={112} />
+      </View>
+    </View>
+  );
+}
+
+function Link({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable role="button" disabled={disabled} onPress={onPress} hitSlop={space.sm} style={{ paddingVertical: space.xs, paddingHorizontal: 2 }}>
+      <Text variant="caption" strong style={{ textDecorationLine: "underline" }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }

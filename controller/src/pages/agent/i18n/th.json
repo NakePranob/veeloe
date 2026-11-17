@@ -13,7 +13,7 @@
   },
   "budget": {
     "heading": "Budget วันนี้",
-    "footer": "นับทุก token ที่ Provider รายงาน วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine พอหมด Turn ที่ทำอยู่จบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนขึ้นวันใหม่หรือมีคนเพิ่ม ควรตั้ง spend limit ที่ Provider ไว้อีกชั้นด้วย (ADR 0043)",
+    "footer": "นับทุก token ที่ Provider รายงาน วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine พอหมด Turn ที่ทำอยู่จบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนขึ้นวันใหม่หรือมีคนเพิ่ม (ADR 0043)",
     "label": "Budget วันนี้",
     "used": "{{used}} จาก {{budget}} token ({{percent}}%)",
     "spent": " · หมดแล้ว",
@@ -37,7 +37,8 @@
     "hours_other": "{{count}} ชั่วโมง"
   },
   "more": {
-    "heading": "ตั้งค่าเพิ่มเติม"
+    "heading": "ตั้งค่าเพิ่มเติม",
+    "footer": "เปลี่ยน model แล้วมีผลตั้งแต่ Task ถัดไป Task ที่กำลังทำอยู่ใช้ model เดิมจนจบ (ADR 0042)"
   },
   "allowlist": {
     "heading": "คำสั่งที่รันได้เลยไม่ต้องขอ Approval",

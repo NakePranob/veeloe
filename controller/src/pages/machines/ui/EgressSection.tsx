@@ -1,12 +1,11 @@
 import { EgressDomainSchema } from "@veeloe/protocol-ts";
 import { useState } from "react";
-import { View } from "react-native";
 import { egressOf as agentEgressOf, type AgentRow } from "../../../entities/agent";
 import { egressOf as machineEgressOf, type Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { keySession } from "../../../shared/keystore";
 import { useT } from "../../../shared/i18n";
-import { Button, Field, inform, Row, Section, Select, space } from "../../../shared/ui";
+import { Button, Field, inform, Row, Section, Select } from "../../../shared/ui";
 
 // controller-prototype's EgressSection: the domains every Agent on this Machine
 // may reach, or the ones one Agent may (`agent-egress-ui`). Every change is signed
@@ -62,17 +61,13 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
         <Row
           key={domain}
           icon="network"
+          iconColor="green"
           title={domain}
           mono
-          accessory={<Button label={t("egress.remove")} onPress={() => void change(egress.filter((item) => item !== domain), t("egress.removePrompt", { domain, who }))} />}
+          accessory={<Button variant="destructive" label={t("egress.remove")} onPress={() => void change(egress.filter((item) => item !== domain), t("egress.removePrompt", { domain, who }))} />}
         />
       ))}
-      <View>
-        <Field label={t("egress.add")} value={draft} onChangeText={setDraft} placeholder={t("egress.placeholder")} mono />
-        <View style={{ alignItems: "flex-start", padding: space.sm }}>
-          <Button label={t("egress.add")} disabled={!draft.trim()} onPress={() => void add()} />
-        </View>
-      </View>
+      <Field label={t("egress.add")} value={draft} onChangeText={setDraft} placeholder={t("egress.placeholder")} mono action={{ label: t("egress.add"), onPress: () => void add(), disabled: !draft.trim() }} />
     </Section>
   );
 }

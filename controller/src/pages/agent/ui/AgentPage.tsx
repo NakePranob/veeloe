@@ -11,7 +11,7 @@ import { useMachineLink, useMachineStatus } from "../../../features/machine-link
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatTokens, useNow, when } from "../../../shared/lib";
-import { Button, Empty, Field, Icon, Meter, Note, Row, Screen, Section, Spinner, Text, confirm, font, inform, space } from "../../../shared/ui";
+import { Button, Dot, Empty, Field, Icon, Meter, Note, Row, Screen, Section, Spinner, Text, confirm, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
@@ -90,6 +90,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
     setSent({ name: next, ...(budget !== undefined && { budget }) });
   }
 
+  const newTask = () => router.push({ pathname: "/tasks/[task]", params: { task: randomUUID(), agent: agent.id } });
+
   async function remove() {
     if (!link || !machine || offline) return inform(t("delete.failed"), t("needsOnline"));
     if (!(await confirm({ title: t("delete.title", { name: agent.name }), message: t("delete.body"), action: t("delete.action"), cancel: t("delete.cancel", { name: agent.name }), destructive: true }))) return;
@@ -112,7 +114,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
           </View>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-          {online !== null && <Icon name={online ? "done" : "offline"} size="xs" color={online ? "green" : "tertiaryLabel"} />}
+          {online !== null && <Dot color={online ? "green" : "tertiaryLabel"} />}
           <Text variant="footnote" tone="secondary">
             {machine?.name}
             {online === null ? "" : ` · ${t(online ? "online" : "offline")}`}
@@ -135,7 +137,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
       )}
 
       <Section title="Task" footer={t("tasks.footer")}>
-        <Row icon="add" title={t("tasks.new")} onPress={() => router.push({ pathname: "/tasks/[task]", params: { task: randomUUID(), agent: agent.id } })} />
+        <Row leading={<Button label={t("tasks.new")} icon="add" variant="primary" onPress={newTask} />} title={t("tasks.new")} onPress={newTask} />
         {tasks.map((task) => (
           <Row
             key={task.id}
@@ -148,7 +150,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
       </Section>
 
       <Section title="Agent">
-        <Row icon="agent" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} />
+        <Row icon="character" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} />
         <Row icon="memory" title="Memory" detail={t("memory.detail")} href={`/agents/${agent.id}/memory`} />
         <Field label={t("name")} value={name} onChangeText={setName} />
       </Section>
@@ -163,7 +165,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
         />
       </Section>
 
-      <Section title={t("more.heading")} footer={t("provider.nextTask")}>
+      <Section title={t("more.heading")} footer={t("more.footer")}>
         <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} />
         <Row icon="branch" title={t("git.row")} value={gitReposOf(agent) === null ? t("git.unsupported") : t("git.count", { count: gitReposOf(agent)!.length })} href={`/agents/${agent.id}/git`} />
         <Row icon="key" title={t("provider.heading")} detail={problem === "provider" ? t("problem.choose") : `${agent.provider} · ${agent.model}`} href={`/agents/${agent.id}/model`} />
@@ -174,19 +176,22 @@ function AgentView({ agent }: { agent: AgentRow }) {
           <View style={{ gap: space.sm, padding: space.sm }}>
             {/* The day so far, large, then the bar: the board's Budget card. */}
             <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.xs }}>
-              <Text style={{ fontFamily: font.display, fontSize: 26 }}>{formatTokens(agent.usage_tokens ?? 0)}</Text>
+              <Text variant="headline" style={{ fontSize: 20 }}>{formatTokens(agent.usage_tokens ?? 0)}</Text>
               <Text variant="subheadline" tone="secondary">
                 {t("budget.of", { budget: formatTokens(agent.budget) })}
               </Text>
             </View>
             <Meter value={share} label={t("budget.label")} />
+            {/* The board shows only the figure and the bar; the words come back when the day is nearly spent. */}
+            {share >= 0.8 && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-              {share >= 0.8 && <Icon name="info" size="sm" color={share >= 1 ? "red" : "orange"} />}
+              {<Icon name="info" size="sm" color={share >= 1 ? "red" : "orange"} />}
               <Text variant="footnote" tone="secondary">
                 {t("budget.used", { used: formatTokens(agent.usage_tokens ?? 0), budget: formatTokens(agent.budget), percent: Math.round(share * 100) })}
                 {share >= 1 ? t("budget.spent") : ""}
               </Text>
             </View>
+            )}
           </View>
         )}
         <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" />

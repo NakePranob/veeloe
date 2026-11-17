@@ -3,11 +3,11 @@
   "agent": "ตั้งค่า Agent",
   "deletedAgent": "Agent ที่ถูกลบแล้ว",
   "readOnly": "Agent นี้ถูกลบแล้ว ประวัติ Task ยังอ่านได้ แต่ส่งข้อความใหม่ไม่ได้",
-  "empty": "ส่งข้อความหา {{name}} เพื่อเริ่ม Task นี้",
+  "empty": "ส่งข้อความเพื่อเริ่ม Task นี้ {{name}} อ่านไฟล์ได้เฉพาะใน Workdir ของตัวเอง",
   "working": "กำลังทำงาน…",
   "sending": "กำลังส่ง…",
   "dismiss": "ลบ",
-  "placeholder": "ส่งข้อความถึง {{name}}",
+  "placeholder": "คุยกับ {{name}}",
   "send": "ส่ง",
   "offline": "Machine ออฟไลน์อยู่ ส่งได้เมื่อกลับมา",
   "tools": {
@@ -29,7 +29,7 @@
     "collapse": "ย่อ"
   },
   "busy": "ส่งได้เมื่อ Turn นี้จบ",
-  "queued": "Turn นี้กำลังทำงาน ข้อความของคุณจะรอจน Turn จบ",
+  "queued": "ส่งได้ จะรอจน Turn นี้จบ",
   "queuedNote": "รอ Turn ที่กำลังทำงานอยู่",
   "queuedPosition": "คิว #{{position}} รอ Turn ที่กำลังทำงาน",
   "attach": "แนบไฟล์",
@@ -58,13 +58,13 @@
     "add": "เพิ่ม Budget"
   },
   "approval": {
-    "title": "{{name}} ขออนุมัติ",
-    "domainTitle": "{{name}} ขอออกไปยังโดเมนนี้",
+    "title": "ขอรันอันนี้ได้ไหม?",
+    "domainTitle": "ขอออกไปที่นี่ได้ไหม?",
     "domainBody": "โดเมนนี้ไม่อยู่ใน Egress ของ {{name}}",
-    "expiresIn_one": "หมดอายุใน {{count}} นาที",
-    "expiresIn_other": "หมดอายุใน {{count}} นาที",
-    "expiresInHours_one": "หมดอายุใน {{count}} ชม.",
-    "expiresInHours_other": "หมดอายุใน {{count}} ชม.",
+    "expiresIn_one": "เหลือ {{count}} นาที",
+    "expiresIn_other": "เหลือ {{count}} นาที",
+    "expiresInHours_one": "เหลือ {{count}} ชม.",
+    "expiresInHours_other": "เหลือ {{count}} ชม.",
     "by": " โดย {{member}}",
     "approved": "อนุมัติแล้ว",
     "denied": "ปฏิเสธแล้ว",
@@ -83,7 +83,8 @@
     "covers": "ตัดท้ายให้เหลือคำนำหน้าที่ต้องการ รายการนี้ครอบทุกคำสั่งที่ขึ้นต้นแบบนี้",
     "doesNotCover": "ไม่ครอบคำสั่งนี้ ยังต้องขออนุมัติ",
     "signAndApprove": "เซ็นและอนุมัติ",
-    "cancel": "ยกเลิก"
+    "cancel": "ยกเลิก",
+    "more": "ตัวเลือกอื่น"
   },
   "openAgent": "เปิดหน้า {{name}}",
   "started": "{{machine}} · {{when}}",
@@ -111,5 +112,7 @@
   },
   "changes_one": "แก้ {{count}} ไฟล์",
   "changes_other": "แก้ {{count}} ไฟล์",
-  "changesNote": "นับเฉพาะไฟล์ที่ Agent แก้ด้วย tool แก้ไฟล์และเขียนไฟล์"
+  "changesNote": "นับเฉพาะไฟล์ที่ Agent แก้ด้วย tool แก้ไฟล์และเขียนไฟล์",
+  "failedTitle": "Turn ล้มเหลว",
+  "emptyTitle": "ให้ {{name}} ช่วยอะไรดี?"
 }

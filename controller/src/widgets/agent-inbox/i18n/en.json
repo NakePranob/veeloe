@@ -16,5 +16,7 @@
     "needsYou": "No Agent is waiting on you",
     "working": "No Agent is working",
     "done": "No Agent has finished yet"
-  }
+  },
+  "answer": "Answer",
+  "offline": "{{machine}} is offline"
 }

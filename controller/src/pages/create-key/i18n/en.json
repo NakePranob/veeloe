@@ -14,5 +14,10 @@
     "web": "This browser has no passkey that can verify you, so Veeloe can't create a key here.",
     "app": "Set up Face ID or a fingerprint on this device, or use Veeloe on the web."
   },
-  "failed": "The key wasn't created. Try again."
+  "failed": "The key wasn't created. Try again.",
+  "points": {
+    "secret": "The secret part never leaves this device. The Hub only knows the public key.",
+    "nothing": "No password to forget, leak or reset.",
+    "ask": "This device asks for Face ID, a fingerprint or a passkey each time the key is used."
+  }
 }

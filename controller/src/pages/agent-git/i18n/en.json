@@ -11,7 +11,8 @@
     "heading": "Repos it may use",
     "footer": "The Agent can clone, fetch and push only these repos, through a broker on the Machine that holds the token, so the Agent never sees it. It can push only branches under veeloe/{{id}}/, and cannot delete a branch, push a tag or touch main",
     "empty": "No repos yet",
-    "emptyDetail": "This Agent can't use git with GitHub"
+    "emptyDetail": "This Agent can't use git with GitHub",
+    "access": "clone · fetch · push veeloe/{{id}}/*"
   },
   "add": {
     "heading": "Add a repo",

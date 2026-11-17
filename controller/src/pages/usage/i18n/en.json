@@ -29,5 +29,12 @@
   "empty": {
     "title": "No data yet",
     "body": "Start the Machine and try again."
-  }
+  },
+  "today": "Today · all Machines",
+  "all": "all Machines",
+  "byMachine": "By Machine",
+  "byAgent": "By Agent",
+  "of": "{{used}} of {{limit}}",
+  "budget": "Today's Budget {{percent}}%",
+  "spent": " · used up"
 }

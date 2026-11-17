@@ -73,7 +73,7 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
       <Section title={t("repos.heading")} footer={t("repos.footer", { id: agentId })}>
         {repos.length === 0 && <Row title={t("repos.empty")} detail={t("repos.emptyDetail")} />}
         {repos.map((repo) => (
-          <Row key={repo} title={repo} mono icon="branch" accessory={<Button
+          <Row key={repo} title={repo} mono icon="branch" detail={t("repos.access", { id: agentId })} accessory={<Button
             label={t("remove")}
             variant="destructive"
             disabled={locked}

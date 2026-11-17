@@ -6,7 +6,9 @@ import { useMachineLink, useMachineStatus } from "../../../features/machine-link
 import { describeError, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatTokens } from "../../../shared/lib";
-import { Button, Empty, Field, Icon, inform, Row, Screen, Section } from "../../../shared/ui";
+import { View } from "react-native";
+import { Character, lookOfJson, moodOf } from "../../../entities/character";
+import { Chip, Empty, Field, Icon, inform, Note, Row, Screen, Section, Stat, Text, space } from "../../../shared/ui";
 import { PROVIDER_PRESETS } from "../model/providers";
 import { EgressSection } from "./EgressSection";
 
@@ -53,7 +55,7 @@ export function MachinePage() {
     setProviderName(preset?.id ?? "");
     setProviderUrl(preset?.url ?? "");
   }
-  const disk = status.diskFreeBytes === null ? undefined : `${(status.diskFreeBytes / 1_000_000_000).toFixed(1)} GB`;
+  const percent = status.budgetToday && status.budgetToday.limitTokens > 0 ? Math.round((status.budgetToday.usedTokens / status.budgetToday.limitTokens) * 100) : null;
   const budget = status.budgetToday && (status.budgetToday.usedTokens > 0 || status.budgetToday.limitTokens > 0) ? `${formatTokens(status.budgetToday.usedTokens)} / ${formatTokens(status.budgetToday.limitTokens)}` : undefined;
 
   if (!machine) {
@@ -66,20 +68,55 @@ export function MachinePage() {
 
   return (
     <Screen title={machine.name}>
+      <View style={{ alignItems: "center", gap: 6, paddingBottom: space.md }}>
+        <Icon name="machine" size="xl" color={status.online ? "green" : "tertiaryLabel"} />
+        <Text selectable style={{ fontSize: 26, fontWeight: "700" }}>
+          {machine.name}
+        </Text>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          <Chip label={status.online === null ? t("status.checking") : t(status.online ? "online" : "offline")} dot={status.online ? "green" : "tertiaryLabel"} />
+          {status.version && <Chip tone="mono" label={`Runtime ${status.version}`} />}
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", gap: space.sm }}>
+        <Stat value={String(agents.length)} label="Agent" />
+        {status.diskFreeBytes !== null && <Stat value={(status.diskFreeBytes / 1_000_000_000).toFixed(0)} unit="GB" label={t("status.disk")} />}
+        {percent !== null && <Stat value={`${percent}%`} label={t("status.budget")} />}
+      </View>
+
       <Section title={t("status.heading")}>
-        <Row icon="machine" iconColor={status.online ? "green" : "tertiaryLabel"} title={t("status.heading")} value={status.online === null ? t("status.checking") : t(status.online ? "online" : "offline")} />
-        <Row icon="info" title="Hub" value={machine.hub_url} />
-        {status.version && <Row icon="info" title={t("status.version")} value={status.version} />}
-        {status.features && <Row icon="info" title={t("status.features")} detail={status.features.join(", ")} />}
-        {disk && <Row icon="usage" title={t("status.disk")} value={disk} />}
+        <Row icon="network" title="Hub" value={machine.hub_url} />
+        {status.features && (
+          <Row
+            icon="shield"
+            title={t("status.features")}
+            accessory={
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, flex: 2 }}>
+                {status.features.map((feature) => (
+                  <Chip key={feature} tone="mono" label={feature} />
+                ))}
+              </View>
+            }
+          />
+        )}
         {budget && <Row icon="usage" title={t("status.budget")} value={budget} />}
-        {status.lastError && <Row icon="warning" iconColor="orange" title={t("status.lastError")} value={status.lastError} />}
+        {status.lastError && (
+          <View style={{ padding: space.md }}>
+            <Note icon="warning" iconColor="orange">{`${t("status.lastError")}\n${status.lastError}`}</Note>
+          </View>
+        )}
       </Section>
 
       <Section title={t("onMachine")}>
         {agents.length === 0 && <Row title={t("noAgent")} />}
         {agents.map((agent) => (
-          <Row key={agent.id} icon="agent" title={agent.name} detail={agent.model} href={`/agents/${agent.id}`} />
+          <Row
+            key={agent.id}
+            leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], status.online)} size={44} />}
+            title={agent.name}
+            detail={agent.model}
+            href={`/agents/${agent.id}`}
+          />
         ))}
       </Section>
 

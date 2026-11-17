@@ -1,6 +1,7 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { Share, View } from "react-native";
+import { router, Stack } from "expo-router";
+import { useEffect, useState, type ReactNode } from "react";
+import { ScrollView, Share, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { listDevices, useDevices } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink } from "../../../features/machine-link";
@@ -8,7 +9,7 @@ import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Button, Card, Field, Note, QrCode, Screen, Section, Spinner, Text, inform, space } from "../../../shared/ui";
+import { Button, Card, Field, Icon, Note, QrCode, Screen, Spinner, Text, column, inform, space } from "../../../shared/ui";
 import { approveLink, handOff, handoffData, nameProblem, openLink, type LinkAsk, type OpenLink } from "../model/link";
 
 // controller-prototype's DeviceLinkPage on the device that is already in the Workspace: show a QR
@@ -16,6 +17,7 @@ import { approveLink, handOff, handoffData, nameProblem, openLink, type LinkAsk,
 // sends back, authenticate and sign (ADR 0013, 0031). The new device never asks for a Hub.
 export function LinkDevicePage() {
   const t = useT("link-device");
+  const insets = useSafeAreaInsets();
   const language = useLanguage();
   const database = useDatabase();
   const machines = useMachines();
@@ -81,6 +83,25 @@ export function LinkDevicePage() {
     </Note>
   );
 
+  const title = <Stack.Screen options={{ title: t("title") }} />;
+  const foot = (children: ReactNode) => <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm, ...column }}>{children}</View>;
+  const wide = (button: ReactNode) => <View style={{ flex: 1 }}>{button}</View>;
+  const centred = (top: ReactNode, heading: string, body: string, footer?: ReactNode) => (
+    <View style={{ flex: 1 }}>
+      {title}
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: 36 }}>
+        {top}
+        <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
+          {heading}
+        </Text>
+        <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
+          {body}
+        </Text>
+      </View>
+      {footer}
+    </View>
+  );
+
   if (machines && !hub) {
     return (
       <Screen title={t("title")}>
@@ -89,84 +110,82 @@ export function LinkDevicePage() {
     );
   }
 
-  if (sending) {
-    return (
-      <Screen title={t("title")}>
-        <View style={{ alignItems: "center", gap: space.sm, paddingVertical: space.xl }}>
-          <Spinner />
-          <Text variant="headline" role="heading">
-            {t("sending.heading")}
-          </Text>
-          <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
-            {t("sending.body")}
-          </Text>
-        </View>
-      </Screen>
-    );
-  }
+  if (sending) return centred(<Spinner size="large" />, t("sending.heading"), t("sending.body"));
 
   if (ask) {
     return (
-      <Screen title={t("title")}>
-        <Section title={t("ask.heading")} footer={t("ask.footer")}>
+      <View style={{ flex: 1 }}>
+        {title}
+        <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ gap: space.md, padding: 20, ...column }}>
+          <Text variant="headline" role="heading" style={{ fontSize: 22 }}>
+            {t("ask.heading")}
+          </Text>
           <Field label={t("ask.label")} value={name} onChangeText={setName} />
-        </Section>
-        {problemText}
-        <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: space.sm }}>
-          <Button label={t("cancel")} onPress={() => router.back()} />
-          <Button label={t("approve")} variant="primary" onPress={() => void approve()} />
-        </View>
-      </Screen>
+          <Note icon="warning" iconColor="orange">
+            {t("ask.footer")}
+          </Note>
+          {problemText}
+        </ScrollView>
+        {foot(
+          <>
+            {wide(<Button size="large" label={t("cancel")} onPress={() => router.back()} />)}
+            {wide(<Button size="large" label={t("approve")} variant="primary" onPress={() => void approve()} />)}
+          </>,
+        )}
+      </View>
     );
   }
 
   if (!offer) {
     return (
-      <Screen title={t("title")}>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        {title}
         <Spinner />
-      </Screen>
+      </View>
     );
   }
 
   if (expired) {
-    return (
-      <Screen title={t("title")}>
-        <Note icon="warning" iconColor="orange">
-          {t("expired")}
-        </Note>
-        <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-          <Button label={t("again")} variant="primary" onPress={fresh} />
-        </View>
-      </Screen>
+    return centred(
+      <Card style={{ width: 112, height: 112, borderRadius: 56, padding: 0, alignItems: "center", justifyContent: "center", marginBottom: space.sm }}>
+        <Icon name="time" size="xl" color="label" />
+      </Card>,
+      t("expired"),
+      t("expiredBody"),
+      foot(wide(<Button size="large" label={t("again")} variant="primary" onPress={fresh} />)),
     );
   }
 
   return (
-    <Screen title={t("title")}>
-      <Section title={t("show.heading")} footer={t("show.footer", { when: when(offer.link.expires * 1000, language) })}>
-        <Card style={{ alignItems: "center" }}>
+    <View style={{ flex: 1 }}>
+      {title}
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ alignItems: "center", gap: space.md, paddingHorizontal: 20, paddingTop: 6, paddingBottom: space.lg, ...column }}>
+        <Text variant="subheadline" style={{ textAlign: "center" }}>
+          {t("show.heading")}
+        </Text>
+        <Card style={{ alignItems: "center", borderRadius: 24 }}>
           <QrCode text={offer.text} label={t("show.label")} />
         </Card>
-        <View style={{ padding: space.sm, gap: space.xs }}>
-          <Text variant="footnote" tone="secondary">
-            {t("show.link")}
-          </Text>
-          <Text selectable mono variant="footnote">
-            {offer.text}
-          </Text>
-          <View style={{ flexDirection: "row" }}>
-            {/* Shared to the owner's own new device, a tablet or laptop with no camera; a share sheet that is missing or dismissed changes nothing. */}
-            <Button label={t("show.share")} onPress={() => void Share.share({ message: offer.text }).catch(() => {})} />
-          </View>
-        </View>
-      </Section>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm }}>
-        <Spinner />
-        <Text variant="subheadline" tone="secondary" style={{ flex: 1 }}>
-          {t("show.waiting")}
+        <Text variant="footnote" tone="secondary" style={{ textAlign: "center" }}>
+          {t("show.footer", { when: when(offer.link.expires * 1000, language) })}
         </Text>
+        <Note icon="lock" iconColor="orange">
+          {t("show.secret")}
+        </Note>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 44 }}>
+          <Spinner />
+          <Text variant="subheadline" tone="secondary">
+            {t("show.waiting")}
+          </Text>
+        </View>
+      </ScrollView>
+      <View style={{ gap: space.sm, paddingHorizontal: space.lg, paddingTop: 4, paddingBottom: insets.bottom + space.sm, ...column }}>
+        <Text variant="footnote" tone="secondary" style={{ textAlign: "center" }}>
+          {t("show.link")}
+        </Text>
+        {/* Shared to the owner's own new device, a tablet or laptop with no camera; a share sheet that is missing or dismissed changes nothing. */}
+        <Button size="large" leading="share" label={t("show.share")} onPress={() => void Share.share({ message: offer.text }).catch(() => {})} />
       </View>
-      <Note icon="lock">{t("show.secret")}</Note>
-    </Screen>
+    </View>
   );
 }

@@ -7,7 +7,7 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { useNow } from "../../../shared/lib";
-import { Card, Empty, Icon, Note, Row, Screen, Section, Tap, Text, confirm, inform, space } from "../../../shared/ui";
+import { Button, Card, Empty, Icon, Note, Screen, Section, Tap, Text, confirm, inform, space } from "../../../shared/ui";
 import { daysLeft } from "../model/trash";
 
 // The Agents on every paired Machine, then the ones a Machine deleted and still
@@ -42,28 +42,39 @@ export function AgentsPage() {
   }
 
   return (
-    <Screen title="Agent" right={{ label: t("create"), icon: "add", variant: "ghost", onPress: () => router.push("/agents/new") }}>
+    <Screen title="Agent" bottom={<Button label={t("create")} variant="primary" size="large" leading="add" onPress={() => router.push("/agents/new")} />}>
       {agents?.length === 0 ? (
         <Empty icon="agent" title={t("none.title")} detail={t("none.body")} />
       ) : (
-        <Card style={{ padding: space.sm, gap: 0 }}>
-          {agents?.map((agent) => (
-            <Tap key={agent.id} href={`/agents/${agent.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.sm }}>
-                    <Character look={lookOfJson(agent.character)} mood={moodOf([], statuses[agent.machine_id]?.online ?? null)} size={44} />
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text variant="headline">{agent.name}</Text>
-                      <Text variant="footnote" tone="secondary" numberOfLines={1}>
-                        {agent.model}
+        <Card style={{ padding: 6, gap: 0 }}>
+          {agents?.map((agent) => {
+            const online = statuses[agent.machine_id]?.online ?? null;
+            const percent = agent.budget ? Math.round(((agent.usage_tokens ?? 0) / agent.budget) * 100) : null;
+            const spent = percent !== null && percent >= 100;
+            return (
+              <Tap key={agent.id} href={`/agents/${agent.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm, paddingHorizontal: 10, borderRadius: 16 }}>
+                <Character look={lookOfJson(agent.character)} mood={moodOf([], online)} size={52} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text strong tone={online === false ? "secondary" : "label"} style={{ fontSize: 16 }}>
+                    {agent.name}
+                  </Text>
+                  <Text variant="caption" tone="secondary" mono numberOfLines={1}>
+                    {agent.model}
+                  </Text>
+                  <Text variant="footnote" tone="secondary" numberOfLines={1}>
+                    {machines.find((m) => m.id === agent.machine_id)?.name}
+                    {online === false ? ` · ${t("offline")}` : ""}
+                    {percent !== null && online !== false ? (
+                      <Text variant="footnote" strong={spent} tone={spent ? "danger" : "secondary"}>
+                        {` · ${t("budget.list", { percent })}${spent ? t("budget.spent") : ""}`}
                       </Text>
-                      <Text variant="footnote" tone="secondary">
-                        {machines.find((m) => m.id === agent.machine_id)?.name}
-                        {statuses[agent.machine_id]?.online === false ? ` · ${t("offline")}` : ""}
-                        {agent.budget ? ` · ${t("budget.list", { percent: Math.round(((agent.usage_tokens ?? 0) / agent.budget) * 100) })}` : ""}
-                      </Text>
-                    </View>
-                    <Icon name="disclosure" size="xs" color="tertiaryLabel" weight="semibold" />
-            </Tap>
-          ))}
+                    ) : null}
+                  </Text>
+                </View>
+                <Icon name="disclosure" size="sm" color="secondaryLabel" weight="semibold" />
+              </Tap>
+            );
+          })}
         </Card>
       )}
       {trashed && trashed.length > 0 && (
@@ -73,18 +84,25 @@ export function AgentsPage() {
               {describeError({ code: failure })}
             </Note>
           )}
-          {/* Section already puts its rows on one Card; a Card here would nest two. */}
           <Section title={t("trash.title")} footer={t("trash.footer")}>
-            {trashed.map((row) => (
-              <Row
-                key={row.id}
-                leading={<Character look={lookOfJson(row.character)} mood={moodOf([], statuses[row.machine_id]?.online ?? null)} size={44} />}
-                title={row.name}
-                detail={`${machines.find((m) => m.id === row.machine_id)?.name ?? ""} · ${t("trash.days", { count: daysLeft(row, now) })}`}
-                value={restoring === row.id ? t("trash.restoring") : t("trash.restore")}
-                onPress={() => void restore(row)}
-              />
-            ))}
+            <View style={{ padding: 6 }}>
+              {trashed.map((row) => (
+                <View key={row.id} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm, paddingHorizontal: 10 }}>
+                  <View style={{ opacity: 0.6 }}>
+                    <Character look={lookOfJson(row.character)} mood="idle" size={44} still />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text variant="subheadline" strong tone="secondary">
+                      {row.name}
+                    </Text>
+                    <Text variant="footnote" tone="secondary">
+                      {`${machines.find((m) => m.id === row.machine_id)?.name ?? ""} · ${t("trash.days", { count: daysLeft(row, now) })}`}
+                    </Text>
+                  </View>
+                  <Button label={restoring === row.id ? t("trash.restoring") : t("trash.restore")} variant="surface" size="small" disabled={restoring === row.id} onPress={() => void restore(row)} />
+                </View>
+              ))}
+            </View>
           </Section>
         </>
       )}

@@ -8,7 +8,7 @@ import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { confirm, Field, inform, Note, Row, Screen, Section, space } from "../../../shared/ui";
+import { Card, Chip, confirm, Field, inform, Note, Row, Screen, Section, space, Text } from "../../../shared/ui";
 import { revocationOf, revokeDevice } from "../model/revoke";
 
 // controller-prototype's DevicesPage: this Member's Controllers, who linked each and when,
@@ -21,6 +21,9 @@ export function DevicesPage() {
   const revoked = devices.filter((d) => d.revoked_at !== null);
   return (
     <Screen title={t("title")} right={{ label: t("linkNew"), icon: "add", onPress: () => router.push("/devices/link") }}>
+      <Card>
+        <Text variant="footnote">{t("intro")}</Text>
+      </Card>
       <Section title={t("mine")} footer={t("footer")}>
         {live.map((device) => (
           <DeviceRow key={device.key} device={device} devices={devices} here={device.key === own} />
@@ -99,9 +102,9 @@ function DeviceRow({ device, devices, here }: { device: Device; devices: Device[
 
   return (
     <View>
-      <Row icon="device" title={name} detail={detail} value={here ? t("thisDevice") : undefined} onPress={() => setOpen(!open)} />
+      <Row icon="device" title={name} detail={detail} accessory={here ? <Chip tone="choice" selected label={t("thisDevice")} /> : undefined} onPress={() => setOpen(!open)} />
       {open && (
-        <View style={{ paddingLeft: space.xl }}>
+        <Card raised style={{ marginHorizontal: space.sm, marginBottom: space.sm, padding: 0, gap: 0, borderRadius: 16, boxShadow: "none" }}>
           {renaming ? (
             <>
               <Field label={t("rename.label")} value={draft} onChangeText={setDraft} placeholder={t("rename.placeholder")} footer={problem ?? t("rename.footer")} />
@@ -130,7 +133,7 @@ function DeviceRow({ device, devices, here }: { device: Device; devices: Device[
             </>
           )}
           <Row icon="trash" title={t("revoke")} destructive onPress={() => void revoke()} />
-        </View>
+        </Card>
       )}
     </View>
   );

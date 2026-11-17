@@ -53,13 +53,15 @@ function Picker({ agent }: { agent: AgentRow }) {
         status={status}
         provider={provider}
         model={model}
-        footer={t("provider.nextTask")}
+        footer={t("provider.footer")}
         onProvider={(name) => {
           setProvider(name);
           setModel(name === agent.provider ? agent.model : null);
         }}
         onModel={setModel}
       />
+      {/* The board ends on this, as a note under the model list. */}
+      <Note icon="info">{t("provider.nextTask")}</Note>
       {sent && <Row title={t("saving")} accessory={<Spinner />} />}
       {tried && status.updateError && !sent && (
         <Note icon="warning" iconColor="orange">

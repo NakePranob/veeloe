@@ -51,5 +51,6 @@
   "linked": {
     "title": "A new device was linked",
     "body": "{{name}} was linked from {{by}}. If that wasn't you, revoke it on My devices."
-  }
+  },
+  "intro": "Each device has its own key. It signs the commands sent to a Machine and never leaves the device. Revoke a device's key and Machines stop following its commands."
 }

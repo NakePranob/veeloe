@@ -28,5 +28,6 @@
   "sending": {
     "heading": "Sending your Machines to the new device…",
     "body": "Keep the app open on the new device until this finishes."
-  }
+  },
+  "expiredBody": "A QR code works once and only for a short time. Make a new one and scan it from the new device again."
 }

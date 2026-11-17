@@ -11,7 +11,8 @@
     "heading": "repo ที่ใช้ได้",
     "footer": "Agent clone, fetch และ push ได้เฉพาะ repo เหล่านี้ ผ่าน broker บน Machine ซึ่งถือ token ไว้เอง Agent จึงไม่เห็น token push ได้แค่ branch ใต้ veeloe/{{id}}/ ลบ branch, push tag หรือแตะ main ไม่ได้",
     "empty": "ยังไม่มี repo",
-    "emptyDetail": "Agent นี้ใช้ git กับ GitHub ไม่ได้"
+    "emptyDetail": "Agent นี้ใช้ git กับ GitHub ไม่ได้",
+    "access": "clone · fetch · push veeloe/{{id}}/*"
   },
   "add": {
     "heading": "เพิ่ม repo",

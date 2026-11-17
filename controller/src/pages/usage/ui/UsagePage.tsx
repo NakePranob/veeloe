@@ -1,14 +1,16 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
+import type React from "react";
 import { useAgents } from "../../../entities/agent";
+import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines, type Machine } from "../../../entities/machine";
 import { previewOf, useTaskSummaries } from "../../../entities/task";
 import { useUsageDays, type UsageDayRow } from "../../../entities/usage";
-import { useMachineLink, useMachineStatus, useMachineStatuses, useUsageStatus, useUsageStatuses, type UsageStatus } from "../../../features/machine-link";
+import { useMachineLink, useMachineStatuses, useUsageStatuses, type UsageStatus } from "../../../features/machine-link";
 import { useDatabase, useLiveQuery } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, shiftDay, useNow, when, type Bar } from "../../../shared/lib";
-import { Bars, Chip, Empty, Note, Row, Screen, Section, Spinner, Text, space } from "../../../shared/ui";
+import { Bars, Chip, Empty, Meter, Note, Row, Screen, Section, Spinner, Tap, Text, space } from "../../../shared/ui";
 import { daysBetween, rowsInRange, totalOf } from "../model/summary";
 import { DEFAULT_USAGE_WINDOW, isUsageWindow, saveUsageWindow, USAGE_WINDOWS } from "../model/window";
 
@@ -32,71 +34,76 @@ function WindowPicker({ days }: { days: number }) {
   );
 }
 
-function MachineSection({ machine, agents, rows, days }: { machine: Machine; agents: AgentRow[]; rows: UsageDayRow[]; days: number }) {
-  const t = useT("usage");
-  const language = useLanguage();
-  const now = useNow();
-  const status = useUsageStatus(machine.id);
-  const machineStatus = useMachineStatus(machine.id);
-  const ids = new Set(agents.map((agent) => agent.id));
+type AgentUsageRow = AgentRow & { budget: number | null; usage_tokens: number | null; character: string | null; model: string };
 
-  // The Machine's own today, or the last day it gave us when it is offline; the window always ends there.
-  const latest = rows
-    .filter((row) => ids.has(row.agent_id))
-    .map((row) => row.day)
-    .sort()
-    .at(-1);
-  const to = status.to ?? latest ?? null;
+// One line of a breakdown: name and "used of limit", the meter, then where it stands.
+function UsageLine({ title, used, limit, line, leading, href, dim }: { title: string; used: number; limit: number | null; line: string; leading?: React.ReactNode; href: string; dim?: boolean }) {
+  const t = useT("usage");
+  const share = limit ? used / limit : null;
+  const spent = share !== null && share >= 1;
+  return (
+    <Tap href={href} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md }}>
+      {leading}
+      <View style={{ flex: 1, gap: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.sm }}>
+          <Text variant="subheadline" strong tone={dim ? "secondary" : "label"} style={{ flex: 1 }} numberOfLines={1}>
+            {title}
+          </Text>
+          <Text variant="footnote" tone="secondary">
+            {limit ? t("of", { used: formatTokens(used), limit: formatTokens(limit) }) : formatTokens(used)}
+          </Text>
+        </View>
+        {share !== null && <Meter value={share} label={t("budget", { percent: Math.round(share * 100) })} />}
+        <Text variant="caption" tone={spent ? "danger" : dim ? "secondary" : "label"}>
+          {line}
+          {share !== null ? ` · ${t("budget", { percent: Math.round(share * 100) })}${spent ? t("spent") : ""}` : ""}
+        </Text>
+      </View>
+    </Tap>
+  );
+}
+
+function Overview({ machines, agents, rows, statuses, days }: { machines: Machine[]; agents: AgentUsageRow[]; rows: UsageDayRow[]; statuses: Record<string, UsageStatus>; days: number }) {
+  const t = useT("usage");
+  const ids = new Set(agents.map((agent) => agent.id));
+  // Each Machine's own today, or the last day it gave us; the window ends at the latest of them.
+  const to = [...machines.map((m) => statuses[m.id]?.to ?? null), ...rows.filter((row) => ids.has(row.agent_id)).map((row) => row.day)].filter((d): d is string => !!d).sort().at(-1) ?? null;
   const from = to ? shiftDay(to, -(days - 1)) : null;
   const visible = from && to ? rowsInRange(rows, ids, from, to) : [];
-  const total = totalOf(visible);
-  const perAgent = agents.map((agent) => ({ ...agent, tokens: totalOf(visible.filter((row) => row.agent_id === agent.id)) })).sort((a, b) => b.tokens - a.tokens);
+  const today = to ? totalOf(visible.filter((row) => row.day === to)) : 0;
+  const loading = machines.some((m) => statuses[m.id]?.loading);
   const bars: Bar[] =
     from && to
       ? daysBetween(from, to).map((day) => {
           const dayRows = visible.filter((row) => row.day === day);
           const tokens = totalOf(dayRows);
-          return {
-            key: day,
-            value: tokens,
-            known: dayRows.length > 0,
-            title: dayRows.length > 0 ? t("chart.bar", { day, tokens: formatTokens(tokens) }) : t("chart.none", { day }),
-          };
+          return { key: day, value: tokens, known: dayRows.length > 0, title: dayRows.length > 0 ? t("chart.bar", { day, tokens: formatTokens(tokens) }) : t("chart.none", { day }) };
         })
       : [];
-  const fetched = machine.usage_fetched_at ? when(machine.usage_fetched_at, language, now) : null;
-
   return (
-    <>
-      <Section title={machine.name}>
-        <View style={{ gap: space.sm, padding: space.sm }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-            <Text variant="headline" style={{ flex: 1 }}>
-              {t("machine.total", { tokens: formatTokens(total) })}
-            </Text>
-            {status.loading && <Spinner />}
-          </View>
-          <Text variant="footnote" tone="secondary">
-            {machineStatus.online === false ? t("machine.offline") : machineStatus.online ? t("machine.online") : ""}
-            {fetched ? ` · ${t("machine.fetched", { when: fetched })}` : ""}
+    <Section footer={t("note")}>
+      <View style={{ gap: 4, paddingTop: space.lg, paddingHorizontal: 14, paddingBottom: space.md }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text variant="footnote" strong tone="secondary" style={{ flex: 1 }}>
+            {t("today")}
           </Text>
-          {bars.length > 0 && <Bars bars={bars} label={t("chart.label", { machine: machine.name })} />}
-          {!to && (
-            <Text variant="footnote" tone="secondary">
-              {t("machine.none")}
-            </Text>
-          )}
+          {loading && <Spinner />}
         </View>
-        {perAgent.map((agent) => (
-          <Row key={agent.id} icon="agent" title={agent.name} value={formatTokens(agent.tokens)} href={`/agents/${agent.id}`} />
-        ))}
-      </Section>
-      {status.error && (
-        <Note icon="warning" iconColor="orange">
-          {describeError({ code: status.error })}
-        </Note>
-      )}
-    </>
+        <Text style={{ fontSize: 30, fontWeight: "700", letterSpacing: -0.6 }}>
+          {formatTokens(today)}
+          <Text variant="subheadline" tone="secondary">{" token"}</Text>
+        </Text>
+        {bars.length > 0 ? (
+          <View style={{ marginTop: space.sm }}>
+            <Bars bars={bars} label={t("chart.label", { machine: t("all") })} height={104} />
+          </View>
+        ) : (
+          <Text variant="footnote" tone="secondary">
+            {t("machine.none")}
+          </Text>
+        )}
+      </View>
+    </Section>
   );
 }
 
@@ -136,6 +143,8 @@ function TopTasks({ statuses, agents }: { statuses: Record<string, UsageStatus>;
 
 export function UsagePage() {
   const t = useT("usage");
+  const language = useLanguage();
+  const now = useNow();
   const link = useMachineLink();
   const machines = useMachines();
   const agents = useAgents() ?? [];
@@ -166,7 +175,6 @@ export function UsagePage() {
   return (
     <Screen title={t("title")} right={{ label: t("retry"), onPress: retry }}>
       <WindowPicker days={days} />
-      <Note icon="info">{t("note")}</Note>
       {machines === null ? (
         <View style={{ alignItems: "center", padding: space.xl }}>
           <Spinner />
@@ -174,9 +182,42 @@ export function UsagePage() {
       ) : list.length === 0 ? (
         <Empty icon="usage" title={t("empty.title")} detail={t("empty.body")} />
       ) : (
-        list.map((machine) => (
-          <MachineSection key={machine.id} machine={machine} agents={agents.filter((agent) => agent.machine_id === machine.id)} rows={rows} days={days} />
-        ))
+        <>
+          <Overview machines={list} agents={agents} rows={rows} statuses={statuses} days={days} />
+          <Section title={t("byMachine")}>
+            {list.map((machine) => {
+              const online = machineStatuses[machine.id]?.online ?? null;
+              const budget = machineStatuses[machine.id]?.budgetToday;
+              const fetched = machine.usage_fetched_at ? when(machine.usage_fetched_at, language, now) : null;
+              const line = [online === null ? null : t(online ? "machine.online" : "machine.offline"), fetched ? t("machine.fetched", { when: fetched }) : null].filter(Boolean).join(" · ");
+              return <UsageLine key={machine.id} title={machine.name} used={budget?.usedTokens ?? 0} limit={budget?.limitTokens || null} line={line} href={`/machines/${machine.id}`} dim={online === false} />;
+            })}
+          </Section>
+          {agents.length > 0 && (
+            <Section title={t("byAgent")}>
+              {[...agents]
+                .sort((a, b) => (b.usage_tokens ?? 0) - (a.usage_tokens ?? 0))
+                .map((agent) => (
+                  <UsageLine
+                    key={agent.id}
+                    title={agent.name}
+                    used={agent.usage_tokens ?? 0}
+                    limit={agent.budget}
+                    line={list.find((m) => m.id === agent.machine_id)?.name ?? ""}
+                    leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], machineStatuses[agent.machine_id]?.online ?? null)} size={32} />}
+                    href={`/agents/${agent.id}`}
+                  />
+                ))}
+            </Section>
+          )}
+          {list.map((machine) =>
+            statuses[machine.id]?.error ? (
+              <Note key={machine.id} icon="warning" iconColor="orange">
+                {`${machine.name}: ${describeError({ code: statuses[machine.id]!.error! })}`}
+              </Note>
+            ) : null,
+          )}
+        </>
       )}
       <TopTasks statuses={statuses} agents={agents} />
     </Screen>
