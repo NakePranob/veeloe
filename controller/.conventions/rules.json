@@ -187,12 +187,7 @@
         "tool": "short check (bun)",
         "at": "controller/scripts/check-structure.ts"
       },
-      "exceptions": [
-        {
-          "path": "src/pages/task/ui/",
-          "until": "task-thread-redesign"
-        }
-      ],
+      "exceptions": [],
       "violation": [
         {
           "path": "src/pages/home/ui/zz_probe.tsx",

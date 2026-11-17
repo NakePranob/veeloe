@@ -11,14 +11,22 @@
   "send": "ส่ง",
   "offline": "Machine ออฟไลน์อยู่ ส่งได้เมื่อกลับมา",
   "tools": {
-    "running": "กำลังรัน {{command}}",
-    "passed_one": "รัน {{count}} คำสั่ง · ผ่านทั้งหมด",
-    "passed_other": "รัน {{count}} คำสั่ง · ผ่านทั้งหมด",
-    "failed_one": "รัน {{count}} คำสั่ง · ล้มเหลว {{failed}}",
-    "failed_other": "รัน {{count}} คำสั่ง · ล้มเหลว {{failed}}",
-    "someUnfinished_one": "รัน {{count}} คำสั่ง · ไม่เสร็จ",
-    "someUnfinished_other": "รัน {{count}} คำสั่ง · ไม่เสร็จ",
-    "unfinished": "ไม่เสร็จ"
+    "verbs": {
+      "bash": "รัน {{target}}",
+      "read": "อ่าน {{target}}",
+      "glob": "หาไฟล์ {{target}}",
+      "grep": "ค้นหา {{target}}",
+      "edit": "แก้ {{target}}",
+      "write": "เขียน {{target}}",
+      "memory": "จด Memory",
+      "send_file": "ส่งไฟล์ {{target}}"
+    },
+    "other": "ใช้ {{tool}}",
+    "more": "+{{count}}",
+    "hiddenFailed": "มีอย่างที่ล้มเหลวซ่อนอยู่",
+    "unfinished": "ไม่เสร็จ",
+    "expand": "ดูทั้งหมด",
+    "collapse": "ย่อ"
   },
   "busy": "ส่งได้เมื่อ Turn นี้จบ",
   "queued": "Turn นี้กำลังทำงาน ข้อความของคุณจะรอจน Turn จบ",
@@ -100,5 +108,8 @@
     "always": "เพิ่ม {{entries}} เข้า Allowlist และอนุมัติ",
     "domain": "อนุญาตโดเมนนี้ให้ {{name}}: {{domain}}",
     "domainAlways": "เพิ่ม {{domain}} เข้า Egress ของ {{name}}"
-  }
+  },
+  "changes_one": "แก้ {{count}} ไฟล์",
+  "changes_other": "แก้ {{count}} ไฟล์",
+  "changesNote": "นับเฉพาะไฟล์ที่ Agent แก้ด้วย tool แก้ไฟล์และเขียนไฟล์"
 }

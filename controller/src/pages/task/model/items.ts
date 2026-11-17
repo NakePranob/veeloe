@@ -21,8 +21,20 @@ export function contextUsageOf(events: EventRow[]): ContextUsage | null {
 
 const atOf = (event: EventRow) => event.at ?? 0;
 
-/** One command the Agent asked for, by the tool's own id, and how it went so far. */
-export type ToolCall = { id: string; command: string; state: "running" | "ok" | "failed" | "unfinished"; output?: string };
+/** One tool the Agent asked for, by the tool's own id, and how it went so far. `tool` is the tool's
+ * name (bash, read, edit and so on; a newer Runtime may add more) and `target` what it worked on. */
+export type ToolCall = { id: string; tool: string; target: string; state: "running" | "ok" | "failed" | "unfinished"; output?: string };
+
+/** What a folded group shows: the call to name, the line of error under it, how many others it hides, and whether a hidden one failed. */
+export type ToolSummary = { call: ToolCall; error?: string; hidden: number; hiddenFailed: boolean };
+
+/** The call that says what a group is doing: the one running, else the latest that failed, else the last. */
+export function summaryOf(calls: ToolCall[]): ToolSummary {
+  const failed = calls.filter((c) => c.state === "failed");
+  const call = calls.find((c) => c.state === "running") ?? failed.at(-1) ?? calls.at(-1)!;
+  const error = call.state === "failed" ? call.output?.trim().split("\n").filter(Boolean).at(-1) : undefined;
+  return { call, ...(error ? { error } : {}), hidden: calls.length - 1, hiddenFailed: failed.some((c) => c !== call) };
+}
 
 /**
  * Where one Approval stands (controller-prototype's ApprovalStatus). `expired`: its
@@ -62,7 +74,9 @@ export type Item =
   | { key: string; kind: "interrupted"; at: number }
   /** The Runtime summarized older history; the model now sees this summary and what follows. */
   | { key: string; kind: "compacted"; summary: string; at: number; tokensBefore?: number; tokensAfter?: number }
-  | { key: string; kind: "file"; name: string; size: number; hash: string; path: string };
+  | { key: string; kind: "file"; name: string; size: number; hash: string; path: string }
+  /** The files edit and write changed in a Turn that just ended, each once, in the order first touched. */
+  | { key: string; kind: "changes"; files: string[] };
 
 const textOf = (content: unknown) =>
   Array.isArray(content)
@@ -72,10 +86,11 @@ const textOf = (content: unknown) =>
         .join("\n\n")
     : "";
 
-// The command when the tool has one, so a file tool of `workdir-file-tools` shows by its name on the same row.
-const commandOf = (use: { name?: unknown; input?: unknown }) => {
-  const command = (use.input as { command?: unknown } | null)?.command;
-  return typeof command === "string" ? command : String(use.name ?? "");
+// What each tool works on, by the field its input names it with; a tool this build does not know shows by name alone.
+const TARGET: Record<string, string> = { bash: "command", read: "path", write: "path", edit: "path", send_file: "path", glob: "pattern", grep: "pattern", memory: "text" };
+const targetOf = (tool: string, input: unknown) => {
+  const value = (input as Record<string, unknown> | null)?.[TARGET[tool] ?? ""];
+  return typeof value === "string" ? value.split("\n")[0]! : "";
 };
 
 type ToolUse = { type: "tool_use"; id: string; name?: unknown; input?: unknown };
@@ -91,6 +106,8 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
   const calls = new Map<string, ToolCall>();
   const approvals = new Map<string, { item: Extract<Item, { kind: "approval" }>; index: number }>();
   let open = false;
+  // The calls of the Turn under way, for the files it changed when it ends.
+  let turnCalls: ToolCall[] = [];
   for (const event of events) {
     let body: { text?: string; content?: unknown; reason?: string; code?: string; request?: string; kind?: string; domain?: string; agent?: string; task?: string; command?: string; parts?: string[]; expiresAt?: number; member?: string; decision?: string; message?: string; summary?: string; tokensBefore?: number; tokensAfter?: number; name?: string; size?: number; hash?: string; path?: string };
     try {
@@ -105,7 +122,9 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       if (text) out.push({ key, kind: "agent", text });
       const uses = Array.isArray(body.content) ? body.content.filter((block): block is ToolUse => block?.type === "tool_use" && typeof block.id === "string") : [];
       for (const use of uses) {
-        const call: ToolCall = { id: use.id, command: commandOf(use), state: "running" };
+        const tool = String(use.name ?? "");
+        const call: ToolCall = { id: use.id, tool, target: targetOf(tool, use.input), state: "running" };
+        turnCalls.push(call);
         calls.set(use.id, call);
         const last = out.at(-1);
         if (last?.kind === "tools") last.calls.push(call);
@@ -152,7 +171,10 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       out.push({ key, kind: "file", name: body.name, size: body.size, hash: body.hash, path: body.path });
     } else if (event.kind === "context.compacted" && typeof body.summary === "string") {
       out.push({ key, kind: "compacted", summary: body.summary, at: atOf(event), ...(typeof body.tokensBefore === "number" && { tokensBefore: body.tokensBefore }), ...(typeof body.tokensAfter === "number" && { tokensAfter: body.tokensAfter }) });
-    } else if (event.kind === "turn.started") open = true;
+    } else if (event.kind === "turn.started") {
+      open = true;
+      turnCalls = [];
+    }
     else if (event.kind === "turn.ended") {
       open = false;
       // A command the Turn ended before it answered never will.
@@ -160,6 +182,10 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       // An Approval its Turn ended before anyone answered is closed, as the prototype's `approvals` does.
       for (const { item } of approvals.values()) if (item.approval.status === "open") item.approval.status = "closed";
       if (body.reason === "error") out.push({ key, kind: "error", code: body.code ?? "provider.failed" });
+      // Only edit and write count: a file bash changed cannot be told from the log, and the row says so.
+      const files = [...new Set(turnCalls.filter((c) => (c.tool === "edit" || c.tool === "write") && c.state === "ok" && c.target).map((c) => c.target))];
+      if (files.length) out.push({ key: `${key}-changes`, kind: "changes", files });
+      turnCalls = [];
     }
   }
   // Nobody answered in time: it counts as denied (CONTEXT.md).

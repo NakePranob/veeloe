@@ -1,6 +1,7 @@
 export { Button } from "./button";
 export { Bars } from "./bars";
 export { Card } from "./card";
+export { Bubble, Fade, FADE, Inset, Input, Ring } from "./chat";
 export { Chip } from "./chip";
 export { Empty, Field, Note, Row, Screen, Section, ToggleRow } from "./forms";
 export { HeaderAction } from "./header-action";

@@ -11,14 +11,22 @@
   "send": "Send",
   "offline": "The Machine is offline. Send once it's back.",
   "tools": {
-    "running": "Running {{command}}",
-    "passed_one": "Ran {{count}} command · all passed",
-    "passed_other": "Ran {{count}} commands · all passed",
-    "failed_one": "Ran {{count}} command · {{failed}} failed",
-    "failed_other": "Ran {{count}} commands · {{failed}} failed",
-    "someUnfinished_one": "Ran {{count}} command · not finished",
-    "someUnfinished_other": "Ran {{count}} commands · not finished",
-    "unfinished": "Not finished"
+    "verbs": {
+      "bash": "Ran {{target}}",
+      "read": "Read {{target}}",
+      "glob": "Found files {{target}}",
+      "grep": "Searched {{target}}",
+      "edit": "Edited {{target}}",
+      "write": "Wrote {{target}}",
+      "memory": "Noted in Memory",
+      "send_file": "Sent {{target}}"
+    },
+    "other": "Used {{tool}}",
+    "more": "+{{count}}",
+    "hiddenFailed": "One that failed is hidden",
+    "unfinished": "Not finished",
+    "expand": "Show all",
+    "collapse": "Collapse"
   },
   "busy": "You can send once this Turn ends",
   "queued": "This Turn is running. Your message will wait for it to end.",
@@ -100,5 +108,8 @@
     "always": "Add {{entries}} to the Allowlist and approve",
     "domain": "Allow this domain for {{name}}: {{domain}}",
     "domainAlways": "Add {{domain}} to {{name}}'s Egress"
-  }
+  },
+  "changes_one": "Changed {{count}} file",
+  "changes_other": "Changed {{count}} files",
+  "changesNote": "Counts only files the Agent changed with its edit and write tools"
 }

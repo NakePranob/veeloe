@@ -28,6 +28,11 @@ export function Stage({ color, children }: { color: string; children: ReactNode 
   return <View style={{ alignItems: "center", gap: space.md, padding: space.lg, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: useTint(color, STAGE) }}>{children}</View>;
 }
 
+/** A card in a soft tint of the Agent's colour, for what that Agent is asking, such as an Approval. */
+export function AgentCard({ color, children }: { color: string; children: ReactNode }) {
+  return <View style={{ gap: space.sm, padding: space.lg, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: useTint(color, STAGE) }}>{children}</View>;
+}
+
 /** One option to pick: the head wearing it and its name. The chosen one fills with the Agent's colour, with no ring. */
 export function LookTile({ color, label, name, selected, onPress, children }: { color: string; label: string; name: string; selected: boolean; onPress: () => void; children: ReactNode }) {
   const colors = useColors();

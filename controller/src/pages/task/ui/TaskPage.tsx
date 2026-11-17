@@ -3,36 +3,22 @@ import * as DocumentPicker from "expo-document-picker";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
-import { allowlistOf, useAgents, useTrashedAgents, type AgentRow } from "../../../entities/agent";import { useMachines } from "../../../entities/machine";
+import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, View, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { allowlistOf, useAgents, useTrashedAgents, type AgentRow } from "../../../entities/agent";
+import { Character, lookOfJson, moodOf } from "../../../entities/character";
+import { useMachines } from "../../../entities/machine";
 import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents, useTaskRow } from "../../../entities/task";
 import { MAX_ATTACHMENT_BYTES, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Button, Card, column, confirm, HeaderAction, Icon, Label, Note, radius, space, Text, type, useColors } from "../../../shared/ui";
+import { Bubble, Button, Card, Chip, column, confirm, Fade, FADE, HeaderAction, Icon, Input, Label, Note, space, Spinner, Text } from "../../../shared/ui";
 import { contextUsageOf, items, type Item } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
 import { ContextMeter } from "./ContextMeter";
-import { ToolCalls } from "./ToolCalls";
-import { FADE, LogFade } from "./LogFade";
-import { LogHead } from "./LogHead";
+import { ChangesRow, ToolCalls } from "./ToolCalls";
 
-// The Owner's message, in an accent bubble on the right as in Messages.
-function Bubble({ text, note }: { text: string; note?: React.ReactNode }) {
-  const colors = useColors();
-  return (
-    <View style={{ alignSelf: "flex-end", alignItems: "flex-end", maxWidth: "80%", gap: space.xs }}>
-      <View style={{ paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: colors.accent }}>
-        <Text selectable style={{ color: colors.onAccent }}>
-          {text}
-        </Text>
-      </View>
-      {note}
-    </View>
-  );
-}
 
 function Problem({ code }: { code: string }) {
   return (
@@ -167,7 +153,6 @@ export function TaskPage() {
   const insets = useSafeAreaInsets();
   const t = useT("task");
   const language = useLanguage();
-  const colors = useColors();
   const database = useDatabase();
   const { task, agent: agentId } = useLocalSearchParams<{ task: string; agent: string }>();
   const agents = useAgents();
@@ -258,14 +243,19 @@ export function TaskPage() {
       <Stack.Screen
         options={{
           title: agent.name,
+          // The Character left of the name, doing what this Task is doing, and the status under the name;
+          // a tap opens the Agent's page, as the settings button does. A deleted Agent has no page.
           headerTitle: () => (
-            <View style={{ alignItems: "center" }}>
-              <Text variant="headline" numberOfLines={1}>
-                {agent.name}
-              </Text>
-              {/* A Task nobody has written in is not "done" yet. */}
-              {taskStatus !== "new" && <TaskStatusLabel status={taskStatus} variant="caption" />}
-            </View>
+            <Pressable role="button" aria-label={t("openAgent", { name: agent.name })} disabled={readOnly} onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+              <Character look={lookOfJson(agent.character)} mood={moodOf(events, status.online)} size={36} />
+              <View>
+                <Text variant="headline" numberOfLines={1}>
+                  {agent.name}
+                </Text>
+                {/* A Task nobody has written in is not "done" yet. */}
+                {taskStatus !== "new" && <TaskStatusLabel status={taskStatus} variant="caption" />}
+              </View>
+            </Pressable>
           ),
         }}
       />
@@ -285,7 +275,6 @@ export function TaskPage() {
         // The end of the log rests clear of the fade.
         contentContainerStyle={[column, { padding: space.lg, paddingBottom: FADE, gap: space.lg }]}
       >
-        <LogHead agent={agent} machine={machine.name} events={events} online={status.online} readOnly={readOnly} />
         {shown.length === 0 && pending.length === 0 && (
           <Text variant="subheadline" tone="secondary" style={{ textAlign: "center", marginTop: space.xl }}>
             {t("empty", { name: agent.name })}
@@ -298,11 +287,14 @@ export function TaskPage() {
             <AgentText key={item.key} text={item.text} />
           ) : item.kind === "tools" ? (
             <ToolCalls key={item.key} calls={item.calls} />
+          ) : item.kind === "changes" ? (
+            <ChangesRow key={item.key} files={item.files} />
           ) : item.kind === "approval" ? (
             <ApprovalCard
               key={item.key}
               approval={item.approval}
               agentName={agent.name}
+              look={lookOfJson(agent.character)}
               allowlist={allowlistOf(agent) ?? []}
               // v0.1 Members in trust are all Owners, who may Approve and Manage every Agent; v0.3 reads Grants.
               canAnswer={!readOnly}
@@ -336,6 +328,7 @@ export function TaskPage() {
           <Bubble
             key={p.id}
             text={p.text}
+            queued
             note={
               p.error ? (
                 <View style={{ alignItems: "flex-end", gap: space.xs }}>
@@ -356,14 +349,14 @@ export function TaskPage() {
         ))}
         {working && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-            <ActivityIndicator size="small" color={colors.secondaryLabel} />
+            <Spinner />
             <Text variant="footnote" tone="secondary">
               {t("working")}
             </Text>
           </View>
         )}
       </ScrollView>
-      <LogFade />
+      <Fade />
       {/* Clear of the home indicator, as in controller-prototype's TaskPage (insets.bottom under the Composer). */}
       {readOnly ? (
         <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm + insets.bottom }}>
@@ -374,12 +367,10 @@ export function TaskPage() {
           <View style={{ position: "relative" }}>
             {contextOpen && contextUsage && (
               <View style={{ position: "absolute", bottom: "100%", left: "8%", right: "8%", paddingBottom: space.sm, zIndex: 20 }}>
-                <View style={{ borderRadius: radius.card, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, overflow: "hidden", backgroundColor: `${colors.surface}E6`, shadowColor: colors.label, shadowOpacity: 0.035, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-                  <View style={{ padding: space.md, gap: space.xs }}>
-                    <Label icon="info">{t("context.title")}</Label>
-                    <ContextDetails usage={contextUsage} />
-                  </View>
-                </View>
+                <Card raised style={{ padding: space.md, gap: space.xs }}>
+                  <Label icon="info">{t("context.title")}</Label>
+                  <ContextDetails usage={contextUsage} />
+                </Card>
               </View>
             )}
             {/* Like the AI apps on iOS: the field on top and, inside the same box, the main action (controller-prototype's Composer). */}
@@ -387,22 +378,18 @@ export function TaskPage() {
               {attachments.length > 0 && (
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
                   {attachments.map((file) => (
-                    <Pressable key={file.uri} accessibilityRole="button" onPress={() => setAttachments(attachments.filter((item) => item.uri !== file.uri))} style={{ flexDirection: "row", alignItems: "center", gap: space.xs, paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.lg, backgroundColor: colors.fill }}>
-                      <Icon name="attach" size="sm" color="secondaryLabel" />
-                      <Text variant="footnote">{file.name}</Text>
-                    </Pressable>
+                    <Chip key={file.uri} label={file.name} onPress={() => setAttachments(attachments.filter((item) => item.uri !== file.uri))} />
                   ))}
                 </View>
               )}
-              <TextInput
+              <Input
                 ref={input}
                 aria-label={t("placeholder", { name: agent.name })}
                 placeholder={status.online === false ? t("offline") : busy ? t("queued", { name: agent.name }) : t("placeholder", { name: agent.name })}
-                placeholderTextColor={colors.tertiaryLabel}
                 value={text}
                 onChangeText={setText}
                 multiline
-                style={[type.body, { minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm, color: colors.label }]}
+                style={{ minHeight: 40, maxHeight: 140, paddingHorizontal: space.sm, paddingVertical: space.sm }}
               />
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.sm }}>
                 <Pressable accessibilityRole="button" accessibilityLabel={t("attach")} hitSlop={8} onPress={() => void attach()}>

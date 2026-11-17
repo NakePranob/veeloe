@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test";
-import { items } from "./items";
+import { items, summaryOf } from "./items";
 
 const row = (seq: number, kind: string, body: unknown) => ({ seq, kind, body: JSON.stringify(body) });
 const use = (id: string, command: string) => ({ type: "tool_use", id, name: "bash", input: { command } });
-const result = (id: string, content: string, is_error = false) => ({ type: "tool_result", tool_use_id: id, content, ...(is_error ? { is_error } : {}) });
 
 test("the Owner's words, the Agent's text without its thinking, and a failed Turn's code", () => {
   const result = items([
@@ -30,7 +29,7 @@ test("a Turn that has started and not ended shows the Agent working", () => {
 
 test("a command shows after the Agent's words before it, running until its result comes by its id", () => {
   const events = [row(1, "turn.started", {}), row(2, "llm.message", { content: [{ type: "text", text: "looking" }, use("u1", "ls")] })];
-  expect(items(events).items.at(-1)).toEqual({ key: "2-tools", kind: "tools", calls: [{ id: "u1", command: "ls", state: "running" }] });
+  expect(items(events).items.at(-1)).toEqual({ key: "2-tools", kind: "tools", calls: [{ id: "u1", tool: "bash", target: "ls", state: "running" }] });
   const done = items([...events, row(3, "tool.result", { content: [result("u1", "a.txt\nexit code: 0")] }), row(4, "llm.message", { content: [{ type: "text", text: "one file" }] }), row(5, "turn.ended", { reason: "done" })]);
   expect(done.items.map((i) => i.kind)).toEqual(["agent", "tools", "agent"]);
   expect(done.items[1]).toMatchObject({ calls: [{ id: "u1", state: "ok", output: "a.txt\nexit code: 0" }] });
@@ -47,7 +46,7 @@ test("commands back to back fold into one item, each with its own result, and a 
     row(7, "turn.ended", { reason: "done" }),
   ]);
   expect(shown).toHaveLength(2);
-  expect(shown[0]).toMatchObject({ kind: "tools", calls: [{ command: "pwd", state: "ok" }, { command: "ls /nope", state: "failed", output: "No such file\nexit code: 1" }, { command: "echo hi", state: "ok" }] });
+  expect(shown[0]).toMatchObject({ kind: "tools", calls: [{ target: "pwd", state: "ok" }, { target: "ls /nope", state: "failed", output: "No such file\nexit code: 1" }, { target: "echo hi", state: "ok" }] });
 });
 
 test("a command the Turn ended before it answered is unfinished, and a tool without a command shows its name", () => {
@@ -56,7 +55,7 @@ test("a command the Turn ended before it answered is unfinished, and a tool with
     row(2, "llm.message", { content: [use("u1", "sleep 1000"), { type: "tool_use", id: "u2", name: "read", input: { path: "a" } }] }),
     row(3, "turn.ended", { reason: "error", code: "agent.unavailable" }),
   ]);
-  expect(shown[0]).toMatchObject({ kind: "tools", calls: [{ command: "sleep 1000", state: "unfinished" }, { command: "read", state: "unfinished" }] });
+  expect(shown[0]).toMatchObject({ kind: "tools", calls: [{ target: "sleep 1000", state: "unfinished" }, { tool: "read", state: "unfinished" }] });
   expect(shown[1]).toMatchObject({ kind: "error" });
 });
 
@@ -152,4 +151,33 @@ test("a restart that cut a Turn off shows the card that carries it on", () => {
   ]);
   expect(working).toBe(false);
   expect(shown.map((i) => i.kind)).toEqual(["agent", "interrupted"]);
+});
+
+const call = (tool: string, input: unknown, id = tool) => ({ type: "tool_use", id, name: tool, input });
+const result = (id: string, content: string, is_error = false) => ({ type: "tool_result", tool_use_id: id, content, is_error });
+
+test("every tool names what it worked on, and a tool this build does not know shows by its name", () => {
+  const events = [
+    row(1, "turn.started", {}),
+    row(2, "llm.message", { content: [call("read", { path: "src/a.rs" }, "r"), call("glob", { pattern: "**/*.rs" }, "g"), call("grep", { pattern: "timeout" }, "s"), call("edit", { path: "src/a.rs", old_string: "a", new_string: "b" }, "e"), call("write", { path: "b.md", content: "x" }, "w"), call("send_file", { path: "out.pdf" }, "f"), call("memory", { text: "note\nmore" }, "m"), call("web_fetch", { url: "x" }, "x")] }),
+  ];
+  const calls = (items(events).items[0] as { calls: { tool: string; target: string }[] }).calls;
+  expect(calls.map((c) => [c.tool, c.target])).toEqual([["read", "src/a.rs"], ["glob", "**/*.rs"], ["grep", "timeout"], ["edit", "src/a.rs"], ["write", "b.md"], ["send_file", "out.pdf"], ["memory", "note"], ["web_fetch", ""]]);
+});
+
+test("a folded group names the running call, else the latest failed with its last error line, else the last", () => {
+  const c = (id: string, state: "running" | "ok" | "failed", output?: string) => ({ id, tool: "bash", target: id, state, ...(output ? { output } : {}) });
+  expect(summaryOf([c("a", "ok"), c("b", "running"), c("c", "failed", "x")])).toEqual({ call: c("b", "running"), hidden: 2, hiddenFailed: true });
+  expect(summaryOf([c("a", "failed", "first\nlast line\n"), c("b", "ok")])).toEqual({ call: c("a", "failed", "first\nlast line\n"), error: "last line", hidden: 1, hiddenFailed: false });
+  expect(summaryOf([c("a", "ok"), c("b", "ok")])).toEqual({ call: c("b", "ok"), hidden: 1, hiddenFailed: false });
+});
+
+test("a Turn that ended lists the files edit and write changed, once each, and none when it only read or failed", () => {
+  const turn = (calls: unknown[], results: unknown[]) => [row(1, "turn.started", {}), row(2, "llm.message", { content: calls }), row(3, "tool.result", { content: results }), row(4, "turn.ended", { reason: "done" })];
+  const changed = items(turn([call("edit", { path: "a.rs" }, "1"), call("edit", { path: "a.rs" }, "2"), call("write", { path: "b.md" }, "3")], [result("1", "ok"), result("2", "ok"), result("3", "ok")])).items;
+  expect(changed.at(-1)).toMatchObject({ kind: "changes", files: ["a.rs", "b.md"] });
+  const read = items(turn([call("read", { path: "a.rs" }, "1")], [result("1", "x")])).items;
+  expect(read.some((i) => i.kind === "changes")).toBe(false);
+  const failed = items(turn([call("edit", { path: "c.rs" }, "1")], [result("1", "no match", true)])).items;
+  expect(failed.some((i) => i.kind === "changes")).toBe(false);
 });

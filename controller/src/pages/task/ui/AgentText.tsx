@@ -1,13 +1,12 @@
 import { Linking, ScrollView, View } from "react-native";
 import { parseMarkdown, type Inline } from "../../../shared/lib";
-import { radius, space, Text, useColors } from "../../../shared/ui";
+import { Inset, space, Text } from "../../../shared/ui";
 
 function Pieces({ inline }: { inline: Inline[] }) {
-  const colors = useColors();
   return inline.map((piece, i) => {
     if (piece.code) {
       return (
-        <Text key={i} variant="subheadline" mono style={{ backgroundColor: colors.fill }}>
+        <Text key={i} variant="subheadline" code style={{ padding: 0 }}>
           {piece.text}
         </Text>
       );
@@ -15,7 +14,7 @@ function Pieces({ inline }: { inline: Inline[] }) {
     if (piece.link) {
       const url = piece.link;
       return (
-        <Text key={i} role="link" style={{ color: colors.accent, textDecorationLine: "underline" }} onPress={() => Linking.openURL(url)}>
+        <Text key={i} role="link" tone="link" style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL(url)}>
           {piece.text}
         </Text>
       );
@@ -32,23 +31,19 @@ function Pieces({ inline }: { inline: Inline[] }) {
 
 // controller-prototype's AgentText: the Markdown an Agent writes.
 export function AgentText({ text }: { text: string }) {
-  const colors = useColors();
   return (
     <View style={{ gap: space.sm }}>
       {parseMarkdown(text).map((block, i) => {
         switch (block.kind) {
           case "code":
             return (
-              <ScrollView
-                key={i}
-                horizontal
-                style={{ borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: colors.fill }}
-                contentContainerStyle={{ padding: space.md }}
-              >
-                <Text variant="footnote" mono selectable>
-                  {block.text}
-                </Text>
-              </ScrollView>
+              <Inset key={i}>
+                <ScrollView horizontal>
+                  <Text variant="footnote" mono selectable>
+                    {block.text}
+                  </Text>
+                </ScrollView>
+              </Inset>
             );
           case "heading":
             return (
@@ -74,11 +69,11 @@ export function AgentText({ text }: { text: string }) {
           case "quote":
             // No divider lines in this app: a quiet fill and a step in from the margin mark it.
             return (
-              <View key={i} style={{ paddingHorizontal: space.md, paddingVertical: space.sm, marginLeft: space.xs, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: colors.fill }}>
+              <Inset key={i}>
                 <Text selectable tone="secondary">
                   <Pieces inline={block.inline} />
                 </Text>
-              </View>
+              </Inset>
             );
           case "table":
             return (

@@ -3,7 +3,7 @@ import { font, radius, space, type, useColors } from "./theme";
 
 // Running text is label or secondary. Orange and green fall below 4.5:1 at text sizes,
 // so state colour goes on an icon beside the words; red text uses `danger`.
-const TONE = { label: "label", secondary: "secondaryLabel", danger: "redText" } as const;
+const TONE = { label: "label", secondary: "secondaryLabel", danger: "redText", link: "accent" } as const;
 
 interface Props extends TextProps {
   variant?: keyof typeof type;

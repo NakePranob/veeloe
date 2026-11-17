@@ -4,13 +4,16 @@ import { covers, missingParts } from "../../../entities/agent";
 import { useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { fromNow } from "../../../shared/lib";
-import { Button, Card, Field, Icon, Label, radius, space, Text, useColors, type IconName } from "../../../shared/ui";
+import { AgentCard, Character, type Look } from "../../../entities/character";
+import { Button, Field, Inset, Label, space, Text, type IconName } from "../../../shared/ui";
 import type { Approval, ApprovalStatus } from "../model/items";
 
 interface Props {
   approval: Approval;
   /** The Agent's name, as the card says who is asking. */
   agentName: string;
+  /** The asking Agent's Character: the card takes its colour, and the head waits with a raised hand. */
+  look: Look;
   /** The Allowlist as the Machine last sent it, for "allow always" and the coverage hints. */
   allowlist: readonly string[];
   canAnswer: boolean;
@@ -32,9 +35,8 @@ const OUTCOME: Record<Exclude<ApprovalStatus, "open">, { icon: IconName; color: 
 
 // The one orange thing on the screen while it waits; once answered it settles
 // into the log like any other event (controller-prototype's ApprovalCard).
-export function ApprovalCard({ approval, agentName, allowlist, canAnswer, canManage, online, now, onAnswer, onSteer }: Props) {
+export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, canManage, online, now, onAnswer, onSteer }: Props) {
   const t = useT("task");
-  const colors = useColors();
   const open = approval.status === "open";
   // A domain approval is the proxy asking for one host outside the Agent's
   // Egress (issue #44): the same card, with three answers and no Allowlist.
@@ -72,9 +74,9 @@ export function ApprovalCard({ approval, agentName, allowlist, canAnswer, canMan
 
   const outcome = open ? null : OUTCOME[approval.status as Exclude<ApprovalStatus, "open">];
   return (
-    <Card>
+    <AgentCard color={look.color}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-        <Icon name="approval" size="md" color={open ? "orange" : "tertiaryLabel"} />
+        <Character look={look} mood={open ? "waiting" : "idle"} size={44} still />
         <Text variant="headline" style={{ flex: 1 }}>
           {domain ? t("approval.domainTitle", { name: agentName }) : t("approval.title", { name: agentName })}
         </Text>
@@ -92,11 +94,11 @@ export function ApprovalCard({ approval, agentName, allowlist, canAnswer, canMan
           {t("approval.domainBody", { name: agentName })}
         </Text>
       )}
-      <View style={{ paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: colors.fill }}>
+      <Inset>
         <Text variant="footnote" mono selectable>
           {domain ? approval.domain : approval.command}
         </Text>
-      </View>
+      </Inset>
       {outcome && (
         <Label icon={outcome.icon} iconColor={outcome.color}>
           {t(outcome.key as "approval.approved" | "approval.denied" | "approval.expired" | "approval.closed")}
@@ -156,6 +158,6 @@ export function ApprovalCard({ approval, agentName, allowlist, canAnswer, canMan
           </View>
         </>
       )}
-    </Card>
+    </AgentCard>
   );
 }
