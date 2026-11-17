@@ -3,6 +3,7 @@ export { Bars } from "./bars";
 export { Card } from "./card";
 export { Bubble, Fade, FADE, Inset, Input, Ring } from "./chat";
 export { Chip } from "./chip";
+export { Dot } from "./dot";
 export { Empty, Field, Note, Row, Screen, Section, ToggleRow } from "./forms";
 export { HeaderAction } from "./header-action";
 export { Icon, type IconName } from "./icon";

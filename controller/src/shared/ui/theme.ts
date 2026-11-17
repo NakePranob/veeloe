@@ -47,6 +47,9 @@ const light = {
   red: "#d92d20",
   // Red that reads as text on the screen and on a card.
   redText: "#b42318",
+  // A card that says something failed, or that a person is needed.
+  redSoft: "#fef3f2",
+  orangeSoft: "#fff4ec",
 };
 
 export type Colors = typeof light;
@@ -74,6 +77,8 @@ const dark: Colors = {
   green: "#3fb37a",
   red: "#f04438",
   redText: "#ff6b5e",
+  redSoft: "#2a1715",
+  orangeSoft: "#2b1d12",
 };
 
 // A card on the screen has no shadow. Only what floats over content does, such as
@@ -131,7 +136,7 @@ export const motion = {
 
 // Icon sizes: xs beside a caption, sm beside a footnote, md beside a headline,
 // lg for a composer action, xl for an empty state.
-export const icon = { xs: 12, sm: 15, md: 18, lg: 32, xl: 44 };
+export const icon = { xs: 12, sm: 16, md: 20, lg: 32, xl: 44 };
 
 // Content stops growing past a readable measure on a computer.
 export const column = { width: "100%", maxWidth: 720, alignSelf: "center" } as const;

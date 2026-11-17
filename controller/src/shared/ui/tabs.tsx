@@ -1,46 +1,47 @@
-import { Pressable, ScrollView, View } from "react-native";
-import { Chip } from "./chip";
+import { Pressable, View } from "react-native";
 import { Text } from "./text";
-import { radius, space, useColors } from "./theme";
+import { radius, space, useColors, useShadows } from "./theme";
 
 export interface Tab<T extends string> {
   value: T;
   label: string;
-  // Shown beside the label when given; urgent makes it orange.
+  // Shown beside the label when given; urgent makes it an orange badge.
   count?: number;
   urgent?: boolean;
 }
 
-// Pills in a row, the chosen one in ink. No underline and no track behind them.
+// The Inbox board's segmented control: a grey track, the chosen tab a white pill lifted by a soft
+// shadow, the rest plain grey words. Each tab takes an equal share of the width.
 export function Tabs<T extends string>({ items, value, onChange }: { items: Tab<T>[]; value: T; onChange: (value: T) => void }) {
   const colors = useColors();
+  const shadows = useShadows();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} role="tablist" contentContainerStyle={{ gap: 6 }}>
+    <View role="tablist" style={{ flexDirection: "row", gap: 2, padding: space.xs, borderRadius: radius.pill, backgroundColor: colors.card }}>
       {items.map((item) => {
         const on = item.value === value;
+        const shown = item.count != null && item.count > 0;
         return (
-          <Pressable key={item.value} role="tab" aria-selected={on} onPress={() => onChange(item.value)} hitSlop={{ top: 4, bottom: 4 }}>
-            {({ pressed }) => (
-              <View
-                style={{
-                  height: 36,
-                  paddingHorizontal: space.md,
-                  borderRadius: radius.pill,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  backgroundColor: on ? colors.accent : pressed ? colors.chipPressed : colors.chip,
-                }}
-              >
-                <Text variant="subheadline" strong style={on ? { color: colors.onAccent } : undefined}>
-                  {item.label}
-                </Text>
-                {item.count != null && item.count > 0 && <Chip tone="count" label={String(item.count)} urgent={item.urgent} />}
-              </View>
-            )}
+          <Pressable key={item.value} role="tab" aria-selected={on} onPress={() => onChange(item.value)} style={{ flex: 1 }}>
+            <View style={{ height: 38, borderRadius: radius.pill, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, backgroundColor: on ? colors.surface : "transparent", boxShadow: on ? shadows.raised : undefined }}>
+              <Text variant="subheadline" strong numberOfLines={1} tone={on ? "label" : "secondary"} style={{ fontSize: 14 }}>
+                {item.label}
+              </Text>
+              {shown &&
+                (item.urgent ? (
+                  <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.orange }}>
+                    <Text variant="caption" strong style={{ fontSize: 11, color: colors.label }}>
+                      {item.count}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text variant="caption" tone="secondary">
+                    {item.count}
+                  </Text>
+                ))}
+            </View>
           </Pressable>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }

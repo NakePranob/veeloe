@@ -10,9 +10,9 @@ import { radius, space, type, useColors } from "./theme";
 export function Bubble({ text, queued, note }: { text: string; queued?: boolean; note?: ReactNode }) {
   const colors = useColors();
   return (
-    <View style={{ alignSelf: "flex-end", alignItems: "flex-end", maxWidth: "80%", gap: space.xs }}>
-      <View style={{ paddingHorizontal: space.lg, paddingVertical: space.sm + 2, borderRadius: 22, borderBottomRightRadius: 6, borderCurve: "continuous", backgroundColor: colors.accent, opacity: queued ? 0.55 : 1 }}>
-        <Text selectable style={{ color: colors.onAccent }}>
+    <View style={{ alignSelf: "flex-end", alignItems: "flex-end", maxWidth: "78%", gap: space.xs }}>
+      <View style={{ paddingHorizontal: space.lg, paddingVertical: 11, borderRadius: 22, borderBottomRightRadius: 6, borderCurve: "continuous", backgroundColor: colors.accent, opacity: queued ? 0.55 : 1 }}>
+        <Text selectable variant="subheadline" style={{ color: colors.onAccent, lineHeight: 22 }}>
           {text}
         </Text>
       </View>
@@ -70,7 +70,8 @@ export function Ring({ ratio, tone }: { ratio: number; tone: keyof typeof RING_T
 }
 
 /** A quiet block set off by the fill, for a quote or a code sample. */
-export function Inset({ children }: { children: ReactNode }) {
+// chip: the white code chip inside a coloured card, as an Approval shows its command.
+export function Inset({ children, chip }: { children: ReactNode; chip?: boolean }) {
   const colors = useColors();
-  return <View style={{ paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: colors.fill }}>{children}</View>;
+  return <View style={{ paddingHorizontal: chip ? 14 : space.md, paddingVertical: space.sm, borderRadius: chip ? 14 : radius.sm, borderCurve: "continuous", backgroundColor: chip ? colors.surface : colors.fill }}>{children}</View>;
 }

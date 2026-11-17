@@ -49,13 +49,13 @@ export function Section({ title, footer, children }: { title?: string; footer?: 
   return (
     <View style={{ gap: space.sm }}>
       {title && (
-        <Text variant="footnote" strong tone="secondary" style={{ paddingHorizontal: space.sm }}>
+        <Text variant="footnote" strong tone="secondary" style={{ paddingHorizontal: 14 }}>
           {title}
         </Text>
       )}
-      {children != null && <Card style={{ padding: space.xs, gap: 0 }}>{children}</Card>}
+      {children != null && <Card style={{ padding: 0, gap: 0, overflow: "hidden" }}>{children}</Card>}
       {footer && (
-        <Text variant="footnote" tone="secondary" style={{ paddingHorizontal: space.sm }}>
+        <Text variant="caption" tone="secondary" style={{ paddingHorizontal: 14, lineHeight: 18 }}>
           {footer}
         </Text>
       )}
@@ -84,14 +84,14 @@ interface RowProps {
 export function Row({ title, detail, value, icon, leading, iconColor, href, onPress, destructive, mono, accessory }: RowProps) {
   const colors = useColors();
   const body = (pressed: boolean) => (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: space.sm, paddingVertical: space.sm, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: pressed ? colors.chipPressed : "transparent" }}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md, backgroundColor: pressed ? colors.chipPressed : "transparent" }}>
       {leading ?? (icon && <Icon name={icon} size="md" color={iconColor ?? (destructive ? "red" : "label")} />)}
       <View style={{ flex: 1, gap: 2 }}>
         <Text mono={mono} strong={destructive} tone={destructive ? "danger" : "label"} variant="subheadline" selectable={!href && !onPress}>
           {title}
         </Text>
         {detail && (
-          <Text variant="footnote" tone="secondary" selectable={!href && !onPress}>
+          <Text variant="caption" tone="secondary" selectable={!href && !onPress}>
             {detail}
           </Text>
         )}
@@ -102,7 +102,7 @@ export function Row({ title, detail, value, icon, leading, iconColor, href, onPr
         </Text>
       )}
       {accessory}
-      {href && <Icon name="disclosure" size="xs" color="tertiaryLabel" weight="semibold" />}
+      {href && <Icon name="disclosure" size="sm" color="secondaryLabel" weight="semibold" />}
     </View>
   );
   // Link's Slot drops a Pressable style function on web, so the look lives on an inner View.
@@ -147,8 +147,8 @@ interface FieldProps {
 export function Field({ label, value, onChangeText, placeholder, footer, multiline, mono, keyboardType, secure, action }: FieldProps) {
   const colors = useColors();
   return (
-    <View style={{ gap: space.xs, padding: space.xs }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 52, paddingLeft: space.lg, paddingRight: action ? space.xs : space.lg, paddingVertical: space.xs, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.surface }}>
+    <View style={{ gap: space.xs, paddingTop: space.xs, paddingHorizontal: 6, paddingBottom: 6 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 52, paddingLeft: 14, paddingRight: action ? space.xs : 14, paddingVertical: 7, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.surface }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text variant="caption" tone="secondary">
             {label}

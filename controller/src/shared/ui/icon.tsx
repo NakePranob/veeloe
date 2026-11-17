@@ -41,6 +41,12 @@ const SYMBOLS = {
   edit: { ios: "pencil", android: "edit", web: "edit" },
   // Draw a new random look.
   shuffle: { ios: "dice", android: "casino", web: "casino" },
+  // An Agent's Character, as a head.
+  character: { ios: "face.smiling", android: "smart_toy", web: "smart_toy" },
+  file: { ios: "doc.text", android: "description", web: "description" },
+  share: { ios: "square.and.arrow.up", android: "ios_share", web: "ios_share" },
+  faceId: { ios: "faceid", android: "fingerprint", web: "fingerprint" },
+  storage: { ios: "externaldrive", android: "storage", web: "storage" },
   branch: { ios: "arrow.triangle.branch", android: "fork_right", web: "fork_right" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 
