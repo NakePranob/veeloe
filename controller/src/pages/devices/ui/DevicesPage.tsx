@@ -32,7 +32,7 @@ export function DevicesPage() {
       {revoked.length > 0 && (
         <Section title={t("revokedSection")}>
           {revoked.map((device) => (
-            <Row key={device.key} icon="device" title={device.name || t("firstDevice")} detail={t("revokedDetail")} />
+            <Row key={device.key} title={device.name || t("firstDevice")} detail={t("revokedDetail")} />
           ))}
         </Section>
       )}
@@ -102,7 +102,7 @@ function DeviceRow({ device, devices, here }: { device: Device; devices: Device[
 
   return (
     <View>
-      <Row icon="device" title={name} detail={detail} accessory={here ? <Chip tone="choice" selected label={t("thisDevice")} /> : undefined} onPress={() => setOpen(!open)} />
+      <Row title={name} detail={detail} accessory={here ? <Chip tone="choice" selected label={t("thisDevice")} /> : undefined} onPress={() => setOpen(!open)} />
       {open && (
         <Card raised style={{ marginHorizontal: space.sm, marginBottom: space.sm, padding: 0, gap: 0, borderRadius: 16, boxShadow: "none" }}>
           {renaming ? (
@@ -112,7 +112,7 @@ function DeviceRow({ device, devices, here }: { device: Device; devices: Device[
               <Row title={t("rename.cancel")} onPress={() => setRenaming(false)} />
             </>
           ) : (
-            <Row icon="device" title={t("rename.action")} onPress={startRename} />
+            <Row icon="edit" title={t("rename.action")} onPress={startRename} />
           )}
           {signed.length > 0 && (
             <>

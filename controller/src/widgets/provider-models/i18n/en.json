@@ -6,7 +6,7 @@
   },
   "asking": "Asking the Machine which Providers it has",
   "provider": {
-    "heading": "Provider and model",
+    "heading": "Provider",
     "footer": "The models come from the Providers set on this Machine. Someone with Manage can change them later, from the next Task on (ADR 0042).",
     "none": "This Machine has no Provider yet",
     "command": "veeloe provider add --name <name> --url <base url>",

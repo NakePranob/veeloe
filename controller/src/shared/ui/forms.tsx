@@ -147,7 +147,8 @@ interface FieldProps {
 export function Field({ label, value, onChangeText, placeholder, footer, multiline, mono, keyboardType, secure, action }: FieldProps) {
   const colors = useColors();
   return (
-    <View style={{ gap: space.xs, paddingTop: space.xs, paddingHorizontal: 6, paddingBottom: 6 }}>
+    // Its own grey card, so a Field reads on the white screen too; inside a Section it is the same grey.
+    <View style={{ gap: space.xs, paddingTop: space.xs, paddingHorizontal: 6, paddingBottom: 6, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: colors.card }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 52, paddingLeft: 14, paddingRight: action ? space.xs : 14, paddingVertical: 7, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.surface }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text variant="caption" tone="secondary">

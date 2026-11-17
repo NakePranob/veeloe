@@ -54,10 +54,11 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
           </Text>
         </View>
         {share !== null && <Meter value={share} label={t("budget", { percent: Math.round(share * 100) })} />}
-        <Text variant="caption" tone={spent ? "danger" : dim ? "secondary" : "label"}>
-          {line}
-          {share !== null ? ` · ${t("budget", { percent: Math.round(share * 100) })}${spent ? t("spent") : ""}` : ""}
-        </Text>
+        {(line || share !== null) && (
+          <Text variant="caption" tone={spent ? "danger" : "secondary"}>
+            {[line, share !== null ? `${t("budget", { percent: Math.round(share * 100) })}${spent ? t("spent") : ""}` : ""].filter(Boolean).join(" · ")}
+          </Text>
+        )}
       </View>
     </Tap>
   );

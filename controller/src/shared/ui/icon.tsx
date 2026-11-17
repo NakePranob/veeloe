@@ -9,7 +9,7 @@ const SYMBOLS = {
   approval: { ios: "hand.raised.fill", android: "back_hand", web: "back_hand" },
   shield: { ios: "checkmark.shield", android: "verified_user", web: "verified_user" },
   scan: { ios: "qrcode.viewfinder", android: "qr_code_scanner", web: "qr_code_scanner" },
-  agent: { ios: "cpu", android: "smart_toy", web: "smart_toy" },
+  agent: { ios: "face.smiling", android: "smart_toy", web: "smart_toy" },
   send: { ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" },
   add: { ios: "plus", android: "add", web: "add" },
   attach: { ios: "paperclip", android: "attach_file", web: "attach_file" },

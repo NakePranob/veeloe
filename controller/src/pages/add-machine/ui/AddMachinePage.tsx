@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { describeError, useT } from "../../../shared/i18n";
-import { Button, Card, Field, Icon, QrScanner, Spinner, Text, column, space } from "../../../shared/ui";
+import { Button, Card, Field, Icon, QrScanner, Spinner, StepNumber, Text, column, space } from "../../../shared/ui";
 import { usePairMachine } from "../model/use-pair-machine";
 
 const linkProblem = { malformed: "pairing.link_malformed", "bad-signature": "pairing.link_bad_signature", expired: "pairing.link_expired" } as const;
@@ -131,11 +131,7 @@ export function AddMachinePage() {
 
   const step = (n: number, heading: string, children: ReactNode) => (
     <View style={{ flexDirection: "row", gap: space.md }}>
-      <Card style={{ width: 26, height: 26, borderRadius: 13, padding: 0, alignItems: "center", justifyContent: "center" }}>
-        <Text variant="footnote" strong>
-          {n}
-        </Text>
-      </Card>
+      <StepNumber n={n} />
       <View style={{ flex: 1, gap: space.sm, paddingTop: 2 }}>
         <Text variant="subheadline" strong>
           {heading}
