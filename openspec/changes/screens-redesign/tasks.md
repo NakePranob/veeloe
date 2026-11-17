@@ -1,8 +1,8 @@
 ## 1. กลุ่ม Inbox
 
 - [ ] 1.1 ทำกระดาน Inbox ให้ครบ: แท็บว่างของทุกแท็บ, ยังไม่มี Agent, กำลังโหลด, Machine ออฟไลน์, จอกว้างที่ Inbox อยู่ข้าง Task และโหมดมืด; ตรวจตามรายการใน design.md ข้อ 2
-- [ ] 1.2 เพิ่ม `tabOf(status)` และการนับต่อแท็บใน `widgets/agent-inbox/model` ตามตารางใน design.md ข้อ 1; ตรวจด้วย test ที่ครอบทุกสถานะและลำดับภายในแท็บ
-- [ ] 1.3 ใส่ `Tabs` จาก `shared/ui` ใน Inbox พร้อมจำนวน แท็บว่าง และจำแท็บระหว่างเปิดแอป และเพิ่มคำทั้งสองภาษา; ตรวจทุก scenario ของ requirement Inbox บน iOS Simulator ผ่าน `bun run dev:ios`
+- [x] 1.2 เพิ่ม `tabOf(status)` และการนับต่อแท็บใน `widgets/agent-inbox/model` ตามตารางใน design.md ข้อ 1; ตรวจด้วย test ที่ครอบทุกสถานะและลำดับภายในแท็บ
+- [x] 1.3 ใส่ `Tabs` จาก `shared/ui` ใน Inbox พร้อมจำนวน แท็บว่าง และจำแท็บระหว่างเปิดแอป และเพิ่มคำทั้งสองภาษา; ตรวจทุก scenario ของ requirement Inbox บน iOS Simulator ผ่าน `bun run dev:ios`
 - [ ] 1.4 ปรับแถวของ Inbox ตามกระดาน (Character ขนาดใหญ่, บรรทัดสถานะมีสี, เวลา, ข้อความล่าสุด) และจอกว้าง; ตรวจบน iOS Simulator และ web ทั้งสองโหมดและสองภาษา พร้อมภาพหน้าจอใน PR
 
 ## 2. กลุ่ม Agent

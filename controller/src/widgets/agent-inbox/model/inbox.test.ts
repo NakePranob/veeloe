@@ -4,7 +4,7 @@ import * as tasks from "../../../entities/task/model/tasks";
 // The entity's public API also brings its React hooks and expo-sqlite, which Bun cannot load.
 // A plain factory: an async one for the same module as links.test hangs Bun when both run in one process.
 mock.module("../../../entities/task", () => tasks);
-const { inboxRows } = await import("./inbox");
+const { countsOf, inboxRows, rowsOf, tabOf } = await import("./inbox");
 
 const agent = (id: string, machine_id = "m1") => ({ id, machine_id });
 const ended = (reason: "done" | "error") => ({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason }) });
@@ -28,4 +28,18 @@ test("one row per Agent with its latest Task: working first, then failed and don
 
 test("a Machine nobody has heard from yet is not called offline", () => {
   expect(inboxRows([agent("a")], [], () => null)[0]!.status).toBe("new");
+});
+
+test("an Agent waiting on its Owner, failed or interrupted needs you; not started and offline are in All only", () => {
+  expect(tabOf("waiting")).toBe("needsYou");
+  expect(tabOf("failed")).toBe("needsYou");
+  expect(tabOf("interrupted")).toBe("needsYou");
+  expect(tabOf("working")).toBe("working");
+  expect(tabOf("done")).toBe("done");
+  expect(tabOf("new")).toBeNull();
+  expect(tabOf("offline")).toBeNull();
+  const rows = [{ status: "working" as const }, { status: "waiting" as const }, { status: "offline" as const }, { status: "failed" as const }];
+  expect(rowsOf(rows, "all")).toEqual(rows);
+  expect(rowsOf(rows, "needsYou")).toEqual([{ status: "waiting" }, { status: "failed" }]);
+  expect(countsOf(rows)).toEqual({ needsYou: 2, working: 1 });
 });

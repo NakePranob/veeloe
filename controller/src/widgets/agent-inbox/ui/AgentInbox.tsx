@@ -1,6 +1,6 @@
 import { randomUUID } from "expo-crypto";
 import { router } from "expo-router";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { FlatList, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
@@ -9,8 +9,8 @@ import { latestEvents, previewOf, TaskStatusLabel, useTaskSummaries, type TaskSt
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Button, Empty, Icon, Tap, Text, column, radius, space } from "../../../shared/ui";
-import { inboxRows } from "../model/inbox";
+import { Button, Empty, Icon, Tabs, Tap, Text, column, radius, space } from "../../../shared/ui";
+import { countsOf, inboxRows, rowsOf, type InboxTab } from "../model/inbox";
 
 const AVATAR = 44;
 
@@ -91,17 +91,41 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
   const tasks = useTaskSummaries();
   const statuses = useMachineStatuses();
   const now = useNow();
+  // Kept while the app is open; a fresh launch starts on All so no Agent is out of sight.
+  const [tab, setTab] = useState<InboxTab>("all");
   if (machines === null || agents === null || tasks === null) return header ?? null;
   const machineName = new Map(machines.map((m) => [m.id, m.name]));
   const online = (machine: string) => statuses[machine]?.online ?? null;
+  const rows = inboxRows(agents, tasks, online);
+  const counts = countsOf(rows);
+  const tabs =
+    rows.length > 0 ? (
+      <View style={{ paddingHorizontal: space.lg, paddingBottom: space.md }}>
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          items={[
+            { value: "all", label: t("tabs.all") },
+            { value: "needsYou", label: t("tabs.needsYou"), count: counts.needsYou, urgent: true },
+            { value: "working", label: t("tabs.working"), count: counts.working },
+            { value: "done", label: t("tabs.done") },
+          ]}
+        />
+      </View>
+    ) : null;
   return (
     <FlatList
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={column}
-      data={inboxRows(agents, tasks, online)}
+      data={rowsOf(rows, tab)}
       keyExtractor={(row) => row.agent.id}
-      ListHeaderComponent={<>{header}</>}
-      ListEmptyComponent={<Empty icon="agent" title={t("noAgents.title")} detail={t("noAgents.body")} action={<Button label={t("noAgents.action")} variant="primary" onPress={() => router.push("/agents/new")} />} />}
+      ListHeaderComponent={
+        <>
+          {header}
+          {tabs}
+        </>
+      }
+      ListEmptyComponent={tab !== "all" ? <Empty icon="inbox" title={t(`emptyTab.${tab}`)} /> : <Empty icon="agent" title={t("noAgents.title")} detail={t("noAgents.body")} action={<Button label={t("noAgents.action")} variant="primary" onPress={() => router.push("/agents/new")} />} />}
       // No separators: rows are set apart by their spacing, not by lines.
       renderItem={({ item }) => (
         <InboxRow

@@ -19,3 +19,20 @@ export function inboxRows<A extends InboxAgent, T extends InboxTask>(agents: A[]
     })
     .sort((a, b) => ORDER[a.status] - ORDER[b.status] || (b.task?.updated_at ?? 0) - (a.task?.updated_at ?? 0));
 }
+
+/** The Inbox's tabs, by what the Owner has to do (screens-redesign). */
+export type InboxTab = "all" | "needsYou" | "working" | "done";
+
+/** Which tab an Agent shows in besides All: one waiting on an Approval, failed or interrupted needs its Owner; one not started or offline is in All only. */
+export function tabOf(status: TaskStatus): Exclude<InboxTab, "all"> | null {
+  if (status === "waiting" || status === "failed" || status === "interrupted") return "needsYou";
+  if (status === "working") return "working";
+  if (status === "done") return "done";
+  return null;
+}
+
+/** The rows a tab shows, in the All tab's order. */
+export const rowsOf = <R extends { status: TaskStatus }>(rows: R[], tab: InboxTab) => (tab === "all" ? rows : rows.filter((row) => tabOf(row.status) === tab));
+
+/** How many rows each tab would show. */
+export const countsOf = (rows: { status: TaskStatus }[]) => ({ needsYou: rowsOf(rows, "needsYou").length, working: rowsOf(rows, "working").length });
