@@ -1,8 +1,9 @@
 import { TaskEventKind } from "@veeloe/protocol-ts";
 
 // How the Agent's Character carries itself (CONTEXT.md): it follows the events, the LLM never picks it.
-// The prototype's six: it raises a hand while it waits on a person (`approval-and-allowlist`).
-export type Mood = "idle" | "thinking" | "working" | "waiting" | "done" | "offline";
+// It raises a hand while it waits on a person, and slumps when a Turn fails (controller-character).
+// stuck is drawn but nothing sets it yet: the Runtime reports a stalled Turn in live-tool-output.
+export type Mood = "idle" | "thinking" | "working" | "waiting" | "done" | "failed" | "stuck" | "offline";
 
 /** An event as the database keeps it: its kind, and its body as JSON. */
 export type StoredEvent = { kind: string; body: string | null };
@@ -32,8 +33,8 @@ export function moodOf(events: readonly StoredEvent[], online: boolean | null): 
   const body = parse(last.body);
   // An Approval waiting on a person: the hand goes up, and stays up until someone answers.
   if (last.kind === TaskEventKind.ApprovalRequested) return "waiting";
-  // A Turn that failed has nothing to celebrate.
-  if (last.kind === TaskEventKind.TurnEnded) return body.reason === "done" ? "done" : "idle";
+  // A Turn that failed slumps; one a person stopped, or the Machine restarted, just rests.
+  if (last.kind === TaskEventKind.TurnEnded) return body.reason === "done" ? "done" : body.reason === "error" ? "failed" : "idle";
   if (last.kind === TaskEventKind.LlmMessage && Array.isArray(body.content) && body.content.some((block) => block?.type === "tool_use")) return "working";
   return "thinking";
 }

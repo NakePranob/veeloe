@@ -12,18 +12,20 @@
     "working": "Working",
     "waiting": "Waiting",
     "done": "Done",
+    "failed": "Failed",
+    "stuck": "Stuck",
     "offline": "Offline"
   },
   "color": "Colour",
   "colorOption": "Colour {{name}}",
   "colors": {
-    "peach": "Peach",
-    "sky": "Sky",
-    "sage": "Sage",
-    "lilac": "Lilac",
-    "rose": "Rose",
     "butter": "Butter",
+    "sky": "Sky",
     "mint": "Mint",
+    "lilac": "Lilac",
+    "peach": "Peach",
+    "orange": "Orange",
+    "rose": "Rose",
     "sand": "Sand"
   },
   "option": "{{slot}} {{name}}",
@@ -34,10 +36,32 @@
     "decal": "Decal"
   },
   "parts": {
-    "shell": { "box": "Box", "capsule": "Capsule", "dome": "Dome", "chamfer": "Chamfer" },
-    "top": { "none": "None", "antenna": "Antenna", "twin": "Twin", "fin": "Fin", "beacon": "Beacon" },
-    "sides": { "none": "None", "ears": "Bolts", "pods": "Pods", "fins": "Wings" },
-    "decal": { "none": "None", "brow": "Brow", "lights": "Lights", "grille": "Grille" }
+    "shell": {
+      "box": "Box",
+      "capsule": "Capsule",
+      "dome": "Dome",
+      "chamfer": "Chamfer",
+      "round": "Round"
+    },
+    "top": {
+      "none": "None",
+      "antenna": "Antenna",
+      "twin": "Twin",
+      "fin": "Fin",
+      "beacon": "Beacon"
+    },
+    "sides": {
+      "none": "None",
+      "ears": "Bolts",
+      "pods": "Pods",
+      "fins": "Wings"
+    },
+    "decal": {
+      "none": "None",
+      "brow": "Brow",
+      "lights": "Lights",
+      "grille": "Grille"
+    }
   },
   "shuffle": "Shuffle parts",
   "saving": "Saving on the Machine",

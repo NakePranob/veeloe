@@ -1,8 +1,16 @@
 // A Character's look (CONTEXT.md): a floating robot head with a shell, and one part in each of its
 // three sockets, in the Agent's colour. The Machine keeps it with the Agent as it was picked, so a
 // later version of these lists never changes how an existing Agent looks.
-export const COLORS = ["#F4B183", "#9DC3E6", "#A9D18E", "#C9B3E6", "#F2A7B8", "#F3D98B", "#92D5C8", "#D8C3A5"] as const;
-export const SHELLS = ["box", "capsule", "dome", "chamfer"] as const;
+// The colour an Agent with no Character gets. Apart from the picker's colours on purpose: a later
+// palette must never change how an existing Agent looks (controller-character).
+export const DEFAULT_COLOR = "#F4B183";
+// The colours the picker and a shuffle offer, from the redesign's Character sheet. An Agent keeps
+// whatever colour it was given, so one from an older palette still draws in its own colour.
+export const COLORS = ["#FFD84D", "#8CCBFF", "#7EE0B5", "#C4B1FF", "#FFB3A1", "#FFB066", "#FFA8D2", "#E3CFA8"] as const;
+// The colour names, in COLORS's order, for what a screen reader says on each swatch.
+export const COLOR_NAMES = ["butter", "sky", "mint", "lilac", "peach", "orange", "rose", "sand"] as const;
+// round is last, so a Controller that does not know it still falls back to box.
+export const SHELLS = ["box", "capsule", "dome", "chamfer", "round"] as const;
 export const TOPS = ["none", "antenna", "twin", "fin", "beacon"] as const;
 export const SIDES = ["none", "ears", "pods", "fins"] as const;
 export const DECALS = ["none", "brow", "lights", "grille"] as const;
@@ -27,7 +35,7 @@ const one = <T extends string>(options: readonly T[], value: unknown): T => (opt
 // before it had a Character gets the first of everything, the one default look.
 export function lookOf(raw: Partial<Record<keyof Look, unknown>> | null | undefined): Look {
   return {
-    color: typeof raw?.color === "string" && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color : COLORS[0],
+    color: typeof raw?.color === "string" && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color : DEFAULT_COLOR,
     shell: one(SHELLS, raw?.shell),
     top: one(TOPS, raw?.top),
     sides: one(SIDES, raw?.sides),
@@ -59,4 +67,11 @@ export function shuffleLook(others: Look[], random = Math.random): Look {
     const look: Look = { color: draw(COLORS, random), shell: draw(SHELLS, random), top: draw(TOPS, random), sides: draw(SIDES, random), decal: draw(DECALS, random) };
     if (tries >= 50 || !others.some((other) => sameLook(other, look))) return look;
   }
+}
+
+/** A colour lifted toward white: 0 is the colour, 1 is white. The Character page's stage and a picked tile. */
+export function tint(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const lift = (v: number) => Math.round(v + (255 - v) * amount).toString(16).padStart(2, "0");
+  return "#" + lift(n >> 16) + lift((n >> 8) & 255) + lift(n & 255);
 }

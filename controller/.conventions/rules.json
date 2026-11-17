@@ -191,10 +191,6 @@
         {
           "path": "src/pages/task/ui/",
           "until": "task-thread-redesign"
-        },
-        {
-          "path": "src/pages/agent-character/",
-          "until": "character-look"
         }
       ],
       "violation": [

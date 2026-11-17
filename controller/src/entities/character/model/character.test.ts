@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { COLORS, DECALS, lookOf, lookOfJson, sameLook, SHELLS, shuffleLook, SIDES, TOPS } from "./look";
+import { COLORS, DECALS, DEFAULT_COLOR, lookOf, lookOfJson, sameLook, SHELLS, shuffleLook, SIDES, tint, TOPS } from "./look";
 import { moodOf } from "./mood";
 
 test("a shuffle draws only from the lists, and every option of every slot comes up", () => {
@@ -19,14 +19,15 @@ test("a shuffle skips a look another Agent has", () => {
   // The first draw always gives the first of everything, the second something else.
   let n = 0;
   const random = () => (n++ < 5 ? 0 : 0.99);
-  const taken = lookOf({});
+  // The look the first draw gives: the first of every list, which is not the default look any more.
+  const taken = lookOf({ color: COLORS[0] });
   const look = shuffleLook([taken], random);
   expect(sameLook(look, taken)).toBe(false);
   expect(look).toEqual({ color: COLORS.at(-1)!, shell: SHELLS.at(-1)!, top: TOPS.at(-1)!, sides: SIDES.at(-1)!, decal: DECALS.at(-1)! });
 });
 
 test("no Character is the one default look, and a slot this build does not know falls back alone", () => {
-  expect(lookOf(null)).toEqual({ color: COLORS[0], shell: "box", top: "none", sides: "none", decal: "none" });
+  expect(lookOf(null)).toEqual({ color: DEFAULT_COLOR, shell: "box", top: "none", sides: "none", decal: "none" });
   expect(lookOfJson(null)).toEqual(lookOf(null));
   expect(lookOfJson("not json")).toEqual(lookOf(null));
   expect(lookOfJson(JSON.stringify({ color: "#9DC3E6", shell: "orb", top: "antenna", sides: "ears", decal: "grille" }))).toEqual({ color: "#9DC3E6", shell: "box", top: "antenna", sides: "ears", decal: "grille" });
@@ -46,8 +47,11 @@ test("the six Moods come from the latest event and whether the Machine is online
   expect(moodOf([e("turn.started")], false)).toBe("offline");
 });
 
-test("a failed Turn is idle, a tool result goes back to thinking, and an unknown Machine is not offline", () => {
-  expect(moodOf([e("turn.started"), e("turn.ended", { reason: "error", code: "provider.unreachable" })], true)).toBe("idle");
+test("a failed Turn is failed, a stopped or interrupted one idle, a tool result goes back to thinking, and an unknown Machine is not offline", () => {
+  expect(moodOf([e("turn.started"), e("turn.ended", { reason: "error", code: "provider.unreachable" })], true)).toBe("failed");
+  expect(moodOf([e("turn.started"), e("turn.ended", { reason: "stopped" })], true)).toBe("idle");
+  expect(moodOf([e("turn.started"), e("turn.ended", { reason: "interrupted" })], true)).toBe("idle");
+  expect(moodOf([e("turn.ended", { reason: "error" })], false)).toBe("offline");
   const tool = [e("turn.started"), e("llm.message", { content: [{ type: "tool_use", id: "t", name: "bash", input: {} }] })];
   expect(moodOf(tool, true)).toBe("working");
   expect(moodOf([...tool, e("tool.result", { content: [{ type: "tool_result", tool_use_id: "t" }] })], true)).toBe("thinking");
@@ -57,4 +61,20 @@ test("a failed Turn is idle, a tool result goes back to thinking, and an unknown
 test("an event of a kind this build does not know is skipped", () => {
   expect(moodOf([e("turn.ended", { reason: "done" }), e("future.thing")], true)).toBe("done");
   expect(moodOf([e("future.thing")], true)).toBe("idle");
+});
+
+test("a new palette never changes an existing Agent's colour or the default look", () => {
+  expect(lookOf(null).color).toBe("#F4B183");
+  expect(lookOf({ color: "#9DC3E6" }).color).toBe("#9DC3E6");
+});
+
+test("round is a shell, and a shell this build does not know is still box", () => {
+  expect(lookOf({ shell: "round" }).shell).toBe("round");
+  expect(lookOf({ shell: "hexagon" }).shell).toBe("box");
+});
+
+test("tint lifts a colour toward white", () => {
+  expect(tint("#C4B1FF", 0)).toBe("#c4b1ff");
+  expect(tint("#C4B1FF", 1)).toBe("#ffffff");
+  expect(tint("#000000", 0.5)).toBe("#808080");
 });

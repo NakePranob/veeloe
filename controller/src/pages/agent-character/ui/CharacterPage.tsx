@@ -1,27 +1,16 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
-import { Character, COLORS, DECALS, lookOfJson, pick, SHELLS, shuffleLook, SIDES, TOPS, type Look } from "../../../entities/character";
+import { Character, COLOR_NAMES, COLORS, DECALS, LookTile, lookOfJson, pick, SHELLS, shuffleLook, SIDES, Stage, Swatch, TOPS, type Look, type Mood } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
-import { Button, column, HeaderAction, Note, radius, space, Text, useColors, useShadows } from "../../../shared/ui";
+import { Button, column, HeaderAction, Note, space, Spinner, Tap, Text } from "../../../shared/ui";
 import { characterToSend } from "../model/to-send";
 
 // The Moods the Member will see this look in, at inbox size, so they can tell they still read.
-const MOODS = ["idle", "thinking", "working", "waiting", "done", "offline"] as const;
-
-const COLOR_NAMES: Record<(typeof COLORS)[number], "peach" | "sky" | "sage" | "lilac" | "rose" | "butter" | "mint" | "sand"> = {
-  "#F4B183": "peach",
-  "#9DC3E6": "sky",
-  "#A9D18E": "sage",
-  "#C9B3E6": "lilac",
-  "#F2A7B8": "rose",
-  "#F3D98B": "butter",
-  "#92D5C8": "mint",
-  "#D8C3A5": "sand",
-};
+const MOODS = ["idle", "thinking", "working", "waiting", "done", "failed", "stuck", "offline"] as const satisfies readonly Mood[];
 
 // Every slot but the colour.
 const PARTS = [
@@ -37,7 +26,7 @@ const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={{ gap: space.sm }}>
-      <Text variant="subheadline" tone="secondary" role="heading">
+      <Text variant="footnote" strong tone="secondary" role="heading" style={{ paddingHorizontal: space.xs }}>
         {title}
       </Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>{children}</View>
@@ -45,45 +34,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-// One option: the head wearing it on a card, its name under it. The chosen one is ringed in the Character's colour.
-function Option({ label, name, selected, ring, onPress, children }: { label: string; name: string; selected: boolean; ring: string; onPress: () => void; children: ReactNode }) {
-  const colors = useColors();
-  const shadows = useShadows();
-  return (
-    <Pressable role="button" aria-label={label} aria-selected={selected} accessibilityState={{ selected }} onPress={onPress}>
-      {({ pressed }) => (
-        <View
-          style={{
-            // Five to a row with their gaps still fit a 375pt screen.
-            width: 62,
-            alignItems: "center",
-            gap: space.xs,
-            paddingVertical: space.sm,
-            // Keeps a long name off the coloured ring.
-            paddingHorizontal: space.xs,
-            borderRadius: radius.lg,
-            borderCurve: "continuous",
-            backgroundColor: pressed ? colors.chipPressed : colors.surface,
-            // Every card keeps the same ring width, clear unless chosen, so choosing never shifts the grid.
-            borderWidth: 2,
-            borderColor: selected ? ring : "transparent",
-            boxShadow: shadows.card,
-          }}
-        >
-          {children}
-          {/* Android's Thai is wider than iOS's: a long name shrinks a little before it is cut. */}
-          <Text variant="caption" tone={selected ? "label" : "secondary"} strong={selected} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-            {name}
-          </Text>
-        </View>
-      )}
-    </Pressable>
-  );
-}
-
 function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
   const t = useT("agent-character");
-  const colors = useColors();
   const link = useMachineLink();
   const machine = useMachines()?.find((m) => m.id === agent.machine_id);
   const status = useMachineStatus(agent.machine_id);
@@ -95,6 +47,8 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
   const [sent, setSent] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   const [notSent, setNotSent] = useState(false);
+  // Which Mood the large head shows, picked from the row of Moods under it.
+  const [preview, setPreview] = useState<Mood>("idle");
   const offline = status.online === false || !link || notSent;
 
   // Closes once the Machine lists the new look (ADR 0006), and stays open on an error.
@@ -146,7 +100,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
       )}
       {sent && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }}>
-          <ActivityIndicator color={colors.secondaryLabel} />
+          <Spinner />
           <Text variant="footnote" tone="secondary">
             {t("saving")}
           </Text>
@@ -157,68 +111,50 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
           {describeError({ code: status.updateError })}
         </Note>
       )}
-      <View style={{ alignItems: "center", gap: space.lg }}>
-        <Character look={draft} mood="idle" size={140} />
-        <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: space.sm }}>
+      {/* The head large on a stage in its own colour, the shuffle floating beside it, and the Moods to preview. */}
+      <Stage color={draft.color}>
+        <View style={{ alignSelf: "stretch", alignItems: "center" }}>
+          <Character look={draft} mood={preview} size={150} />
+          <View style={{ position: "absolute", right: space.sm, top: space.sm }}>
+            <Button
+              label={t("shuffle")}
+              icon="shuffle"
+              variant="floating"
+              onPress={() => {
+                setDraft(shuffleLook(others));
+                setTouched(new Set(["color", "shell", "top", "sides", "decal"]));
+              }}
+            />
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: space.xs }}>
           {MOODS.map((mood) => (
-            <View key={mood} style={{ width: 48, alignItems: "center", gap: space.xs }}>
-              <Character look={draft} mood={mood} size={44} />
-              <Text variant="caption" tone="secondary" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Tap key={mood} selected={preview === mood} onPress={() => setPreview(mood)} style={{ width: 52, alignItems: "center", gap: 2, paddingVertical: space.xs }}>
+              <Character look={draft} mood={mood} size={38} still />
+              <Text variant="caption" tone={preview === mood ? "label" : "secondary"} strong={preview === mood} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {t(`moods.${mood}`)}
               </Text>
-            </View>
+            </Tap>
           ))}
         </View>
-      </View>
+      </Stage>
       <Section title={t("color")}>
-        {COLORS.map((color) => {
-          const selected = draft.color.toLowerCase() === color.toLowerCase();
-          return (
-            <Pressable
-              key={color}
-              role="button"
-              aria-label={t("colorOption", { name: t(`colors.${COLOR_NAMES[color]}`) })}
-              aria-selected={selected}
-              accessibilityState={{ selected }}
-              onPress={() => choose("color", color)}
-              // 34 plus 5 on each side clears the 44pt target.
-              hitSlop={5}
-            >
-              {/* The chosen colour is ringed in ink, a gap of screen between, so it reads on any pastel in either theme. */}
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: radius.pill,
-                  backgroundColor: color,
-                  boxShadow: selected ? `0 0 0 3px ${colors.background}, 0 0 0 5px ${colors.label}` : undefined,
-                }}
-              />
-            </Pressable>
-          );
-        })}
+        {COLORS.map((color, i) => (
+          <Swatch key={color} color={color} label={t("colorOption", { name: t(`colors.${COLOR_NAMES[i]}`) })} selected={draft.color.toLowerCase() === color.toLowerCase()} onPress={() => choose("color", color)} />
+        ))}
       </Section>
       {PARTS.map(({ slot, options }) => (
         <Section key={slot} title={t(`slots.${slot}`)}>
           {options.map((value) => {
             const name = t(`parts.${slot}.${value}` as never) as string;
             return (
-              <Option key={value} label={t("option", { slot: t(`slots.${slot}`), name })} name={name} selected={draft[slot] === value} ring={draft.color} onPress={() => choose(slot, value)}>
+              <LookTile key={value} color={draft.color} label={t("option", { slot: t(`slots.${slot}`), name })} name={name} selected={draft[slot] === value} onPress={() => choose(slot, value)}>
                 <Character look={pick(draft, slot, value)} mood="idle" size={48} still />
-              </Option>
+              </LookTile>
             );
           })}
         </Section>
       ))}
-      <View style={{ alignItems: "center", paddingBottom: space.lg }}>
-        <Button
-          label={t("shuffle")}
-          onPress={() => {
-            setDraft(shuffleLook(others));
-            setTouched(new Set(["color", "shell", "top", "sides", "decal"]));
-          }}
-        />
-      </View>
     </ScrollView>
   );
 }

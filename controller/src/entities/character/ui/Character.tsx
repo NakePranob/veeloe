@@ -21,6 +21,9 @@ const SCREEN = "#151b25";
 const SCREEN_TOP = "#070a10";
 const SCREEN_BOTTOM = "#1f2836";
 const LED = "#eef6ff";
+// A failed Turn: a red glow on the screen and crossed eyes.
+const FAILED = "#f04438";
+const FAILED_LED = "#ffc9c2";
 
 // Each shell on a 100 × 100 grid, its bottom on y 84. visor: x, y, width, height, radius; top: the top
 // socket's y; side: the side sockets' x; hand: where the raised hand floats.
@@ -29,6 +32,8 @@ const SHELLS: Record<Shell, { d: string; round?: number; visor: number[]; top: n
   capsule: { d: "M37 30H63A27 27 0 0 1 63 84H37A27 27 0 0 1 37 30Z", visor: [20, 41, 60, 30, 15], top: 30, side: [10, 90], hand: [88, 33] },
   dome: { d: "M14 76V58a36 36 0 0 1 72 0v18q0 8-8 8H22q-8 0-8-8Z", visor: [22, 44, 56, 28, 12], top: 22, side: [14, 86], hand: [81, 27] },
   chamfer: { d: "M30 24H70L86 40V68L70 84H30L14 68V40Z", round: 6, visor: [22, 38, 56, 34, 10], top: 21, side: [12, 88], hand: [84, 27] },
+  // A ball as wide as it is tall, so it has the volume of the other shells; its screen sits high.
+  round: { d: "M50 16A34 34 0 1 1 50 84A34 34 0 1 1 50 16Z", visor: [24, 37, 52, 28, 14], top: 17, side: [16, 84], hand: [82, 24] },
 };
 
 // How each Mood holds the head: tilt in degrees, turn from −1 (its left) to 1, how far it sinks and
@@ -39,13 +44,17 @@ const POSE: Record<Mood, { tilt: number; turn: number; lift: number; look: [numb
   working: { tilt: 2, turn: 0, lift: 1, look: [0, 1], open: 0.4 },
   waiting: { tilt: -6, turn: 0, lift: -1, look: [0, 0], open: 1.08 },
   done: { tilt: -4, turn: 0, lift: 0, look: [0, 0], open: 1 },
+  // Slumped and still: a Turn failed, so there is nothing to celebrate.
+  failed: { tilt: 10, turn: 0, lift: 4, look: [0, 2], open: 1 },
+  // Frozen in place with a shiver now and then: the Runtime says the Turn has gone quiet.
+  stuck: { tilt: -3, turn: 0, lift: 0, look: [0, 0], open: 1 },
   offline: { tilt: 12, turn: 0, lift: 8, look: [0, 0], open: 1 },
 };
 
 // How long one float up (or down) takes; working nods instead, offline rests on the ground.
 const FLOAT: Partial<Record<Mood, number>> = { idle: 1800, thinking: 2500, waiting: 1200, done: 1800 };
 
-const AT_REST: Mood[] = ["idle", "done", "offline"];
+const AT_REST: Mood[] = ["idle", "done", "failed", "offline"];
 const native = process.env.EXPO_OS !== "web";
 
 // The parts are the shell's colour, darker; white mixes in the lit side.
@@ -214,7 +223,17 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
     if (mood === "working") loops.push(swing(v.nod, 0, 1, 250), swing(v.scan, 0, 1, 900));
     if (mood === "waiting") loops.push(swing(v.wave, 0, 1, 800));
     if (mood === "thinking") loops.push(swing(v.pulse, 1, 0.25, 600));
-    if (mood !== "done" && mood !== "offline")
+    // A short shiver every few seconds, using the nod.
+    if (mood === "stuck")
+      loops.push(
+        Animated.loop(
+          Animated.sequence([
+            Animated.delay(2600),
+            ...[1, 0, 1, 0].map((toValue) => Animated.timing(v.nod, { toValue, duration: 70, useNativeDriver: native })),
+          ]),
+        ),
+      );
+    if (mood !== "done" && mood !== "offline" && mood !== "failed")
       loops.push(
         Animated.loop(
           Animated.sequence([
@@ -320,6 +339,8 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
                     </Defs>
                     <DecalPart decal={look.decal} visor={s.visor} c={part} />
                     <Rect x={vx} y={vy} width={vw} height={vh} rx={vr} fill={mood === "offline" ? SCREEN : `url(#${id}v)`} />
+                    {/* A failed Turn shows on the screen as a faint red glow. */}
+                    {mood === "failed" && <Rect x={vx} y={vy} width={vw} height={vh} rx={vr} fill={FAILED} opacity={0.28} />}
                     <Path d={`M${vx + 4} ${vy + vh - 4}L${vx + 10} ${vy + 4}h4L${vx + 8} ${vy + vh - 4}Z`} fill="#ffffff" opacity={0.1} />
                   </Layer>
                   {mood !== "offline" && (
@@ -334,7 +355,11 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
                       }}
                     >
                       {[-12, 12].map((dx) =>
-                        mood === "done" ? (
+                        mood === "failed" ? (
+                          <Path key={dx} d={`M${50 + dx - 4} ${fy - 4}l8 8M${50 + dx + 4} ${fy - 4}l-8 8`} stroke={FAILED_LED} strokeWidth={3} strokeLinecap="round" />
+                        ) : mood === "stuck" ? (
+                          <Rect key={dx} x={50 + dx - 5} y={fy - 1.5} width={10} height={3} rx={1.5} fill={LED} />
+                        ) : mood === "done" ? (
                           <Path key={dx} d={`M${50 + dx - 5} ${fy + 2.5}Q${50 + dx} ${fy - 5} ${50 + dx + 5} ${fy + 2.5}`} stroke={LED} strokeWidth={3} strokeLinecap="round" fill="none" />
                         ) : (
                           <Rect key={dx} x={50 + dx - 4} y={fy - 6} width={8} height={12} rx={4} fill={LED} />

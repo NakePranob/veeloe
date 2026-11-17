@@ -37,6 +37,8 @@ const SYMBOLS = {
   trash: { ios: "trash", android: "delete", web: "delete" },
   memory: { ios: "brain.head.profile", android: "psychology", web: "psychology" },
   // A git repo an Agent may use (issue #32).
+  // Draw a new random look.
+  shuffle: { ios: "dice", android: "casino", web: "casino" },
   branch: { ios: "arrow.triangle.branch", android: "fork_right", web: "fork_right" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 
