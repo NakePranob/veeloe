@@ -1,12 +1,12 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus, useMemoryStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Empty, Note, Screen, Section, space, Text, useColors } from "../../../shared/ui";
+import { Empty, Note, Screen, Section, Spinner, Text, space } from "../../../shared/ui";
 
 // The count is shown against the same cap `runtime-core` applies to the prompt. It is fixed in
 // v0.1 (ADR 0036), so it lives here as a constant: when `MEMORY_LIMIT` moves, this must move too.
@@ -18,7 +18,6 @@ export function MemoryPage() {
   const t = useT("agent-memory");
   const language = useLanguage();
   const now = useNow();
-  const colors = useColors();
   const link = useMachineLink();
   const agents = useAgents();
   const machines = useMachines() ?? [];
@@ -59,7 +58,7 @@ export function MemoryPage() {
       )}
       {status.loading && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }}>
-          <ActivityIndicator color={colors.secondaryLabel} />
+          <Spinner />
           <Text variant="footnote" tone="secondary">
             {t("loading")}
           </Text>
@@ -85,7 +84,7 @@ export function MemoryPage() {
             {memory.text ? (
               // Plain text only: Memory is Agent-written and may be poisoned, so nothing here
               // is interpreted as Markdown or HTML, and nothing is tappable.
-              <Text variant="subheadline" mono style={{ backgroundColor: colors.fill, padding: space.sm }}>
+              <Text variant="subheadline" code>
                 {memory.text}
               </Text>
             ) : (

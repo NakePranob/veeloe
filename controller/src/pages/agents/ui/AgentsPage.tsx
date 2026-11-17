@@ -1,20 +1,19 @@
-import { Link, router } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { useAgents, useTrashedAgents, type AgentTrashRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { useNow } from "../../../shared/lib";
-import { Card, confirm, Empty, Icon, inform, Note, radius, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
+import { Card, Empty, Icon, Note, Row, Screen, Section, Tap, Text, confirm, inform, space } from "../../../shared/ui";
 import { daysLeft } from "../model/trash";
 
 // The Agents on every paired Machine, then the ones a Machine deleted and still
 // lets us restore for 30 days (controller-prototype's AgentsPage, `agent-trash`).
 export function AgentsPage() {
   const t = useT("agents");
-  const colors = useColors();
   const now = useNow();
   const agents = useAgents();
   const trashed = useTrashedAgents();
@@ -49,10 +48,7 @@ export function AgentsPage() {
       ) : (
         <Card style={{ padding: space.sm, gap: 0 }}>
           {agents?.map((agent) => (
-            <Link key={agent.id} href={`/agents/${agent.id}`} asChild>
-              <Pressable role="link">
-                {({ pressed }) => (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.sm, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: pressed ? colors.chip : "transparent" }}>
+            <Tap key={agent.id} href={`/agents/${agent.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.sm }}>
                     <Character look={lookOfJson(agent.character)} mood={moodOf([], statuses[agent.machine_id]?.online ?? null)} size={44} />
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text variant="headline">{agent.name}</Text>
@@ -66,10 +62,7 @@ export function AgentsPage() {
                       </Text>
                     </View>
                     <Icon name="disclosure" size="xs" color="tertiaryLabel" weight="semibold" />
-                  </View>
-                )}
-              </Pressable>
-            </Link>
+            </Tap>
           ))}
         </Card>
       )}

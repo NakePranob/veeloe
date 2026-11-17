@@ -1,7 +1,7 @@
 import type { LinkingLink } from "@veeloe/protocol-ts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 import { saveDeviceNames } from "../../../entities/device";
 import { saveMachine } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";
@@ -9,7 +9,7 @@ import { deviceName } from "../../../shared/device-name";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Button, Field, inform, Note, QrScanner, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
+import { Button, Field, Note, QrScanner, Row, Screen, Section, Spinner, Text, inform, space } from "../../../shared/ui";
 import { readLink, sendLinkRequest, waitForHandoff } from "../model/wait";
 
 type Waiting = ReturnType<typeof waitForHandoff>;
@@ -19,7 +19,6 @@ type Waiting = ReturnType<typeof waitForHandoff>;
 // with none, as Pairing reads `veeloe pair`'s. The link names the Hub, so this asks for none.
 export function LinkThisDevicePage() {
   const t = useT("link-this-device");
-  const colors = useColors();
   const language = useLanguage();
   const database = useDatabase();
   // Filled when the camera or another app opened a veeloe://link link.
@@ -85,7 +84,7 @@ export function LinkThisDevicePage() {
       <Screen title={t("title")}>
         <Section title={t("waiting.heading")} footer={t("waiting.footer", { when: when(link.expires * 1000, language) })}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, padding: space.sm }}>
-            <ActivityIndicator color={colors.secondaryLabel} />
+            <Spinner />
             <Text variant="subheadline" tone="secondary" style={{ flex: 1 }}>
               {t("waiting.body", { name: name.trim() })}
             </Text>

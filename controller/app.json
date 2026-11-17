@@ -54,7 +54,8 @@
           "faceIDPermission": "Veeloe uses Face ID to unlock the key that signs your commands.",
           "configureAndroidBackup": true
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }

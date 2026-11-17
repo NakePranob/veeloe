@@ -5,7 +5,8 @@ import { Card } from "./card";
 import { HeaderAction } from "./header-action";
 import { Icon, type IconName } from "./icon";
 import { Text } from "./text";
-import { column, radius, space, type, useColors, type Colors } from "./theme";
+import { Button } from "./button";
+import { column, font, radius, space, type, useColors, type Colors } from "./theme";
 
 interface ScreenProps {
   title: string;
@@ -41,7 +42,7 @@ export function Section({ title, footer, children }: { title?: string; footer?: 
           {title}
         </Text>
       )}
-      {children != null && <Card style={{ padding: space.sm, gap: 0 }}>{children}</Card>}
+      {children != null && <Card style={{ padding: space.xs, gap: 0 }}>{children}</Card>}
       {footer && (
         <Text variant="footnote" tone="secondary" style={{ paddingHorizontal: space.sm }}>
           {footer}
@@ -72,10 +73,10 @@ interface RowProps {
 export function Row({ title, detail, value, icon, leading, iconColor, href, onPress, destructive, mono, accessory }: RowProps) {
   const colors = useColors();
   const body = (pressed: boolean) => (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 44, paddingHorizontal: space.sm, paddingVertical: space.sm, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: pressed ? colors.chip : "transparent" }}>
-      {leading ?? (icon && <Icon name={icon} size="md" color={iconColor ?? (destructive ? "red" : "secondaryLabel")} />)}
+    <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: space.sm, paddingVertical: space.sm, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: pressed ? colors.chipPressed : "transparent" }}>
+      {leading ?? (icon && <Icon name={icon} size="md" color={iconColor ?? (destructive ? "red" : "label")} />)}
       <View style={{ flex: 1, gap: 2 }}>
-        <Text mono={mono} selectable={!href && !onPress} style={destructive ? { color: colors.red } : undefined}>
+        <Text mono={mono} strong={destructive} tone={destructive ? "danger" : "label"} variant="subheadline" selectable={!href && !onPress}>
           {title}
         </Text>
         {detail && (
@@ -127,34 +128,43 @@ interface FieldProps {
   mono?: boolean;
   keyboardType?: KeyboardTypeOptions;
   secure?: boolean;
+  // A button inside the field, for adding the typed value to a list in one line.
+  action?: { label: string; onPress: () => void; disabled?: boolean };
 }
 
-export function Field({ label, value, onChangeText, placeholder, footer, multiline, mono, keyboardType, secure }: FieldProps) {
+// The label sits inside the field, on the surface a step lighter than the card.
+export function Field({ label, value, onChangeText, placeholder, footer, multiline, mono, keyboardType, secure, action }: FieldProps) {
   const colors = useColors();
   return (
-    <View style={{ gap: space.xs, padding: space.sm }}>
-      <Text variant="footnote" tone="secondary">
-        {label}
-      </Text>
-      <TextInput
-        aria-label={label}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.tertiaryLabel}
-        multiline={multiline}
-        keyboardType={keyboardType}
-        secureTextEntry={secure}
-        autoCapitalize={mono ? "none" : "sentences"}
-        autoCorrect={!mono}
-        style={[
-          type.body,
-          { minHeight: multiline ? 88 : 40, paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: colors.fill, color: colors.label, textAlignVertical: multiline ? "top" : "center" },
-          mono && { fontFamily: "monospace" },
-        ]}
-      />
+    <View style={{ gap: space.xs, padding: space.xs }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 52, paddingLeft: space.lg, paddingRight: action ? space.xs : space.lg, paddingVertical: space.xs, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.surface }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="caption" tone="secondary">
+            {label}
+          </Text>
+          <TextInput
+            aria-label={label}
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+            placeholderTextColor={colors.tertiaryLabel}
+            multiline={multiline}
+            keyboardType={keyboardType}
+            secureTextEntry={secure}
+            autoCapitalize={mono ? "none" : "sentences"}
+            autoCorrect={!mono}
+            onSubmitEditing={action && !action.disabled ? action.onPress : undefined}
+            style={[
+              type.body,
+              { minHeight: multiline ? 72 : 24, padding: 0, color: colors.label, textAlignVertical: multiline ? "top" : "center" },
+              mono && { fontFamily: font.mono, fontSize: 14 },
+            ]}
+          />
+        </View>
+        {action && <Button label={action.label} variant="primary" onPress={action.onPress} disabled={action.disabled} />}
+      </View>
       {footer && (
-        <Text variant="footnote" tone="secondary">
+        <Text variant="footnote" tone="secondary" style={{ paddingHorizontal: space.sm }}>
           {footer}
         </Text>
       )}

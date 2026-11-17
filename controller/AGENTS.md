@@ -1,4 +1,4 @@
-This is the Veeloe Controller, the real app. `../controller-prototype/` is a throwaway on Demo data: do not build on it, but it is the design source of truth for a screen. Before writing or changing any screen, read its prototype page and the entity/state module it imports, and match every state, label, hint line, button and its order, and control shape — a value that opens a picker in one row, not one row per option. A screen that invents its own layout or repeats a label down a list is wrong even if it works. Prove parity state by state against the prototype, then delete any temporary preview route or seed helper.
+This is the Veeloe Controller, the real app. The design source of truth for a screen is its boards on the redesign canvas: https://claude.ai/artifact/DEHC2ENNKRsri7YtPHaBPc. Before writing or changing any screen, read its boards there in full, and match every state, label, hint line, button and its order, and control shape — a value that opens a picker in one row, not one row per option. Build a screen only once its boards show every state the code has (loading, empty, error, offline, light and dark); draw a missing state on the canvas first. A screen that invents its own layout or repeats a label down a list is wrong even if it works. Prove parity state by state against the canvas, then delete any temporary preview route or seed helper. `../controller-prototype/` is a throwaway on Demo data: do not build on it or follow it.
 
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
@@ -40,10 +40,10 @@ Never write a sentence into a screen (ADR 0065):
 
 ## UI
 
-The design system (tokens, components, widgets, guidelines) is the reference: https://claude.ai/artifact/FLFrmUHanU1rdq7qF6bR8R. Change one in the design system and the code together.
+The design system (tokens, components, entities, widgets, dark mode) is the "Design system" board on the redesign canvas: https://claude.ai/artifact/DEHC2ENNKRsri7YtPHaBPc. Change the board and the code together.
 
 - Navigation, headers, the back button, alerts and the menus a control opens are the platform's. Never rebuild them.
-- Buttons, chips, cards and everything else on the page are ours, from `src/shared/ui`. No borders or divider lines: space, surface and shadow set things apart. Each control keeps a pressed state, a role and a 44pt target.
+- Buttons, chips, cards and everything else on the page are ours, from `src/shared/ui`. No borders or divider lines: space and surface set things apart, and only what floats over content has a shadow. Each control keeps a pressed state, a role and a 44pt target.
 - Before writing or changing a screen, load the `expo-native-ui` and `expo-design-system` skills.
 - Colours come from `src/shared/ui/theme.ts` only. Icons are `Icon`; never emoji. Motion uses `motion` from the theme.
 - Name the app a screen follows and match its structure.

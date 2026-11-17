@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { ActivityIndicator } from "react-native";
 import type { MachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
-import { Field, Icon, Row, Section, useColors } from "../../../shared/ui";
+import { Field, Icon, Row, Section, Spinner } from "../../../shared/ui";
 import { errorOf, modelsOf } from "../model/providers";
 
 // ponytail: a gateway can list hundreds of models, so only the first matches show; add paging if people miss theirs.
@@ -29,7 +28,6 @@ export function ProviderModelSections({
   onModel: (id: string) => void;
 }) {
   const t = useT("provider-models");
-  const colors = useColors();
   const [filter, setFilter] = useState("");
   const providers = status?.providers ?? [];
   const chosen = providers.find((p) => p.name === provider);
@@ -44,7 +42,7 @@ export function ProviderModelSections({
         {status?.online === false ? (
           <Row icon="machine" title={t("machine.offline")} />
         ) : !status?.providers ? (
-          <Row title={t("asking")} accessory={<ActivityIndicator color={colors.secondaryLabel} />} />
+          <Row title={t("asking")} accessory={<Spinner />} />
         ) : providers.length === 0 ? (
           <Row icon="key" title={t("provider.none")} detail={t("provider.command")} />
         ) : (

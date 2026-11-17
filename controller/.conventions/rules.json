@@ -178,6 +178,45 @@
           "content": "export const x = 1;\n"
         }
       ]
+    },
+    {
+      "id": "colour-from-shared-ui",
+      "statement": "A file in src/pages or src/widgets does not import useColors or useShadows and has no hex colour: colour comes from shared/ui; View lays things out. Entities may use colour.",
+      "adr": "docs/adr/0072-controller-colour-comes-from-shared-ui.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [
+        {
+          "path": "src/pages/task/ui/",
+          "until": "task-thread-redesign"
+        },
+        {
+          "path": "src/pages/agent-character/",
+          "until": "character-look"
+        }
+      ],
+      "violation": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { useColors } from \"../../../shared/ui\";\nexport const a = useColors;\n"
+        },
+        {
+          "path": "src/widgets/agent-inbox/ui/zz_probe.tsx",
+          "content": "export const tint = { backgroundColor: \"#ff7a2f\" };\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/entities/character/ui/zz_probe.tsx",
+          "content": "export const screen = \"#151b25\";\n"
+        },
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { View } from \"react-native\";\nimport { space } from \"../../../shared/ui\";\nexport const Row = () => <View style={{ flexDirection: \"row\", gap: space.md }} />;\n"
+        }
+      ]
     }
   ]
 }

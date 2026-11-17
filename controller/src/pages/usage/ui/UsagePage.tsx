@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useMachines, type Machine } from "../../../entities/machine";
 import { previewOf, useTaskSummaries } from "../../../entities/task";
@@ -8,7 +8,7 @@ import { useMachineLink, useMachineStatus, useMachineStatuses, useUsageStatus, u
 import { useDatabase, useLiveQuery } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, shiftDay, useNow, when, type Bar } from "../../../shared/lib";
-import { Bars, Empty, Note, radius, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
+import { Bars, Chip, Empty, Note, Row, Screen, Section, Spinner, Text, space } from "../../../shared/ui";
 import { daysBetween, rowsInRange, totalOf } from "../model/summary";
 import { DEFAULT_USAGE_WINDOW, isUsageWindow, saveUsageWindow, USAGE_WINDOWS } from "../model/window";
 
@@ -20,29 +20,12 @@ const WINDOW_KEY = { 1: "window.1", 3: "window.3", 7: "window.7", 30: "window.30
 function WindowPicker({ days }: { days: number }) {
   const t = useT("usage");
   const database = useDatabase();
-  const colors = useColors();
   return (
     <View style={{ flexDirection: "row", gap: space.xs, paddingHorizontal: space.sm }}>
       {USAGE_WINDOWS.map((window) => {
         const selected = window === days;
         return (
-          <Pressable
-            key={window}
-            role="button"
-            aria-pressed={selected}
-            onPress={() => void saveUsageWindow(database, window)}
-            style={{
-              paddingHorizontal: space.md,
-              paddingVertical: space.xs,
-              borderRadius: radius.pill,
-              borderCurve: "continuous",
-              backgroundColor: selected ? colors.accent : colors.fill,
-            }}
-          >
-            <Text variant="subheadline" style={{ color: selected ? colors.onAccent : colors.label }}>
-              {t(WINDOW_KEY[window])}
-            </Text>
-          </Pressable>
+          <Chip key={window} tone="choice" label={t(WINDOW_KEY[window])} selected={selected} onPress={() => void saveUsageWindow(database, window)} />
         );
       })}
     </View>
@@ -53,7 +36,6 @@ function MachineSection({ machine, agents, rows, days }: { machine: Machine; age
   const t = useT("usage");
   const language = useLanguage();
   const now = useNow();
-  const colors = useColors();
   const status = useUsageStatus(machine.id);
   const machineStatus = useMachineStatus(machine.id);
   const ids = new Set(agents.map((agent) => agent.id));
@@ -92,7 +74,7 @@ function MachineSection({ machine, agents, rows, days }: { machine: Machine; age
             <Text variant="headline" style={{ flex: 1 }}>
               {t("machine.total", { tokens: formatTokens(total) })}
             </Text>
-            {status.loading && <ActivityIndicator size="small" color={colors.secondaryLabel} />}
+            {status.loading && <Spinner />}
           </View>
           <Text variant="footnote" tone="secondary">
             {machineStatus.online === false ? t("machine.offline") : machineStatus.online ? t("machine.online") : ""}
@@ -154,7 +136,6 @@ function TopTasks({ statuses, agents }: { statuses: Record<string, UsageStatus>;
 
 export function UsagePage() {
   const t = useT("usage");
-  const colors = useColors();
   const link = useMachineLink();
   const machines = useMachines();
   const agents = useAgents() ?? [];
@@ -188,7 +169,7 @@ export function UsagePage() {
       <Note icon="info">{t("note")}</Note>
       {machines === null ? (
         <View style={{ alignItems: "center", padding: space.xl }}>
-          <ActivityIndicator color={colors.secondaryLabel} />
+          <Spinner />
         </View>
       ) : list.length === 0 ? (
         <Empty icon="usage" title={t("empty.title")} detail={t("empty.body")} />

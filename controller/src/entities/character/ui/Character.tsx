@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from "react-native";
+import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
-import { motion, useColors, type Colors } from "../../../shared/ui";
+import { motion, useColors, useReduceMotion, type Colors } from "../../../shared/ui";
 import type { Decal, Look, Shell, Sides, Top } from "../model/look";
 import type { Mood } from "../model/mood";
 
@@ -60,15 +60,6 @@ function grey(hex: string) {
   return "#" + l.toString(16).padStart(2, "0").repeat(3);
 }
 
-function useReduceMotion() {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduce);
-    const sub = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduce);
-    return () => sub.remove();
-  }, []);
-  return reduce;
-}
 
 // One slice of the head: an SVG on the shared grid, inside a view that moves on its own.
 function Layer({ style, children }: { style?: object; children: ReactNode }) {

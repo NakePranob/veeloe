@@ -11,7 +11,7 @@ import { useMachineLinks } from "../../features/machine-link";
 import { DatabaseProvider, useDatabase } from "../../shared/db";
 import { deviceLanguage, initI18n, useT } from "../../shared/i18n";
 import { useKeyActivity, useKeyStatus } from "../../shared/keystore";
-import { Button, Card, inform, SIDEBAR_WIDTH, space, Text, useColors, useSplit } from "../../shared/ui";
+import { Button, Card, inform, SIDEBAR_WIDTH, space, Text, useAppFonts, useColors, useSplit } from "../../shared/ui";
 import { AgentInbox } from "../../widgets/agent-inbox";
 import { resources } from "../i18n/resources";
 import "../styles/web-reset";
@@ -79,13 +79,17 @@ export function RootLayout() {
   const keyStatus = useKeyStatus();
   const trackActivity = useKeyActivity();
   const { state, useHere, retry } = useAppDatabase();
+  // Nothing with text draws until the bundled fonts are in, so no screen changes font after it shows.
+  const fontsReady = useAppFonts();
   const base = useColorScheme() === "dark" ? DarkTheme : DefaultTheme;
   const theme = { ...base, colors: { ...base.colors, background: colors.background, card: colors.background, text: colors.label, border: colors.separator, primary: colors.accent } };
   return (
     <ThemeProvider value={theme}>
       <StatusBar style="auto" />
       {/* In place of the Stack rather than a route, so the URL is still there afterwards. */}
-      {state.status === "ready" ? (
+      {!fontsReady ? (
+        <View style={{ flex: 1, backgroundColor: colors.background }} />
+      ) : state.status === "ready" ? (
         <DatabaseProvider value={state.database}>
           <MachineLinks />
           {/* The Stack stays mounted but hidden while locked, so unlocking returns to the same page. */}

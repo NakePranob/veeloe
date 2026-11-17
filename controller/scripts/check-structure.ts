@@ -139,6 +139,21 @@ for (const path of files) {
   }
 }
 
+// colour-from-shared-ui (ADR 0072): pages and widgets take colour from shared/ui only.
+const colourRule = (rules.rules as { id: string; exceptions?: { path: string }[] }[]).find((rule) => rule.id === "colour-from-shared-ui");
+const colourExempt = (colourRule?.exceptions ?? []).map((exception) => exception.path);
+for (const path of files) {
+  if (!CODE.test(path)) continue;
+  const file = rel(path);
+  const where = place(path);
+  if (!where || (where.layer !== "pages" && where.layer !== "widgets") || isTest(file)) continue;
+  if (colourExempt.some((prefix) => file.startsWith(prefix))) continue;
+  const text = readFileSync(path, "utf8");
+  if (/\buse(Colors|Shadows)\b/.test(text)) fail("colour-from-shared-ui", file, "uses useColors or useShadows; take colour from a shared/ui component");
+  const hex = text.match(/["'`]#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})["'`]/);
+  if (hex) fail("colour-from-shared-ui", file, `has the colour ${hex[0]}; colours live in shared/ui/theme.ts`);
+}
+
 if (failures.length > 0) {
   for (const line of failures) console.error(line);
   console.error(`\n${failures.length} structure problem(s). The rules: controller/.conventions/rules.json, ADR 0070.`);

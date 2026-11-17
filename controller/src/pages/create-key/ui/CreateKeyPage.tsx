@@ -2,12 +2,11 @@ import { useState } from "react";
 import { View } from "react-native";
 import { useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, Icon, space, Text, useColors } from "../../../shared/ui";
+import { Button, Centered, Icon, Text, space } from "../../../shared/ui";
 
 // The first screen of a new device, and where a key the OS invalidated ends up (ADR 0012).
 export function CreateKeyPage({ lost }: { lost: boolean }) {
   const t = useT("create-key");
-  const colors = useColors();
   const [problem, setProblem] = useState<"unsupported" | "failed" | null>(null);
   const words = lost ? "lost" : "create";
 
@@ -17,7 +16,7 @@ export function CreateKeyPage({ lost }: { lost: boolean }) {
   }
 
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.lg, padding: space.xl, backgroundColor: colors.background }}>
+    <Centered>
       <View style={{ alignItems: "center", gap: space.sm, maxWidth: 420 }}>
         <Icon name={lost ? "warning" : "key"} size="xl" color={lost ? "orange" : "secondaryLabel"} />
         <Text variant="headline" role="heading" style={{ textAlign: "center" }}>
@@ -33,6 +32,6 @@ export function CreateKeyPage({ lost }: { lost: boolean }) {
         )}
       </View>
       <Button label={t(`${words}.action`)} variant="primary" onPress={() => void create()} />
-    </View>
+    </Centered>
   );
 }

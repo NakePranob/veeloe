@@ -1,6 +1,7 @@
 {
   "clean": "pass",
   "rules": {
+    "colour-from-shared-ui": "caught",
     "fsd-layer-direction": "caught",
     "fsd-no-cross-slice": "caught",
     "fsd-public-api": "caught",

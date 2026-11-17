@@ -1,9 +1,9 @@
 import { parsePairingLink, type PairingLink } from "@veeloe/protocol-ts";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, TextInput, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { describeError, useT } from "../../../shared/i18n";
-import { Button, Card, column, Icon, QrScanner, radius, space, Text, useColors } from "../../../shared/ui";
+import { Button, Card, Field, Icon, QrScanner, Spinner, Text, column, space } from "../../../shared/ui";
 import { usePairMachine } from "../model/use-pair-machine";
 
 const linkProblem = { malformed: "pairing.link_malformed", "bad-signature": "pairing.link_bad_signature", expired: "pairing.link_expired" } as const;
@@ -22,7 +22,6 @@ function openedLink({ link, machine, secret, expires, sig }: OpenedParams): stri
 
 export function AddMachinePage() {
   const t = useT("add-machine");
-  const colors = useColors();
   const pair = usePairMachine();
   // Filled when the phone's camera or another app opened a veeloe://pair link.
   const params = useLocalSearchParams<OpenedParams>();
@@ -74,7 +73,7 @@ export function AddMachinePage() {
       <Stack.Screen options={{ title: t("title") }} />
       {pairing ? (
         <View style={{ alignItems: "center", gap: space.sm, paddingVertical: space.xl }}>
-          <ActivityIndicator color={colors.secondaryLabel} />
+          <Spinner />
           <Text variant="headline" role="heading">
             {t("pairing.heading")}
           </Text>
@@ -132,18 +131,7 @@ export function AddMachinePage() {
             </Text>
           </View>
           <QrScanner labels={{ scan: t("enter.scan"), stop: t("enter.stopScan") }} onScan={accept} onNoCamera={() => setProblem(t("enter.noCamera"))} />
-          <TextInput
-            aria-label={t("enter.paste")}
-            placeholder={t("enter.paste")}
-            placeholderTextColor={colors.tertiaryLabel}
-            value={text}
-            onChangeText={setText}
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            multiline
-            style={{ minHeight: 96, padding: space.md, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: colors.surface, color: colors.label, textAlignVertical: "top" }}
-          />
+          <Field label={t("enter.paste")} value={text} onChangeText={setText} multiline mono />
           {problemText}
           <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
             <Button label={t("enter.continue")} variant="primary" disabled={!text.trim()} onPress={() => accept(text)} />

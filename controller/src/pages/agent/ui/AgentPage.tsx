@@ -1,7 +1,7 @@
 import { randomUUID } from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Keyboard, View } from "react-native";
+import { Keyboard, View } from "react-native";
 import { APPROVAL_TIMEOUT_S_DEFAULT, APPROVAL_TIMEOUT_S_MAX, APPROVAL_TIMEOUT_S_MIN } from "@veeloe/protocol-ts";
 import { allowlistOf, approvalTimeoutOf, gitReposOf, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
@@ -11,7 +11,7 @@ import { useMachineLink, useMachineStatus } from "../../../features/machine-link
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatTokens, useNow, when } from "../../../shared/lib";
-import { confirm, Empty, Field, Icon, inform, Meter, Note, Row, Screen, Section, space, Text, useColors } from "../../../shared/ui";
+import { Empty, Field, Icon, Meter, Note, Row, Screen, Section, Spinner, Text, confirm, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
@@ -22,7 +22,6 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const t = useT("agent");
   const status = useT("task-status");
   const language = useLanguage();
-  const colors = useColors();
   const now = useNow();
   const link = useMachineLink();
   const machine = useMachines()?.find((m) => m.id === agent.machine_id);
@@ -164,7 +163,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
         )}
         <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" />
       </Section>
-      {sent !== null && <Row title={t("saving")} accessory={<ActivityIndicator color={colors.secondaryLabel} />} />}
+      {sent !== null && <Row title={t("saving")} accessory={<Spinner />} />}
       {tried && machineStatus.updateError && sent === null && (
         <Note icon="warning" iconColor="orange">
           {describeError({ code: machineStatus.updateError })}

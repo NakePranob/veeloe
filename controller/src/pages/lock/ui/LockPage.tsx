@@ -2,12 +2,11 @@ import { useEffect } from "react";
 import { View } from "react-native";
 import { useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, Icon, space, Text, useColors } from "../../../shared/ui";
+import { Button, Centered, Icon, Text, space } from "../../../shared/ui";
 
 // A phone asks at once. A browser refuses a passkey without a press, so web waits for the button.
 export function LockPage() {
   const t = useT("lock");
-  const colors = useColors();
   const prompt = t("prompt");
 
   useEffect(() => {
@@ -15,7 +14,7 @@ export function LockPage() {
   }, [prompt]);
 
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.lg, padding: space.xl, backgroundColor: colors.background }}>
+    <Centered>
       <View style={{ alignItems: "center", gap: space.sm, maxWidth: 420 }}>
         <Icon name="lock" size="xl" />
         <Text variant="headline" role="heading" style={{ textAlign: "center" }}>
@@ -26,6 +25,6 @@ export function LockPage() {
         </Text>
       </View>
       <Button label={t("action")} variant="primary" onPress={() => void keySession.unlock(prompt)} />
-    </View>
+    </Centered>
   );
 }

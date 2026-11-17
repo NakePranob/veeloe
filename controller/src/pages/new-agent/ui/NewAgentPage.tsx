@@ -2,20 +2,19 @@ import { READ_ONLY_ALLOWLIST } from "@veeloe/protocol-ts";
 import { randomUUID } from "expo-crypto";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { Character, lookOfJson, shuffleLook } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
-import { Button, Field, Icon, Note, Row, Screen, Section, space, ToggleRow, useColors } from "../../../shared/ui";
+import { Button, Field, Icon, Note, Row, Screen, Section, Spinner, ToggleRow, space } from "../../../shared/ui";
 import { modelsOf, ProviderModelSections } from "../../../widgets/provider-models";
 
 // controller-prototype's NewAgentPage, with what this version sends: a Character, a name, a Machine, a Provider and a model.
 // ponytail: no description or instructions yet; each comes with the change that uses it.
 export function NewAgentPage() {
   const t = useT("new-agent");
-  const colors = useColors();
   const machines = useMachines() ?? [];
   const statuses = useMachineStatuses();
   const link = useMachineLink();
@@ -115,7 +114,7 @@ export function NewAgentPage() {
 
       <Note>{t("budget.default")}</Note>
 
-      {creating && <Row title={t("creating")} accessory={<ActivityIndicator color={colors.secondaryLabel} />} />}
+      {creating && <Row title={t("creating")} accessory={<Spinner />} />}
       {status?.createError && (
         <Note icon="warning" iconColor="orange">
           {describeError({ code: status.createError })}

@@ -1,7 +1,7 @@
 import { randomUUID } from "expo-crypto";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
-import { FlatList, Pressable, View } from "react-native";
+import { FlatList, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
@@ -9,7 +9,7 @@ import { latestEvents, previewOf, TaskStatusLabel, useTaskSummaries, type TaskSt
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Button, column, Empty, Icon, radius, space, Text, useColors } from "../../../shared/ui";
+import { Button, Empty, Icon, Tap, Text, column, radius, space } from "../../../shared/ui";
 import { inboxRows } from "../model/inbox";
 
 const AVATAR = 44;
@@ -29,7 +29,6 @@ interface RowProps {
 // Laid out like Mail: sender and time, a status line, then two lines of preview.
 function InboxRow({ agent, machine, online, task, status, now, selected, replace }: RowProps) {
   const t = useT("agent-inbox");
-  const colors = useColors();
   const language = useLanguage();
   // Tapping goes straight into the chat; an Agent with no Task yet gets an empty one.
   const open = () => {
@@ -38,28 +37,17 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
     else router.push(href);
   };
   return (
-    <Pressable role="button" aria-selected={selected} onPress={open}>
+    // An inset rounded highlight, as in an iPadOS sidebar, so it sits inside the card's
+    // curve rather than cutting across it; content still lines up at space.lg.
+    <Tap onPress={open} selected={selected} style={{ flexDirection: "row", gap: space.md, marginHorizontal: space.sm, paddingHorizontal: space.sm, paddingVertical: space.md }}>
       {({ pressed }) => (
-        // An inset rounded highlight, as in an iPadOS sidebar, so it sits inside the card's
-        // curve rather than cutting across it; content still lines up at space.lg.
-        <View
-          style={{
-            flexDirection: "row",
-            gap: space.md,
-            marginHorizontal: space.sm,
-            paddingHorizontal: space.sm,
-            paddingVertical: space.md,
-            borderRadius: radius.lg,
-            borderCurve: "continuous",
-            // What the row is painted with: the sidebar card in split view, else the screen.
-            backgroundColor: colors[pressed ? "chipPressed" : selected ? "chip" : replace ? "surface" : "background"],
-          }}
-        >
+        <>
           <Character
             look={lookOfJson(agent.character)}
             mood={moodOf(task ? latestEvents(task) : [], online)}
             size={AVATAR}
-            backdrop={pressed ? "chipPressed" : selected ? "chip" : replace ? "surface" : "background"}
+            // What the row is painted with: the sidebar card in split view, else the screen.
+            backdrop={pressed ? "chipPressed" : selected ? "chip" : replace ? "card" : "background"}
           />
           <View style={{ flex: 1, gap: space.xs / 2 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
@@ -81,9 +69,9 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
               {(task && previewOf(task)) || t("start", { name: agent.name })}
             </Text>
           </View>
-        </View>
+        </>
       )}
-    </Pressable>
+    </Tap>
   );
 }
 

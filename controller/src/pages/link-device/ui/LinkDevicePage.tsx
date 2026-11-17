@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Share, View } from "react-native";
+import { Share, View } from "react-native";
 import { listDevices, useDevices } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink } from "../../../features/machine-link";
@@ -8,7 +8,7 @@ import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Button, Card, Field, inform, Note, QrCode, Screen, Section, space, Text, useColors } from "../../../shared/ui";
+import { Button, Card, Field, Note, QrCode, Screen, Section, Spinner, Text, inform, space } from "../../../shared/ui";
 import { approveLink, handOff, handoffData, nameProblem, openLink, type LinkAsk, type OpenLink } from "../model/link";
 
 // controller-prototype's DeviceLinkPage on the device that is already in the Workspace: show a QR
@@ -16,7 +16,6 @@ import { approveLink, handOff, handoffData, nameProblem, openLink, type LinkAsk,
 // sends back, authenticate and sign (ADR 0013, 0031). The new device never asks for a Hub.
 export function LinkDevicePage() {
   const t = useT("link-device");
-  const colors = useColors();
   const language = useLanguage();
   const database = useDatabase();
   const machines = useMachines();
@@ -94,7 +93,7 @@ export function LinkDevicePage() {
     return (
       <Screen title={t("title")}>
         <View style={{ alignItems: "center", gap: space.sm, paddingVertical: space.xl }}>
-          <ActivityIndicator color={colors.secondaryLabel} />
+          <Spinner />
           <Text variant="headline" role="heading">
             {t("sending.heading")}
           </Text>
@@ -124,7 +123,7 @@ export function LinkDevicePage() {
   if (!offer) {
     return (
       <Screen title={t("title")}>
-        <ActivityIndicator color={colors.secondaryLabel} />
+        <Spinner />
       </Screen>
     );
   }
@@ -162,7 +161,7 @@ export function LinkDevicePage() {
         </View>
       </Section>
       <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm }}>
-        <ActivityIndicator color={colors.secondaryLabel} />
+        <Spinner />
         <Text variant="subheadline" tone="secondary" style={{ flex: 1 }}>
           {t("show.waiting")}
         </Text>
