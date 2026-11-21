@@ -7,7 +7,6 @@
   "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",
   "count_one": "{{count}} Agent",
   "count_other": "{{count}} Agent",
-  "spent": "Budget หมด",
   "cancel": "ยกเลิก",
   "trash": {
     "title": "Agent ที่ถูกลบ",

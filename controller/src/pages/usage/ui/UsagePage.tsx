@@ -10,7 +10,7 @@ import { useMachineLink, useMachineStatuses, useUsageStatuses, type UsageStatus 
 import { useDatabase, useLiveQuery } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, shiftDay, useNow, when, type Bar } from "../../../shared/lib";
-import { Bars, Button, Empty, Meter, Note, Row, Screen, Section, Spinner, Tap, Text, space } from "../../../shared/ui";
+import { Bars, Button, Empty, Meter, Note, Row, Screen, Section, size, Spinner, Tap, Text, space } from "../../../shared/ui";
 import { daysBetween, rowsInRange, totalOf } from "../model/summary";
 import { DEFAULT_USAGE_WINDOW, isUsageWindow, saveUsageWindow, USAGE_WINDOWS } from "../model/window";
 
@@ -26,7 +26,7 @@ function WindowPicker({ days }: { days: number }) {
   const database = useDatabase();
   // Four equal 44pt pills across the width, as the board draws them: the chosen one ink, the rest grey.
   return (
-    <View style={{ flexDirection: "row", gap: 6 }}>
+    <View style={{ flexDirection: "row", gap: space.smd }}>
       {USAGE_WINDOWS.map((window) => (
         <View key={window} style={{ flex: 1 }}>
           <Button label={t(WINDOW_KEY[window])} variant={window === days ? "primary" : "chip"} pressed={window === days} onPress={() => void saveUsageWindow(database, window)} />
@@ -46,9 +46,9 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
   // Offline: nothing to open and nothing fresh to measure, so the whole line goes grey with only what it used.
   if (dim) {
     return (
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md }}>
         {leading}
-        <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flex: 1, gap: space.xxs }}>
           <Text variant="subheadline" strong tone="secondary" numberOfLines={1}>
             {title}
           </Text>
@@ -65,9 +65,9 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
     );
   }
   return (
-    <Tap href={href} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md }}>
+    <Tap href={href} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md }}>
       {leading}
-      <View style={{ flex: 1, gap: 6 }}>
+      <View style={{ flex: 1, gap: space.smd }}>
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.sm }}>
           <Text variant="subheadline" strong style={{ flex: 1 }} numberOfLines={1}>
             {title}
@@ -107,7 +107,7 @@ function Overview({ machines, agents, rows, statuses, days }: { machines: Machin
       : [];
   return (
     <Section footer={t("note")}>
-      <View style={{ gap: 4, paddingTop: space.lg, paddingHorizontal: 14, paddingBottom: space.md }}>
+      <View style={{ gap: space.xs, paddingTop: space.lg, paddingHorizontal: space.inset, paddingBottom: space.md }}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Text variant="footnote" strong tone="secondary" style={{ flex: 1 }}>
             {t("today")}

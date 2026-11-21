@@ -36,6 +36,11 @@ export function staleUsage(agent: Pick<AgentRow, "machine_id" | "usage_day">, ag
   return day !== null && agents.some((other) => other.machine_id === agent.machine_id && other.usage_day !== null && other.usage_day > day);
 }
 
+/** Today's Budget is used up. A tally from a day the Machine has moved past (staleUsage) is not today's, so it never is. */
+export function isSpent(agent: Pick<AgentRow, "machine_id" | "usage_day" | "usage_tokens" | "budget">, agents: readonly Pick<AgentRow, "machine_id" | "usage_day">[]): boolean {
+  return !!agent.budget && !staleUsage(agent, agents) && (agent.usage_tokens ?? 0) >= agent.budget;
+}
+
 /** The Approval timeout the Machine last sent, in seconds, or null when it never sent one. */
 export function approvalTimeoutOf(row: Pick<AgentRow, "approval_timeout_s">): number | null {
   return typeof row.approval_timeout_s === "number" ? row.approval_timeout_s : null;

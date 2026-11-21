@@ -1,5 +1,5 @@
 import { router, Stack } from "expo-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, Share, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { listDevices, useDevices } from "../../../entities/device";
@@ -9,7 +9,7 @@ import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { useNow, when } from "../../../shared/lib";
-import { Button, Card, Field, Icon, Note, QrCode, Screen, Spinner, Text, column, inform, space } from "../../../shared/ui";
+import { Button, Card, CenteredStep, Chip, Field, FooterBar, IconDisc, Note, QrCode, radius, Screen, Spinner, Text, column, inform, space } from "../../../shared/ui";
 import { approveLink, handOff, handoffData, nameProblem, openLink, type LinkAsk, type OpenLink } from "../model/link";
 
 // controller-prototype's DeviceLinkPage on the device that is already in the Workspace: show a QR
@@ -84,23 +84,6 @@ export function LinkDevicePage() {
   );
 
   const title = <Stack.Screen options={{ title: t("title") }} />;
-  const foot = (children: ReactNode) => <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm, ...column }}>{children}</View>;
-  const wide = (button: ReactNode) => <View style={{ flex: 1 }}>{button}</View>;
-  const centred = (top: ReactNode, heading: string, body: string, footer?: ReactNode) => (
-    <View style={{ flex: 1 }}>
-      {title}
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: 36 }}>
-        {top}
-        <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
-          {heading}
-        </Text>
-        <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
-          {body}
-        </Text>
-      </View>
-      {footer}
-    </View>
-  );
 
   if (machines && !hub) {
     return (
@@ -110,14 +93,20 @@ export function LinkDevicePage() {
     );
   }
 
-  if (sending) return centred(<Spinner size="large" />, t("sending.heading"), t("sending.body"));
+  if (sending)
+    return (
+      <>
+        {title}
+        <CenteredStep top={<Spinner size="large" />} heading={t("sending.heading")} body={t("sending.body")} />
+      </>
+    );
 
   if (ask) {
     return (
       <View style={{ flex: 1 }}>
         {title}
         <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ gap: space.md, padding: 20, ...column }}>
-          <Text variant="headline" role="heading" style={{ fontSize: 22 }}>
+          <Text variant="title" role="heading">
             {t("ask.heading")}
           </Text>
           <Field label={t("ask.label")} value={name} onChangeText={setName} />
@@ -126,13 +115,11 @@ export function LinkDevicePage() {
           </Note>
           {problemText}
         </ScrollView>
-        {foot(
-          <>
-            {/* Back to a QR: the one shown was spent on this request, so it is a fresh one (single use, ADR 0031). */}
-            {wide(<Button size="large" label={t("cancel")} onPress={fresh} />)}
-            {wide(<Button size="large" label={t("approve")} variant="primary" onPress={() => void approve()} />)}
-          </>,
-        )}
+        {/* Back to a QR: the one shown was spent on this request, so it is a fresh one (single use, ADR 0031). */}
+        <FooterBar>
+          <Button size="large" label={t("cancel")} onPress={fresh} />
+          <Button size="large" label={t("approve")} variant="primary" onPress={() => void approve()} />
+        </FooterBar>
       </View>
     );
   }
@@ -147,24 +134,31 @@ export function LinkDevicePage() {
   }
 
   if (expired) {
-    return centred(
-      <Card style={{ width: 112, height: 112, borderRadius: 56, padding: 0, alignItems: "center", justifyContent: "center", marginBottom: space.sm }}>
-        <Icon name="time" size="xl" color="label" />
-      </Card>,
-      t("expired"),
-      t("expiredBody"),
-      foot(wide(<Button size="large" label={t("again")} variant="primary" onPress={fresh} />)),
+    return (
+      <>
+        {title}
+        <CenteredStep
+          top={<IconDisc icon="time" />}
+          heading={t("expired")}
+          body={t("expiredBody")}
+          footer={
+            <FooterBar>
+              <Button size="large" label={t("again")} variant="primary" onPress={fresh} />
+            </FooterBar>
+          }
+        />
+      </>
     );
   }
 
   return (
     <View style={{ flex: 1 }}>
       {title}
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ alignItems: "center", gap: space.md, paddingHorizontal: 20, paddingTop: 6, paddingBottom: space.lg, ...column }}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ alignItems: "center", gap: space.md, paddingHorizontal: 20, paddingTop: space.smd, paddingBottom: space.lg, ...column }}>
         <Text variant="subheadline" style={{ textAlign: "center" }}>
           {t("show.heading")}
         </Text>
-        <Card style={{ alignItems: "center", borderRadius: 24, gap: space.md }}>
+        <Card style={{ alignItems: "center", borderRadius: radius.lg, gap: space.md }}>
           <QrCode text={offer.text} label={t("show.label")} />
           {/* ponytail: the board's short code ("K7F-29Q") beside the timer needs a code the Hub's Linking does not issue; add it with one. */}
           <Countdown until={offer.link.expires * 1000} />
@@ -182,7 +176,7 @@ export function LinkDevicePage() {
           </Text>
         </View>
       </ScrollView>
-      <View style={{ gap: space.sm, paddingHorizontal: space.lg, paddingTop: 4, paddingBottom: insets.bottom + space.sm, ...column }}>
+      <View style={{ gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: insets.bottom + space.sm, ...column }}>
         <Text variant="footnote" tone="secondary" style={{ textAlign: "center" }}>
           {t("show.link")}
         </Text>
@@ -201,12 +195,7 @@ function Countdown({ until }: { until: number }) {
   const left = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
   return (
     <View role="timer" aria-label={t("show.expiresIn", { left })}>
-      <Card tone="surface" style={{ flexDirection: "row", alignItems: "center", gap: 5, height: 32, paddingVertical: 0, paddingHorizontal: 10, borderRadius: 16 }}>
-        <Icon name="time" size="sm" color="bodyLabel" />
-        <Text variant="footnote" mono strong tone="body">
-          {left}
-        </Text>
-      </Card>
+      <Chip tone="mono" icon="time" label={left} />
     </View>
   );
 }

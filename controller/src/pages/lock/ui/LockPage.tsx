@@ -23,7 +23,7 @@ export function LockPage() {
     <Centered>
       <View style={{ flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.md }}>
         <Character look={LOOK} mood="idle" size={150} />
-        <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
+        <Text variant="title" role="heading" style={{ textAlign: "center" }}>
           {t("title")}
         </Text>
         <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>

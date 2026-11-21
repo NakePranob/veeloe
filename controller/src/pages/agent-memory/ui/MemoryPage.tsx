@@ -56,7 +56,7 @@ export function MemoryPage() {
     >
       <Note tone="plain">{t("note")}</Note>
       {online === false && (
-        <Note icon="offline" iconColor="orange">
+        <Note tone="offline">
           {t("needsOnline")}
         </Note>
       )}
@@ -76,7 +76,7 @@ export function MemoryPage() {
       {memory && !memory.exists && <Empty icon="memory" title={t("empty.title")} detail={t("empty.body")} />}
       {memory?.exists && (
         <Section title={t("heading")} footer={status.fetchedAt ? `${count} · ${fetched}` : undefined}>
-          <View style={{ gap: 10, padding: 14 }}>
+          <View style={{ gap: space.md, padding: space.inset }}>
             {/* The file it is, as on the board's Memory card. */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
               <Icon name="file" size="sm" color="bodyLabel" />
@@ -104,7 +104,7 @@ export function MemoryPage() {
       {/* ponytail: the board's "today's notes" section (notes/<date>.md) has no data yet: the Runtime
           sends only MEMORY.md. Add it when the memory reply carries the day's notes file. */}
       {memory && !memory.exists && status.fetchedAt ? (
-        <Text variant="caption" tone="secondary" style={{ paddingHorizontal: 14, lineHeight: 18 }}>
+        <Text variant="caption" tone="secondary" style={{ paddingHorizontal: space.inset }}>
           {fetched}
         </Text>
       ) : null}

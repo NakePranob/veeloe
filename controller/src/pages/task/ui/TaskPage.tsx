@@ -12,7 +12,7 @@ import { MAX_ATTACHMENT_BYTES, useMachineLink, useMachineStatus } from "../../..
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, useNow, when } from "../../../shared/lib";
-import { Bubble, Button, Card, Chip, column, confirm, Fade, FADE, font, HeaderAction, Icon, Input, Inset, Label, Meter, space, Spinner, Text } from "../../../shared/ui";
+import { Bubble, Button, Card, Chip, column, confirm, Fade, FADE, HeaderAction, Icon, Input, Inset, Label, Meter, radius, space, Spinner, Text } from "../../../shared/ui";
 import { contextUsageOf, items, type Item, type ToolCall } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
@@ -25,11 +25,11 @@ const FOLLOW_END_PT = 80;
 function FailedCard({ code, agentName }: { code: string; agentName: string }) {
   const t = useT("task");
   return (
-    <Card tone="danger" style={{ padding: 14, gap: 6 }}>
+    <Card tone="danger" style={{ padding: space.inset, gap: space.smd }}>
       <Label icon="failed" iconColor="red" variant="subheadline" tone="label" strong>
-        <Text variant="subheadline" tone="danger" strong style={{ fontSize: 14 }}>{t("failedTitle")}</Text>
+        <Text variant="callout" tone="danger" strong>{t("failedTitle")}</Text>
       </Label>
-      <Text variant="subheadline" tone="body" style={{ fontSize: 14, lineHeight: 21 }}>
+      <Text variant="callout" tone="body">
         {describeError({ code })} {t("failedBody", { name: agentName })}
       </Text>
     </Card>
@@ -50,9 +50,9 @@ function CompactedCard({ item }: { item: Extract<Item, { kind: "compacted" }> })
   const [open, setOpen] = useState(false);
   return (
     <Pressable onPress={() => setOpen(!open)} accessibilityRole="button">
-      <Card style={{ padding: 14, gap: 6 }}>
+      <Card style={{ padding: space.inset, gap: space.smd }}>
         <Label icon="info" tone="label" strong variant="subheadline">{t("compacted.title")} · {when(item.at, language)}</Label>
-        <Text variant="subheadline" tone="body" numberOfLines={open ? undefined : 2} selectable style={{ fontSize: 14, lineHeight: 21 }}>
+        <Text variant="callout" tone="body" numberOfLines={open ? undefined : 2} selectable>
           {item.summary}
         </Text>
         <Text variant="caption" strong style={{ textDecorationLine: "underline" }}>
@@ -96,13 +96,13 @@ function FileCard({ item, onOpen }: { item: Extract<Item, { kind: "file" }>; onO
     }
   }
   return (
-    <Card style={{ paddingVertical: 10, paddingRight: 10, paddingLeft: 14, gap: space.sm }}>
+    <Card style={{ paddingVertical: 10, paddingRight: 10, paddingLeft: space.inset, gap: space.sm }}>
       <View aria-label={t("file.offered")} style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
         <Inset chip>
           <Icon name="file" size="md" color="link" />
         </Inset>
         <View style={{ flex: 1 }}>
-          <Text variant="subheadline" strong numberOfLines={1} style={{ fontSize: 14 }}>{item.name}</Text>
+          <Text variant="callout" strong numberOfLines={1}>{item.name}</Text>
           <Text variant="caption" tone="secondary">{t("file.size", { size: Math.max(1, Math.round(item.size / 1024)) })}</Text>
         </View>
         <Button label={opening ? t("file.opening") : t("file.open")} variant="primary" disabled={opening} onPress={() => void open()} />
@@ -117,11 +117,11 @@ function BudgetCard({ machine, agent, readOnly }: { machine: string; agent: Agen
   const t = useT("task");
   const used = agent.usage_tokens ?? 0;
   return (
-    <Card tone="warning" style={{ padding: 14 }}>
+    <Card tone="warning" style={{ padding: space.inset }}>
       <Label icon="info" iconColor="orange" tone="label" strong variant="subheadline">
         {t("budget.out")}
       </Label>
-      <Text variant="subheadline" tone="body" style={{ fontSize: 14, lineHeight: 21 }}>{t("budget.body", { machine })}</Text>
+      <Text variant="callout" tone="body">{t("budget.body", { machine })}</Text>
       {/* How much of today's Budget went, from the Agent's usage; a deleted Agent's placeholder has none. */}
       {!!agent.budget && (
         <>
@@ -145,9 +145,9 @@ function BudgetCard({ machine, agent, readOnly }: { machine: string; agent: Agen
 function InterruptedCard({ machine, agentName, onContinue, readOnly }: { machine: string; agentName: string; onContinue: () => void; readOnly: boolean }) {
   const t = useT("task");
   return (
-    <Card style={{ padding: 14 }}>
+    <Card style={{ padding: space.inset }}>
       <Label icon="offline" iconColor="label" tone="label" strong variant="subheadline">{t("interrupted.title", { machine })}</Label>
-      <Text variant="subheadline" tone="body" style={{ fontSize: 14, lineHeight: 21 }}>{t("interrupted.body", { name: agentName })}</Text>
+      <Text variant="callout" tone="body">{t("interrupted.body", { name: agentName })}</Text>
       {/* Carry on sends a message, which a deleted Agent can no longer take. */}
       {!readOnly && (
         <View style={{ flexDirection: "row" }}>
@@ -373,15 +373,15 @@ export function TaskPage() {
         }}
         scrollEventThrottle={16}
         // The end of the log rests clear of the fade.
-        contentContainerStyle={[column, { flexGrow: 1, justifyContent: "flex-end", paddingHorizontal: 18, paddingTop: space.lg, paddingBottom: FADE, gap: 14 }]}
+        contentContainerStyle={[column, { flexGrow: 1, justifyContent: "flex-end", paddingHorizontal: 18, paddingTop: space.lg, paddingBottom: FADE, gap: space.inset }]}
       >
         {shown.length === 0 && pending.length === 0 && (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 22 }}>
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.inset, paddingHorizontal: 22 }}>
             <Character look={lookOfJson(agent.character)} mood={moodOf([], status.online)} size={160} />
-            <Text strong style={{ fontSize: 20, fontFamily: font.bold, textAlign: "center" }}>
+            <Text variant="title" style={{ textAlign: "center" }}>
               {t("emptyTitle", { name: agent.name })}
             </Text>
-            <Text variant="subheadline" tone="secondary" style={{ fontSize: 14, lineHeight: 21, textAlign: "center" }}>
+            <Text variant="callout" tone="secondary" style={{ textAlign: "center" }}>
               {t("empty", { name: agent.name })}
             </Text>
           </View>
@@ -415,7 +415,7 @@ export function TaskPage() {
             />
           ) : item.kind === "stopped" ? (
             // Who braked, in the prototype's centred line, so the log says a person did this and why it ended.
-            <Card key={item.key} style={{ alignSelf: "center", paddingHorizontal: space.md, paddingVertical: 6, borderRadius: 14 }}>
+            <Card key={item.key} style={{ alignSelf: "center", paddingHorizontal: space.md, paddingVertical: space.smd, borderRadius: 14 }}>
               <Label icon="stopped">{t("stopped", { member: item.member, when: when(item.at, language, now) })}</Label>
             </Card>
           ) : item.kind === "compacted" ? (
@@ -460,7 +460,7 @@ export function TaskPage() {
         {working &&
           (running ? (
             // The board's grey pill naming the command under way.
-            <Card style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: space.sm, height: 32, paddingVertical: 0, paddingHorizontal: 12, borderRadius: 16 }}>
+            <Card style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: space.sm, height: 32, paddingVertical: 0, paddingHorizontal: space.md, borderRadius: radius.md }}>
               <Spinner />
               <Text variant="caption" tone="body" mono numberOfLines={1} style={{ flexShrink: 1 }}>
                 {t("runningCommand", { target: running.target })}
@@ -479,8 +479,8 @@ export function TaskPage() {
       {/* Clear of the home indicator, as in controller-prototype's TaskPage (insets.bottom under the Composer). */}
       {readOnly ? (
         <View style={[column, { paddingHorizontal: space.xl, paddingTop: space.xs, paddingBottom: space.lg + insets.bottom }]}>
-          <Card style={{ paddingHorizontal: space.lg, paddingVertical: 14 }}>
-            <Text variant="subheadline" tone="secondary" style={{ fontSize: 14, lineHeight: 21, textAlign: "center" }}>
+          <Card style={{ paddingHorizontal: space.lg, paddingVertical: space.inset }}>
+            <Text variant="callout" tone="secondary" style={{ textAlign: "center" }}>
               {t("readOnly")}
             </Text>
           </Card>
@@ -497,9 +497,9 @@ export function TaskPage() {
               </View>
             )}
             {attachments.length > 0 && (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, paddingBottom: space.sm }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.smd, paddingBottom: space.sm }}>
                 {attachments.map((file) => (
-                  <Chip key={file.uri} label={file.name} onPress={() => setAttachments(attachments.filter((item) => item.uri !== file.uri))} />
+                  <Chip key={file.uri} label={file.name} aria-label={t("removeAttachment", { name: file.name })} onPress={() => setAttachments(attachments.filter((item) => item.uri !== file.uri))} />
                 ))}
               </View>
             )}

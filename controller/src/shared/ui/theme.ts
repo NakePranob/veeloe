@@ -37,7 +37,8 @@ const light = {
   secondaryLabel: "#5c5c5c",
   // Body text on a card or a pill, a step softer than the label.
   bodyLabel: "#3a3a3a",
-  tertiaryLabel: "#9ca3af",
+  // Placeholders and disabled words: still quieter than secondary, but 3:1 on white and on the card.
+  tertiaryLabel: "#80868f",
   // A link in running text.
   link: "#7e66cc",
   // The accent is the ink itself.
@@ -113,23 +114,36 @@ export function useShadows() {
   return shadows[useColorScheme() === "dark" ? "dark" : "light"];
 }
 
-export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
+// xxs: between a title and its detail line. smd: a dot and its words, a heading and its card.
+// inset: how far a row's content sits in from its card's edge, and the board's step between blocks.
+export const space = { xxs: 2, xs: 4, smd: 6, sm: 8, md: 12, inset: 14, lg: 16, xl: 24 };
 
 // Pair every radius but a pill with borderCurve "continuous".
-// sm: an icon tile in a row. md: a field or a picker tile. card: a group of rows. lg: a large card.
+// sm: an icon tile in a row. md: a field, a picker tile or a card nested in a card. card: a group of rows. lg: a large card.
 export const radius = { sm: 10, md: 16, card: 20, lg: 24, pill: 999 };
+
+// row: the least height of one line in a section.
+export const size = { row: 52 };
+
+// dim: a control or row that cannot act right now, and a text link while pressed. retired: what is away or gone (an offline Machine, a deleted Agent).
+export const opacity = { dim: 0.45, retired: 0.6 };
 
 // The board's scale. Weight comes from the family (see fonts.ts), never fontWeight,
 // which iOS would synthesize over a bundled font.
+// largeTitle: an Agent's name on its stage. title: the one heading of a centred step or a form (lock, pairing).
+// callout: body text on a card or a notice, a step under subheadline. caption2: tab, bar and picker labels.
 export const type = {
   largeTitle: { fontSize: 30, lineHeight: 36, fontFamily: font.bold, letterSpacing: -0.9 },
+  title: { fontSize: 22, lineHeight: 28, fontFamily: font.bold, letterSpacing: -0.4 },
   // A large number on a tile or a total: Space Grotesk, with room above so iOS does not clip it.
   figure: { fontSize: 30, lineHeight: 36, fontFamily: font.display, letterSpacing: -0.6, fontVariant: ["tabular-nums"] },
   headline: { fontSize: 17, fontFamily: font.bold },
   body: { fontSize: 16, fontFamily: font.regular, lineHeight: 24 },
   subheadline: { fontSize: 15, fontFamily: font.regular },
-  footnote: { fontSize: 13, fontFamily: font.regular },
-  caption: { fontSize: 12, fontFamily: font.regular },
+  callout: { fontSize: 14, lineHeight: 21, fontFamily: font.regular },
+  footnote: { fontSize: 13, lineHeight: 20, fontFamily: font.regular },
+  caption: { fontSize: 12, lineHeight: 18, fontFamily: font.regular },
+  caption2: { fontSize: 11, lineHeight: 14, fontFamily: font.regular },
 } as const;
 
 export const mono = font.mono;

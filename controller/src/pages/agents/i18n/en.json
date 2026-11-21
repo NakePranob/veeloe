@@ -7,7 +7,6 @@
   "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",
   "count_one": "{{count}} Agent",
   "count_other": "{{count}} Agents",
-  "spent": "Budget used up",
   "cancel": "Cancel",
   "trash": {
     "title": "Deleted Agents",

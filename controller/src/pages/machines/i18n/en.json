@@ -40,7 +40,6 @@
   "noAgent": "No Agent yet",
   "agentsTab": {
     "create": "Create an Agent on this Machine",
-    "spent": "Budget used up",
     "search": "Search Agents on this Machine",
     "searchPlaceholder": "Search {{count}} Agents",
     "noMatch": "No Agent matches",

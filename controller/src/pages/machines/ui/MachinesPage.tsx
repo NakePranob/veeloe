@@ -5,7 +5,7 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
 import { formatTokens } from "../../../shared/lib";
-import { Button, Dot, Empty, Icon, Meter, Screen, Section, Tap, Text, Tile, space } from "../../../shared/ui";
+import { Button, Dot, Empty, Icon, Meter, opacity, Screen, Section, size, Tap, Text, Tile, space } from "../../../shared/ui";
 
 // The Machines board: how many are online and today's Budget across them, then one card of Machines.
 // ponytail: OS and last-seen are not in the database yet, so the row's line leaves them out.
@@ -27,13 +27,13 @@ export function MachinesPage() {
         <Empty icon="machine" title={t("none.title")} detail={t("none.body")} action={<Button label={t("pair")} variant="primary" leading="add" onPress={pair} />} />
       ) : (
         <View style={{ gap: 18 }}>
-          <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flexDirection: "row", gap: space.md }}>
             <Tile
               top={<Caption>{t("online")}</Caption>}
               value={String(online)}
               unit={` / ${list.length}`}
               detail={
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, paddingTop: 2 }}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs, paddingTop: space.xxs }}>
                   {list.map((m) => (
                     <Dot key={m.id} color={statuses[m.id]?.online ? "green" : "tertiaryLabel"} />
                   ))}
@@ -47,7 +47,7 @@ export function MachinesPage() {
                 share === null ? (
                   t("budgetUnknown")
                 ) : (
-                  <View style={{ paddingTop: 6 }}>
+                  <View style={{ paddingTop: space.smd }}>
                     <Meter value={share} label={t("budgetTotal")} />
                   </View>
                 )
@@ -61,9 +61,9 @@ export function MachinesPage() {
               const budget = status?.budgetToday;
               const count = t("agents", { count: agents.filter((a) => a.machine_id === machine.id).length });
               return (
-                <Tap key={machine.id} href={`/machines/${machine.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md, opacity: on === false ? 0.6 : 1 }}>
+                <Tap key={machine.id} href={`/machines/${machine.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md, opacity: on === false ? opacity.retired : 1 }}>
                   <Icon name="machine" size="md" color={on ? "green" : "tertiaryLabel"} />
-                  <View style={{ flex: 1, gap: 6 }}>
+                  <View style={{ flex: 1, gap: space.smd }}>
                     <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.sm }}>
                       <Text variant="subheadline" strong numberOfLines={1} style={{ flex: 1 }}>
                         {machine.name}

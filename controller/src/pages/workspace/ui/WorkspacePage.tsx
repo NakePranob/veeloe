@@ -8,7 +8,7 @@ import { PUSH_READY, savePushEnabled, useMachineStatuses, usePushEnabled } from 
 import { useDatabase } from "../../../shared/db";
 import { saveLanguage, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, shiftDay, type Bar } from "../../../shared/lib";
-import { Bars, Dot, Screen, Section, Text, Tile, ToggleRow, type Colors } from "../../../shared/ui";
+import { Bars, DotLabel, Screen, Section, space, Tile, ToggleRow } from "../../../shared/ui";
 
 const TILE = 156;
 
@@ -55,13 +55,13 @@ export function WorkspacePage() {
   const next = language === "th" ? "en" : "th";
   return (
     <Screen title="Workspace" right={{ label: language === "th" ? "TH" : "EN", variant: "chip", onPress: () => void saveLanguage(database, next) }}>
-      <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: "row", gap: 10 }}>
+      <View style={{ gap: space.md }}>
+        <View style={{ flexDirection: "row", gap: space.md }}>
           <Tile
             icon="machine"
             value={machines ? String(machines.length) : undefined}
             title="Machine"
-            detail={machines?.length ? <Line color={online ? "green" : "tertiaryLabel"} text={t("machines.online", { online, count: machines.length })} /> : undefined}
+            detail={machines?.length ? <DotLabel color={online ? "green" : "tertiaryLabel"}>{t("machines.online", { online, count: machines.length })}</DotLabel> : undefined}
             height={TILE}
             href="/machines"
           />
@@ -69,12 +69,12 @@ export function WorkspacePage() {
             icon="agent"
             value={agents ? String(agents.length) : undefined}
             title="Agent"
-            detail={agents?.length ? <Line color={waiting ? "orange" : undefined} text={t("agents.line", { waiting, working })} /> : undefined}
+            detail={agents?.length ? <DotLabel color={waiting ? "orange" : undefined}>{t("agents.line", { waiting, working })}</DotLabel> : undefined}
             height={TILE}
             href="/agents"
           />
         </View>
-        <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flexDirection: "row", gap: space.md }}>
           <Tile
             top={<Bars bars={bars} label={t("tokens.chart")} height={40} />}
             value={rows ? formatTokens(today ? total(today) : 0) : undefined}
@@ -88,7 +88,7 @@ export function WorkspacePage() {
             value={live ? String(live.length) : undefined}
             title={t("devices.title")}
             // Once there is a device list, which comes with the first Machine.
-            detail={live?.length === 1 ? <Line color="orange" text={t("devices.linkSecond")} /> : undefined}
+            detail={live?.length === 1 ? <DotLabel color="orange">{t("devices.linkSecond")}</DotLabel> : undefined}
             height={TILE}
             href="/devices"
           />
@@ -104,14 +104,3 @@ export function WorkspacePage() {
   );
 }
 
-// A tile's last line: a dot that says the same thing as the words after it.
-function Line({ color, text }: { color?: keyof Colors; text: string }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-      {color && <Dot color={color} size={7} />}
-      <Text variant="caption" tone="body" numberOfLines={1} style={{ flexShrink: 1 }}>
-        {text}
-      </Text>
-    </View>
-  );
-}

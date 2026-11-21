@@ -34,6 +34,7 @@
   "queuedPosition": "คิว #{{position}} รอ Turn ที่กำลังทำงาน",
   "attach": "แนบไฟล์",
   "attachedOnly": "ไฟล์แนบ",
+  "removeAttachment": "นำ {{name}} ออก",
   "file": {
     "offered": "ไฟล์จาก Agent",
     "size": "{{size}} KB",

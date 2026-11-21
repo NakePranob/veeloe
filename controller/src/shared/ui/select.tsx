@@ -28,13 +28,14 @@ export function Select<T extends string>({ label, value, options, onChange, disa
   }
   return (
     <>
-      <Row title={label} value={chosen?.label} disabled={disabled} onPress={press} accessory={<Icon name={open ? "collapse" : "expand"} size="sm" color="tertiaryLabel" />} />
+      <Row title={label} value={chosen?.label} disabled={disabled} onPress={press} expanded={process.env.EXPO_OS === "ios" ? undefined : open} accessory={<Icon name={open ? "collapse" : "expand"} size="sm" color="tertiaryLabel" />} />
       {open &&
         options.map((option) => (
           <Row
             key={option.value}
             title={option.label}
             onPress={() => pick(option.value)}
+            selected={option.value === value}
             accessory={option.value === value ? <Icon name="check" size="md" color="label" weight="semibold" /> : undefined}
           />
         ))}

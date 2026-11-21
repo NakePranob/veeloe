@@ -8,7 +8,7 @@ import { Icon, type IconName } from "./icon";
 import { Text } from "./text";
 import { Button } from "./button";
 import { OnCard, useOnCard } from "./surface";
-import { column, font, radius, space, type, useColors, type Colors } from "./theme";
+import { column, font, opacity, radius, size, space, type, useColors, type Colors } from "./theme";
 
 interface ScreenProps {
   title: string;
@@ -69,9 +69,9 @@ export function OnTint({ children }: { children: ReactNode }) {
 // A titled group of rows on one card; the footer explains what the group means.
 export function Section({ title, footer, children }: { title?: string; footer?: string; children?: ReactNode }) {
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: space.smd }}>
       {title && (
-        <Text variant="footnote" strong tone="secondary" style={{ paddingHorizontal: 14 }}>
+        <Text variant="footnote" strong tone="secondary" style={{ paddingHorizontal: space.inset }}>
           {title}
         </Text>
       )}
@@ -79,7 +79,7 @@ export function Section({ title, footer, children }: { title?: string; footer?: 
         <Card style={{ padding: 0, gap: 0, overflow: "hidden" }}>{children}</Card>
       )}
       {footer && (
-        <Text variant="caption" tone="secondary" style={{ paddingHorizontal: 14, lineHeight: 18 }}>
+        <Text variant="caption" tone="secondary" style={{ paddingHorizontal: space.inset }}>
           {footer}
         </Text>
       )}
@@ -104,16 +104,27 @@ interface RowProps {
   accessory?: ReactNode;
   // Shown faded and inert, for a setting that cannot change right now (its Machine is offline).
   disabled?: boolean;
+  // The board's create row: an ink circle with a plus in place of the icon, and the title in bold.
+  add?: boolean;
+  // For a row that opens choices under it (Select): whether they are showing, and which one is chosen.
+  expanded?: boolean;
+  selected?: boolean;
 }
 
 // One line in a section. It opens something when it has an href or onPress.
-export function Row({ title, detail, value, icon, leading, iconColor, href, onPress, destructive, mono, accessory, disabled }: RowProps) {
+export function Row({ title, detail, value, icon, leading, iconColor, href, onPress, destructive, mono, accessory, disabled, add, expanded, selected }: RowProps) {
   const colors = useColors();
   const body = (pressed: boolean) => (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md, backgroundColor: pressed ? colors.chipPressed : "transparent" }}>
-      {leading ?? (icon && <Icon name={icon} size="md" color={iconColor ?? (destructive ? "red" : "label")} />)}
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text mono={mono} strong={destructive} tone={destructive ? "danger" : "label"} variant="subheadline" selectable={!href && !onPress}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md, backgroundColor: pressed ? colors.chipPressed : "transparent" }}>
+      {add ? (
+        <View aria-hidden style={{ width: 32, height: 32, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", backgroundColor: colors.accent }}>
+          <Icon name="add" size="md" color="onAccent" weight="semibold" />
+        </View>
+      ) : (
+        (leading ?? (icon && <Icon name={icon} size="md" color={iconColor ?? (destructive ? "red" : "label")} />))
+      )}
+      <View style={{ flex: 1, gap: space.xxs }}>
+        <Text mono={mono} strong={destructive || add} tone={destructive ? "danger" : "label"} variant="subheadline" selectable={!href && !onPress}>
           {title}
         </Text>
         {detail && (
@@ -131,23 +142,26 @@ export function Row({ title, detail, value, icon, leading, iconColor, href, onPr
       {href && !disabled && <Icon name="disclosure" size="sm" color="secondaryLabel" weight="semibold" />}
     </View>
   );
+  const role = href ? "link" : onPress ? "button" : undefined;
+  const state = { "aria-expanded": expanded, "aria-selected": selected };
+  // Still the control it would be, so a screen reader says it is there and dimmed.
   if (disabled)
     return (
-      <View aria-disabled style={{ opacity: 0.45 }}>
+      <Pressable role={role} disabled aria-disabled accessibilityState={{ disabled: true }} {...state} style={{ opacity: opacity.dim }}>
         {body(false)}
-      </View>
+      </Pressable>
     );
   // Link's Slot drops a Pressable style function on web, so the look lives on an inner View.
   if (href) {
     return (
       <Link href={href as never} asChild>
-        <Pressable role="link">{({ pressed }) => body(pressed)}</Pressable>
+        <Pressable role="link" {...state}>{({ pressed }) => body(pressed)}</Pressable>
       </Link>
     );
   }
   if (onPress) {
     return (
-      <Pressable role="button" onPress={onPress}>
+      <Pressable role="button" onPress={onPress} {...state}>
         {({ pressed }) => body(pressed)}
       </Pressable>
     );
@@ -186,10 +200,10 @@ export function Field({ label, value, onChangeText, placeholder, footer, multili
   const inCard = useOnCard();
   return (
     // In a Section's card the box is white with a little inset; on the screen it is one grey box.
-    <View style={{ gap: space.xs, opacity: disabled ? 0.45 : 1, ...(inCard ? { paddingTop: space.xs, paddingHorizontal: 6, paddingBottom: 6 } : null) }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: bare ? 44 : 52, paddingLeft: 14, paddingRight: action ? space.xs : 14, paddingVertical: bare ? space.xs : 7, borderRadius: bare ? radius.pill : radius.md, borderCurve: "continuous", backgroundColor: inCard ? colors.surface : colors.card }}>
+    <View style={{ gap: space.xs, opacity: disabled ? opacity.dim : 1, ...(inCard ? { paddingTop: space.xs, paddingHorizontal: space.smd, paddingBottom: space.smd } : null) }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: bare ? 44 : size.row, paddingLeft: space.inset, paddingRight: action ? space.xs : space.inset, paddingVertical: bare ? space.xs : 7, borderRadius: bare ? radius.pill : radius.md, borderCurve: "continuous", backgroundColor: inCard ? colors.surface : colors.card }}>
         {icon && <Icon name={icon} size="sm" color="secondaryLabel" />}
-        <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flex: 1, gap: space.xxs }}>
           {!bare && (
             <Text variant="caption" tone="secondary">
               {label}
@@ -246,22 +260,24 @@ export function Empty({ icon, title, detail, action }: { icon: IconName; title: 
 }
 
 // A short rule the Member should not miss, on the screen's grey rather than a card.
-// plain: a 12pt paragraph under the content, as the boards end a page.
+// plain: a caption paragraph under the content where there is no Section whose footer it could be.
 // warning: a soft orange box with an icon, for something a person should act on.
+// offline: the line that says the Machine must be online for this, with the orange offline mark.
 // Otherwise a line with an icon in front.
-export function Note({ icon = "info", iconColor = "secondaryLabel", tone, children }: { icon?: IconName; iconColor?: keyof Colors; tone?: "plain" | "warning"; children: ReactNode }) {
+export function Note({ icon = "info", iconColor = "secondaryLabel", tone, children }: { icon?: IconName; iconColor?: keyof Colors; tone?: "plain" | "warning" | "offline"; children: ReactNode }) {
   const colors = useColors();
   if (tone === "plain")
     return (
-      <Text variant="caption" tone="secondary" style={{ paddingHorizontal: 14, lineHeight: 18 }}>
+      <Text variant="caption" tone="secondary" style={{ paddingHorizontal: space.inset }}>
         {children}
       </Text>
     );
   const box = tone === "warning";
+  const offline = tone === "offline";
   return (
-    <View style={[{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.sm }, box && { paddingHorizontal: 14, paddingVertical: space.md, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: colors.orangeSoft }]}>
-      <Icon name={box ? "warning" : icon} size="sm" color={box ? "orange" : iconColor} />
-      <Text variant="footnote" tone={box ? "body" : "secondary"} style={{ flex: 1, lineHeight: 20 }}>
+    <View style={[{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.sm }, box && { paddingHorizontal: space.inset, paddingVertical: space.md, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: colors.orangeSoft }]}>
+      <Icon name={box ? "warning" : offline ? "offline" : icon} size="sm" color={box || offline ? "orange" : iconColor} />
+      <Text variant="footnote" tone={box ? "body" : "secondary"} style={{ flex: 1 }}>
         {children}
       </Text>
     </View>

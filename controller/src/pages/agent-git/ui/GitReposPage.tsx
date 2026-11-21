@@ -69,7 +69,7 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
         </Note>
       )}
       {offline && (
-        <Note icon="offline" iconColor="orange">
+        <Note tone="offline">
           {t("offline")}
         </Note>
       )}
@@ -77,10 +77,10 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
       {(adding || (repos.length === 0 && !locked)) && <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono action={{ label: t("add.action"), onPress: add, disabled: !entry.trim() || locked }} />}
       {repos.length === 0 && <Empty icon="branch" title={t("repos.empty")} detail={t("repos.emptyDetail")} />}
       {/* One card per repo, its two actions under it (the board). */}
-      <View style={{ gap: 10 }}>
+      <View style={{ gap: space.md }}>
         {repos.map((repo) => (
-          <Card key={repo} style={{ padding: 14, gap: 10 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Card key={repo} style={{ padding: space.inset, gap: space.md }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
               <Icon name="branch" size="md" color="label" />
               <Text variant="subheadline" mono strong selectable style={{ flex: 1 }}>
                 {repo}

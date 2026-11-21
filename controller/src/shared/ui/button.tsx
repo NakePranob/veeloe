@@ -72,7 +72,8 @@ export function Button({ label, onPress, variant = "chip", icon, disabled, size 
       onPress={onPress}
       onPressIn={() => press(motion.press)}
       onPressOut={() => press(1)}
-      hitSlop={space.xs}
+      // A 32pt small pill still takes a 44pt press.
+      hitSlop={size === "small" ? (44 - 32) / 2 : space.xs}
       style={size === "large" ? { alignSelf: "stretch" } : undefined}
     >
       {({ pressed }) => {
@@ -88,7 +89,7 @@ export function Button({ label, onPress, variant = "chip", icon, disabled, size 
               opacity: disabled && inked ? 0.3 : 1,
               minHeight: side,
               minWidth: side,
-              paddingHorizontal: icon ? 0 : size === "small" ? 14 : 18,
+              paddingHorizontal: icon ? 0 : size === "small" ? space.inset : 18,
               borderRadius: radius.pill,
               alignItems: "center",
               justifyContent: "center",
@@ -101,7 +102,7 @@ export function Button({ label, onPress, variant = "chip", icon, disabled, size 
             ) : (
               <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
                 {leading && <Icon name={leading} size="sm" color={ink} weight="semibold" />}
-                <Text variant={large ? "body" : "subheadline"} strong style={[{ color: colors[ink] }, !large && { fontSize: size === "small" ? 13 : 14 }]}>
+                <Text variant={large ? "body" : size === "small" ? "footnote" : "callout"} strong style={{ color: colors[ink] }}>
                   {label}
                 </Text>
               </View>

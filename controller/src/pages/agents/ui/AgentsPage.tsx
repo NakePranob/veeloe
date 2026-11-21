@@ -1,14 +1,14 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
-import { staleUsage, useAgents, useTrashedAgents, type AgentTrashRow } from "../../../entities/agent";
+import { isSpent, useAgents, useTrashedAgents, type AgentTrashRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, RETIRED_COLOR } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { STATUS_DOT, statusOf, useTaskSummaries } from "../../../entities/task";
+import { statusOf, TaskStatusDot, useTaskSummaries } from "../../../entities/task";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { useNow } from "../../../shared/lib";
-import { Button, Card, Dot, Empty, Icon, Note, Screen, Section, Tap, Text, confirm, inform, space } from "../../../shared/ui";
+import { Button, Card, Dot, Empty, Icon, Note, opacity, Screen, Section, Tap, Text, confirm, inform, space } from "../../../shared/ui";
 import { daysLeft } from "../model/trash";
 
 
@@ -17,7 +17,6 @@ import { daysLeft } from "../model/trash";
 // ponytail: an offline Machine's "last seen" is left out: nothing stores when a Machine was last seen.
 export function AgentsPage() {
   const t = useT("agents");
-  const taskStatus = useT("task-status");
   const now = useNow();
   const agents = useAgents();
   const trashed = useTrashedAgents();
@@ -54,8 +53,8 @@ export function AgentsPage() {
         if (own.length === 0) return null;
         const online = statuses[machine.id]?.online ?? null;
         return (
-          <View key={machine.id} style={{ gap: 6, opacity: online === false ? 0.6 : 1 }}>
-            <Tap href={`/machines/${machine.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: 14, minHeight: 28 }}>
+          <View key={machine.id} style={{ gap: space.smd, opacity: online === false ? opacity.retired : 1 }}>
+            <Tap href={`/machines/${machine.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.inset, minHeight: 28 }}>
               <Dot color={online === false || online === null ? "tertiaryLabel" : "green"} />
               <Text variant="footnote" strong mono>
                 {machine.name}
@@ -70,24 +69,18 @@ export function AgentsPage() {
                 const latest = summaries.find((task) => task.agent_id === agent.id);
                 const status = statusOf(latest, online);
                 // Yesterday's tally is not today's, so it never says the Budget is used up.
-                const spent = !!agent.budget && !staleUsage(agent, own) && (agent.usage_tokens ?? 0) >= agent.budget && online !== false;
-                const loud = spent || status === "waiting";
+                const spent = isSpent(agent, own) && online !== false;
                 return (
-                  <Tap key={agent.id} href={`/agents/${agent.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 7, paddingHorizontal: 10 }}>
+                  <Tap key={agent.id} href={`/agents/${agent.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm, paddingHorizontal: space.md }}>
                     <Character look={lookOfJson(agent.character)} mood={moodOf(latest?.latest_kind ? [{ kind: latest.latest_kind, body: latest.latest_body }] : [], online)} size={40} />
-                    <View style={{ flex: 1, gap: 1 }}>
+                    <View style={{ flex: 1, gap: space.xxs }}>
                       <Text variant="subheadline" strong numberOfLines={1} tone={online === false ? "secondary" : "label"}>
                         {`${agent.name} `}
                         <Text variant="caption" tone="secondary" mono>
                           {agent.model}
                         </Text>
                       </Text>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                        <Dot color={spent ? "red" : STATUS_DOT[status]} size={7} />
-                        <Text variant="caption" strong={loud} tone={spent ? "danger" : loud ? "label" : "body"} numberOfLines={1}>
-                          {spent ? t("spent") : taskStatus(status)}
-                        </Text>
-                      </View>
+                      <TaskStatusDot status={status} spent={spent} />
                     </View>
                     <Icon name="disclosure" size="sm" color="secondaryLabel" weight="semibold" />
                   </Tap>
@@ -103,11 +96,11 @@ export function AgentsPage() {
           <Section title={t("trash.title")} footer={t("trash.footer")}>
             <View style={{ padding: space.xs }}>
               {trashed.map((row) => (
-                <View key={row.id} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 7, paddingHorizontal: 10 }}>
-                  <View style={{ opacity: 0.6 }}>
+                <View key={row.id} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm, paddingHorizontal: space.md }}>
+                  <View style={{ opacity: opacity.retired }}>
                     <Character look={{ ...lookOfJson(row.character), color: RETIRED_COLOR }} mood="idle" size={40} still />
                   </View>
-                  <View style={{ flex: 1, gap: 1 }}>
+                  <View style={{ flex: 1, gap: space.xxs }}>
                     <Text variant="subheadline" strong tone="secondary">
                       {row.name}
                     </Text>

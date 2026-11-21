@@ -89,7 +89,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
             </Text>
           )}
         </View>
-        <Card raised style={{ alignSelf: "stretch", flexDirection: "row", justifyContent: "space-between", gap: 0, paddingVertical: space.sm, paddingHorizontal: 6 }}>
+        <Card raised style={{ alignSelf: "stretch", flexDirection: "row", justifyContent: "space-between", gap: 0, paddingVertical: space.sm, paddingHorizontal: space.smd }}>
           {MOODS.map((mood) => (
             <MoodTile key={mood} color={draft.color} label={t(`moods.${mood}`)} selected={preview === mood} onPress={() => setPreview(mood)}>
               <Character look={draft} mood={mood} size={38} still />
@@ -98,7 +98,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
         </Card>
       </Stage>
       {offline && (
-        <Note icon="offline" iconColor="orange">
+        <Note tone="offline">
           {t("offline")}
         </Note>
       )}

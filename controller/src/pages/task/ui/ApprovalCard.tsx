@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Pressable, useColorScheme, View } from "react-native";
+import { View } from "react-native";
 import { covers, missingParts } from "../../../entities/agent";
 import { useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { fromNow } from "../../../shared/lib";
 import { AgentCard, Character, type Look } from "../../../entities/character";
-import { Button, Card, Field, font, Icon, Inset, Label, radius, space, Text, type IconName } from "../../../shared/ui";
+import { Button, Card, Field, Icon, Inset, Label, radius, space, Text, TextLink, type IconName } from "../../../shared/ui";
 import { canAllowAlways } from "../model/allow-always";
 import type { Approval, ApprovalStatus } from "../model/items";
 
@@ -55,7 +55,6 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   const [busy, setBusy] = useState(false);
   // The rarer answers wait behind the board's one "Other options" link.
   const [more, setMore] = useState(false);
-  const dark = useColorScheme() === "dark";
   const by = approval.answeredBy ? t("approval.by", { member: approval.answeredBy.member }) : "";
 
   // Answering takes a fresh unlock, so a phone left open cannot approve (ADR 0012).
@@ -129,7 +128,7 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   const left = fromNow(approval.expiresAt, now);
   const body = (
     <>
-      <Text strong style={{ fontSize: 21, fontFamily: font.bold, letterSpacing: -0.4, textAlign: "center" }}>
+      <Text variant="title" style={{ textAlign: "center" }}>
         {domain ? t("approval.domainTitle", { name: agentName }) : t("approval.title", { name: agentName })}
       </Text>
       {approval.reason && (
@@ -138,7 +137,7 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
         </Text>
       )}
       <Inset chip>
-        <Text variant="subheadline" mono selectable style={{ fontSize: 14 }}>
+        <Text variant="callout" mono selectable>
           {target}
         </Text>
       </Inset>
@@ -173,26 +172,26 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
             {domain && canManage && (
               <>
                 <Dot />
-                <Link label={t("approval.allowAlways")} disabled={!online || busy} onPress={() => void respond("always")} />
+                <TextLink role="button" strong label={t("approval.allowAlways")} disabled={!online || busy} onPress={() => void respond("always")} />
               </>
             )}
             {!domain && !more && (
               <>
                 <Dot />
-                <Link label={t("approval.more")} onPress={() => setMore(true)} />
+                <TextLink role="button" strong label={t("approval.more")} onPress={() => setMore(true)} />
               </>
             )}
             {!domain && more && canManage && (
               <>
                 <Dot />
                 {/* The Protocol takes at most 20, so the card offers at most that many. */}
-                <Link label={t("approval.always")} disabled={!online} onPress={() => setEntries(missingParts(approval.command, allowlist).slice(0, 20).map((part) => ({ entry: part, part })))} />
+                <TextLink role="button" strong label={t("approval.always")} disabled={!online} onPress={() => setEntries(missingParts(approval.command, allowlist).slice(0, 20).map((part) => ({ entry: part, part })))} />
               </>
             )}
             {!domain && more && (
               <>
                 <Dot />
-                <Link label={t("approval.steer")} disabled={!online} onPress={onSteer} />
+                <TextLink role="button" strong label={t("approval.steer")} disabled={!online} onPress={onSteer} />
               </>
             )}
           </View>
@@ -222,17 +221,12 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
       )}
     </>
   );
-  // The board's card: the Agent's colour, solid, radius 30, with its 112pt head waiting over the top edge.
-  // Dark keeps the entity's tint, since the ink text would not read on the solid colour there.
+  // The board's card: the Agent's colour, solid, with its 112pt head waiting over the top edge.
   return (
     <View style={{ marginTop: 54 }}>
-      {dark ? (
-        <AgentCard color={look.color}>
-          <View style={{ alignItems: "center", gap: space.md, paddingTop: 42 }}>{body}</View>
-        </AgentCard>
-      ) : (
-        <View style={{ backgroundColor: look.color, borderRadius: 30, borderCurve: "continuous", paddingTop: 58, paddingHorizontal: 18, paddingBottom: 18, alignItems: "center", gap: space.md }}>{body}</View>
-      )}
+      <AgentCard color={look.color} solid>
+        <View style={{ alignItems: "center", gap: space.md, paddingTop: 40 }}>{body}</View>
+      </AgentCard>
       <View style={{ position: "absolute", top: -62, left: 0, right: 0, alignItems: "center", pointerEvents: "none" }}>
         <Character look={look} mood="waiting" size={112} />
       </View>
@@ -242,12 +236,3 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
 
 const Dot = () => <Text variant="caption">·</Text>;
 
-function Link({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
-  return (
-    <Pressable role="button" disabled={disabled} onPress={onPress} hitSlop={space.sm} style={{ paddingVertical: space.xs, paddingHorizontal: 2 }}>
-      <Text variant="caption" strong style={{ textDecorationLine: "underline" }}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}

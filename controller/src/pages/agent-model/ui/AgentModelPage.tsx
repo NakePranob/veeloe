@@ -5,7 +5,7 @@ import { useAgents, type AgentRow } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
 import { useAgentUpdate, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
-import { Empty, Note, Row, Screen, Spinner } from "../../../shared/ui";
+import { Empty, Note, Row, Screen, space, Spinner } from "../../../shared/ui";
 import { modelsOf, ProviderModelSections } from "../../../widgets/provider-models";
 
 // The AgentModel board: the Provider and model picker New Agent also uses, saved with the header button.
@@ -34,9 +34,9 @@ function Picker({ agent }: { agent: AgentRow }) {
   return (
     <Screen title={t("provider.heading")} subtitle={machine ? t("subtitle", { agent: agent.name, machine: machine.name }) : agent.name} right={{ label: t("save"), onPress: submit, disabled: !changed || !listed || offline || save.sending }}>
       {/* The board spaces its blocks 14 apart, closer than the Screen's sections. */}
-      <View style={{ gap: 14 }}>
+      <View style={{ gap: space.inset }}>
         {offline && (
-          <Note icon="offline" iconColor="orange">
+          <Note tone="offline">
             {t("needsOnline")}
           </Note>
         )}

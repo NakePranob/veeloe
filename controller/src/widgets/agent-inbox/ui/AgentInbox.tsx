@@ -36,7 +36,7 @@ function Dots() {
           aria-hidden
           style={{ marginLeft: delay === 0 ? 4 : 0, opacity: reduce ? 1 : phase.interpolate({ inputRange: [0, delay, delay + 0.33, Math.min(1, delay + 0.66), 1], outputRange: [0.25, 0.25, 1, 0.25, 0.25] }) }}
         >
-          <Text variant="subheadline" tone="secondary" style={{ fontSize: 14 }}>
+          <Text variant="callout" tone="secondary">
             ●
           </Text>
         </Animated.View>
@@ -82,12 +82,12 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
             // What the row is painted with: the sidebar card in split view, else the screen.
             backdrop={pressed ? "chipPressed" : selected ? "chip" : replace ? "card" : "background"}
           />
-          <View style={{ flex: 1, gap: 2 }}>
+          <View style={{ flex: 1, gap: space.xxs }}>
             <Text strong numberOfLines={1} tone={status === "offline" ? "secondary" : "label"} style={{ fontFamily: font.bold }}>
               {agent.name}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text variant="subheadline" tone={quiet ? "secondary" : "label"} numberOfLines={1} style={{ fontSize: 14, flexShrink: 1 }}>
+              <Text variant="callout" tone={quiet ? "secondary" : "label"} numberOfLines={1} style={{ flexShrink: 1 }}>
                 {line}
               </Text>
               {status === "working" && <Dots />}
@@ -136,7 +136,7 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
   const counts = countsOf(rows);
   const tabs =
     rows.length > 0 ? (
-      <View style={{ paddingHorizontal: space.lg, paddingBottom: 14 }}>
+      <View style={{ paddingHorizontal: space.lg, paddingBottom: space.inset }}>
         <Tabs
           value={tab}
           onChange={setTab}

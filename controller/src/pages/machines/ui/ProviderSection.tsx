@@ -5,8 +5,7 @@ import type { Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, Card, Dot, Field, Icon, inform, Row, Section, Select, Text } from "../../../shared/ui";
-import { AddRow } from "./AgentList";
+import { Button, Card, DotLabel, Field, Icon, inform, radius, Row, Section, Select, size, space, Text } from "../../../shared/ui";
 import { PROVIDER_PRESETS } from "../model/providers";
 
 const CUSTOM = "custom";
@@ -62,9 +61,9 @@ export function ProviderSection({ machine, agents }: { machine: Machine; agents:
           ? describeError({ code: error })
           : [models ? t("provider.models", { count: models.length }) : null, users.length ? t("provider.usedBy", { agents: users.join(", ") }) : null].filter(Boolean).join(" · ") || undefined;
         return (
-          <View key={provider.name} style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 52, paddingHorizontal: 14, paddingVertical: 10 }}>
+          <View key={provider.name} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md }}>
             <Icon name="key" size="md" color={error ? "orange" : "label"} />
-            <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ flex: 1, gap: space.xxs }}>
               <Text variant="subheadline" strong selectable>
                 {provider.name}
               </Text>
@@ -76,20 +75,17 @@ export function ProviderSection({ machine, agents }: { machine: Machine; agents:
             </View>
             {!error && (
               // Green words fail contrast on grey, so the dot carries the colour and the words stay ink.
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                <Dot color="green" size={7} />
-                <Text variant="caption" strong>
-                  {t("provider.ok")}
-                </Text>
-              </View>
+              <DotLabel color="green" tone="label" strong>
+                {t("provider.ok")}
+              </DotLabel>
             )}
           </View>
         );
       })}
       {adding ? (
-        <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 8 }}>
-          <Card tone="surface" style={{ paddingTop: 12, paddingHorizontal: 8, paddingBottom: 8, gap: 10, borderRadius: 18 }}>
-            <Text variant="subheadline" strong style={{ fontSize: 14, paddingHorizontal: 6 }}>
+        <View style={{ paddingHorizontal: space.sm, paddingTop: space.xs, paddingBottom: space.sm }}>
+          <Card tone="surface" style={{ paddingTop: space.md, paddingHorizontal: space.sm, paddingBottom: space.sm, gap: space.md, borderRadius: radius.md }}>
+            <Text variant="callout" strong style={{ paddingHorizontal: space.smd }}>
               {t("provider.add")}
             </Text>
             <Select
@@ -106,7 +102,7 @@ export function ProviderSection({ machine, agents }: { machine: Machine; agents:
               </>
             )}
             <Field label={t("provider.key")} value={key} onChangeText={setKey} secure mono />
-            <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={{ flexDirection: "row", gap: space.sm }}>
               <View style={{ flex: 1 }}>
                 <Button label={t("provider.cancel")} onPress={close} />
               </View>
@@ -117,7 +113,7 @@ export function ProviderSection({ machine, agents }: { machine: Machine; agents:
           </Card>
         </View>
       ) : (
-        <AddRow label={t("provider.add")} onPress={() => setAdding(true)} />
+        <Row add title={t("provider.add")} onPress={() => setAdding(true)} />
       )}
       {status.providerError && <Row icon="warning" iconColor="orange" title={t("provider.failed")} detail={describeError({ code: status.providerError })} />}
     </Section>

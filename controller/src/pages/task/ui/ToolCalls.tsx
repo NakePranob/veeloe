@@ -43,7 +43,7 @@ function CallRow({ call }: { call: ToolCall }) {
   const output = call.state === "unfinished" ? t("tools.unfinished") : call.output;
   return (
     <View style={{ flexDirection: "row", gap: space.sm }}>
-      <View style={{ width: icon.md, alignItems: "center", paddingTop: 2 }}>
+      <View style={{ width: icon.md, alignItems: "center", paddingTop: space.xxs }}>
         <Status state={call.state} />
       </View>
       <View style={{ flex: 1, gap: space.xs / 2 }}>
@@ -98,8 +98,8 @@ export function ToolCalls({ calls }: { calls: ToolCall[] }) {
       {!open && error && (
         // The board's white code box under the failed call.
         <View style={{ paddingLeft: space.sm + icon.md + space.sm, paddingRight: space.sm, paddingBottom: space.sm }}>
-          <Card tone="surface" style={{ paddingVertical: space.sm, paddingHorizontal: 10, borderRadius: 10 }}>
-            <Text variant="caption" tone="body" mono numberOfLines={2} selectable style={{ fontSize: 11, lineHeight: 16 }}>
+          <Card tone="surface" style={{ paddingVertical: space.sm, paddingHorizontal: space.md, borderRadius: radius.sm }}>
+            <Text variant="caption2" tone="body" mono numberOfLines={2} selectable>
               {error}
             </Text>
           </Card>
@@ -130,13 +130,13 @@ export function ChangesRow({ files }: { files: string[] }) {
         onPress={() => setOpen(!open)}
         style={({ pressed }) => ({ alignSelf: "flex-start", opacity: pressed ? 0.6 : 1 })}
       >
-        <Card style={{ flexDirection: "row", alignItems: "center", gap: space.sm, height: 32, paddingVertical: 0, paddingHorizontal: 12, borderRadius: radius.pill }}>
+        <Card style={{ flexDirection: "row", alignItems: "center", gap: space.sm, height: 32, paddingVertical: 0, paddingHorizontal: space.md, borderRadius: radius.pill }}>
           <Text variant="footnote">{t("changes", { count: files.length })}</Text>
           <Icon name={open ? "collapse" : "expand"} size="xs" weight="semibold" />
         </Card>
       </Pressable>
       {open && (
-        <Card style={{ gap: space.xs, padding: 14 }}>
+        <Card style={{ gap: space.xs, padding: space.inset }}>
           {files.map((file) => (
             <Text key={file} variant="caption" mono selectable>
               {file}

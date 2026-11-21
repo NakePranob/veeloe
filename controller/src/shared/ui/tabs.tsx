@@ -1,4 +1,5 @@
 import { Pressable, View } from "react-native";
+import { Chip } from "./chip";
 import { Text } from "./text";
 import { radius, space, useColors, useShadows } from "./theme";
 
@@ -11,28 +12,24 @@ export interface Tab<T extends string> {
 }
 
 // The Inbox board's segmented control: a grey track, the chosen tab a white pill lifted by a soft
-// shadow, the rest plain grey words. Each tab takes an equal share of the width.
+// shadow, the rest plain grey words. Each tab takes an equal share of the width; a 38pt tab takes a 44pt press.
 export function Tabs<T extends string>({ items, value, onChange }: { items: Tab<T>[]; value: T; onChange: (value: T) => void }) {
   const colors = useColors();
   const shadows = useShadows();
   return (
-    <View role="tablist" style={{ flexDirection: "row", gap: 2, padding: space.xs, borderRadius: radius.pill, backgroundColor: colors.card }}>
+    <View role="tablist" style={{ flexDirection: "row", gap: space.xxs, padding: space.xs, borderRadius: radius.pill, backgroundColor: colors.card }}>
       {items.map((item) => {
         const on = item.value === value;
         const shown = item.count != null && item.count > 0;
         return (
-          <Pressable key={item.value} role="tab" aria-selected={on} onPress={() => onChange(item.value)} style={{ flex: 1 }}>
-            <View style={{ height: 38, borderRadius: radius.pill, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, backgroundColor: on ? colors.surface : "transparent", boxShadow: on ? shadows.raised : undefined }}>
-              <Text variant="subheadline" strong numberOfLines={1} tone={on ? "label" : "secondary"} style={{ fontSize: 14 }}>
+          <Pressable key={item.value} role="tab" aria-selected={on} onPress={() => onChange(item.value)} hitSlop={(44 - 38) / 2} style={{ flex: 1 }}>
+            <View style={{ height: 38, borderRadius: radius.pill, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.smd, backgroundColor: on ? colors.surface : "transparent", boxShadow: on ? shadows.raised : undefined }}>
+              <Text variant="callout" strong numberOfLines={1} tone={on ? "label" : "secondary"}>
                 {item.label}
               </Text>
               {shown &&
                 (item.urgent ? (
-                  <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.orange }}>
-                    <Text variant="caption" strong style={{ fontSize: 11, color: colors.onOrange }}>
-                      {item.count}
-                    </Text>
-                  </View>
+                  <Chip tone="count" urgent label={String(item.count)} />
                 ) : (
                   <Text variant="caption" tone="secondary">
                     {item.count}

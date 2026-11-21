@@ -1,14 +1,14 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { staleUsage, useAgents } from "../../../entities/agent";
-import { Character, lookOfJson, moodOf } from "../../../entities/character";
+import { isSpent, staleUsage, useAgents } from "../../../entities/agent";
+import { HeadStack, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { latestEvents, statusOf, useTaskSummaries } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
 import { formatTokens } from "../../../shared/lib";
-import { Button, Card, Chip, Dot, Empty, Icon, Label, Meter, Row, Screen, Section, Tabs, Text, Tile } from "../../../shared/ui";
+import { Button, Card, Chip, DotLabel, Empty, Icon, Label, Meter, Row, Screen, Section, space, Tabs, Text, Tile } from "../../../shared/ui";
 import { countsOf, ordered, shareOf } from "../model/agents";
 import { AgentList, type AgentLine } from "./AgentList";
 import { EgressSection } from "./EgressSection";
@@ -44,55 +44,42 @@ export function MachinePage() {
   const lines: AgentLine[] = ordered(
     agents.map((agent) => {
       const task = tasks.find((s) => s.agent_id === agent.id);
-      return { agent, status: statusOf(task, status.online), mood: moodOf(task ? latestEvents(task) : [], status.online), share: staleUsage(agent, agents) ? null : shareOf(agent.usage_tokens, agent.budget) };
+      return { agent, status: statusOf(task, status.online), mood: moodOf(task ? latestEvents(task) : [], status.online), share: staleUsage(agent, agents) ? null : shareOf(agent.usage_tokens, agent.budget), spent: isSpent(agent, agents) };
     }),
   );
   const counts = countsOf(lines);
-  const spent = lines.filter((line) => line.share !== null && line.share >= 1).length;
+  const spent = lines.filter((line) => line.spent).length;
   const budget = status.budgetToday && status.budgetToday.limitTokens > 0 ? status.budgetToday : null;
   const providerTrouble = !!status.providerError || !!status.providers?.some((p) => (p as { error?: string }).error);
 
   return (
     <Screen title={machine.name} subtitle={status.online === null ? t("status.checking") : t(status.online ? "online" : "offline")}>
       {/* The board spaces its blocks 14 apart, closer than the Screen's sections. */}
-      <View style={{ gap: 14 }}>
-        <View style={{ flexDirection: "row", gap: 10 }}>
+      <View style={{ gap: space.inset }}>
+        <View style={{ flexDirection: "row", gap: space.md }}>
           <Tile
             height={136}
             onPress={() => setPart("agent")}
-            top={
-              <View aria-hidden style={{ height: 44, flexDirection: "row", alignItems: "flex-end" }}>
-                {lines.slice(0, 3).map((line, i) => (
-                  <View key={line.agent.id} style={{ marginLeft: i ? -10 : 0 }}>
-                    <Character look={lookOfJson(line.agent.character)} mood={line.mood} size={34} backdrop="card" />
-                  </View>
-                ))}
-                {lines.length > 3 && (
-                  <Card tone="surface" style={{ marginLeft: -6, width: 34, height: 34, padding: 0, borderRadius: 17, alignItems: "center", justifyContent: "center" }}>
-                    <Text variant="caption" strong tone="body">{`+${lines.length - 3}`}</Text>
-                  </Card>
-                )}
-              </View>
-            }
+            top={<HeadStack looks={lines.map((line) => ({ id: line.agent.id, look: lookOfJson(line.agent.character), mood: line.mood }))} />}
             value={String(agents.length)}
             unit=" Agent"
             detail={
-              <View style={{ gap: 2, paddingTop: 2 }}>
+              <View style={{ gap: space.xxs, paddingTop: space.xxs }}>
                 {counts.needsYou > 0 && (
-                  <Count dot="orange" strong>
+                  <DotLabel color="orange" tone="label" strong>
                     {t("tile.needsYou", { count: counts.needsYou })}
-                  </Count>
+                  </DotLabel>
                 )}
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                  <Count dot="blue">{t("tile.working", { count: counts.working })}</Count>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: space.smd }}>
+                  <DotLabel color="blue">{t("tile.working", { count: counts.working })}</DotLabel>
                   {spent > 0 && (
                     <>
                       <Text variant="caption" tone="body">
                         ·
                       </Text>
-                      <Count dot="red" danger>
+                      <DotLabel color="red" tone="danger">
                         {t("tile.spent", { count: spent })}
-                      </Count>
+                      </DotLabel>
                     </>
                   )}
                 </View>
@@ -111,9 +98,9 @@ export function MachinePage() {
         </View>
 
         {status.lastError && (
-          <Card tone="warning" style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+          <Card tone="warning" style={{ flexDirection: "row", alignItems: "flex-start", gap: space.md, paddingHorizontal: space.inset, paddingVertical: space.md }}>
             <Icon name="warning" size="sm" color="orange" />
-            <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ flex: 1, gap: space.xxs }}>
               <Text variant="footnote" strong>
                 {t("status.lastError")}
               </Text>
@@ -146,11 +133,11 @@ export function MachinePage() {
             {status.version && <Row icon="machine" title="Runtime" value={status.version} />}
             {status.diskFreeBytes !== null && <Row icon="storage" title={t("status.disk")} value={`${(status.diskFreeBytes / 1_000_000_000).toFixed(0)} GB`} />}
             {status.features && (
-              <View style={{ gap: 8, paddingHorizontal: 14, paddingVertical: 12 }}>
+              <View style={{ gap: space.sm, paddingHorizontal: space.inset, paddingVertical: space.md }}>
                 <Label icon="shield" iconColor="label" variant="subheadline" tone="label">
                   {t("status.features")}
                 </Label>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
                   {status.features.map((feature) => (
                     <Chip key={feature} tone="mono" label={feature} />
                   ))}
@@ -164,14 +151,3 @@ export function MachinePage() {
   );
 }
 
-// One count on the Agent tile: a coloured dot and its words.
-function Count({ dot, strong, danger, children }: { dot: "orange" | "blue" | "red"; strong?: boolean; danger?: boolean; children: string }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-      <Dot color={dot} size={7} />
-      <Text variant="caption" strong={strong} tone={danger ? "danger" : strong ? "label" : "body"} numberOfLines={1}>
-        {children}
-      </Text>
-    </View>
-  );
-}

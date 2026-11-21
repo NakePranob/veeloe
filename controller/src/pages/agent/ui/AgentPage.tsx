@@ -11,7 +11,7 @@ import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../featu
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatTokens, useNow, when } from "../../../shared/lib";
-import { Button, Dot, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, Tile, confirm, inform, space } from "../../../shared/ui";
+import { Button, Dot, DotLabel, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, TextLink, Tile, confirm, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
@@ -102,26 +102,22 @@ function AgentView({ agent }: { agent: AgentRow }) {
 
   return (
     <Screen title="" right={{ label: t("save"), onPress: save, disabled: !canSave }}>
-      <Stage color={look.color} bleed gap={6}>
+      <Stage color={look.color} bleed gap={space.smd}>
         <View style={{ alignItems: "center", gap: space.xs }}>
           <Character look={look} mood={moodOf(latest?.latest_kind ? [{ kind: latest.latest_kind, body: latest.latest_body }] : [], online)} size={112} />
           <Text variant="largeTitle" selectable>
             {agent.name}
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            {online !== null && <Dot color={online ? "green" : "tertiaryLabel"} size={7} />}
-            <Text variant="caption" tone="body" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {/* ponytail: the board's "เห็นล่าสุด" waits for a last-seen time on the Machine; the model stays in its place. */}
-              {online === null ? "" : `${t(online ? "online" : "offline")} · `}
-              <Text variant="caption" tone="body" mono role="link" onPress={() => router.push(`/machines/${agent.machine_id}`)} style={{ textDecorationLine: "underline" }}>
-                {machine?.name}
+          <DotLabel color={online === null ? undefined : online ? "green" : "tertiaryLabel"}>
+            {/* ponytail: the board's "เห็นล่าสุด" waits for a last-seen time on the Machine; the model stays in its place. */}
+            <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
+              {online !== null && <Text variant="caption" tone="body">{`${t(online ? "online" : "offline")} · `}</Text>}
+              {machine && <TextLink label={machine.name} mono tone="body" onPress={() => router.push(`/machines/${agent.machine_id}`)} />}
+              <Text variant="caption" tone="body" mono numberOfLines={1} style={{ flexShrink: 1 }}>
+                {` · ${agent.model}`}
               </Text>
-              {" · "}
-              <Text variant="caption" tone="body" mono>
-                {agent.model}
-              </Text>
-            </Text>
-          </View>
+            </View>
+          </DotLabel>
         </View>
         <View style={{ flexDirection: "row", alignSelf: "stretch", gap: space.sm }}>
           <View style={{ flex: 1 }}>
@@ -138,9 +134,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
         </Note>
       ) : (
         offline && (
-          <Note icon="offline" iconColor="orange">
-            {t("needsOnline")}
-          </Note>
+          <Note tone="offline">{t("needsOnline")}</Note>
         )
       )}
       {problem && <Note tone="warning">{problem === "provider" ? t("problem.provider", { provider: agent.provider }) : t("problem.model", { provider: agent.provider, model: agent.model })}</Note>}

@@ -1,7 +1,10 @@
 import { Link } from "expo-router";
-import type { ReactNode } from "react";
+import { Children, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, View, type StyleProp, type ViewStyle } from "react-native";
-import { radius, space, useColors } from "./theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Icon, type IconName } from "./icon";
+import { Text } from "./text";
+import { column, radius, space, useColors, type Colors } from "./theme";
 
 // Pages and widgets lay things out with View, but take colour only from here (controller-theme).
 
@@ -47,5 +50,45 @@ export function Tap({ href, onPress, selected, style, children }: TapProps) {
     <Pressable role="button" aria-selected={selected} onPress={onPress}>
       {({ pressed }) => body(pressed)}
     </Pressable>
+  );
+}
+
+/** The big grey disc with one icon that heads a whole-screen message (another tab, storage, a new key). small: the 36pt one beside a point in a list. */
+export function IconDisc({ icon, color = "label", small }: { icon: IconName; color?: keyof Colors; small?: boolean }) {
+  const colors = useColors();
+  const side = small ? 36 : 112;
+  return (
+    <View aria-hidden style={[{ width: side, height: side, borderRadius: side / 2, alignItems: "center", justifyContent: "center", backgroundColor: colors.card }, !small && { alignSelf: "center", marginBottom: space.sm }]}>
+      <Icon name={icon} size={small ? "sm" : "xl"} color={color} />
+    </View>
+  );
+}
+
+/** A form step's actions pinned at its foot, clear of the home indicator; each takes an equal share of the width. */
+export function FooterBar({ children }: { children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm, ...column }}>
+      {Children.map(children, (child) => child && <View style={{ flex: 1 }}>{child}</View>)}
+    </View>
+  );
+}
+
+/** One step of a flow, centred: something on top (a spinner, an IconDisc), its heading and body, then anything under them; the footer is pinned below. */
+export function CenteredStep({ top, heading, body, footer, children }: { top: ReactNode; heading: string; body: string; footer?: ReactNode; children?: ReactNode }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.xl + space.md }}>
+        {top}
+        <Text variant="title" role="heading" style={{ textAlign: "center" }}>
+          {heading}
+        </Text>
+        <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
+          {body}
+        </Text>
+        {children}
+      </View>
+      {footer}
+    </View>
   );
 }

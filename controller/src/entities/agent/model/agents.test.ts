@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "bun:test";
 import type { Agent } from "@veeloe/protocol-ts";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { allowlistOf, approvalTimeoutOf, egressOf, saveAgents, saveUsage, staleUsage } from "./agents";
+import { allowlistOf, approvalTimeoutOf, egressOf, isSpent, saveAgents, saveUsage, staleUsage } from "./agents";
 
 // Real SQL on bun:sqlite, behind the few methods expo-sqlite gives the app.
 function connect(): Connection {
@@ -192,4 +192,13 @@ test("a tally is stale only once another Agent of the same Machine has a newer d
   expect(staleUsage(today, [today, yesterday, elsewhere])).toBe(false);
   expect(staleUsage(yesterday, [yesterday, elsewhere])).toBe(false);
   expect(staleUsage({ machine_id: "m1", usage_day: null }, [today])).toBe(false);
+});
+
+test("a Budget is spent only by today's tally", () => {
+  const today = { machine_id: "m1", usage_day: "2026-11-21", usage_tokens: 100, budget: 100 };
+  const yesterday = { machine_id: "m1", usage_day: "2026-11-20", usage_tokens: 500, budget: 100 };
+  expect(isSpent(today, [today, yesterday])).toBe(true);
+  expect(isSpent(yesterday, [today, yesterday])).toBe(false);
+  expect(isSpent({ ...today, usage_tokens: 99 }, [today])).toBe(false);
+  expect(isSpent({ ...today, budget: null }, [today])).toBe(false);
 });

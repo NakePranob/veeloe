@@ -40,7 +40,6 @@
   "noAgent": "ยังไม่มี Agent",
   "agentsTab": {
     "create": "สร้าง Agent บนเครื่องนี้",
-    "spent": "Budget หมด",
     "search": "ค้นหา Agent บนเครื่องนี้",
     "searchPlaceholder": "ค้นหา Agent {{count}} ตัว",
     "noMatch": "ไม่พบ Agent ที่ตรงกัน",

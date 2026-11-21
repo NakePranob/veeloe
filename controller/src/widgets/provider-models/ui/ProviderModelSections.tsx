@@ -61,8 +61,8 @@ export function ProviderModelSections({
           <Field bare icon="search" label={t("modelFilter")} value={filter} onChangeText={setFilter} placeholder={t("modelFilter")} />
           <Section title={t("modelHeading", { provider: chosen?.name ?? "", count: models.length })} footer={t("contextFooter")}>
             {matching.map((m) => (
-              <Tap key={m.id} onPress={() => onModel(m.id)} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 60, paddingHorizontal: 14, paddingVertical: space.sm, borderRadius: 0 }}>
-                <View style={{ flex: 1, gap: 2 }}>
+              <Tap key={m.id} onPress={() => onModel(m.id)} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 60, paddingHorizontal: space.inset, paddingVertical: space.sm, borderRadius: 0 }}>
+                <View style={{ flex: 1, gap: space.xxs }}>
                   <Text variant="subheadline" strong>
                     {m.name ?? m.id}
                   </Text>

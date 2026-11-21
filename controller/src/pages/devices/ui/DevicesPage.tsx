@@ -8,7 +8,7 @@ import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Button, Card, Chip, confirm, Field, Icon, inform, Note, radius, Row, Screen, Section, space, Text } from "../../../shared/ui";
+import { Button, Card, Chip, confirm, Field, Icon, inform, Note, radius, Row, Screen, Section, size, space, Text } from "../../../shared/ui";
 import { revocationOf, revokeDevice } from "../model/revoke";
 
 // The Devices board: this device on top, the Member's other Controllers, the revoked ones,
@@ -32,15 +32,15 @@ export function DevicesPage() {
         </Section>
       )}
       {revoked.length > 0 && (
-        <View style={{ gap: 6 }}>
-          <Text variant="footnote" strong tone="secondary" style={{ paddingHorizontal: 14 }}>
+        <View style={{ gap: space.smd }}>
+          <Text variant="footnote" strong tone="secondary" style={{ paddingHorizontal: space.inset }}>
             {t("revokedSection")}
           </Text>
           {/* Each revoked device on a card of its own, all of it grey: it no longer does anything. */}
           {revoked.map((device) => (
-            <Card key={device.key} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md, borderRadius: 20 }}>
+            <Card key={device.key} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md, borderRadius: radius.card }}>
               <Icon name="device" size="md" color="secondaryLabel" />
-              <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ flex: 1, gap: space.xxs }}>
                 <Text variant="subheadline" tone="secondary" selectable>
                   {device.name || t("firstDevice")}
                 </Text>
@@ -150,15 +150,15 @@ function Hero({ device, devices }: { device: Device; devices: Device[] }) {
   const { name, detail, renaming, startRename, rename, options } = useDeviceActions(device, devices, true);
   return (
     <>
-      <Card style={{ padding: 18, gap: 14, borderRadius: radius.lg }}>
-        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14 }}>
+      <Card style={{ padding: 18, gap: space.inset, borderRadius: radius.lg }}>
+        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: space.inset }}>
           {/* A raised Card without its shadow is the white square the board puts the icon on. */}
-          <Card tone="surface" style={{ width: 56, height: 56, padding: 0, borderRadius: 18, alignItems: "center", justifyContent: "center" }}>
+          <Card tone="surface" style={{ width: 56, height: 56, padding: 0, borderRadius: radius.md, alignItems: "center", justifyContent: "center" }}>
             <Icon name="device" size="lg" color="label" />
           </Card>
           <View style={{ flex: 1, gap: 3 }}>
             <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.sm }}>
-              <Text variant="headline" selectable style={{ fontSize: 20 }}>
+              <Text variant="title" selectable>
                 {name}
               </Text>
               <Chip tone="choice" selected label={t("thisDevice")} />
@@ -192,7 +192,7 @@ function DeviceRow({ device, devices }: { device: Device; devices: Device[] }) {
     <View>
       <Row icon="device" title={name} detail={detail} accessory={<Icon name={open ? "collapse" : "expand"} size="sm" color="secondaryLabel" />} onPress={() => setOpen(!open)} />
       {open && (
-        <Card tone="surface" style={{ marginHorizontal: space.sm, marginBottom: space.sm, padding: 0, gap: 0, borderRadius: 16 }}>
+        <Card tone="surface" style={{ marginHorizontal: space.sm, marginBottom: space.sm, padding: 0, gap: 0, borderRadius: radius.md }}>
           {renaming ? rename : <Row icon="edit" title={t("rename.action")} onPress={startRename} />}
           {options}
         </Card>

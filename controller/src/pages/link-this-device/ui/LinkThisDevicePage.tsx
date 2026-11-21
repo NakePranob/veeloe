@@ -1,8 +1,7 @@
 import type { LinkingLink } from "@veeloe/protocol-ts";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { saveDeviceNames } from "../../../entities/device";
 import { saveMachine } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";
@@ -10,7 +9,7 @@ import { deviceName } from "../../../shared/device-name";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Button, Card, Field, Note, QrScanner, Row, Spinner, Text, column, inform, space } from "../../../shared/ui";
+import { Button, Card, CenteredStep, Field, FooterBar, Note, QrScanner, Row, Spinner, Text, column, inform, space } from "../../../shared/ui";
 import { readLink, sendLinkRequest, waitForHandoff } from "../model/wait";
 
 type Waiting = ReturnType<typeof waitForHandoff>;
@@ -20,7 +19,6 @@ type Waiting = ReturnType<typeof waitForHandoff>;
 // with none, as Pairing reads `veeloe pair`'s. The link names the Hub, so this asks for none.
 export function LinkThisDevicePage() {
   const t = useT("link-this-device");
-  const insets = useSafeAreaInsets();
   const language = useLanguage();
   const database = useDatabase();
   // Filled when the camera or another app opened a veeloe://link link.
@@ -82,25 +80,18 @@ export function LinkThisDevicePage() {
   );
 
   const title = <Stack.Screen options={{ title: t("title") }} />;
-  const foot = (children: ReactNode) => <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm, ...column }}>{children}</View>;
-  const wide = (button: ReactNode) => <View style={{ flex: 1 }}>{button}</View>;
   const scroll = { contentInsetAdjustmentBehavior: "automatic", keyboardShouldPersistTaps: "handled", automaticallyAdjustKeyboardInsets: true, keyboardDismissMode: "interactive" } as const;
 
   if (waiting && link) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: 36 }}>
+      <>
         {title}
-        <Spinner size="large" />
-        <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
-          {t("waiting.heading")}
-        </Text>
-        <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
-          {t("waiting.body", { name: name.trim() })}
-        </Text>
-        <Text variant="footnote" tone="secondary">
-          {t("waiting.footer", { when: when(link.expires * 1000, language) })}
-        </Text>
-      </View>
+        <CenteredStep top={<Spinner size="large" />} heading={t("waiting.heading")} body={t("waiting.body", { name: name.trim() })}>
+          <Text variant="footnote" tone="secondary">
+            {t("waiting.footer", { when: when(link.expires * 1000, language) })}
+          </Text>
+        </CenteredStep>
+      </>
     );
   }
 
@@ -109,7 +100,7 @@ export function LinkThisDevicePage() {
       <View style={{ flex: 1 }}>
         {title}
         <ScrollView {...scroll} contentContainerStyle={{ gap: space.md, padding: 20, ...column }}>
-          <Text variant="headline" role="heading" style={{ fontSize: 22 }}>
+          <Text variant="title" role="heading">
             {t("name.heading")}
           </Text>
           <Field label={t("name.label")} value={name} onChangeText={setName} />
@@ -122,21 +113,17 @@ export function LinkThisDevicePage() {
           </Text>
           {problemText}
         </ScrollView>
-        {foot(
-          <>
-            {wide(
-              <Button
-                size="large"
-                label={t("back")}
-                onPress={() => {
-                  setLink(null);
-                  setProblem(null);
-                }}
-              />,
-            )}
-            {wide(<Button size="large" label={t("send")} variant="primary" onPress={() => void ask()} />)}
-          </>,
-        )}
+        <FooterBar>
+          <Button
+            size="large"
+            label={t("back")}
+            onPress={() => {
+              setLink(null);
+              setProblem(null);
+            }}
+          />
+          <Button size="large" label={t("send")} variant="primary" onPress={() => void ask()} />
+        </FooterBar>
       </View>
     );
   }
@@ -144,7 +131,7 @@ export function LinkThisDevicePage() {
   return (
     <View style={{ flex: 1 }}>
       {title}
-      <ScrollView {...scroll} contentContainerStyle={{ gap: space.md, paddingHorizontal: 20, paddingTop: 6, paddingBottom: space.lg, ...column }}>
+      <ScrollView {...scroll} contentContainerStyle={{ gap: space.md, paddingHorizontal: 20, paddingTop: space.smd, paddingBottom: space.lg, ...column }}>
         <Text variant="subheadline" strong>
           {t("enter.heading")}
         </Text>
@@ -155,7 +142,9 @@ export function LinkThisDevicePage() {
         </Text>
         {problemText}
       </ScrollView>
-      {foot(wide(<Button size="large" label={t("enter.continue")} variant="primary" disabled={!text.trim()} onPress={() => accept(text)} />))}
+      <FooterBar>
+        <Button size="large" label={t("enter.continue")} variant="primary" disabled={!text.trim()} onPress={() => accept(text)} />
+      </FooterBar>
     </View>
   );
 }

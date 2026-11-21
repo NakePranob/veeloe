@@ -6,7 +6,7 @@ import { useMachineLink, useMachineStatus } from "../../../features/machine-link
 import { keySession } from "../../../shared/keystore";
 import { useT } from "../../../shared/i18n";
 import { View } from "react-native";
-import { Button, Field, inform, Note, Row, Section, Select } from "../../../shared/ui";
+import { Button, Field, inform, Note, Row, Section, Select, space } from "../../../shared/ui";
 
 // The Machine board's Egress tab: the domains every Agent on this Machine
 // may reach, or the ones one Agent may (`agent-egress-ui`). Every change is signed
@@ -38,7 +38,7 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
   }
 
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: space.smd }}>
       {/* The board's line names no Agents; the signing prompt below still does, since it is what the Owner confirms. */}
       <Note tone="plain">{t(agent ? "egress.topOne" : "egress.top", { who: agent ? who : t("egress.who", { machine: machine.name }) })}</Note>
       <Section footer={t("egress.footer")}>

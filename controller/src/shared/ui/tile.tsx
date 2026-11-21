@@ -4,7 +4,7 @@ import { Pressable, View } from "react-native";
 import { Icon, type IconName } from "./icon";
 import { OnCard } from "./surface";
 import { Text } from "./text";
-import { font, radius, useColors } from "./theme";
+import { font, radius, space, useColors } from "./theme";
 
 interface Props {
   // On top: an icon in a white circle, or something of the screen's own (a few heads, a caption).
@@ -26,7 +26,7 @@ interface Props {
 export function Tile({ icon, top, value, unit, title, detail, height, href, onPress }: Props) {
   const colors = useColors();
   const body = (pressed: boolean) => (
-    <View style={{ height, flexGrow: 1, gap: 2, padding: 14, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: pressed ? colors.chipPressed : colors.card }}>
+    <View style={{ height, flexGrow: 1, gap: space.xxs, padding: space.inset, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: pressed ? colors.chipPressed : colors.card }}>
       {icon ? (
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface }}>
           <Icon name={icon} size="md" color="label" />

@@ -43,14 +43,14 @@ export function HomePage() {
         {!split && header}
         <View style={{ flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.md }}>
           <Character look={WELCOME} mood="idle" size={150} />
-          <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
+          <Text variant="title" role="heading" style={{ textAlign: "center" }}>
             {t("empty.title")}
           </Text>
           <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
             {t("empty.body")}
           </Text>
         </View>
-        <View style={{ alignSelf: "stretch", gap: 10, paddingBottom: insets.bottom }}>
+        <View style={{ alignSelf: "stretch", gap: space.sm, paddingBottom: insets.bottom }}>
           <Button label={t("add")} variant="primary" size="large" onPress={() => router.navigate("/add-machine")} />
           <Button label={t("link")} size="large" onPress={() => router.navigate("/link")} />
         </View>

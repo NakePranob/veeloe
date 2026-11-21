@@ -73,5 +73,5 @@ export function Ring({ ratio, tone }: { ratio: number; tone: keyof typeof RING_T
 // chip: the white code chip inside a coloured card, as an Approval shows its command.
 export function Inset({ children, chip }: { children: ReactNode; chip?: boolean }) {
   const colors = useColors();
-  return <View style={{ paddingHorizontal: chip ? 14 : space.md, paddingVertical: space.sm, borderRadius: chip ? 14 : radius.sm, borderCurve: "continuous", backgroundColor: chip ? colors.surface : colors.fill }}>{children}</View>;
+  return <View style={{ paddingHorizontal: chip ? space.inset : space.md, paddingVertical: space.sm, borderRadius: chip ? 14 : radius.sm, borderCurve: "continuous", backgroundColor: chip ? colors.surface : colors.fill }}>{children}</View>;
 }

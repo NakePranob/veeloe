@@ -6,5 +6,6 @@
   "offline": "Offline",
   "new": "Not started",
   "interrupted": "Turn interrupted",
-  "stuck": "Turn stalled"
+  "stuck": "Turn stalled",
+  "spent": "Budget used up"
 }

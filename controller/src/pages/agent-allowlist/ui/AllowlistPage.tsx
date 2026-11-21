@@ -68,7 +68,7 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
   return (
     <Screen title={t("title")} subtitle={t("subtitle", { name: agentName, count: allowlist.length })}>
       {offline && (
-        <Note icon="offline" iconColor="orange">
+        <Note tone="offline">
           {t("offline")}
         </Note>
       )}
@@ -92,9 +92,9 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
 
       <Section title={t("try.heading")} footer={draft && !validDraft ? t("try.invalidDraft") : undefined}>
         <Field label={t("try.label")} value={sample} onChangeText={setSample} mono bare icon="terminal" />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: 14, paddingTop: space.xs, paddingBottom: space.md }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.inset, paddingTop: space.xs, paddingBottom: space.md }}>
           <Icon name={runs ? "done" : "approval"} size="lg" color={runs ? "green" : "orange"} />
-          <View style={{ flex: 1, gap: 2 }}>
+          <View style={{ flex: 1, gap: space.xxs }}>
             <Text variant="subheadline" strong>
               {runs ? (validDraft && !before ? t("try.wouldRun", { entry: draft }) : t("try.runs")) : parts.length && parts.every((part) => allowlist.some((item) => covers(item, part))) ? t("try.asksAlways") : t("try.asks")}
             </Text>

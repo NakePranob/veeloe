@@ -1,11 +1,11 @@
 import { View } from "react-native";
 import { barHeight, type Bar } from "../lib/bars";
 import { Text } from "./text";
-import { useColors } from "./theme";
+import { space, type, useColors } from "./theme";
 
-// One line of 11pt caption and the 6pt gap to its bar, above and below the bars when the chart has words.
-const LINE = 14;
-const GAP = 6;
+// One line of caption2 and the gap to its bar, above and below the bars when the chart has words.
+const LINE = type.caption2.lineHeight;
+const GAP = space.smd;
 
 interface Props {
   bars: Bar[];
@@ -31,7 +31,7 @@ export function Bars({ bars, label, height = 56, ticks, peak }: Props) {
         <View key={bar.key} role="img" aria-label={bar.title} style={{ flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: worded ? GAP : 0 }}>
           {/* Only today's value shows; the others keep their line so every bar starts from the same floor. */}
           {worded && (
-            <Text variant="caption" strong numberOfLines={1} style={{ fontSize: 11, lineHeight: LINE, opacity: i === last && peak !== undefined ? 1 : 0 }}>
+            <Text variant="caption2" strong numberOfLines={1} style={{ opacity: i === last && peak !== undefined ? 1 : 0 }}>
               {i === last ? (peak ?? "") : ""}
             </Text>
           )}
@@ -39,7 +39,7 @@ export function Bars({ bars, label, height = 56, ticks, peak }: Props) {
           {/* Today, the last bar, is solid; the days before it are faded, as on the Usage board. */}
           <View style={{ width: "100%", maxWidth: 30, height: barHeight(bar, max, room), borderRadius: 8, backgroundColor: colors.accent, opacity: i === last ? 1 : 0.28 }} />
           {worded && (
-            <Text variant="caption" tone={i === last ? "label" : "secondary"} strong={i === last} numberOfLines={1} style={{ fontSize: 11, lineHeight: LINE }}>
+            <Text variant="caption2" tone={i === last ? "label" : "secondary"} strong={i === last} numberOfLines={1}>
               {ticks?.[i] ?? ""}
             </Text>
           )}

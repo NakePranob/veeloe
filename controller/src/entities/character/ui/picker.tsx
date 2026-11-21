@@ -45,9 +45,20 @@ export function Stage({ color, bleed, gap = space.md, children }: { color: strin
   );
 }
 
-/** A card in a soft tint of the Agent's colour, for what that Agent is asking, such as an Approval. */
-export function AgentCard({ color, children }: { color: string; children: ReactNode }) {
-  return <View style={{ gap: space.sm, padding: space.lg, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: useTint(color, STAGE) }}>{children}</View>;
+/**
+ * A card in a soft tint of the Agent's colour, for what that Agent is asking. solid: the open Approval's
+ * card, the Agent's colour itself with the board's radius 30; dark keeps the tint, since ink words would
+ * not read on the solid colour there. Either way, fields and pills on it draw white.
+ */
+export function AgentCard({ color, solid, children }: { color: string; solid?: boolean; children: ReactNode }) {
+  const soft = useTint(color, STAGE);
+  const dark = useColorScheme() === "dark";
+  if (!solid) return <View style={{ gap: space.sm, padding: space.lg, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: soft }}>{children}</View>;
+  return (
+    <View style={{ padding: 18, borderRadius: 30, borderCurve: "continuous", backgroundColor: dark ? soft : color }}>
+      <OnTint>{children}</OnTint>
+    </View>
+  );
 }
 
 /** One option to pick: the head wearing it and its name. The chosen one fills with the Agent's colour, with no ring. */
@@ -65,15 +76,14 @@ export function LookTile({ color, label, name, selected, onPress, children }: { 
             gap: space.xs,
             paddingVertical: space.sm,
             paddingHorizontal: space.xs,
-            borderRadius: 18,
+            borderRadius: radius.md,
             borderCurve: "continuous",
             backgroundColor: selected ? picked : pressed ? colors.chipPressed : colors.card,
           }}
         >
           {children}
           {/* Android's Thai is wider than iOS's: a long name shrinks a little before it is cut. */}
-          {/* 11pt, a step under caption, as the board's part names; no type token is that small. */}
-          <Text variant="caption" strong tone="body" style={{ fontSize: 11 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          <Text variant="caption2" strong tone="body" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {name}
           </Text>
         </View>
@@ -100,9 +110,9 @@ export function MoodTile({ color, label, selected, onPress, children }: { color:
   return (
     <Pressable role="button" aria-label={label} aria-selected={selected} accessibilityState={{ selected }} onPress={onPress}>
       {({ pressed }) => (
-        <View style={{ width: 54, alignItems: "center", gap: 2, paddingVertical: space.xs, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: selected ? previewed : pressed ? colors.chipPressed : "transparent" }}>
+        <View style={{ width: 54, alignItems: "center", gap: space.xxs, paddingVertical: space.xs, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: selected ? previewed : pressed ? colors.chipPressed : "transparent" }}>
           {children}
-          <Text variant="caption" tone={selected ? "label" : "secondary"} strong={selected} style={{ fontSize: 11 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          <Text variant="caption2" tone={selected ? "label" : "secondary"} strong={selected} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {label}
           </Text>
         </View>

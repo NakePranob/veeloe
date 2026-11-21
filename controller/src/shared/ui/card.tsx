@@ -7,7 +7,7 @@ interface Props {
   // raised: floats over content, as the composer does: the surface colour with a shadow.
   raised?: boolean;
   // danger: a failed Turn (soft red). warning: a person is needed (soft orange).
-  // surface: white without a shadow, for an icon tile or a nested list on a grey card.
+  // surface: white without a shadow, for a real card nested in a grey one (a form, a code box, a nested list).
   tone?: "danger" | "warning" | "surface";
   style?: StyleProp<ViewStyle>;
   children: ReactNode;

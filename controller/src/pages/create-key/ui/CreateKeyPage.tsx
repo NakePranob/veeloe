@@ -3,7 +3,7 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, Card, Centered, Icon, Text, space, type IconName } from "../../../shared/ui";
+import { Button, Centered, IconDisc, Text, space, type IconName } from "../../../shared/ui";
 
 const POINTS: { key: "secret" | "nothing" | "ask"; icon: IconName }[] = [
   { key: "secret", icon: "shield" },
@@ -26,21 +26,17 @@ export function CreateKeyPage({ lost }: { lost: boolean }) {
   return (
     <Centered>
       <ScrollView style={{ flex: 1, alignSelf: "stretch" }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center", gap: space.md }}>
-        <Card style={{ alignSelf: "center", width: 112, height: 112, borderRadius: 56, padding: 0, alignItems: "center", justifyContent: "center", marginBottom: space.sm }}>
-          <Icon name={lost ? "warning" : "key"} size="xl" color={lost ? "orange" : "label"} />
-        </Card>
-        <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
+        <IconDisc icon={lost ? "warning" : "key"} color={lost ? "orange" : "label"} />
+        <Text variant="title" role="heading" style={{ textAlign: "center" }}>
           {t(`${words}.title`)}
         </Text>
-        <Text variant="subheadline" tone="secondary" style={{ textAlign: "center", marginBottom: 10 }}>
+        <Text variant="subheadline" tone="secondary" style={{ textAlign: "center", marginBottom: space.md }}>
           {t(`${words}.body`)}
         </Text>
         {POINTS.map((p) => (
           <View key={p.key} style={{ flexDirection: "row", gap: space.md, alignItems: "flex-start" }}>
-            <Card style={{ width: 36, height: 36, borderRadius: 18, padding: 0, alignItems: "center", justifyContent: "center" }}>
-              <Icon name={p.icon} color="label" />
-            </Card>
-            <Text variant="subheadline" tone="body" style={{ flex: 1, paddingTop: 7, fontSize: 14, lineHeight: 21 }}>
+            <IconDisc small icon={p.icon} />
+            <Text variant="callout" tone="body" style={{ flex: 1, paddingTop: 7 }}>
               {t(`points.${p.key}`)}
             </Text>
           </View>

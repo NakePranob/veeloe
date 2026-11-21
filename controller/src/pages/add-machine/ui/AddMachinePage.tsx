@@ -2,9 +2,8 @@ import { parsePairingLink, type PairingLink } from "@veeloe/protocol-ts";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { describeError, useT } from "../../../shared/i18n";
-import { Button, Card, Field, Icon, QrScanner, Spinner, StepNumber, Text, column, space } from "../../../shared/ui";
+import { Button, Card, CenteredStep, Field, FooterBar, Icon, QrScanner, radius, Spinner, StepNumber, Text, column, space } from "../../../shared/ui";
 import { usePairMachine } from "../model/use-pair-machine";
 
 const linkProblem = { malformed: "pairing.link_malformed", "bad-signature": "pairing.link_bad_signature", expired: "pairing.link_expired" } as const;
@@ -26,7 +25,6 @@ function openedLink({ link, machine, secret, expires, sig }: OpenedParams): stri
 
 export function AddMachinePage() {
   const t = useT("add-machine");
-  const insets = useSafeAreaInsets();
   const pair = usePairMachine();
   // Filled when the phone's camera or another app opened a veeloe://pair link.
   const params = useLocalSearchParams<OpenedParams>();
@@ -68,21 +66,13 @@ export function AddMachinePage() {
   );
 
   const title = <Stack.Screen options={{ title: t("title") }} />;
-  const foot = (children: ReactNode) => <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm, ...column }}>{children}</View>;
-  const wide = (button: ReactNode) => <View style={{ flex: 1 }}>{button}</View>;
 
   if (pairing) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: 36 }}>
+      <>
         {title}
-        <Spinner size="large" />
-        <Text variant="headline" role="heading" style={{ fontSize: 22, textAlign: "center" }}>
-          {t("pairing.heading")}
-        </Text>
-        <Text variant="subheadline" tone="secondary" style={{ textAlign: "center" }}>
-          {t("pairing.body")}
-        </Text>
-      </View>
+        <CenteredStep top={<Spinner size="large" />} heading={t("pairing.heading")} body={t("pairing.body")} />
+      </>
     );
   }
 
@@ -91,7 +81,7 @@ export function AddMachinePage() {
       <View style={{ flex: 1 }}>
         {title}
         <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ gap: space.lg, padding: 20, ...column }}>
-          <Text variant="headline" role="heading" style={{ fontSize: 22 }}>
+          <Text variant="title" role="heading">
             {t("confirm.heading")}
           </Text>
           <Text variant="subheadline" tone="secondary">
@@ -101,7 +91,7 @@ export function AddMachinePage() {
             <Text variant="footnote" tone="secondary">
               {t("confirm.hub")}
             </Text>
-            <Text selectable mono variant="footnote" style={{ marginBottom: 10 }}>
+            <Text selectable mono variant="footnote" style={{ marginBottom: space.md }}>
               {link.hub}
             </Text>
             <Text variant="footnote" tone="secondary">
@@ -113,21 +103,17 @@ export function AddMachinePage() {
           </Card>
           {problemText}
         </ScrollView>
-        {foot(
-          <>
-            {wide(
-              <Button
-                size="large"
-                label={t("confirm.cancel")}
-                onPress={() => {
-                  setLink(null);
-                  setProblem(null);
-                }}
-              />,
-            )}
-            {wide(<Button size="large" label={t("confirm.action")} variant="primary" onPress={() => void confirm()} />)}
-          </>,
-        )}
+        <FooterBar>
+          <Button
+            size="large"
+            label={t("confirm.cancel")}
+            onPress={() => {
+              setLink(null);
+              setProblem(null);
+            }}
+          />
+          <Button size="large" label={t("confirm.action")} variant="primary" onPress={() => void confirm()} />
+        </FooterBar>
       </View>
     );
   }
@@ -135,7 +121,7 @@ export function AddMachinePage() {
   const step = (n: number, heading: string, children: ReactNode) => (
     <View style={{ flexDirection: "row", gap: space.md }}>
       <StepNumber n={n} />
-      <View style={{ flex: 1, gap: space.sm, paddingTop: 2 }}>
+      <View style={{ flex: 1, gap: space.sm, paddingTop: space.xxs }}>
         <Text variant="subheadline" strong>
           {heading}
         </Text>
@@ -145,7 +131,7 @@ export function AddMachinePage() {
   );
 
   const command = (text: string) => (
-    <Card style={{ paddingVertical: space.sm, borderRadius: 16 }}>
+    <Card style={{ paddingVertical: space.sm, borderRadius: radius.md }}>
       <Text selectable mono variant="footnote">
         {text}
       </Text>
@@ -187,7 +173,9 @@ export function AddMachinePage() {
         )}
         {problemText}
       </ScrollView>
-      {foot(wide(<Button size="large" label={t("enter.continue")} variant="primary" disabled={!text.trim()} onPress={() => accept(text)} />))}
+      <FooterBar>
+        <Button size="large" label={t("enter.continue")} variant="primary" disabled={!text.trim()} onPress={() => accept(text)} />
+      </FooterBar>
     </View>
   );
 }
