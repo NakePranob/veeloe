@@ -4,6 +4,8 @@
 // The colour an Agent with no Character gets. Apart from the picker's colours on purpose: a later
 // palette must never change how an existing Agent looks (controller-character).
 export const DEFAULT_COLOR = "#F4B183";
+// A deleted Agent's head: neutral grey, so nothing in the trash reads as alive (the Agents board).
+export const RETIRED_COLOR = "#D9D9D9";
 // The colours the picker and a shuffle offer, from the redesign's Character sheet. An Agent keeps
 // whatever colour it was given, so one from an older palette still draws in its own colour.
 export const COLORS = ["#FFD84D", "#8CCBFF", "#7EE0B5", "#C4B1FF", "#FFB3A1", "#FFB066", "#FFA8D2", "#E3CFA8"] as const;

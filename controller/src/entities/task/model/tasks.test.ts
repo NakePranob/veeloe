@@ -2,7 +2,7 @@ import { Database as Sqlite } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { addPendingMessage, failPendingMessage, latestOf, LIST_TASK_SUMMARIES, markPendingSent, saveTaskEvents, statusOf, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskRow, type TaskSummary } from "./tasks";
+import { addPendingMessage, failPendingMessage, isBudgetOut, latestOf, LIST_TASK_SUMMARIES, markPendingSent, saveTaskEvents, statusOf, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskRow, type TaskSummary } from "./tasks";
 
 // The same statements as expo-sqlite, over Bun's own SQLite.
 function connection(sqlite: Sqlite): Connection {
@@ -103,4 +103,10 @@ test("a Turn a Stop ended is finished, and one a restart cut off says so", () =>
   expect(ended("stopped")).toHaveLength(1);
   // The event of a restart on its own says it too, before the Turn's end lands.
   expect(statusOf({ latest_kind: "turn.interrupted", latest_body: JSON.stringify({ reason: "restart" }) }, true)).toBe("interrupted");
+});
+
+test("only a Turn that ended on today's Budget counts as Budget out", () => {
+  expect(isBudgetOut({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason: "error", code: "budget.exhausted" }) })).toBe(true);
+  expect(isBudgetOut({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason: "error", code: "provider.failed" }) })).toBe(false);
+  expect(isBudgetOut(undefined)).toBe(false);
 });

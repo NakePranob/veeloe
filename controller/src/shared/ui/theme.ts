@@ -24,8 +24,8 @@ const light = {
   // What floats, or a field or icon tile inside a card: white, a step up from the card.
   surface: "#ffffff",
   // A quiet pill: one grey that reads on the white screen and on a grey card alike.
-  chip: "#e8eaee",
-  chipPressed: "#dcdfe4",
+  chip: "#f3f4f6",
+  chipPressed: "#e5e7eb",
   // A code span or block on the white screen.
   fill: "#f3f4f6",
   // The empty part of a Meter.
@@ -35,7 +35,11 @@ const light = {
   ground: "#0f152052",
   label: "#111111",
   secondaryLabel: "#5c5c5c",
+  // Body text on a card or a pill, a step softer than the label.
+  bodyLabel: "#3a3a3a",
   tertiaryLabel: "#9ca3af",
+  // A link in running text.
+  link: "#7e66cc",
   // The accent is the ink itself.
   accent: "#111111",
   onAccent: "#ffffff",
@@ -49,7 +53,7 @@ const light = {
   redText: "#b42318",
   // A card that says something failed, or that a person is needed.
   redSoft: "#fef3f2",
-  orangeSoft: "#fff4ec",
+  orangeSoft: "#fff4e5",
 };
 
 export type Colors = typeof light;
@@ -68,7 +72,9 @@ const dark: Colors = {
   ground: "#000000bf",
   label: "#f5f6f7",
   secondaryLabel: "#9ba0a8",
-  tertiaryLabel: "#6b7079",
+  bodyLabel: "#c9ccd2",
+  tertiaryLabel: "#9ca3af",
+  link: "#b9a6ff",
   accent: "#f5f6f7",
   onAccent: "#0e0f12",
   orange: "#ff7a2f",
@@ -116,9 +122,11 @@ export const radius = { sm: 10, md: 16, card: 20, lg: 24, pill: 999 };
 // The board's scale. Weight comes from the family (see fonts.ts), never fontWeight,
 // which iOS would synthesize over a bundled font.
 export const type = {
-  largeTitle: { fontSize: 30, fontFamily: font.bold, letterSpacing: -0.5 },
+  largeTitle: { fontSize: 30, lineHeight: 36, fontFamily: font.bold, letterSpacing: -0.9 },
+  // A large number on a tile or a total: Space Grotesk, with room above so iOS does not clip it.
+  figure: { fontSize: 30, lineHeight: 36, fontFamily: font.display, letterSpacing: -0.6, fontVariant: ["tabular-nums"] },
   headline: { fontSize: 17, fontFamily: font.bold },
-  body: { fontSize: 16, fontFamily: font.regular },
+  body: { fontSize: 16, fontFamily: font.regular, lineHeight: 24 },
   subheadline: { fontSize: 15, fontFamily: font.regular },
   footnote: { fontSize: 13, fontFamily: font.regular },
   caption: { fontSize: 12, fontFamily: font.regular },

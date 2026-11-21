@@ -7,10 +7,13 @@ import { HeaderAction } from "./header-action";
 import { Icon, type IconName } from "./icon";
 import { Text } from "./text";
 import { Button } from "./button";
+import { OnCard, useOnCard } from "./surface";
 import { column, font, radius, space, type, useColors, type Colors } from "./theme";
 
 interface ScreenProps {
   title: string;
+  // A line under the title in the header, such as whose page this is ("Nim · 4 entries").
+  subtitle?: string;
   // Goes on the header's right, such as a save or add action.
   right?: { label: string; onPress: () => void; disabled?: boolean; icon?: IconName; variant?: "primary" | "chip" | "ghost" };
   // The one action the screen is for, pinned under the content, clear of the home indicator.
@@ -19,7 +22,7 @@ interface ScreenProps {
 }
 
 // A settings-style screen: the platform's header over a scrolling column of sections.
-export function Screen({ title, right, bottom, children }: ScreenProps) {
+export function Screen({ title, subtitle, right, bottom, children }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const scroll = (
     <ScrollView
@@ -28,9 +31,9 @@ export function Screen({ title, right, bottom, children }: ScreenProps) {
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
-      contentContainerStyle={[column, { padding: space.lg, gap: space.lg, paddingBottom: space.xl * 2 }]}
+      contentContainerStyle={[column, { paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.xl, paddingBottom: space.xl * 2 }]}
     >
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen options={{ title, ...(subtitle != null && { headerTitle: () => <HeaderTitle title={title} subtitle={subtitle} /> }) }} />
       {right && <HeaderAction {...right} />}
       {children}
     </ScrollView>
@@ -44,16 +47,37 @@ export function Screen({ title, right, bottom, children }: ScreenProps) {
   );
 }
 
+// The title with a quieter line under it, as the platform's header draws a subtitle.
+function HeaderTitle({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <View style={{ alignItems: "center" }}>
+      <Text variant="headline" numberOfLines={1}>
+        {title}
+      </Text>
+      <Text variant="caption" tone="secondary" numberOfLines={1}>
+        {subtitle}
+      </Text>
+    </View>
+  );
+}
+
+/** Fields and pills inside draw white, as on a card: for a tinted stage, where grey would sink into the colour. */
+export function OnTint({ children }: { children: ReactNode }) {
+  return <OnCard.Provider value>{children}</OnCard.Provider>;
+}
+
 // A titled group of rows on one card; the footer explains what the group means.
 export function Section({ title, footer, children }: { title?: string; footer?: string; children?: ReactNode }) {
   return (
-    <View style={{ gap: space.sm }}>
+    <View style={{ gap: 6 }}>
       {title && (
         <Text variant="footnote" strong tone="secondary" style={{ paddingHorizontal: 14 }}>
           {title}
         </Text>
       )}
-      {children != null && <Card style={{ padding: 0, gap: 0, overflow: "hidden" }}>{children}</Card>}
+      {children != null && (
+        <Card style={{ padding: 0, gap: 0, overflow: "hidden" }}>{children}</Card>
+      )}
       {footer && (
         <Text variant="caption" tone="secondary" style={{ paddingHorizontal: 14, lineHeight: 18 }}>
           {footer}
@@ -78,10 +102,12 @@ interface RowProps {
   mono?: boolean;
   // A control on the right instead of the value and chevron.
   accessory?: ReactNode;
+  // Shown faded and inert, for a setting that cannot change right now (its Machine is offline).
+  disabled?: boolean;
 }
 
 // One line in a section. It opens something when it has an href or onPress.
-export function Row({ title, detail, value, icon, leading, iconColor, href, onPress, destructive, mono, accessory }: RowProps) {
+export function Row({ title, detail, value, icon, leading, iconColor, href, onPress, destructive, mono, accessory, disabled }: RowProps) {
   const colors = useColors();
   const body = (pressed: boolean) => (
     <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md, backgroundColor: pressed ? colors.chipPressed : "transparent" }}>
@@ -102,9 +128,15 @@ export function Row({ title, detail, value, icon, leading, iconColor, href, onPr
         </Text>
       )}
       {accessory}
-      {href && <Icon name="disclosure" size="sm" color="secondaryLabel" weight="semibold" />}
+      {href && !disabled && <Icon name="disclosure" size="sm" color="secondaryLabel" weight="semibold" />}
     </View>
   );
+  if (disabled)
+    return (
+      <View aria-disabled style={{ opacity: 0.45 }}>
+        {body(false)}
+      </View>
+    );
   // Link's Slot drops a Pressable style function on web, so the look lives on an inner View.
   if (href) {
     return (
@@ -141,21 +173,32 @@ interface FieldProps {
   secure?: boolean;
   // A button inside the field, for adding the typed value to a list in one line.
   action?: { label: string; onPress: () => void; disabled?: boolean };
+  // The label is only read aloud: a one-line pill, such as an add box or a search box, where the placeholder says enough.
+  bare?: boolean;
+  icon?: IconName;
+  // Faded and read-only, for a value that cannot change right now.
+  disabled?: boolean;
 }
 
 // The label sits inside the field, on the surface a step lighter than the card.
-export function Field({ label, value, onChangeText, placeholder, footer, multiline, mono, keyboardType, secure, action }: FieldProps) {
+export function Field({ label, value, onChangeText, placeholder, footer, multiline, mono, keyboardType, secure, action, bare, icon, disabled }: FieldProps) {
   const colors = useColors();
+  const inCard = useOnCard();
   return (
-    // Its own grey card, so a Field reads on the white screen too; inside a Section it is the same grey.
-    <View style={{ gap: space.xs, paddingTop: space.xs, paddingHorizontal: 6, paddingBottom: 6, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: colors.card }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 52, paddingLeft: 14, paddingRight: action ? space.xs : 14, paddingVertical: 7, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.surface }}>
+    // In a Section's card the box is white with a little inset; on the screen it is one grey box.
+    <View style={{ gap: space.xs, opacity: disabled ? 0.45 : 1, ...(inCard ? { paddingTop: space.xs, paddingHorizontal: 6, paddingBottom: 6 } : null) }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: bare ? 44 : 52, paddingLeft: 14, paddingRight: action ? space.xs : 14, paddingVertical: bare ? space.xs : 7, borderRadius: bare ? radius.pill : radius.md, borderCurve: "continuous", backgroundColor: inCard ? colors.surface : colors.card }}>
+        {icon && <Icon name={icon} size="sm" color="secondaryLabel" />}
         <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="caption" tone="secondary">
-            {label}
-          </Text>
+          {!bare && (
+            <Text variant="caption" tone="secondary">
+              {label}
+            </Text>
+          )}
           <TextInput
             aria-label={label}
+            aria-disabled={disabled}
+            editable={!disabled}
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
@@ -173,7 +216,7 @@ export function Field({ label, value, onChangeText, placeholder, footer, multili
             ]}
           />
         </View>
-        {action && <Button label={action.label} variant="primary" onPress={action.onPress} disabled={action.disabled} />}
+        {action && <Button label={action.label} variant="primary" size={bare ? "small" : undefined} onPress={action.onPress} disabled={action.disabled} />}
       </View>
       {footer && (
         <Text variant="footnote" tone="secondary" style={{ paddingHorizontal: space.sm }}>
@@ -203,11 +246,22 @@ export function Empty({ icon, title, detail, action }: { icon: IconName; title: 
 }
 
 // A short rule the Member should not miss, on the screen's grey rather than a card.
-export function Note({ icon = "info", iconColor = "secondaryLabel", children }: { icon?: IconName; iconColor?: keyof Colors; children: ReactNode }) {
+// plain: a 12pt paragraph under the content, as the boards end a page.
+// warning: a soft orange box with an icon, for something a person should act on.
+// Otherwise a line with an icon in front.
+export function Note({ icon = "info", iconColor = "secondaryLabel", tone, children }: { icon?: IconName; iconColor?: keyof Colors; tone?: "plain" | "warning"; children: ReactNode }) {
+  const colors = useColors();
+  if (tone === "plain")
+    return (
+      <Text variant="caption" tone="secondary" style={{ paddingHorizontal: 14, lineHeight: 18 }}>
+        {children}
+      </Text>
+    );
+  const box = tone === "warning";
   return (
-    <View style={{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.sm }}>
-      <Icon name={icon} size="sm" color={iconColor} />
-      <Text variant="footnote" tone="secondary" style={{ flex: 1 }}>
+    <View style={[{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.sm }, box && { paddingHorizontal: 14, paddingVertical: space.md, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: colors.orangeSoft }]}>
+      <Icon name={box ? "warning" : icon} size="sm" color={box ? "orange" : iconColor} />
+      <Text variant="footnote" tone={box ? "body" : "secondary"} style={{ flex: 1, lineHeight: 20 }}>
         {children}
       </Text>
     </View>

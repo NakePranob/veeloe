@@ -47,6 +47,13 @@ const SYMBOLS = {
   share: { ios: "square.and.arrow.up", android: "ios_share", web: "ios_share" },
   faceId: { ios: "faceid", android: "fingerprint", web: "fingerprint" },
   storage: { ios: "externaldrive", android: "storage", web: "storage" },
+  sliders: { ios: "slider.horizontal.3", android: "tune", web: "tune" },
+  copy: { ios: "doc.on.doc", android: "content_copy", web: "content_copy" },
+  qr: { ios: "qrcode", android: "qr_code", web: "qr_code" },
+  terminal: { ios: "apple.terminal", android: "terminal", web: "terminal" },
+  search: { ios: "magnifyingglass", android: "search", web: "search" },
+  more: { ios: "ellipsis", android: "more_horiz", web: "more_horiz" },
+  external: { ios: "arrow.up.right.square", android: "open_in_new", web: "open_in_new" },
   branch: { ios: "arrow.triangle.branch", android: "fork_right", web: "fork_right" },
 } as const satisfies Record<string, SymbolViewProps["name"]>;
 

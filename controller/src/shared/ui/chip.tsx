@@ -1,4 +1,5 @@
 import { Pressable, View } from "react-native";
+import { useOnCard } from "./surface";
 import { Text } from "./text";
 import { font, radius, space, useColors, type Colors } from "./theme";
 
@@ -18,9 +19,10 @@ interface Props {
 // A small pill: a status, a name, a count, or one choice among several.
 export function Chip({ label, tone = "status", dot, urgent, selected, onPress }: Props) {
   const colors = useColors();
+  const grey = useOnCard() ? colors.surface : colors.chip;
   if (tone === "count") {
     return (
-      <View style={{ minWidth: 22, height: 22, paddingHorizontal: 7, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", backgroundColor: urgent ? colors.orange : colors.chip }}>
+      <View style={{ minWidth: 22, height: 22, paddingHorizontal: 7, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", backgroundColor: urgent ? colors.orange : grey }}>
         <Text variant="caption" strong style={{ color: urgent ? colors.onOrange : colors.secondaryLabel, fontVariant: ["tabular-nums"] }}>
           {label}
         </Text>
@@ -38,7 +40,7 @@ export function Chip({ label, tone = "status", dot, urgent, selected, onPress }:
           flexDirection: "row",
           alignItems: "center",
           gap: 6,
-          backgroundColor: on ? colors.accent : pressed ? colors.chipPressed : colors.chip,
+          backgroundColor: on ? colors.accent : pressed ? colors.chipPressed : grey,
         }}
       >
         {dot && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors[dot] }} />}

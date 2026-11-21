@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
+import { OnCard } from "./surface";
 import { radius, space, useColors, useShadows } from "./theme";
 
 interface Props {
   // raised: floats over content, as the composer does: the surface colour with a shadow.
   raised?: boolean;
   // danger: a failed Turn (soft red). warning: a person is needed (soft orange).
-  tone?: "danger" | "warning";
+  // surface: white without a shadow, for an icon tile or a nested list on a grey card.
+  tone?: "danger" | "warning" | "surface";
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
 }
@@ -19,12 +21,13 @@ export function Card({ raised, tone, style, children }: Props) {
   return (
     <View
       style={[
-        { gap: space.sm, padding: space.lg, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: tone === "danger" ? colors.redSoft : tone === "warning" ? colors.orangeSoft : raised ? colors.surface : colors.card },
+        { gap: space.sm, padding: space.lg, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: tone === "danger" ? colors.redSoft : tone === "warning" ? colors.orangeSoft : raised || tone === "surface" ? colors.surface : colors.card },
         raised && { boxShadow: shadows.raised },
         style,
       ]}
     >
-      {children}
+      {/* Only the plain grey card turns what is on it white; a white or tinted card keeps it grey. */}
+      <OnCard.Provider value={!raised && !tone}>{children}</OnCard.Provider>
     </View>
   );
 }

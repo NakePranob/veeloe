@@ -1,6 +1,7 @@
+import { Stack } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, useColorScheme, View } from "react-native";
-import { radius, space, Text, useColors } from "../../../shared/ui";
+import { OnTint, radius, space, Text, useColors } from "../../../shared/ui";
 import { tint } from "../model/look";
 
 // The pieces of the Character editor that are painted in the Agent's own colour. They live with the
@@ -9,6 +10,8 @@ import { tint } from "../model/look";
 // How far the Agent's colour is lifted toward the screen: a soft stage, a stronger chosen tile.
 const STAGE = { light: 0.72, dark: 0.82 };
 const PICKED = { light: 0.5, dark: 0.7 };
+// The Mood being previewed, on the white card under the stage (AgentCharacter board: tint .6).
+const PREVIEWED = { light: 0.6, dark: 0.7 };
 
 /** The colour lifted toward the screen's own, so it stays soft on white and on the dark screen alike. */
 function useTint(color: string, amount: { light: number; dark: number }) {
@@ -23,9 +26,23 @@ function mixToward(hex: string, to: string, k: number) {
   return "#" + ch(a >> 16, b >> 16) + ch((a >> 8) & 255, (b >> 8) & 255) + ch(a & 255, b & 255);
 }
 
-/** A rounded stage in a soft tint of the Agent's colour, for the head being edited. */
-export function Stage({ color, children }: { color: string; children: ReactNode }) {
-  return <View style={{ alignItems: "center", gap: space.md, padding: space.lg, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: useTint(color, STAGE) }}>{children}</View>;
+/**
+ * A stage in a soft tint of the Agent's colour, for the head. Rounded on its own, or, with bleed, the top
+ * of a Screen: edge to edge under a header of the same tint, rounded only below (the Agent board).
+ */
+// gap: between what the stage holds; the Agent board packs its head, name and pills at 6.
+export function Stage({ color, bleed, gap = space.md, children }: { color: string; bleed?: boolean; gap?: number; children: ReactNode }) {
+  const background = useTint(color, STAGE);
+  if (!bleed) return <View style={{ alignItems: "center", gap, padding: space.lg, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: background }}>{children}</View>;
+  return (
+    // The Screen pads its column by space.lg and starts space.sm down; the stage cancels both.
+    <View style={{ alignItems: "center", gap, marginHorizontal: -space.lg, marginTop: -space.sm, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, borderCurve: "continuous", backgroundColor: background }}>
+      <Stack.Screen options={{ headerStyle: { backgroundColor: background }, headerShadowVisible: false, headerTransparent: false }} />
+      {/* What a pull past the top uncovers is the same tint, not the white screen. */}
+      <View style={{ position: "absolute", left: 0, right: 0, bottom: "100%", height: 1000, backgroundColor: background }} />
+      <OnTint>{children}</OnTint>
+    </View>
+  );
 }
 
 /** A card in a soft tint of the Agent's colour, for what that Agent is asking, such as an Approval. */
@@ -48,14 +65,15 @@ export function LookTile({ color, label, name, selected, onPress, children }: { 
             gap: space.xs,
             paddingVertical: space.sm,
             paddingHorizontal: space.xs,
-            borderRadius: radius.md,
+            borderRadius: 18,
             borderCurve: "continuous",
             backgroundColor: selected ? picked : pressed ? colors.chipPressed : colors.card,
           }}
         >
           {children}
           {/* Android's Thai is wider than iOS's: a long name shrinks a little before it is cut. */}
-          <Text variant="caption" strong={selected} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {/* 11pt, a step under caption, as the board's part names; no type token is that small. */}
+          <Text variant="caption" strong tone="body" style={{ fontSize: 11 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {name}
           </Text>
         </View>
@@ -68,9 +86,27 @@ export function LookTile({ color, label, name, selected, onPress, children }: { 
 export function Swatch({ color, label, selected, onPress }: { color: string; label: string; selected: boolean; onPress: () => void }) {
   const colors = useColors();
   return (
-    // 34 plus 5 on each side clears the 44pt target.
-    <Pressable role="button" aria-label={label} aria-selected={selected} accessibilityState={{ selected }} onPress={onPress} hitSlop={5}>
-      <View style={{ width: 34, height: 34, borderRadius: radius.pill, backgroundColor: color, boxShadow: selected ? `0 0 0 3px ${colors.background}, 0 0 0 5px ${colors.label}` : undefined }} />
+    // 30 plus 7 on each side clears the 44pt target. The gap is the card it sits on (the board).
+    <Pressable role="button" aria-label={label} aria-selected={selected} accessibilityState={{ selected }} onPress={onPress} hitSlop={7}>
+      <View style={{ width: 30, height: 30, borderRadius: radius.pill, backgroundColor: color, boxShadow: selected ? `0 0 0 2px ${colors.card}, 0 0 0 4px ${colors.label}` : undefined }} />
+    </Pressable>
+  );
+}
+
+/** One Mood to preview the head in; the one shown fills with the Agent's colour. */
+export function MoodTile({ color, label, selected, onPress, children }: { color: string; label: string; selected: boolean; onPress: () => void; children: ReactNode }) {
+  const colors = useColors();
+  const previewed = useTint(color, PREVIEWED);
+  return (
+    <Pressable role="button" aria-label={label} aria-selected={selected} accessibilityState={{ selected }} onPress={onPress}>
+      {({ pressed }) => (
+        <View style={{ width: 54, alignItems: "center", gap: 2, paddingVertical: space.xs, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: selected ? previewed : pressed ? colors.chipPressed : "transparent" }}>
+          {children}
+          <Text variant="caption" tone={selected ? "label" : "secondary"} strong={selected} style={{ fontSize: 11 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {label}
+          </Text>
+        </View>
+      )}
     </Pressable>
   );
 }

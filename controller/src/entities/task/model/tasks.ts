@@ -131,6 +131,22 @@ export const latestEvents = ({ latest_kind, latest_body }: Latest) => (latest_ki
 /** What a Task is doing, in the prototype's words for it. `failed`: its latest Turn ended in an error. */
 export type TaskStatus = "waiting" | "working" | "stuck" | "interrupted" | "failed" | "done" | "offline" | "new";
 
+/** An Approval waiting, a Turn that went quiet, failed or was cut off: the Owner has to look (the Inbox's needs-you tab). */
+export const needsYou = (status: TaskStatus) => status === "waiting" || status === "stuck" || status === "failed" || status === "interrupted";
+
+/** The colour of the dot beside a status: orange needs a person, red failed, blue running, green done, grey idle. */
+export const STATUS_DOT = { waiting: "orange", stuck: "orange", interrupted: "orange", failed: "red", working: "blue", done: "green", new: "tertiaryLabel", offline: "tertiaryLabel" } as const satisfies Record<TaskStatus, string>;
+
+/** The latest Turn stopped because today's token Budget ran out: a failure with a way out (add Budget). */
+export function isBudgetOut(latest: Latest | undefined) {
+  if (latest?.latest_kind !== TaskEventKind.TurnEnded) return false;
+  try {
+    return (JSON.parse(latest.latest_body ?? "null") as { code?: unknown } | null)?.code === "budget.exhausted";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Offline first; then from the latest known event: none is not started, an Approval
  * asked and not yet answered is waiting on a person, and anything else before
