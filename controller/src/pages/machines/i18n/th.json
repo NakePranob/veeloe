@@ -23,13 +23,17 @@
     "budget": "Budget วันนี้",
     "lastError": "error ล่าสุด",
     "seeProvider": "ดู Provider",
-    "features": "ฟีเจอร์ที่เครื่องนี้รองรับ"
+    "features": "ฟีเจอร์ที่เครื่องนี้รองรับ",
+    "diskFree": "{{size}} GB"
   },
   "tile": {
     "needsYou": "รอคุณ {{count}}",
     "working": "ทำงาน {{count}}",
     "spent": "หมด {{count}}",
-    "budget": "{{used}} จาก {{limit}} วันนี้"
+    "budget": "{{used}} จาก {{limit}} วันนี้",
+    "agentUnit": "Agent",
+    "budgetUnit": "Budget",
+    "ofCount": "/ {{count}}"
   },
   "tabs": {
     "info": "เครื่อง"
@@ -59,7 +63,6 @@
     "command": "veeloe provider add --name <ชื่อ> --url <base url>",
     "models_one": "{{count}} model",
     "models_other": "{{count}} model",
-    "usedBy": "ใช้โดย {{agents}}",
     "ok": "ใช้ได้",
     "add": "เพิ่ม Provider",
     "custom": "Provider อื่นๆ",
@@ -70,7 +73,9 @@
     "cancel": "ยกเลิก",
     "prompt": "เพิ่ม Provider นี้ให้ {{machine}}",
     "failed": "เพิ่ม Provider ไม่สำเร็จ",
-    "failedBody": "Machine ไม่รับ key หรือ URL นี้"
+    "failedBody": "Machine ไม่รับ key หรือ URL นี้",
+    "modelsUsedBy_one": "{{count}} model · ใช้โดย {{agents}}",
+    "modelsUsedBy_other": "{{count}} model · ใช้โดย {{agents}}"
   },
   "egress": {
     "who": "Agent ทุกตัวบน {{machine}}",

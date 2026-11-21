@@ -3,9 +3,11 @@ import { View } from "react-native";
 import type { AgentRow } from "../../../entities/agent";
 import type { Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
-import { describeError, useT } from "../../../shared/i18n";
+import { describeError, useLanguage, useT } from "../../../shared/i18n";
+import { formatList } from "../../../shared/lib";
 import { keySession } from "../../../shared/keystore";
 import { Button, Card, DotLabel, Field, Icon, inform, radius, Row, Section, Select, size, space, Text } from "../../../shared/ui";
+import { errorOf, modelsOf } from "../../../widgets/provider-models";
 import { PROVIDER_PRESETS } from "../model/providers";
 
 const CUSTOM = "custom";
@@ -15,6 +17,7 @@ const CUSTOM = "custom";
 // ponytail: the board's "change key" waits for a Runtime command that replaces a Provider's key.
 export function ProviderSection({ machine, agents }: { machine: Machine; agents: AgentRow[] }) {
   const t = useT("machines");
+  const language = useLanguage();
   const link = useMachineLink();
   const status = useMachineStatus(machine.id);
   const [adding, setAdding] = useState(false);
@@ -54,12 +57,11 @@ export function ProviderSection({ machine, agents }: { machine: Machine; agents:
     <Section footer={t("provider.footer")}>
       {status.providers?.length === 0 && <Row icon="key" title={t("provider.none")} detail={t("provider.command")} mono />}
       {status.providers?.map((provider) => {
-        const models = (provider as { models?: unknown[] }).models;
-        const error = (provider as { error?: string }).error;
+        // A Provider lists its models or says why it could not (ADR 0023).
+        const error = errorOf(provider);
+        const count = modelsOf(provider).length;
         const users = agents.filter((agent) => agent.provider === provider.name).map((agent) => agent.name);
-        const detail = error
-          ? describeError({ code: error })
-          : [models ? t("provider.models", { count: models.length }) : null, users.length ? t("provider.usedBy", { agents: users.join(", ") }) : null].filter(Boolean).join(" · ") || undefined;
+        const detail = error ? describeError({ code: error }) : users.length ? t("provider.modelsUsedBy", { count, agents: formatList(users, language) }) : t("provider.models", { count });
         return (
           <View key={provider.name} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md }}>
             <Icon name="key" size="md" color={error ? "orange" : "label"} />

@@ -145,7 +145,7 @@ export function CharacterPage() {
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
   const agents = useAgents();
   const agent = agents?.find((a) => a.id === id);
-  if (!agent) {
+  if (!agents || !agent) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, padding: space.lg }}>
         <Stack.Screen options={{ title: t("title") }} />
@@ -156,5 +156,5 @@ export function CharacterPage() {
     );
   }
   // Keyed by the Agent so a draft never carries over to another one.
-  return <Editor key={agent.id} agent={agent} others={agents!.flatMap((a) => (a.id === agent.id ? [] : [lookOfJson(a.character)]))} />;
+  return <Editor key={agent.id} agent={agent} others={agents.flatMap((a) => (a.id === agent.id ? [] : [lookOfJson(a.character)]))} />;
 }

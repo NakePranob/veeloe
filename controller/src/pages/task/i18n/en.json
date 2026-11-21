@@ -23,14 +23,9 @@
     },
     "other": "Used {{tool}}",
     "more": "+{{count}}",
-    "hiddenFailed": "One that failed is hidden",
-    "unfinished": "Not finished",
-    "expand": "Show all",
-    "collapse": "Collapse"
+    "unfinished": "Not finished"
   },
-  "busy": "You can send once this Turn ends",
   "queued": "You can send; it waits until this Turn ends",
-  "queuedNote": "Waiting for the running Turn",
   "queuedPosition": "Queued #{{position}} for the running Turn",
   "attach": "Attach a file",
   "attachedOnly": "Attached file",
@@ -42,7 +37,7 @@
     "opening": "Opening…"
   },
   "compacted": {
-    "title": "Context compacted",
+    "title": "Context compacted · {{when}}",
     "show": "Show summary",
     "hide": "Hide summary"
   },
@@ -68,14 +63,12 @@
     "expiresIn_other": "{{count}} min left",
     "expiresInHours_one": "{{count}} hr left",
     "expiresInHours_other": "{{count}} hr left",
-    "by": " by {{member}}",
     "approved": "Approved",
     "denied": "Denied",
     "expired": "Timed out",
     "closed": "Its Turn ended before anyone answered",
     "waitingForApprover": "Waiting for someone with Approve",
     "sent": "Answer sent",
-    "notInAllowlist": "Not in the Allowlist. If nobody answers before it expires, it counts as denied.",
     "approve": "Approve",
     "allowOnce": "Allow once",
     "allowAlways": "Always allow",
@@ -88,12 +81,12 @@
     "signAndApprove": "Sign and approve",
     "cancel": "Cancel",
     "more": "Other options",
-    "expiredNote": "counted as denied",
-    "addedEgress": "added {{target}} to Egress"
+    "outcome": "{{outcome}} · {{target}}",
+    "outcomeBy": "{{outcome}} by {{member}} · {{target}}",
+    "outcomeExpired": "{{outcome}} counted as denied · {{target}}",
+    "outcomeAlways": "{{outcome}} · added {{target}} to Egress"
   },
   "openAgent": "Open {{name}}",
-  "started": "{{machine}} · {{when}}",
-  "notStarted": "{{machine}} · Not started",
   "stopped": "{{member}} stopped this Turn · {{when}}",
   "interrupted": {
     "title": "{{machine}} started again mid-Turn",

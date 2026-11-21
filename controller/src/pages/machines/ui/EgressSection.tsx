@@ -4,7 +4,8 @@ import { egressOf as agentEgressOf, type AgentRow } from "../../../entities/agen
 import { egressOf as machineEgressOf, type Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { keySession } from "../../../shared/keystore";
-import { useT } from "../../../shared/i18n";
+import { useLanguage, useT } from "../../../shared/i18n";
+import { formatList } from "../../../shared/lib";
 import { View } from "react-native";
 import { Button, Field, inform, Note, Row, Section, Select, space } from "../../../shared/ui";
 
@@ -14,6 +15,7 @@ import { Button, Field, inform, Note, Row, Section, Select, space } from "../../
 // Machine signed back for that Agent (ADR 0008, 0029).
 export function EgressSection({ machine, agents }: { machine: Machine; agents: AgentRow[] }) {
   const t = useT("machines");
+  const language = useLanguage();
   const link = useMachineLink();
   const status = useMachineStatus(machine.id);
   // The empty id is no Agent: the whole Machine, as before per-Agent Egress.
@@ -22,7 +24,7 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
   const agent = agents.find((entry) => entry.id === scope);
   const egress = agent ? agentEgressOf(agent) : machineEgressOf(machine);
   const agentNames = agents.map((entry) => entry.name);
-  const who = agent ? t("egress.whoOne", { machine: machine.name, agent: agent.name }) : agentNames.length ? t("egress.whoNamed", { machine: machine.name, agents: agentNames.join(", ") }) : t("egress.who", { machine: machine.name });
+  const who = agent ? t("egress.whoOne", { machine: machine.name, agent: agent.name }) : agentNames.length ? t("egress.whoNamed", { machine: machine.name, agents: formatList(agentNames, language) }) : t("egress.who", { machine: machine.name });
 
   async function change(next: string[], prompt: string) {
     if (!status.online || !link) return inform(t("egress.offline.title"), t("egress.offline.body", { machine: machine.name }));

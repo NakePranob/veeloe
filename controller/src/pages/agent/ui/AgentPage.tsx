@@ -10,7 +10,7 @@ import { previewOf, STATUS_DOT, statusOf, useTaskSummaries } from "../../../enti
 import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { formatTokens, useNow, when } from "../../../shared/lib";
+import { formatTokens, mark, splitMarks, useNow, when } from "../../../shared/lib";
 import { Button, Dot, DotLabel, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, TextLink, Tile, confirm, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
@@ -111,11 +111,19 @@ function AgentView({ agent }: { agent: AgentRow }) {
           <DotLabel color={online === null ? undefined : online ? "green" : "tertiaryLabel"}>
             {/* ponytail: the board's "เห็นล่าสุด" waits for a last-seen time on the Machine; the model stays in its place. */}
             <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
-              {online !== null && <Text variant="caption" tone="body">{`${t(online ? "online" : "offline")} · `}</Text>}
-              {machine && <TextLink label={machine.name} mono tone="body" onPress={() => router.push(`/machines/${agent.machine_id}`)} />}
-              <Text variant="caption" tone="body" mono numberOfLines={1} style={{ flexShrink: 1 }}>
-                {` · ${agent.model}`}
-              </Text>
+              {splitMarks(online === null ? t("stage.line", { machine: mark(0), model: mark(1) }) : t("stage.withState", { state: t(online ? "online" : "offline"), machine: mark(0), model: mark(1) })).map((piece, index) =>
+                piece === 0 ? (
+                  machine && <TextLink key={index} label={machine.name} mono tone="body" onPress={() => router.push(`/machines/${agent.machine_id}`)} />
+                ) : piece === 1 ? (
+                  <Text key={index} variant="caption" tone="body" mono numberOfLines={1} style={{ flexShrink: 1 }}>
+                    {agent.model}
+                  </Text>
+                ) : (
+                  <Text key={index} variant="caption" tone="body">
+                    {piece}
+                  </Text>
+                ),
+              )}
             </View>
           </DotLabel>
         </View>
@@ -147,7 +155,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
               key={task.id}
               leading={<Dot color={STATUS_DOT[statusOf(task, online)]} size={9} />}
               title={previewOf(task) || t("tasks.untitled")}
-              detail={task.events ? `${status(statusOf(task, online))} · ${when(task.updated_at, language, now)}` : status(statusOf(task, online))}
+              detail={task.events ? t("tasks.detail", { status: status(statusOf(task, online)), when: when(task.updated_at, language, now) }) : status(statusOf(task, online))}
               href={`/tasks/${task.id}?agent=${agent.id}`}
             />
           ))}
@@ -163,12 +171,12 @@ function AgentView({ agent }: { agent: AgentRow }) {
                 {t("budget.label")}
               </Text>
               <Text variant="caption" tone="body">
-                {stale && agent.usage_day ? t("budget.asOf", { when: agent.usage_day }) : away && machine?.usage_fetched_at ? t("budget.asOf", { when: when(machine.usage_fetched_at, language, now) }) : t("budget.perDay", { budget: formatTokens(agent.budget) })}
+                {stale && agent.usage_day ? t("budget.asOf", { when: agent.usage_day }) : away && machine?.usage_fetched_at ? t("budget.asOf", { when: when(machine.usage_fetched_at, language, now) }) : t("budget.perDay", { budget: formatTokens(agent.budget, language) })}
               </Text>
             </View>
           }
-          value={formatTokens(agent.usage_tokens ?? 0)}
-          unit={`${t("budget.used", { percent: Math.round(share * 100) })}${share >= 1 && !stale ? t("budget.spent") : ""}`}
+          value={formatTokens(agent.usage_tokens ?? 0, language)}
+          unit={t(share >= 1 && !stale ? "budget.usedSpent" : "budget.used", { percent: Math.round(share * 100) })}
           detail={stale ? undefined : <Meter value={share} label={t("budget.label")} />}
         />
       )}

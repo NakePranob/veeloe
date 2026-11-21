@@ -1,4 +1,4 @@
-import { Link, Stack } from "expo-router";
+import { Link, Stack, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, Switch, TextInput, View, type KeyboardTypeOptions } from "react-native";
@@ -96,7 +96,7 @@ interface RowProps {
   // A picture or Character on the left, in place of the icon.
   leading?: ReactNode;
   iconColor?: keyof Colors;
-  href?: string;
+  href?: Href;
   onPress?: () => void;
   destructive?: boolean;
   mono?: boolean;
@@ -154,7 +154,7 @@ export function Row({ title, detail, value, icon, leading, iconColor, href, onPr
   // Link's Slot drops a Pressable style function on web, so the look lives on an inner View.
   if (href) {
     return (
-      <Link href={href as never} asChild>
+      <Link href={href} asChild>
         <Pressable role="link" {...state}>{({ pressed }) => body(pressed)}</Pressable>
       </Link>
     );

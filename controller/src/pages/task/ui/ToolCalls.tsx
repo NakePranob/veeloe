@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useToolOutput } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
+import { clock } from "../../../shared/lib";
 import { Card, Chip, Icon, icon, radius, space, Spinner, Tap, Text } from "../../../shared/ui";
 import { summaryOf, type ToolCall } from "../model/items";
 
@@ -57,8 +58,6 @@ function CallRow({ call }: { call: ToolCall }) {
     </View>
   );
 }
-
-const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
 
 // A running command's latest line of output and how long it has run, as the Machine streams it (ADR 0073).
 function Live({ id }: { id: string }) {

@@ -8,13 +8,12 @@
     "30": "30 วัน"
   },
   "note": "นับทุก token ที่ Provider รายงาน วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine และไม่มีตัวเลขเงิน (ADR 0043)",
-  "loading": "กำลังขอข้อมูลจาก Machine",
   "machine": {
-    "total": "ใช้ไป {{tokens}} token",
     "fetched": "ข้อมูลเมื่อ {{when}}",
     "online": "ออนไลน์",
     "offline": "ออฟไลน์",
-    "none": "ยังไม่มีข้อมูลของเครื่องนี้"
+    "none": "ยังไม่มีข้อมูลของเครื่องนี้",
+    "stateFetched": "{{state}} · ข้อมูลเมื่อ {{when}}"
   },
   "chart": {
     "label": "การใช้ token ต่อวันของ {{machine}}",
@@ -37,5 +36,9 @@
   "byAgent": "ตาม Agent",
   "of": "{{used}} จาก {{limit}}",
   "budget": "Budget วันนี้ {{percent}}%",
-  "spent": " · หมดแล้ว"
+  "budgetSpent": "Budget วันนี้ {{percent}}% · หมดแล้ว",
+  "lineBudget": "{{line}} · Budget วันนี้ {{percent}}%",
+  "lineBudgetSpent": "{{line}} · Budget วันนี้ {{percent}}% · หมดแล้ว",
+  "tokenUnit": "token",
+  "machineError": "{{machine}}: {{error}}"
 }

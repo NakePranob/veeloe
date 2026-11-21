@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import type { MachineStatus } from "../../../features/machine-link";
-import { describeError, useT } from "../../../shared/i18n";
+import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens } from "../../../shared/lib";
 import { Chip, Field, Icon, Note, Row, Section, Select, Spinner, Tap, Text, space } from "../../../shared/ui";
 import { errorOf, modelsOf } from "../model/providers";
@@ -31,6 +31,7 @@ export function ProviderModelSections({
   onModel: (id: string) => void;
 }) {
   const t = useT("provider-models");
+  const language = useLanguage();
   const [filter, setFilter] = useState("");
   const providers = status?.providers ?? [];
   const chosen = providers.find((p) => p.name === provider);
@@ -72,7 +73,7 @@ export function ProviderModelSections({
                     </Text>
                   )}
                 </View>
-                {m.contextWindow ? <Chip tone="mono" label={formatTokens(m.contextWindow)} /> : null}
+                {m.contextWindow ? <Chip tone="mono" label={formatTokens(m.contextWindow, language)} /> : null}
                 {/* Kept in place when hidden, so the chips line up down the list. */}
                 <View style={{ opacity: m.id === model ? 1 : 0 }} aria-hidden={m.id !== model}>
                   <Icon name="check" size="md" color="label" weight="semibold" />

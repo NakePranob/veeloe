@@ -25,6 +25,11 @@ export type AgentRow = {
   git_repos: string | null;
 };
 
+/** A deleted Agent's stand-in, so its Task still opens: the row keeps the Machine, and the log fills in from the event history. */
+export function deletedAgent(id: string, machineId: string | undefined, name: string): AgentRow {
+  return { id, machine_id: machineId ?? "", name, provider: "", model: "", character: null, budget: null, usage_day: null, usage_tokens: null, allowlist: null, approval_timeout_s: null, egress: "[]", git_repos: null };
+}
+
 /**
  * True when the Agent's tally is from a day its Machine has moved past, so it is not today's (ADR 0043).
  * The day is the Machine's own, which the Controller cannot work out from its clock: a newer day on any

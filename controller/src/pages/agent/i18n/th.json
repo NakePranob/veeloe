@@ -11,16 +11,17 @@
     "label": "Budget วันนี้",
     "perDay": "ต่อวัน {{budget}}",
     "used": "token · {{percent}}%",
-    "spent": " · หมดแล้ว",
     "field": "Budget ต่อวัน (ล้าน token)",
     "footer": "นับทุก token ที่ Provider รายงาน วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine พอหมด Turn ที่ทำอยู่จบเหมือนโดน Stop และงานใหม่ไม่เริ่มจนขึ้นวันใหม่หรือมีคนเพิ่ม (ADR 0043)",
-    "asOf": "ข้อมูลเมื่อ {{when}}"
+    "asOf": "ข้อมูลเมื่อ {{when}}",
+    "usedSpent": "token · {{percent}}% · หมดแล้ว"
   },
   "tasks": {
     "heading": "Task ล่าสุด",
     "new": "Task ใหม่",
     "footer": "แสดงเฉพาะ Task ที่คุณเริ่ม (ADR 0060)",
-    "untitled": "ยังไม่มีข้อความ"
+    "untitled": "ยังไม่มีข้อความ",
+    "detail": "{{status}} · {{when}}"
   },
   "approval": {
     "waiting": "Approval หมดอายุใน",
@@ -76,5 +77,9 @@
     "body": "{{name}} ไม่ได้ทำงานตอนนี้ ตั้งค่าแก้ได้เมื่อเครื่องกลับมา ข้อความถึง Task ส่งได้ตามปกติ และจะออกไปเมื่อเครื่องกลับมา",
     "workFooter": "ค่าเหล่านี้เก็บอยู่บน {{machine}} จึงแก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",
     "deleteFooter": "การลบต้องให้ Machine เป็นคนหยุด Agent จึงลบได้เมื่อ {{machine}} กลับมาออนไลน์"
+  },
+  "stage": {
+    "withState": "{{state}} · {{machine}} · {{model}}",
+    "line": "{{machine}} · {{model}}"
   }
 }

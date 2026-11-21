@@ -76,17 +76,6 @@ export function useMachineStatuses(): Record<string, MachineStatus> {
   );
 }
 
-const NO_USAGE: UsageStatus = { request: null, days: null, loading: false, error: null, from: null, to: null, tasks: [], total: 0 };
-
-/** One Machine's usage request: loading, or the code it failed with. */
-export function useUsageStatus(machine: string): UsageStatus {
-  const links = useCurrent();
-  return useSyncExternalStore(
-    (listener) => links?.subscribeUsage(listener) ?? (() => {}),
-    () => links?.usage(machine) ?? NO_USAGE,
-  );
-}
-
 const NO_USAGES: Record<string, UsageStatus> = {};
 
 /** Every Machine's usage request at once, for the page's list of Tasks. */

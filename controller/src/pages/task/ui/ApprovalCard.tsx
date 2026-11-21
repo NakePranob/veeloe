@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { covers, missingParts } from "../../../entities/agent";
-import { useT } from "../../../shared/i18n";
+import { useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { fromNow } from "../../../shared/lib";
 import { AgentCard, Character, type Look } from "../../../entities/character";
-import { Button, Card, Field, Icon, Inset, Label, radius, space, Text, TextLink, type IconName } from "../../../shared/ui";
+import { Button, Field, Inset, Label, space, Text, TextLink } from "../../../shared/ui";
 import { canAllowAlways } from "../model/allow-always";
-import type { Approval, ApprovalStatus } from "../model/items";
+import { promptFor, respond, type Answer, type Decision } from "../model/approval";
+import type { Approval } from "../model/items";
+import { ApprovalOutcome } from "./ApprovalOutcome";
 
 interface Props {
   approval: Approval;
@@ -22,27 +24,16 @@ interface Props {
   online: boolean;
   now: number;
   /** Answers it and shows "sent" until the Machine's `approval.answered` lands. */
-  onAnswer: (answer: { decision: "approve" | "deny" | "always"; allowAlways?: string[] }) => string | null;
+  onAnswer: (answer: Answer) => string | null;
   /** Puts the cursor in the composer so the Member can say what to do instead. */
   onSteer: () => void;
 }
 
-// The board's settled pills: green and red for an answer, a grey clock for one that timed out, a grey stop for one its Turn closed.
-const OUTCOME: Record<Exclude<ApprovalStatus, "open">, { icon: IconName; color: "green" | "red" | "secondaryLabel"; key: string }> = {
-  approved: { icon: "done", color: "green", key: "approval.approved" },
-  denied: { icon: "failed", color: "red", key: "approval.denied" },
-  expired: { icon: "time", color: "secondaryLabel", key: "approval.expired" },
-  // ponytail: the board draws a minus in a circle; Icon has no minus yet, so the stop circle stands in.
-  closed: { icon: "stopped", color: "secondaryLabel", key: "approval.closed" },
-};
-
-// Where the target goes in a sentence, so each language keeps its own order around the mono part.
-const MARK = "\u0000";
-
 // The one orange thing on the screen while it waits; once answered it settles
-// into the log like any other event (controller-prototype's ApprovalCard).
+// into the log like any other event.
 export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, canManage, online, now, onAnswer, onSteer }: Props) {
   const t = useT("task");
+  const language = useLanguage();
   const open = approval.status === "open";
   // A domain approval is the proxy asking for one host outside the Agent's
   // Egress (issue #44): the same card, with three answers and no Allowlist.
@@ -55,76 +46,26 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   const [busy, setBusy] = useState(false);
   // The rarer answers wait behind the board's one "Other options" link.
   const [more, setMore] = useState(false);
-  const by = approval.answeredBy ? t("approval.by", { member: approval.answeredBy.member }) : "";
 
   // Answering takes a fresh unlock, so a phone left open cannot approve (ADR 0012).
-  async function respond(decision: "approve" | "deny" | "always", allowAlways?: string[]) {
+  async function answer(decision: Decision, allowAlways?: string[]) {
     if (sent || busy) return;
-    if (decision === "approve" || decision === "always") {
-      const prompt = domain
-        ? t(decision === "always" ? "authenticate.domainAlways" : "authenticate.domain", { domain: approval.domain ?? "", name: agentName })
-        : allowAlways?.length
-          ? t("authenticate.always", { entries: allowAlways.join(", ") })
-          : t("authenticate.approve", { name: agentName });
-      setBusy(true);
-      try {
-        if ((await keySession.signed(prompt, () => onAnswer({ decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) }))).status === "sent") setSent(true);
-      } finally {
-        setBusy(false);
-      }
-      return;
+    const prompt = promptFor({ decision, domain: domain ? (approval.domain ?? "") : undefined, agentName, allowAlways, language });
+    setBusy(true);
+    try {
+      if (await respond({ decision, allowAlways, prompt: prompt && t(prompt.key, prompt.values), onAnswer, sign: (words, send) => keySession.signed(words, send) })) setSent(true);
+    } finally {
+      setBusy(false);
     }
-    const sig = onAnswer({ decision });
-    if (sig) setSent(true);
   }
 
   async function allowAlways() {
     if (!entries || !canAllowAlways(entries)) return;
-    await respond("approve", entries.map((item) => item.entry.trim()));
+    await answer("approve", entries.map((item) => item.entry.trim()));
   }
 
-  const outcome = open ? null : OUTCOME[approval.status as Exclude<ApprovalStatus, "open">];
   const target = (domain ? approval.domain : approval.command) ?? "";
-  // Answered, it settles into the log as a small grey pill: the outcome, who, and what.
-  if (outcome) {
-    // A permanent yes says so and what it added. Only a domain answer carries "always": a command's allow-always
-    // goes out as an approve with entries, and the log does not say which entries (ponytail: show it when it does).
-    const always = approval.answeredBy?.decision === "always";
-    const [before, after] = t("approval.addedEgress", { target: MARK }).split(MARK);
-    const mono = (
-      <Text variant="caption" mono>
-        {target}
-      </Text>
-    );
-    return (
-      <Card style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, paddingVertical: 7, borderRadius: radius.md }}>
-        <Icon name={outcome.icon} size="sm" color={outcome.color} />
-        {approval.status === "closed" ? (
-          <Text variant="footnote" tone="secondary" style={{ flexShrink: 1 }}>
-            {t("approval.closed")}
-          </Text>
-        ) : (
-          <Text variant="footnote" style={{ flexShrink: 1 }}>
-            <Text variant="footnote" strong>
-              {always ? t("approval.always") : t(outcome.key as "approval.approved" | "approval.denied" | "approval.expired")}
-            </Text>
-            {approval.status === "expired" && ` ${t("approval.expiredNote")}`}
-            {!always && by}
-            {" · "}
-            {always ? (
-              <>
-                {before}
-                {mono}
-                {after}
-              </>
-            ) : (
-              mono
-            )}
-          </Text>
-        )}
-      </Card>
-    );
-  }
+  if (!open) return <ApprovalOutcome approval={approval} target={target} />;
   const left = fromNow(approval.expiresAt, now);
   const body = (
     <>
@@ -160,10 +101,10 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
         <>
           <View style={{ alignSelf: "stretch", flexDirection: "row", gap: space.sm }}>
             <View style={{ flex: 1 }}>
-              <Button size="large" label={t(domain ? "approval.allowOnce" : "approval.approve")} variant="primary" disabled={!online || busy} onPress={() => void respond("approve")} />
+              <Button size="large" label={t(domain ? "approval.allowOnce" : "approval.approve")} variant="primary" disabled={!online || busy} onPress={() => void answer("approve")} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button size="large" label={t("approval.deny")} variant="surface" disabled={!online || busy} onPress={() => void respond("deny")} />
+              <Button size="large" label={t("approval.deny")} variant="surface" disabled={!online || busy} onPress={() => void answer("deny")} />
             </View>
           </View>
           {/* The board's expiry line; the rarer answers sit behind its link, as on the board. */}
@@ -172,7 +113,7 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
             {domain && canManage && (
               <>
                 <Dot />
-                <TextLink role="button" strong label={t("approval.allowAlways")} disabled={!online || busy} onPress={() => void respond("always")} />
+                <TextLink role="button" strong label={t("approval.allowAlways")} disabled={!online || busy} onPress={() => void answer("always")} />
               </>
             )}
             {!domain && !more && (

@@ -2,7 +2,7 @@ import { Database as Sqlite } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { LIST_DEVICES, renameDevice, type Device } from "./devices";
+import { LIST_DEVICES, nameProblem, renameDevice, type Device } from "./devices";
 
 function connection(sqlite: Sqlite): Connection {
   return {
@@ -50,4 +50,13 @@ test("an unknown Controller is not created by renaming", async () => {
   const database = await open();
   expect(await renameDevice(database, "missing", "Phone")).toBe(false);
   expect(await database.query<Device>(LIST_DEVICES)).toEqual([]);
+});
+
+test("a name must not be empty or the name of another device in use, except the one being renamed", () => {
+  const device = (key: string, name: string, revoked = false): Device => ({ key, member_id: "m_1", name, linked_by: null, linked_at: null, revoked_at: revoked ? 1 : null });
+  const devices = [device("a", "iPhone"), device("b", "Old iPad", true)];
+  expect(nameProblem("  ", devices)).toBe("empty");
+  expect(nameProblem(" iPhone ", devices)).toBe("taken");
+  expect(nameProblem("Old iPad", devices)).toBeNull();
+  expect(nameProblem("iPhone", devices, "a")).toBeNull();
 });

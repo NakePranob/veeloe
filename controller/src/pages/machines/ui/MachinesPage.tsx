@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
 import { useMachineStatuses } from "../../../features/machine-link";
-import { useT } from "../../../shared/i18n";
+import { useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens } from "../../../shared/lib";
 import { Button, Dot, Empty, Icon, Meter, opacity, Screen, Section, size, Tap, Text, Tile, space } from "../../../shared/ui";
 
@@ -11,14 +11,15 @@ import { Button, Dot, Empty, Icon, Meter, opacity, Screen, Section, size, Tap, T
 // ponytail: OS and last-seen are not in the database yet, so the row's line leaves them out.
 export function MachinesPage() {
   const t = useT("machines");
+  const language = useLanguage();
   const machines = useMachines();
   const agents = useAgents() ?? [];
   const statuses = useMachineStatuses();
   const list = machines ?? [];
   const online = list.filter((m) => statuses[m.id]?.online).length;
-  const budgets = list.map((m) => statuses[m.id]?.budgetToday).filter((b) => b && b.limitTokens > 0);
-  const limit = budgets.reduce((sum, b) => sum + b!.limitTokens, 0);
-  const share = limit > 0 ? budgets.reduce((sum, b) => sum + b!.usedTokens, 0) / limit : null;
+  const budgets = list.map((m) => statuses[m.id]?.budgetToday).filter((b): b is NonNullable<typeof b> => !!b && b.limitTokens > 0);
+  const limit = budgets.reduce((sum, b) => sum + b.limitTokens, 0);
+  const share = limit > 0 ? budgets.reduce((sum, b) => sum + b.usedTokens, 0) / limit : null;
   const pair = () => router.push("/add-machine");
 
   return (
@@ -31,7 +32,7 @@ export function MachinesPage() {
             <Tile
               top={<Caption>{t("online")}</Caption>}
               value={String(online)}
-              unit={` / ${list.length}`}
+              unit={t("tile.ofCount", { count: list.length })}
               detail={
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs, paddingTop: space.xxs }}>
                   {list.map((m) => (
@@ -70,12 +71,12 @@ export function MachinesPage() {
                       </Text>
                       {on === false ? (
                         <Text variant="caption" tone="body">
-                          {formatTokens(0)}
+                          {formatTokens(0, language)}
                         </Text>
                       ) : (
                         budget && (
                           <Text variant="caption" tone="body" style={{ fontVariant: ["tabular-nums"] }}>
-                            {budget.limitTokens > 0 ? t("usedOf", { used: formatTokens(budget.usedTokens), limit: formatTokens(budget.limitTokens) }) : formatTokens(budget.usedTokens)}
+                            {budget.limitTokens > 0 ? t("usedOf", { used: formatTokens(budget.usedTokens, language), limit: formatTokens(budget.limitTokens, language) }) : formatTokens(budget.usedTokens, language)}
                           </Text>
                         )
                       )}

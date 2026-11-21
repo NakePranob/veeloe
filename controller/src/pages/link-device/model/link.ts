@@ -47,13 +47,6 @@ export function openLink({ hub, ownKey, ttlSeconds = LINKING_TTL_SECONDS, now = 
 
 export type OpenLink = ReturnType<typeof openLink>;
 
-/** Why a name cannot be the new device's: empty, or the same as another device of this Member still in use. */
-export function nameProblem(name: string, devices: readonly Device[]): "empty" | "taken" | null {
-  const chosen = name.trim();
-  if (!chosen) return "empty";
-  return devices.some((d) => d.revoked_at === null && d.name === chosen) ? "taken" : null;
-}
-
 /**
  * Signs the new key into this Member and has the Hub register it. Nothing is
  * signed or sent until the owner has authenticated again (ADR 0012); null means they did not.

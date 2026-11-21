@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { Link, type Href } from "expo-router";
 import { Children, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,7 +21,7 @@ export function Centered({ children }: { children: ReactNode }) {
 }
 
 interface TapProps {
-  href?: string;
+  href?: Href;
   onPress?: () => void;
   // Kept highlighted, such as the Task open beside the inbox.
   selected?: boolean;
@@ -41,7 +41,7 @@ export function Tap({ href, onPress, selected, style, children }: TapProps) {
   // Link's Slot drops a Pressable style function on web, so the look lives on an inner View.
   if (href) {
     return (
-      <Link href={href as never} asChild>
+      <Link href={href} asChild>
         <Pressable role="link">{({ pressed }) => body(pressed)}</Pressable>
       </Link>
     );

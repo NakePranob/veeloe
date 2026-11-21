@@ -55,7 +55,7 @@ export function createMachineLinks({
   /** Which Machine an envelope went to, by its sig, so an answer about it finds its way back. */
   const sentTo = new Map<string, { machine: string; kind: Kind; request?: string }>();
   // The Hub does not say when a Machine comes back, so one that was offline is asked again, later each time.
-  const retries = new Map<string, { timer: ReturnType<typeof setTimeout>; backoff: ReturnType<typeof createBackoff> }>();
+  const retries = new Map<string, { timer?: ReturnType<typeof setTimeout>; backoff: ReturnType<typeof createBackoff> }>();
 
   const setStatus = (machine: string, change: Partial<MachineStatus>) => statuses.set(machine, change);
   const setUsage = (machine: string, change: Partial<UsageStatus>) => usage.set(machine, change);
@@ -88,7 +88,7 @@ export function createMachineLinks({
   }
 
   function helloLater(machine: Machine) {
-    const retry = retries.get(machine.id) ?? { timer: undefined as never, backoff: createBackoff({ baseMs: 3000, capMs: 30_000 }) };
+    const retry = retries.get(machine.id) ?? { backoff: createBackoff({ baseMs: 3000, capMs: 30_000 }) };
     clearTimeout(retry.timer);
     retry.timer = setTimeout(() => void hello(machine), Math.max(1000, retry.backoff.next()));
     retries.set(machine.id, retry);

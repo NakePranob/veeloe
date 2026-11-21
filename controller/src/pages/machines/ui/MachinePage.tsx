@@ -6,9 +6,10 @@ import { HeadStack, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { latestEvents, statusOf, useTaskSummaries } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
-import { useT } from "../../../shared/i18n";
-import { formatTokens } from "../../../shared/lib";
+import { useLanguage, useT } from "../../../shared/i18n";
+import { formatNumber, formatTokens } from "../../../shared/lib";
 import { Button, Card, Chip, DotLabel, Empty, Icon, Label, Meter, Row, Screen, Section, space, Tabs, Text, Tile } from "../../../shared/ui";
+import { errorOf } from "../../../widgets/provider-models";
 import { countsOf, ordered, shareOf } from "../model/agents";
 import { AgentList, type AgentLine } from "./AgentList";
 import { EgressSection } from "./EgressSection";
@@ -20,6 +21,7 @@ type Part = "agent" | "provider" | "egress" | "info";
 // ponytail: the board's ⋯ menu (rename, unpair) and the OS line wait for those actions and that field to exist.
 export function MachinePage() {
   const t = useT("machines");
+  const language = useLanguage();
   const { machine: id } = useLocalSearchParams<{ machine: string }>();
   const machines = useMachines();
   const machine = machines?.find((m) => m.id === id);
@@ -50,7 +52,7 @@ export function MachinePage() {
   const counts = countsOf(lines);
   const spent = lines.filter((line) => line.spent).length;
   const budget = status.budgetToday && status.budgetToday.limitTokens > 0 ? status.budgetToday : null;
-  const providerTrouble = !!status.providerError || !!status.providers?.some((p) => (p as { error?: string }).error);
+  const providerTrouble = !!status.providerError || !!status.providers?.some((p) => errorOf(p) !== null);
 
   return (
     <Screen title={machine.name} subtitle={status.online === null ? t("status.checking") : t(status.online ? "online" : "offline")}>
@@ -62,7 +64,7 @@ export function MachinePage() {
             onPress={() => setPart("agent")}
             top={<HeadStack looks={lines.map((line) => ({ id: line.agent.id, look: lookOfJson(line.agent.character), mood: line.mood }))} />}
             value={String(agents.length)}
-            unit=" Agent"
+            unit={t("tile.agentUnit")}
             detail={
               <View style={{ gap: space.xxs, paddingTop: space.xxs }}>
                 {counts.needsYou > 0 && (
@@ -91,9 +93,9 @@ export function MachinePage() {
             href="/usage"
             top={<View style={{ height: 44, justifyContent: "center" }}>{budget && <Meter value={budget.usedTokens / budget.limitTokens} label={t("status.budget")} />}</View>}
             value={budget ? `${Math.round((budget.usedTokens / budget.limitTokens) * 100)}%` : undefined}
-            unit={budget ? " Budget" : undefined}
-            title={budget ? undefined : "Budget"}
-            detail={budget ? t("tile.budget", { used: formatTokens(budget.usedTokens), limit: formatTokens(budget.limitTokens) }) : t("budgetUnknown")}
+            unit={budget ? t("tile.budgetUnit") : undefined}
+            title={budget ? undefined : t("tile.budgetUnit")}
+            detail={budget ? t("tile.budget", { used: formatTokens(budget.usedTokens, language), limit: formatTokens(budget.limitTokens, language) }) : t("budgetUnknown")}
           />
         </View>
 
@@ -131,7 +133,7 @@ export function MachinePage() {
           <Section footer={t("info.footer")}>
             <Row icon="network" title="Hub" value={machine.hub_url} />
             {status.version && <Row icon="machine" title="Runtime" value={status.version} />}
-            {status.diskFreeBytes !== null && <Row icon="storage" title={t("status.disk")} value={`${(status.diskFreeBytes / 1_000_000_000).toFixed(0)} GB`} />}
+            {status.diskFreeBytes !== null && <Row icon="storage" title={t("status.disk")} value={t("status.diskFree", { size: formatNumber(Math.round(status.diskFreeBytes / 1_000_000_000), language) })} />}
             {status.features && (
               <View style={{ gap: space.sm, paddingHorizontal: space.inset, paddingVertical: space.md }}>
                 <Label icon="shield" iconColor="label" variant="subheadline" tone="label">

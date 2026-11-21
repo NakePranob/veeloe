@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { checkLinkingProof, createSigner, linkRequestProof, parseLinkingLink, publicKeyOf, toBase64url, verifyCertificate, type HubLinkRequest, type SignedPart } from "@veeloe/protocol-ts";
 import type { Device } from "../../../entities/device";
 import type { Machine } from "../../../entities/machine";
-import { approveLink, handOff, handoffData, nameProblem, openLink } from "./link";
+import { approveLink, handOff, handoffData, openLink } from "./link";
 
 // TEST-ONLY KEYS.
 const oldSeed = new Uint8Array(32).fill(0x44);
@@ -55,13 +55,6 @@ test("a request after the link ran out is nothing", () => {
   const request = requestFrom(offer.text);
   at += 601_000;
   expect(offer.take(request)).toBeNull();
-});
-
-test("a new name must not be empty or the name of another device in use", () => {
-  const devices = [device("a", "iPhone"), device("b", "Old iPad", true)];
-  expect(nameProblem("  ", devices)).toBe("empty");
-  expect(nameProblem(" iPhone ", devices)).toBe("taken");
-  expect(nameProblem("Old iPad", devices)).toBeNull();
 });
 
 test("a request that checked out is not linked until the owner approves: cancelling the authentication signs and sends nothing", async () => {

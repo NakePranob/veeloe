@@ -1,22 +1,19 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import type React from "react";
-import { staleUsage, useAgents } from "../../../entities/agent";
+import { staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines, type Machine } from "../../../entities/machine";
 import { latestEvents, previewOf, useTaskSummaries } from "../../../entities/task";
-import { useUsageDays, type UsageDayRow } from "../../../entities/usage";
+import { dailyTotals, useUsageDays, type UsageDayRow } from "../../../entities/usage";
 import { useMachineLink, useMachineStatuses, useUsageStatuses, type UsageStatus } from "../../../features/machine-link";
-import { useDatabase, useLiveQuery } from "../../../shared/db";
+import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, shiftDay, useNow, when, type Bar } from "../../../shared/lib";
 import { Bars, Button, Empty, Meter, Note, Row, Screen, Section, size, Spinner, Tap, Text, space } from "../../../shared/ui";
-import { daysBetween, rowsInRange, totalOf } from "../model/summary";
-import { DEFAULT_USAGE_WINDOW, isUsageWindow, saveUsageWindow, USAGE_WINDOWS } from "../model/window";
+import { saveUsageWindow, USAGE_WINDOWS, useUsageWindow } from "../model/window";
 
 const latestOf = (task: Parameters<typeof latestEvents>[0] | undefined) => (task ? latestEvents(task) : []);
-
-type AgentRow = { id: string; name: string; machine_id: string };
 
 /** The windows as words in the picked language; one key per window keeps the labels in the JSON. */
 const WINDOW_KEY = { 1: "window.1", 3: "window.3", 7: "window.7", 30: "window.30" } as const;
@@ -36,11 +33,10 @@ function WindowPicker({ days }: { days: number }) {
   );
 }
 
-type AgentUsageRow = AgentRow & { budget: number | null; usage_tokens: number | null; character: string | null; model: string };
-
 // One line of a breakdown: name and "used of limit", the meter, then where it stands.
 function UsageLine({ title, used, limit, line, leading, href, dim }: { title: string; used: number; limit: number | null; line: string; leading?: React.ReactNode; href: string; dim?: boolean }) {
   const t = useT("usage");
+  const language = useLanguage();
   const share = limit ? used / limit : null;
   const spent = share !== null && share >= 1;
   // Offline: nothing to open and nothing fresh to measure, so the whole line goes grey with only what it used.
@@ -59,7 +55,7 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
           ) : null}
         </View>
         <Text variant="footnote" tone="secondary">
-          {formatTokens(used)}
+          {formatTokens(used, language)}
         </Text>
       </View>
     );
@@ -73,13 +69,13 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
             {title}
           </Text>
           <Text variant="footnote" tone="secondary">
-            {limit ? t("of", { used: formatTokens(used), limit: formatTokens(limit) }) : formatTokens(used)}
+            {limit ? t("of", { used: formatTokens(used, language), limit: formatTokens(limit, language) }) : formatTokens(used, language)}
           </Text>
         </View>
         {share !== null && <Meter value={share} label={t("budget", { percent: Math.round(share * 100) })} />}
         {(line || share !== null) && (
           <Text variant="caption" tone={spent ? "danger" : "label"}>
-            {[line, share !== null ? `${t("budget", { percent: Math.round(share * 100) })}${spent ? t("spent") : ""}` : ""].filter(Boolean).join(" · ")}
+            {share === null ? line : t(line ? (spent ? "lineBudgetSpent" : "lineBudget") : spent ? "budgetSpent" : "budget", { line, percent: Math.round(share * 100) })}
           </Text>
         )}
       </View>
@@ -87,24 +83,17 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
   );
 }
 
-function Overview({ machines, agents, rows, statuses, days }: { machines: Machine[]; agents: AgentUsageRow[]; rows: UsageDayRow[]; statuses: Record<string, UsageStatus>; days: number }) {
+function Overview({ machines, agents, rows, statuses, days }: { machines: Machine[]; agents: AgentRow[]; rows: UsageDayRow[]; statuses: Record<string, UsageStatus>; days: number }) {
   const t = useT("usage");
   const language = useLanguage();
   const ids = new Set(agents.map((agent) => agent.id));
   // Each Machine's own today, or the last day it gave us; the window ends at the latest of them.
   const to = [...machines.map((m) => statuses[m.id]?.to ?? null), ...rows.filter((row) => ids.has(row.agent_id)).map((row) => row.day)].filter((d): d is string => !!d).sort().at(-1) ?? null;
   const from = to ? shiftDay(to, -(days - 1)) : null;
-  const visible = from && to ? rowsInRange(rows, ids, from, to) : [];
-  const today = to ? totalOf(visible.filter((row) => row.day === to)) : 0;
+  const totals = from && to ? dailyTotals(rows, ids, from, to) : [];
+  const today = totals.at(-1)?.tokens ?? 0;
   const loading = machines.some((m) => statuses[m.id]?.loading);
-  const bars: Bar[] =
-    from && to
-      ? daysBetween(from, to).map((day) => {
-          const dayRows = visible.filter((row) => row.day === day);
-          const tokens = totalOf(dayRows);
-          return { key: day, value: tokens, known: dayRows.length > 0, title: dayRows.length > 0 ? t("chart.bar", { day, tokens: formatTokens(tokens) }) : t("chart.none", { day }) };
-        })
-      : [];
+  const bars: Bar[] = totals.map(({ day, tokens, known }) => ({ key: day, value: tokens, known, title: known ? t("chart.bar", { day, tokens: formatTokens(tokens, language) }) : t("chart.none", { day }) }));
   return (
     <Section footer={t("note")}>
       <View style={{ gap: space.xs, paddingTop: space.lg, paddingHorizontal: space.inset, paddingBottom: space.md }}>
@@ -115,12 +104,12 @@ function Overview({ machines, agents, rows, statuses, days }: { machines: Machin
           {loading && <Spinner />}
         </View>
         <Text variant="figure">
-          {formatTokens(today)}
-          <Text variant="subheadline" tone="secondary">{" token"}</Text>
+          {formatTokens(today, language)}
+          <Text variant="subheadline" tone="secondary">{` ${t("tokenUnit")}`}</Text>
         </Text>
         {bars.length > 0 ? (
           <View style={{ marginTop: space.sm }}>
-            <Bars bars={bars} label={t("chart.label", { machine: t("all") })} height={140} ticks={bars.map((bar, i) => tickOf(bar.key, i === bars.length - 1, bars.length, language, t("chart.today")))} peak={formatTokens(today)} />
+            <Bars bars={bars} label={t("chart.label", { machine: t("all") })} height={140} ticks={bars.map((bar, i) => tickOf(bar.key, i === bars.length - 1, bars.length, language, t("chart.today")))} peak={formatTokens(today, language)} />
           </View>
         ) : (
           <Text variant="footnote" tone="secondary">
@@ -141,6 +130,7 @@ function tickOf(day: string, last: boolean, count: number, language: string, tod
 
 function TopTasks({ statuses, agents }: { statuses: Record<string, UsageStatus>; agents: AgentRow[] }) {
   const t = useT("usage");
+  const language = useLanguage();
   const summaries = useTaskSummaries() ?? [];
   const previews = new Map(summaries.map((task) => [task.id, previewOf(task)]));
   const names = new Map(agents.map((agent) => [agent.id, agent.name]));
@@ -163,12 +153,12 @@ function TopTasks({ statuses, agents }: { statuses: Record<string, UsageStatus>;
             icon="thread"
             title={preview || t("tasks.unknown", { id: task.task.slice(0, 8) })}
             detail={names.get(task.agent)}
-            value={formatTokens(task.tokens)}
+            value={formatTokens(task.tokens, language)}
             {...(preview ? { href: `/tasks/${task.task}?agent=${task.agent}` } : {})}
           />
         );
       })}
-      {other > 0 && <Row title={t("tasks.other")} value={formatTokens(other)} />}
+      {other > 0 && <Row title={t("tasks.other")} value={formatTokens(other, language)} />}
     </Section>
   );
 }
@@ -185,9 +175,7 @@ export function UsagePage() {
   // Newest first, so the first Task of an Agent's is the one its face shows, as the Inbox reads it.
   const summaries = useTaskSummaries() ?? [];
   const machineStatuses = useMachineStatuses();
-  const saved = useLiveQuery<{ value: string }>("SELECT value FROM device_setting WHERE key = 'usage.window'", [], ["device_setting"]);
-  const savedDays = Number(saved?.[0]?.value);
-  const days = isUsageWindow(savedDays) ? savedDays : DEFAULT_USAGE_WINDOW;
+  const days = useUsageWindow();
 
   const list = machines ?? [];
   const ids = list.map((machine) => machine.id).join(",");
@@ -223,7 +211,8 @@ export function UsagePage() {
               const online = machineStatuses[machine.id]?.online ?? null;
               const budget = machineStatuses[machine.id]?.budgetToday;
               const fetched = machine.usage_fetched_at ? when(machine.usage_fetched_at, language, now) : null;
-              const line = [online === null ? null : t(online ? "machine.online" : "machine.offline"), fetched ? t("machine.fetched", { when: fetched }) : null].filter(Boolean).join(" · ");
+              const state = online === null ? null : t(online ? "machine.online" : "machine.offline");
+              const line = state && fetched ? t("machine.stateFetched", { state, when: fetched }) : fetched ? t("machine.fetched", { when: fetched }) : (state ?? "");
               return <UsageLine key={machine.id} title={machine.name} used={budget?.usedTokens ?? 0} limit={budget?.limitTokens || null} line={line} href={`/machines/${machine.id}`} dim={online === false} />;
             })}
           </Section>
@@ -248,7 +237,7 @@ export function UsagePage() {
           {list.map((machine) =>
             statuses[machine.id]?.error ? (
               <Note key={machine.id} icon="warning" iconColor="orange">
-                {`${machine.name}: ${describeError({ code: statuses[machine.id]!.error! })}`}
+                {t("machineError", { machine: machine.name, error: describeError({ code: statuses[machine.id]!.error! }) })}
               </Note>
             ) : null,
           )}

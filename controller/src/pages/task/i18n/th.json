@@ -23,14 +23,9 @@
     },
     "other": "ใช้ {{tool}}",
     "more": "+{{count}}",
-    "hiddenFailed": "มีอย่างที่ล้มเหลวซ่อนอยู่",
-    "unfinished": "ไม่เสร็จ",
-    "expand": "ดูทั้งหมด",
-    "collapse": "ย่อ"
+    "unfinished": "ไม่เสร็จ"
   },
-  "busy": "ส่งได้เมื่อ Turn นี้จบ",
   "queued": "ส่งได้ จะรอจน Turn นี้จบ",
-  "queuedNote": "รอ Turn ที่กำลังทำงานอยู่",
   "queuedPosition": "คิว #{{position}} รอ Turn ที่กำลังทำงาน",
   "attach": "แนบไฟล์",
   "attachedOnly": "ไฟล์แนบ",
@@ -42,7 +37,7 @@
     "opening": "กำลังเปิด…"
   },
   "compacted": {
-    "title": "ย่อ context แล้ว",
+    "title": "ย่อ context แล้ว · {{when}}",
     "show": "ดูสรุป",
     "hide": "ซ่อนสรุป"
   },
@@ -68,14 +63,12 @@
     "expiresIn_other": "เหลือ {{count}} นาที",
     "expiresInHours_one": "เหลือ {{count}} ชม.",
     "expiresInHours_other": "เหลือ {{count}} ชม.",
-    "by": " โดย {{member}}",
     "approved": "อนุมัติแล้ว",
     "denied": "ปฏิเสธแล้ว",
     "expired": "หมดเวลา",
     "closed": "Turn จบก่อนมีคนตอบ",
     "waitingForApprover": "รอคนที่มี Approve ตอบ",
     "sent": "ส่งคำตอบแล้ว",
-    "notInAllowlist": "ไม่อยู่ใน Allowlist ถ้าไม่ตอบก่อนหมดอายุจะนับว่าปฏิเสธ",
     "approve": "อนุมัติ",
     "allowOnce": "อนุญาตครั้งนี้",
     "allowAlways": "อนุญาตถาวร",
@@ -88,12 +81,12 @@
     "signAndApprove": "เซ็นและอนุมัติ",
     "cancel": "ยกเลิก",
     "more": "ตัวเลือกอื่น",
-    "expiredNote": "นับว่าปฏิเสธ",
-    "addedEgress": "เพิ่ม {{target}} เข้า Egress"
+    "outcome": "{{outcome}} · {{target}}",
+    "outcomeBy": "{{outcome}} โดย {{member}} · {{target}}",
+    "outcomeExpired": "{{outcome}} นับว่าปฏิเสธ · {{target}}",
+    "outcomeAlways": "{{outcome}} · เพิ่ม {{target}} เข้า Egress"
   },
   "openAgent": "เปิดหน้า {{name}}",
-  "started": "{{machine}} · {{when}}",
-  "notStarted": "{{machine}} · ยังไม่ได้เริ่ม",
   "stopped": "{{member}} หยุด Turn นี้ · {{when}}",
   "interrupted": {
     "title": "{{machine}} เริ่มใหม่กลาง Turn",

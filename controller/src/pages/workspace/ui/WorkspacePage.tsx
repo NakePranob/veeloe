@@ -3,7 +3,7 @@ import { useAgents } from "../../../entities/agent";
 import { useDevices } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
 import { needsYou, statusOf, useTaskSummaries } from "../../../entities/task";
-import { useUsageDays } from "../../../entities/usage";
+import { dailyTotals, useUsageDays } from "../../../entities/usage";
 import { PUSH_READY, savePushEnabled, useMachineStatuses, usePushEnabled } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { saveLanguage, useLanguage, useT } from "../../../shared/i18n";
@@ -39,16 +39,9 @@ export function WorkspacePage() {
 
   // Today is the latest day a Machine gave us, as the Usage page reads it; the bars are the week up to it.
   const ids = new Set(agents?.map((agent) => agent.id));
-  const kept = rows?.filter((row) => ids.has(row.agent_id)) ?? [];
-  const today = kept.map((row) => row.day).sort().at(-1);
-  const total = (day: string) => kept.filter((row) => row.day === day).reduce((sum, row) => sum + row.tokens, 0);
-  const bars: Bar[] = today
-    ? Array.from({ length: 7 }, (_, i) => {
-        const day = shiftDay(today, i - 6);
-        const known = kept.some((row) => row.day === day);
-        return { key: day, value: total(day), known, title: t("tokens.bar", { day, tokens: formatTokens(total(day)) }) };
-      })
-    : [];
+  const today = rows?.filter((row) => ids.has(row.agent_id)).map((row) => row.day).sort().at(-1);
+  const week = today && rows ? dailyTotals(rows, ids, shiftDay(today, -6), today) : [];
+  const bars: Bar[] = week.map(({ day, tokens, known }) => ({ key: day, value: tokens, known, title: t("tokens.bar", { day, tokens: formatTokens(tokens, language) }) }));
 
   const pushOn = usePushEnabled();
 
@@ -77,7 +70,7 @@ export function WorkspacePage() {
         <View style={{ flexDirection: "row", gap: space.md }}>
           <Tile
             top={<Bars bars={bars} label={t("tokens.chart")} height={40} />}
-            value={rows ? formatTokens(today ? total(today) : 0) : undefined}
+            value={rows ? formatTokens(week.at(-1)?.tokens ?? 0, language) : undefined}
             title={t("tokens.title")}
             detail={t("tokens.detail")}
             height={TILE}

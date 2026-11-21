@@ -111,5 +111,3 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
     </Screen>
   );
 }
-
-/** The header's title with the Agent and its count under it, as the board draws it. */

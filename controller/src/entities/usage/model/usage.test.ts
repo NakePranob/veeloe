@@ -2,7 +2,7 @@ import { Database as Sqlite } from "bun:sqlite";
 import { beforeEach, expect, test } from "bun:test";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { saveUsageFetchedAt, saveUsageHistory } from "./usage";
+import { dailyTotals, saveUsageFetchedAt, saveUsageHistory } from "./usage";
 
 function connect(): Connection {
   const sqlite = new Sqlite(":memory:");
@@ -73,4 +73,18 @@ test("the time the Machine last answered is kept per Machine", async () => {
   expect((await database.query<{ usage_fetched_at: number | null }>("SELECT usage_fetched_at FROM machine"))[0]!.usage_fetched_at).toBeNull();
   await saveUsageFetchedAt(database, "machine-1", 1_800_000_000_000);
   expect(await database.query("SELECT usage_fetched_at FROM machine")).toEqual([{ usage_fetched_at: 1_800_000_000_000 }]);
+});
+
+test("each day of a range is a column, across a month and a year, totalled over its own Agents, a day with no row a gap", () => {
+  const rows = [
+    { agent_id: "a1", day: "2026-12-30", tokens: 10 },
+    { agent_id: "a1", day: "2027-01-01", tokens: 20 },
+    { agent_id: "a2", day: "2027-01-01", tokens: 30 },
+    { agent_id: "a3", day: "2027-01-01", tokens: 99 },
+  ];
+  expect(dailyTotals(rows, new Set(["a1", "a2"]), "2026-12-31", "2027-01-01")).toEqual([
+    { day: "2026-12-31", tokens: 0, known: false },
+    { day: "2027-01-01", tokens: 50, known: true },
+  ]);
+  expect(dailyTotals(rows, new Set(["a1"]), "2027-01-02", "2027-01-01")).toEqual([]);
 });

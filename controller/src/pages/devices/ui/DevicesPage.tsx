@@ -1,13 +1,13 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { Switch, View } from "react-native";
-import { renameDevice, useDevices, type Device } from "../../../entities/device";
+import { nameProblem, renameDevice, useDevices, type Device } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { when } from "../../../shared/lib";
+import { formatList, when } from "../../../shared/lib";
 import { Button, Card, Chip, confirm, Field, Icon, inform, Note, radius, Row, Screen, Section, size, space, Text } from "../../../shared/ui";
 import { revocationOf, revokeDevice } from "../model/revoke";
 
@@ -84,10 +84,8 @@ function useDeviceActions(device: Device, devices: Device[], here: boolean) {
 
   async function saveRename() {
     const next = draft.trim();
-    if (!next) return setProblem(t("rename.empty"));
-    if (devices.some((other) => other.key !== device.key && other.revoked_at === null && other.name === next)) {
-      return setProblem(t("rename.taken"));
-    }
+    const why = nameProblem(next, devices, device.key);
+    if (why) return setProblem(t(why === "empty" ? "rename.empty" : "rename.taken"));
     if (!(await renameDevice(database, device.key, next))) return setProblem(t("rename.failed"));
     setProblem(null);
     setRenaming(false);
@@ -100,7 +98,7 @@ function useDeviceActions(device: Device, devices: Device[], here: boolean) {
     if (!machine) return inform(t("failed"), describeError({ code: "pairing.hub_unreachable" }));
     const others = drops.filter((key) => key !== device.key).map(nameOf);
     const kept = signed.filter((d) => keep.includes(d.key)).map((d) => d.name);
-    const message = [here ? t("confirm.here") : null, t("confirm.body"), others.length ? t("confirm.drops", { names: others.join(", ") }) : null, kept.length ? t("confirm.kept", { names: kept.join(", ") }) : null]
+    const message = [here ? t("confirm.here") : null, t("confirm.body"), others.length ? t("confirm.drops", { names: formatList(others, language) }) : null, kept.length ? t("confirm.kept", { names: formatList(kept, language) }) : null]
       .filter(Boolean)
       .join("\n\n");
     if (!(await confirm({ title: t("confirm.title", { name }), message, action: t("confirm.action"), cancel: t("confirm.cancel"), destructive: true }))) return;

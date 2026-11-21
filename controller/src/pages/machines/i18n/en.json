@@ -23,13 +23,17 @@
     "budget": "Budget today",
     "lastError": "Last error",
     "seeProvider": "See Providers",
-    "features": "Features this Machine supports"
+    "features": "Features this Machine supports",
+    "diskFree": "{{size}} GB"
   },
   "tile": {
     "needsYou": "{{count}} need you",
     "working": "{{count}} working",
     "spent": "{{count}} out",
-    "budget": "{{used}} of {{limit}} today"
+    "budget": "{{used}} of {{limit}} today",
+    "agentUnit": "Agent",
+    "budgetUnit": "Budget",
+    "ofCount": "/ {{count}}"
   },
   "tabs": {
     "info": "Machine"
@@ -59,7 +63,6 @@
     "command": "veeloe provider add --name <name> --url <base url>",
     "models_one": "{{count}} model",
     "models_other": "{{count}} models",
-    "usedBy": "used by {{agents}}",
     "ok": "Working",
     "add": "Add Provider",
     "custom": "Custom Provider",
@@ -70,7 +73,9 @@
     "cancel": "Cancel",
     "prompt": "Add this Provider to {{machine}}",
     "failed": "Couldn't add this Provider",
-    "failedBody": "The Machine did not accept the key or its URL."
+    "failedBody": "The Machine did not accept the key or its URL.",
+    "modelsUsedBy_one": "{{count}} model · used by {{agents}}",
+    "modelsUsedBy_other": "{{count}} models · used by {{agents}}"
   },
   "egress": {
     "who": "every Agent on {{machine}}",

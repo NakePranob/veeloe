@@ -11,16 +11,17 @@
     "label": "Today's Budget",
     "perDay": "{{budget}} a day",
     "used": "tokens · {{percent}}%",
-    "spent": " · used up",
     "field": "Budget per day (million tokens)",
     "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget (ADR 0043).",
-    "asOf": "As of {{when}}"
+    "asOf": "As of {{when}}",
+    "usedSpent": "tokens · {{percent}}% · used up"
   },
   "tasks": {
     "heading": "Latest Tasks",
     "new": "New Task",
     "footer": "Only the Tasks you started are here (ADR 0060).",
-    "untitled": "No message yet"
+    "untitled": "No message yet",
+    "detail": "{{status}} · {{when}}"
   },
   "approval": {
     "waiting": "Approval waits",
@@ -76,5 +77,9 @@
     "body": "{{name}} isn't working right now. Settings can change once the Machine is back. Messages to a Task can still be sent, and go out when it returns.",
     "workFooter": "These values live on {{machine}}, so they can change once it is back online (ADR 0006).",
     "deleteFooter": "Deleting needs the Machine to stop the Agent, so it can be deleted once {{machine}} is back online."
+  },
+  "stage": {
+    "withState": "{{state}} · {{machine}} · {{model}}",
+    "line": "{{machine}} · {{model}}"
   }
 }

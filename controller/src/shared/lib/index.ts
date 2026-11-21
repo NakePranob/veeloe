@@ -1,5 +1,6 @@
-export { parseInline, parseMarkdown, plainFirstLine, type Block, type Inline } from "./markdown";
-export { fromNow, useNow, when } from "./time";
-export { formatTokens } from "./tokens";
-export { barHeight, barShare, type Bar } from "./bars";
+export { parseMarkdown, plainFirstLine, type Block, type Inline } from "./markdown";
+export { clock, dayDistance, fromNow, useNow, when } from "./time";
+export { formatList, formatNumber, formatTokens } from "./format";
+export { barHeight, type Bar } from "./bars";
 export { shiftDay } from "./days";
+export { mark, splitMarks } from "./marks";

@@ -39,3 +39,15 @@ export function saveUsageHistory(database: Database, machineId: string, body: Us
 export function saveUsageFetchedAt(database: Database, machineId: string, at: number) {
   return database.write(["machine"], (transaction) => transaction.run("UPDATE machine SET usage_fetched_at = ? WHERE id = ?", [at, machineId]));
 }
+
+/**
+ * Each Budget day from `from` to `to`, both ends included, with the tokens the given Agents used on it. A day
+ * no row reports is `known: false`, so a gap can be drawn as a gap rather than a 0.
+ */
+export function dailyTotals(rows: readonly UsageDayRow[], agentIds: ReadonlySet<string>, from: string, to: string): { day: string; tokens: number; known: boolean }[] {
+  const byDay = new Map<string, number>();
+  for (const row of rows) if (agentIds.has(row.agent_id) && row.day >= from && row.day <= to) byDay.set(row.day, (byDay.get(row.day) ?? 0) + row.tokens);
+  const days = [];
+  for (let day = from; day <= to; day = shiftDay(day, 1)) days.push({ day, tokens: byDay.get(day) ?? 0, known: byDay.has(day) });
+  return days;
+}

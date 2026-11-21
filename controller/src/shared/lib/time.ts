@@ -21,6 +21,18 @@ export function fromNow(at: number, now = Date.now()) {
   return minutes < 60 ? { count: minutes, unit: "minute" as const } : { count: Math.max(1, Math.floor(minutes / 60)), unit: "hour" as const };
 }
 
+/** Whole calendar days from `at` to `now` in the device's time zone: 0 today, 1 yesterday. */
+export function dayDistance(at: number, now: number) {
+  const day = (ms: number) => {
+    const d = new Date(ms);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+  return Math.round((day(now) - day(at)) / DAY);
+}
+
+/** A duration as a stopwatch shows it, "m:ss". */
+export const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+
 // The current time, refreshed often enough for a list's times to stay true while a screen is open.
 export function useNow(every = 30_000) {
   const [now, setNow] = useState(Date.now);

@@ -70,3 +70,13 @@ export function droppedWith(devices: readonly Device[], device: string, keep: re
   const links = devices.filter((d) => d.linked_by && d.revoked_at === null).map((d) => ({ key: d.key, by: d.linked_by! }));
   return revokedWith(device, links, keep);
 }
+
+/**
+ * Why a name cannot be a device's: empty, or the name of another of this Member's devices still in use.
+ * `except` is the device being renamed, whose own name is no clash.
+ */
+export function nameProblem(name: string, devices: readonly Device[], except?: string): "empty" | "taken" | null {
+  const chosen = name.trim();
+  if (!chosen) return "empty";
+  return devices.some((d) => d.key !== except && d.revoked_at === null && d.name === chosen) ? "taken" : null;
+}

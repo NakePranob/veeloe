@@ -2,15 +2,15 @@ import { router, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, Share, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { listDevices, useDevices } from "../../../entities/device";
+import { listDevices, nameProblem, useDevices } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { useNow, when } from "../../../shared/lib";
+import { clock, useNow, when } from "../../../shared/lib";
 import { Button, Card, CenteredStep, Chip, Field, FooterBar, IconDisc, Note, QrCode, radius, Screen, Spinner, Text, column, inform, space } from "../../../shared/ui";
-import { approveLink, handOff, handoffData, nameProblem, openLink, type LinkAsk, type OpenLink } from "../model/link";
+import { approveLink, handOff, handoffData, openLink, type LinkAsk, type OpenLink } from "../model/link";
 
 // controller-prototype's DeviceLinkPage on the device that is already in the Workspace: show a QR
 // that carries this device's Hub, as `veeloe pair` does, then approve the request the new device
@@ -192,7 +192,7 @@ function Countdown({ until }: { until: number }) {
   const t = useT("link-device");
   const now = useNow(1000);
   const seconds = Math.max(0, Math.ceil((until - now) / 1000));
-  const left = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  const left = clock(seconds * 1000);
   return (
     <View role="timer" aria-label={t("show.expiresIn", { left })}>
       <Chip tone="mono" icon="time" label={left} />
