@@ -356,7 +356,7 @@ export function TaskPage() {
       >
         {shown.length === 0 && pending.length === 0 && (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 22 }}>
-            <Character look={lookOfJson(agent.character)} mood="idle" size={160} />
+            <Character look={lookOfJson(agent.character)} mood={moodOf([], status.online)} size={160} />
             <Text strong style={{ fontSize: 20, fontFamily: font.bold, textAlign: "center" }}>
               {t("emptyTitle", { name: agent.name })}
             </Text>

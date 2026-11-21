@@ -39,6 +39,9 @@ function AgentView({ agent }: { agent: AgentRow }) {
   // How long an Approval waits, as the Machine last said (ADR 0030).
   const approvalSeconds = approvalTimeoutOf(agent) ?? APPROVAL_TIMEOUT_S_DEFAULT;
   const offline = online === false || !link || notSent;
+  // The Agent-Offline board: its Machine is away, so nothing runs and nothing about the Agent can change (ADR 0006).
+  // Its Tasks still open to read, and a new Task's first message waits for the Machine.
+  const away = online === false;
   const problem = providerProblem(agent, machineStatus.providers);
   const dirty = name.trim() !== agent.name;
   // A name or Budget not being edited follows the Machine's (ADR 0006).
@@ -109,6 +112,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             {online !== null && <Dot color={online ? "green" : "tertiaryLabel"} size={7} />}
             <Text variant="caption" tone="body" numberOfLines={1} style={{ flexShrink: 1 }}>
+              {/* ponytail: the board's "เห็นล่าสุด" waits for a last-seen time on the Machine; the model stays in its place. */}
               {online === null ? "" : `${t(online ? "online" : "offline")} · `}
               <Text variant="caption" tone="body" mono role="link" onPress={() => router.push(`/machines/${agent.machine_id}`)} style={{ textDecorationLine: "underline" }}>
                 {machine?.name}
@@ -124,13 +128,21 @@ function AgentView({ agent }: { agent: AgentRow }) {
           <View style={{ flex: 1 }}>
             <Button label={t("tasks.new")} leading="add" variant="primary" size="large" onPress={newTask} />
           </View>
-          <Button label="Memory" leading="memory" variant="surface" size="large" onPress={() => router.push(`/agents/${agent.id}/memory`)} />
+          {/* Memory is read from the Machine, so it waits for it too. */}
+          <Button label="Memory" leading="memory" variant="surface" size="large" disabled={away} onPress={() => router.push(`/agents/${agent.id}/memory`)} />
         </View>
       </Stage>
-      {offline && (
-        <Note icon="offline" iconColor="orange">
-          {t("needsOnline")}
+      {away ? (
+        <Note tone="warning">
+          <Text variant="footnote" strong tone="body">{t("away.title", { machine: machine?.name })} </Text>
+          {t("away.body", { name: agent.name })}
         </Note>
+      ) : (
+        offline && (
+          <Note icon="offline" iconColor="orange">
+            {t("needsOnline")}
+          </Note>
+        )
       )}
       {problem && <Note tone="warning">{problem === "provider" ? t("problem.provider", { provider: agent.provider }) : t("problem.model", { provider: agent.provider, model: agent.model })}</Note>}
 
@@ -158,7 +170,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
                 {t("budget.label")}
               </Text>
               <Text variant="caption" tone="body">
-                {t("budget.perDay", { budget: formatTokens(agent.budget) })}
+                {away && machine?.usage_fetched_at ? t("budget.asOf", { when: when(machine.usage_fetched_at, language, now) }) : t("budget.perDay", { budget: formatTokens(agent.budget) })}
               </Text>
             </View>
           }
@@ -169,13 +181,13 @@ function AgentView({ agent }: { agent: AgentRow }) {
       )}
 
       <Section title={t("identity")}>
-        <Row icon="character" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} />
-        <Row icon="memory" title="Memory" detail={t("memory.detail")} href={`/agents/${agent.id}/memory`} />
-        <Field label={t("name")} value={name} onChangeText={setName} />
+        <Row icon="character" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} disabled={away} />
+        <Row icon="memory" title="Memory" detail={t("memory.detail")} href={`/agents/${agent.id}/memory`} disabled={away} />
+        <Field label={t("name")} value={name} onChangeText={setName} disabled={away} />
       </Section>
 
-      <Section title={t("work.heading")} footer={t("work.footer")}>
-        <Row icon="key" title={t("provider.heading")} detail={problem === "provider" ? t("problem.choose") : undefined} value={problem === "provider" ? undefined : agent.model} href={`/agents/${agent.id}/model`} />
+      <Section title={t("work.heading")} footer={away ? t("away.workFooter", { machine: machine?.name }) : t("work.footer")}>
+        <Row icon="key" title={t("provider.heading")} detail={problem === "provider" ? t("problem.choose") : undefined} value={problem === "provider" ? undefined : agent.model} href={`/agents/${agent.id}/model`} disabled={away} />
         <ExpiryPicker
           seconds={approvalSeconds}
           disabled={offline}
@@ -183,16 +195,16 @@ function AgentView({ agent }: { agent: AgentRow }) {
             if (link && machine) link.updateAgent(machine, { id: agent.id, approvalTimeoutS: next });
           }}
         />
-        <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} />
-        <Row icon="branch" title={t("git.row")} value={repos === null ? t("git.unsupported") : t("git.count", { count: repos.length })} href={`/agents/${agent.id}/git`} />
+        <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} disabled={away} />
+        <Row icon="branch" title={t("git.row")} value={repos === null ? t("git.unsupported") : t("git.count", { count: repos.length })} href={`/agents/${agent.id}/git`} disabled={away} />
         {/* Not on the board, which has no way to set the Budget yet; it saves with the name. */}
-        <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" footer={t("budget.footer")} />
+        <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" footer={t("budget.footer")} disabled={away} />
       </Section>
       {sent !== null && <Row title={t("saving")} accessory={<Spinner />} />}
       {tried && machineStatus.updateError && sent === null && <Note tone="warning">{describeError({ code: machineStatus.updateError })}</Note>}
       {machineStatus.deleteError && <Note tone="warning">{describeError({ code: machineStatus.deleteError })}</Note>}
-      <Section footer={t("delete.body")}>
-        <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} />
+      <Section footer={away ? t("away.deleteFooter", { machine: machine?.name }) : t("delete.body")}>
+        <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} disabled={away} />
       </Section>
     </Screen>
   );
