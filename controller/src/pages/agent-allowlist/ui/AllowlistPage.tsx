@@ -49,9 +49,7 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
   async function save(next: string[], prompt: string) {
     if (offline || !link || !machine) return false;
     Keyboard.dismiss();
-    let sent = false;
-    await keySession.withFreshAuthentication(prompt, () => void (sent = !!link.updateAgent(machine, { id: agentId, allowlist: next })));
-    return sent;
+    return (await keySession.signed(prompt, () => link.updateAgent(machine, { id: agentId, allowlist: next }))).status === "sent";
   }
 
   async function add() {

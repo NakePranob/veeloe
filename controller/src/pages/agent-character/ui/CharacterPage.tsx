@@ -1,10 +1,9 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, COLOR_NAMES, COLORS, DECALS, LookTile, lookOfJson, MoodTile, pick, SHELLS, shuffleLook, SIDES, Stage, Swatch, TOPS, type Look, type Mood } from "../../../entities/character";
-import { useMachines } from "../../../entities/machine";
-import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
+import { useAgentUpdate } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { Button, Card, HeaderAction, Note, Screen, space, Spinner, Text } from "../../../shared/ui";
 import { characterToSend } from "../model/to-send";
@@ -22,9 +21,6 @@ const PARTS = [
 ] as const;
 
 // A page opened from a link has the inbox underneath (the root layout's anchor), so there is always somewhere to go back to.
-/** How long a save waits for the Machine's answer before the page lets it go. */
-const SAVE_ANSWER_MS = 15_000;
-
 const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -40,37 +36,18 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
   const t = useT("agent-character");
-  const link = useMachineLink();
-  const machine = useMachines()?.find((m) => m.id === agent.machine_id);
-  const status = useMachineStatus(agent.machine_id);
   // Picking changes this draft only; Done sends it, and Cancel or a swipe drops it with the screen.
   const [draft, setDraft] = useState<Look>(() => lookOfJson(agent.character));
   // Only the slots touched go back changed, so a part this build does not know stays (ADR 0023).
   const [touched, setTouched] = useState<ReadonlySet<keyof Look>>(new Set());
-  // What went, kept as JSON: compared by the look this build draws from it.
-  const [sent, setSent] = useState<string | null>(null);
-  const [tried, setTried] = useState(false);
-  const [notSent, setNotSent] = useState(false);
+  // Closes once the Machine lists the new look (ADR 0006), compared by the look this build draws, and stays open on an error.
+  const save = useAgentUpdate(agent, {
+    landed: (row, sent) => JSON.stringify(lookOfJson(row.character)) === JSON.stringify(lookOfJson(JSON.stringify(sent.character))),
+    onLanded: close,
+  });
   // Which Mood the large head shows, picked from the row of Moods under it.
   const [preview, setPreview] = useState<Mood>("idle");
-  const offline = status.online === false || !link || notSent;
-
-  // Closes once the Machine lists the new look (ADR 0006), and stays open on an error.
-  useEffect(() => {
-    if (sent && JSON.stringify(lookOfJson(agent.character)) === JSON.stringify(lookOfJson(sent))) close();
-  }, [sent, agent.character]);
-  useEffect(() => {
-    if (status.updateError) setSent(null);
-  }, [status.updateError]);
-  // A send that found no link is tried again once the link or the Machine changes, and a save the Machine
-  // never answers, or one cut off by the Machine going away, is let go rather than locking the page.
-  useEffect(() => setNotSent(false), [link, status.online]);
-  useEffect(() => {
-    if (sent === null) return;
-    if (status.online === false) return setSent(null);
-    const timer = setTimeout(() => setSent(null), SAVE_ANSWER_MS);
-    return () => clearTimeout(timer);
-  }, [sent, status.online]);
+  const offline = save.offline;
 
   const choose = (slot: keyof Look, value: string) => {
     setDraft((look) => pick(look, slot, value));
@@ -79,11 +56,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
 
   function done() {
     if (touched.size === 0) return close();
-    if (!link || !machine) return;
-    const character = characterToSend(agent.character, draft, touched);
-    setTried(true);
-    if (!link.updateAgent(machine, { id: agent.id, character })) return setNotSent(true);
-    setSent(JSON.stringify(character));
+    save.send({ character: characterToSend(agent.character, draft, touched) });
   }
 
   // The parts it wears, under the head, as the board names them; an empty slot says nothing.
@@ -94,7 +67,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
   return (
     <Screen title={t("title")} subtitle={t("titleOf", { name: agent.name })}>
       <HeaderAction label={t("cancel")} placement="left" onPress={close} />
-      <HeaderAction label={t("done")} onPress={done} disabled={!!sent || offline} />
+      <HeaderAction label={t("done")} onPress={done} disabled={save.sending || offline} />
       {/* The head large on a stage of its colour under the header, the shuffle floating beside it, and the Moods to preview. */}
       <Stage color={draft.color} bleed>
         <View style={{ alignSelf: "stretch", alignItems: "center", gap: space.xs }}>
@@ -129,7 +102,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
           {t("offline")}
         </Note>
       )}
-      {sent && (
+      {save.sending && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }}>
           <Spinner />
           <Text variant="footnote" tone="secondary">
@@ -137,9 +110,9 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
           </Text>
         </View>
       )}
-      {tried && status.updateError && !sent && (
+      {save.error && (
         <Note icon="warning" iconColor="orange">
-          {describeError({ code: status.updateError })}
+          {describeError({ code: save.error })}
         </Note>
       )}
       <Group title={t("color")}>

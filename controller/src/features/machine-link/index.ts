@@ -2,3 +2,4 @@ export type { MachineStatus, MemoryStatus, ToolOutput, UsageStatus } from "./mod
 export { MAX_ATTACHMENT_BYTES } from "./model/downloads";
 export { useMachineLink, useMachineLinks, useMachineStatus, useMachineStatuses, useMemoryStatus, useToolOutput, useUsageStatus, useUsageStatuses } from "./model/use-machine-links";
 export { PUSH_READY, savePushEnabled, usePushEnabled } from "./model/push-setting";
+export { useAgentUpdate } from "./model/use-agent-update";

@@ -47,9 +47,7 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
   async function save(next: string[], prompt: string) {
     if (locked || !link || !machine) return false;
     Keyboard.dismiss();
-    let sent = false;
-    await keySession.withFreshAuthentication(prompt, () => void (sent = !!link.updateAgent(machine, { id: agentId, gitRepos: next })));
-    return sent;
+    return (await keySession.signed(prompt, () => link.updateAgent(machine, { id: agentId, gitRepos: next }))).status === "sent";
   }
 
   async function add() {

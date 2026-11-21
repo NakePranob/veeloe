@@ -26,9 +26,7 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
 
   async function change(next: string[], prompt: string) {
     if (!status.online || !link) return inform(t("egress.offline.title"), t("egress.offline.body", { machine: machine.name }));
-    let sent = false;
-    await keySession.withFreshAuthentication(prompt, () => void (sent = link.setEgress(machine, next, agent?.id)));
-    return sent;
+    return (await keySession.signed(prompt, () => link.setEgress(machine, next, agent?.id))).status === "sent";
   }
 
   async function add() {

@@ -30,19 +30,16 @@ export function ProviderSection({ machine, agents }: { machine: Machine; agents:
   async function save() {
     if (!link || busy) return;
     if (!key.trim() || (!chosen && (!name.trim() || !url.trim()))) return;
-    let sig: string | null = null;
     setBusy(true);
-    let authenticated = false;
+    let result;
     try {
-      authenticated = await keySession.withFreshAuthentication(t("provider.prompt", { machine: machine.name }), async () => {
-        sig = await link.addProvider(machine, { name: chosen?.id ?? name.trim(), url: chosen?.url ?? url.trim(), ...(chosen ? { preset: chosen.id } : {}), key });
-      });
+      result = await keySession.signed(t("provider.prompt", { machine: machine.name }), () => link.addProvider(machine, { name: chosen?.id ?? name.trim(), url: chosen?.url ?? url.trim(), ...(chosen ? { preset: chosen.id } : {}), key }));
     } finally {
       setBusy(false);
     }
     // A cancelled unlock sent nothing and needs no alert; only a send that failed after it does.
-    if (!authenticated) return;
-    if (!sig) return inform(t("provider.failed"), t("provider.failedBody"));
+    if (result.status === "cancelled") return;
+    if (result.status === "failed") return inform(t("provider.failed"), t("provider.failedBody"));
     close();
   }
 

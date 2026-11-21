@@ -163,3 +163,19 @@ test("an important action on an invalidated key does not run and reports lost", 
   expect(ran).toBe(false);
   expect(session.status()).toBe("lost");
 });
+
+test("signing never sends when the fresh authentication did not happen, and tells a failed send from a cancel", async () => {
+  const { session, state } = await unlocked();
+  let sends = 0;
+  const send = () => (++sends, "sig");
+  state.read = "refuse";
+  expect(await session.signed("p", send)).toEqual({ status: "cancelled" });
+  state.read = "lost";
+  expect(await session.signed("p", send)).toEqual({ status: "cancelled" });
+  expect(sends).toBe(0);
+  state.read = "ok";
+  expect(await session.signed("p", () => null)).toEqual({ status: "failed" });
+  expect(await session.signed("p", async () => false)).toEqual({ status: "failed" });
+  expect(await session.signed("p", send)).toEqual({ status: "sent", value: "sig" });
+  expect(sends).toBe(1);
+});

@@ -67,14 +67,12 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
         : allowAlways?.length
           ? t("authenticate.always", { entries: allowAlways.join(", ") })
           : t("authenticate.approve", { name: agentName });
-      let sig: string | null = null;
       setBusy(true);
       try {
-        await keySession.withFreshAuthentication(prompt, () => void (sig = onAnswer({ decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) })));
+        if ((await keySession.signed(prompt, () => onAnswer({ decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) }))).status === "sent") setSent(true);
       } finally {
         setBusy(false);
       }
-      if (sig) setSent(true);
       return;
     }
     const sig = onAnswer({ decision });

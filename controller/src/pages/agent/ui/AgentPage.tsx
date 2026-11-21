@@ -1,13 +1,13 @@
 import { randomUUID } from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Keyboard, View } from "react-native";
-import { APPROVAL_TIMEOUT_S_DEFAULT, APPROVAL_TIMEOUT_S_MAX, APPROVAL_TIMEOUT_S_MIN } from "@veeloe/protocol-ts";
+import { APPROVAL_TIMEOUT_S_DEFAULT } from "@veeloe/protocol-ts";
 import { allowlistOf, approvalTimeoutOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { previewOf, STATUS_DOT, statusOf, useTaskSummaries } from "../../../entities/task";
-import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
+import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatTokens, useNow, when } from "../../../shared/lib";
@@ -15,10 +15,6 @@ import { Button, Dot, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, 
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
-
-/** How long a save waits for the Machine's answer before the page lets it go. */
-const SAVE_ANSWER_MS = 15_000;
-
 
 // The Agent board: a stage in the Agent's colour with its head, name and two actions, then its Tasks,
 // today's Budget and its settings. The header keeps the save for the name and the Budget, where the board
@@ -35,15 +31,16 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const online = machineStatus.online;
   const tasks = (useTaskSummaries() ?? []).filter((task) => task.agent_id === agent.id);
   const [name, setName] = useState(agent.name);
-  // What the last save sent, so the page shows the Machine's values once they land (ADR 0006).
-  const [sent, setSent] = useState<{ name: string; budget?: number } | null>(null);
-  const [tried, setTried] = useState(false);
-  const [notSent, setNotSent] = useState(false);
+  // The page shows the Machine's values once a save lands (ADR 0006), and another device's change comes in the same way.
+  // A Machine older than `daily-budget` never says a Budget: its answer settles the save rather than spinning forever.
+  const update = useAgentUpdate<{ name: string; budget?: number }>(agent, {
+    landed: (row, sent) => row.name === sent.name && (sent.budget === undefined || row.budget === sent.budget || row.budget === null),
+  });
   // Set before the confirm, so a second tap cannot ask or delete twice.
   const [removing, setRemoving] = useState(false);
   // How long an Approval waits, as the Machine last said (ADR 0030).
   const approvalSeconds = approvalTimeoutOf(agent) ?? APPROVAL_TIMEOUT_S_DEFAULT;
-  const offline = online === false || !link || notSent;
+  const offline = update.offline;
   // The Agent-Offline board: its Machine is away, so nothing runs and nothing about the Agent can change (ADR 0006).
   // Its Tasks still open to read, and a new Task's first message waits for the Machine.
   const away = online === false;
@@ -58,13 +55,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
   // A tally from a day the Machine has moved past shows as of that day, never as today's or used up.
   const stale = staleUsage(agent, useAgents() ?? []);
   // One save for the name and the Budget: the header's button. An unchanged Budget is left out, and an invalid one disables it.
-  const canSave = !!name.trim() && (dirty || budgetChanged) && (!budgetChanged || budgetValid) && !offline && sent === null;
+  const canSave = !!name.trim() && (dirty || budgetChanged) && (!budgetChanged || budgetValid) && !offline && !update.sending;
 
-  // The values shown are the Machine's (ADR 0006), and another device's change comes in the same way.
-  // A Machine older than `daily-budget` never says a Budget: its answer settles the save rather than spinning forever.
-  useEffect(() => {
-    if (sent !== null && agent.name === sent.name && (sent.budget === undefined || agent.budget === sent.budget || agent.budget === null)) setSent(null);
-  }, [sent, agent.name, agent.budget]);
   // A name not being edited follows the Machine's.
   const [shown, setShown] = useState(agent.name);
   if (shown !== agent.name) {
@@ -74,30 +66,15 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const [shownBudget, setShownBudget] = useState(agent.budget);
   if (shownBudget !== agent.budget) {
     setShownBudget(agent.budget);
-    if (sent === null) setBudgetText(agent.budget !== null ? String(agent.budget / 1_000_000) : "");
+    if (!update.sending) setBudgetText(agent.budget !== null ? String(agent.budget / 1_000_000) : "");
   }
-  useEffect(() => {
-    if (machineStatus.updateError) setSent(null);
-  }, [machineStatus.updateError]);
-  // A send that found no link is tried again once the link or the Machine changes, and a save the Machine
-  // never answers, or one cut off by the Machine going away, is let go rather than locking the page.
-  useEffect(() => setNotSent(false), [link, online]);
-  useEffect(() => {
-    if (sent === null) return;
-    if (online === false) return setSent(null);
-    const timer = setTimeout(() => setSent(null), SAVE_ANSWER_MS);
-    return () => clearTimeout(timer);
-  }, [sent, online]);
-
   function save() {
     const next = name.trim();
-    if (!next || !link || !machine || !canSave) return;
+    if (!next || !canSave) return;
     Keyboard.dismiss();
-    setTried(true);
     const budget = budgetChanged && budgetValid ? budgetTokens : undefined;
     // A Budget that did not change is not sent, so a rename alone stays a rename; both go in one envelope when both change.
-    if (!link.updateAgent(machine, { id: agent.id, name: next, ...(budget !== undefined && { budget }) })) return setNotSent(true);
-    setSent({ name: next, ...(budget !== undefined && { budget }) });
+    update.send({ name: next, ...(budget !== undefined && { budget }) });
   }
 
   const newTask = () => router.push({ pathname: "/tasks/[task]", params: { task: randomUUID(), agent: agent.id } });
@@ -106,19 +83,16 @@ function AgentView({ agent }: { agent: AgentRow }) {
     if (removing) return;
     if (!link || !machine || offline) return inform(t("delete.failed"), t("needsOnline"));
     setRemoving(true);
-    let sig: string | null = null;
-    let authenticated = false;
+    let result;
     try {
       if (!(await confirm({ title: t("delete.title", { name: agent.name }), message: t("delete.body"), action: t("delete.action"), cancel: t("delete.cancel", { name: agent.name }), destructive: true }))) return;
-      authenticated = await keySession.withFreshAuthentication(t("delete.prompt", { name: agent.name }), async () => {
-        sig = link.deleteAgent(machine, agent.id);
-      });
+      result = await keySession.signed(t("delete.prompt", { name: agent.name }), () => link.deleteAgent(machine, agent.id));
     } finally {
       setRemoving(false);
     }
     // A cancelled unlock sent nothing and needs no alert; only a send that failed after it does.
-    if (!authenticated) return;
-    if (!sig) inform(t("delete.failed"), t("needsOnline"));
+    if (result.status === "cancelled") return;
+    if (result.status === "failed") inform(t("delete.failed"), t("needsOnline"));
     else router.replace("/");
   }
 
@@ -225,8 +199,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
         {/* Not on the board, which has no way to set the Budget yet; it saves with the name. */}
         <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" footer={t("budget.footer")} disabled={away} />
       </Section>
-      {sent !== null && <Row title={t("saving")} accessory={<Spinner />} />}
-      {tried && machineStatus.updateError && sent === null && <Note tone="warning">{describeError({ code: machineStatus.updateError })}</Note>}
+      {update.sending && <Row title={t("saving")} accessory={<Spinner />} />}
+      {update.error && <Note tone="warning">{describeError({ code: update.error })}</Note>}
       {machineStatus.deleteError && <Note tone="warning">{describeError({ code: machineStatus.deleteError })}</Note>}
       <Section footer={away ? t("away.deleteFooter", { machine: machine?.name }) : t("delete.body")}>
         <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} disabled={away || removing} />

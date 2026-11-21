@@ -120,5 +120,17 @@ export function createKeySession({ vault, now, generate }: { vault: Vault; now: 
         key.fill(0);
       }
     },
+
+    /**
+     * Sign and send after a fresh authentication (ADR 0012). `send` runs only once it happened, and says what
+     * went, or null/false when nothing did: so a cancelled unlock stays silent and only a failed send is reported.
+     */
+    async signed<T>(prompt: string, send: () => T | null | false | undefined | Promise<T | null | false | undefined>): Promise<Signed<T>> {
+      let value: T | null | false | undefined = null;
+      if (!(await this.withFreshAuthentication(prompt, async () => void (value = await send())))) return { status: "cancelled" };
+      return value === null || value === false || value === undefined ? { status: "failed" } : { status: "sent", value };
+    },
   };
 }
+
+export type Signed<T> = { status: "cancelled" } | { status: "failed" } | { status: "sent"; value: T };
