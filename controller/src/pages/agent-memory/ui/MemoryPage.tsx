@@ -20,9 +20,9 @@ export function MemoryPage() {
   const now = useNow();
   const link = useMachineLink();
   const agents = useAgents();
-  const machines = useMachines() ?? [];
+  const machines = useMachines();
   const agent = agents?.find((row) => row.id === agentParam);
-  const machine = machines.find((row) => row.id === agent?.machine_id);
+  const machine = machines?.find((row) => row.id === agent?.machine_id);
   const machineStatus = useMachineStatus(machine?.id ?? "");
   const status = useMemoryStatus(machine?.id ?? "", agent?.id ?? "");
   const online = machineStatus.online;
@@ -36,7 +36,7 @@ export function MemoryPage() {
     if (link && machine && agent && online !== false) link.requestMemory(machine, agent.id);
   }, [link, machine?.id, agent?.id, online]);
 
-  if (agents && (!agent || !machine)) {
+  if (agents && machines && (!agent || !machine)) {
     return (
       <Screen title={t("title")}>
         <Empty icon="memory" title={t("missing.title")} detail={t("missing.body")} />

@@ -22,6 +22,9 @@ const PARTS = [
 ] as const;
 
 // A page opened from a link has the inbox underneath (the root layout's anchor), so there is always somewhere to go back to.
+/** How long a save waits for the Machine's answer before the page lets it go. */
+const SAVE_ANSWER_MS = 15_000;
+
 const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -59,6 +62,15 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
   useEffect(() => {
     if (status.updateError) setSent(null);
   }, [status.updateError]);
+  // A send that found no link is tried again once the link or the Machine changes, and a save the Machine
+  // never answers, or one cut off by the Machine going away, is let go rather than locking the page.
+  useEffect(() => setNotSent(false), [link, status.online]);
+  useEffect(() => {
+    if (sent === null) return;
+    if (status.online === false) return setSent(null);
+    const timer = setTimeout(() => setSent(null), SAVE_ANSWER_MS);
+    return () => clearTimeout(timer);
+  }, [sent, status.online]);
 
   const choose = (slot: keyof Look, value: string) => {
     setDraft((look) => pick(look, slot, value));

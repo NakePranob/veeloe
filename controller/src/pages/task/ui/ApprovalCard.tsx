@@ -6,6 +6,7 @@ import { keySession } from "../../../shared/keystore";
 import { fromNow } from "../../../shared/lib";
 import { AgentCard, Character, type Look } from "../../../entities/character";
 import { Button, Card, Field, font, Icon, Inset, Label, radius, space, Text, type IconName } from "../../../shared/ui";
+import { canAllowAlways } from "../model/allow-always";
 import type { Approval, ApprovalStatus } from "../model/items";
 
 interface Props {
@@ -50,6 +51,8 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   // Member means. Each is checked against the part it came from, not the whole command (ADR 0030).
   const [entries, setEntries] = useState<{ entry: string; part: string }[] | null>(null);
   const [sent, setSent] = useState(false);
+  // An answer waiting on the fresh unlock, so a second tap cannot sign it twice.
+  const [busy, setBusy] = useState(false);
   // The rarer answers wait behind the board's one "Other options" link.
   const [more, setMore] = useState(false);
   const dark = useColorScheme() === "dark";
@@ -57,7 +60,7 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
 
   // Answering takes a fresh unlock, so a phone left open cannot approve (ADR 0012).
   async function respond(decision: "approve" | "deny" | "always", allowAlways?: string[]) {
-    if (sent) return;
+    if (sent || busy) return;
     if (decision === "approve" || decision === "always") {
       const prompt = domain
         ? t(decision === "always" ? "authenticate.domainAlways" : "authenticate.domain", { domain: approval.domain ?? "", name: agentName })
@@ -65,7 +68,12 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
           ? t("authenticate.always", { entries: allowAlways.join(", ") })
           : t("authenticate.approve", { name: agentName });
       let sig: string | null = null;
-      await keySession.withFreshAuthentication(prompt, () => void (sig = onAnswer({ decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) })));
+      setBusy(true);
+      try {
+        await keySession.withFreshAuthentication(prompt, () => void (sig = onAnswer({ decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) })));
+      } finally {
+        setBusy(false);
+      }
       if (sig) setSent(true);
       return;
     }
@@ -74,10 +82,8 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   }
 
   async function allowAlways() {
-    if (!entries) return;
-    const cleaned = entries.map((item) => item.entry.trim()).filter(Boolean);
-    if (cleaned.length === 0) return;
-    await respond("approve", cleaned);
+    if (!entries || !canAllowAlways(entries)) return;
+    await respond("approve", entries.map((item) => item.entry.trim()));
   }
 
   const outcome = open ? null : OUTCOME[approval.status as Exclude<ApprovalStatus, "open">];
@@ -157,10 +163,10 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
         <>
           <View style={{ alignSelf: "stretch", flexDirection: "row", gap: space.sm }}>
             <View style={{ flex: 1 }}>
-              <Button size="large" label={t(domain ? "approval.allowOnce" : "approval.approve")} variant="primary" disabled={!online} onPress={() => void respond("approve")} />
+              <Button size="large" label={t(domain ? "approval.allowOnce" : "approval.approve")} variant="primary" disabled={!online || busy} onPress={() => void respond("approve")} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button size="large" label={t("approval.deny")} variant="surface" disabled={!online} onPress={() => void respond("deny")} />
+              <Button size="large" label={t("approval.deny")} variant="surface" disabled={!online || busy} onPress={() => void respond("deny")} />
             </View>
           </View>
           {/* The board's expiry line; the rarer answers sit behind its link, as on the board. */}
@@ -169,7 +175,7 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
             {domain && canManage && (
               <>
                 <Dot />
-                <Link label={t("approval.allowAlways")} disabled={!online} onPress={() => void respond("always")} />
+                <Link label={t("approval.allowAlways")} disabled={!online || busy} onPress={() => void respond("always")} />
               </>
             )}
             {!domain && !more && (
@@ -208,7 +214,7 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
           ))}
           <View style={{ flexDirection: "row", gap: space.sm }}>
             <View style={{ flex: 1 }}>
-              <Button size="large" label={t("approval.signAndApprove")} variant="primary" disabled={!online} onPress={() => void allowAlways()} />
+              <Button size="large" label={t("approval.signAndApprove")} variant="primary" disabled={!online || busy || !canAllowAlways(entries)} onPress={() => void allowAlways()} />
             </View>
             <View style={{ flex: 1 }}>
               <Button size="large" label={t("approval.cancel")} onPress={() => setEntries(null)} />

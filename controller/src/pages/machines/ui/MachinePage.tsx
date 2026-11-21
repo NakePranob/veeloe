@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { useAgents } from "../../../entities/agent";
+import { staleUsage, useAgents } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { latestEvents, statusOf, useTaskSummaries } from "../../../entities/task";
@@ -21,7 +21,8 @@ type Part = "agent" | "provider" | "egress" | "info";
 export function MachinePage() {
   const t = useT("machines");
   const { machine: id } = useLocalSearchParams<{ machine: string }>();
-  const machine = useMachines()?.find((m) => m.id === id);
+  const machines = useMachines();
+  const machine = machines?.find((m) => m.id === id);
   const agents = (useAgents() ?? []).filter((a) => a.machine_id === id);
   const tasks = useTaskSummaries() ?? [];
   const status = useMachineStatus(id);
@@ -34,7 +35,7 @@ export function MachinePage() {
   if (!machine) {
     return (
       <Screen title="Machine">
-        <Empty icon="machine" title={t("missing.title")} detail={t("missing.body")} />
+        {machines && <Empty icon="machine" title={t("missing.title")} detail={t("missing.body")} />}
       </Screen>
     );
   }
@@ -43,7 +44,7 @@ export function MachinePage() {
   const lines: AgentLine[] = ordered(
     agents.map((agent) => {
       const task = tasks.find((s) => s.agent_id === agent.id);
-      return { agent, status: statusOf(task, status.online), mood: moodOf(task ? latestEvents(task) : [], status.online), share: shareOf(agent.usage_tokens, agent.budget) };
+      return { agent, status: statusOf(task, status.online), mood: moodOf(task ? latestEvents(task) : [], status.online), share: staleUsage(agent, agents) ? null : shareOf(agent.usage_tokens, agent.budget) };
     }),
   );
   const counts = countsOf(lines);

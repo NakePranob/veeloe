@@ -50,7 +50,8 @@
     "used": "ใช้ไป",
     "of": "{{used}} / {{window}} tokens",
     "compactAt": "ย่อเมื่อถึง",
-    "threshold": "{{tokens}} tokens"
+    "threshold": "{{tokens}} tokens",
+    "a11y": "ใช้ context window ไป {{percent}}%"
   },
   "budget": {
     "out": "Budget ของวันนี้หมดแล้ว",

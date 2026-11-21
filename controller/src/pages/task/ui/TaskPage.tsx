@@ -19,6 +19,8 @@ import { ApprovalCard } from "./ApprovalCard";
 import { ContextMeter } from "./ContextMeter";
 import { ChangesRow, ToolCalls } from "./ToolCalls";
 
+/** How close to the end of the log, in points, still counts as reading the end. */
+const FOLLOW_END_PT = 80;
 
 function FailedCard({ code, agentName }: { code: string; agentName: string }) {
   const t = useT("task");
@@ -207,7 +209,8 @@ export function TaskPage() {
   // Sending, Stop and settings need the Agent itself; the history does not.
   const row = useTaskRow(task)?.[0];
   const agent = found ?? placeholderAgent(agentId, gone?.machine_id ?? row?.machine_id, gone?.name ?? t("deletedAgent"));
-  const machine = useMachines()?.find((m) => m.id === agent.machine_id);
+  const machines = useMachines();
+  const machine = machines?.find((m) => m.id === agent.machine_id);
   const readOnly = !found;
   const status = useMachineStatus(machine?.id ?? "");
   const link = useMachineLink();
@@ -223,10 +226,15 @@ export function TaskPage() {
   const input = useRef<TextInputInstance>(null);
   const scroll = useRef<ScrollViewInstance>(null);
   const viewport = useRef(0);
+  // Whether the reader is at the end of the log, so new content follows only then.
+  const atEnd = useRef(true);
+  // Set before the first await, so a second tap while files upload cannot send twice.
+  const [sending, setSending] = useState(false);
 
   // Until both lists land, neither "an Agent" nor "a deleted Agent" is known yet:
   // showing the deleted state here would flash a wrong name and no composer.
-  if (!agents || !trashedAgents || !machine || !events || !pending) return <Stack.Screen options={{ title: t("title") }} />;
+  // A Machine no longer paired (or a deleted Agent's unknown one) still shows the log, read from the device.
+  if (!agents || !trashedAgents || !machines || !events || !pending) return <Stack.Screen options={{ title: t("title") }} />;
   const { items: shown, working } = items(events, now);
   const message = text.trim();
   // The command running now, when there is one, for the working line.
@@ -241,11 +249,12 @@ export function TaskPage() {
   const isStopping = stopAsked && busy && !status.stopError;
 
   async function send(text = message) {
-    if ((!text && attachments.length === 0) || !link || !machine || readOnly) return;
+    if ((!text && attachments.length === 0) || !link || !machine || readOnly || sending) return;
     const files = attachments;
     const words = text;
     Keyboard.dismiss();
     setSendProblem(null);
+    setSending(true);
     const sent = [];
     try {
       for (const file of files) {
@@ -255,11 +264,18 @@ export function TaskPage() {
       }
     } catch (problem) {
       setSendProblem(problem instanceof Error ? problem.message : "attachment.invalid");
+      setSending(false);
       return;
     }
     setText("");
     setAttachments([]);
-    void link.sendMessage(machine, { agent: agent.id, task, text: words || t("attachedOnly"), attachments: sent });
+    try {
+      await link.sendMessage(machine, { agent: agent.id, task, text: words || t("attachedOnly"), attachments: sent });
+    } catch (problem) {
+      setSendProblem(problem instanceof Error ? problem.message : "hub.machine_offline");
+    } finally {
+      setSending(false);
+    }
   }
 
   async function attach() {
@@ -316,7 +332,7 @@ export function TaskPage() {
                   </Text>
                   {taskStatus === "new" ? (
                     <Text variant="caption" tone="secondary" numberOfLines={1}>
-                      {t("newSubtitle", { name: agent.name, machine: machine.name })}
+                      {t("newSubtitle", { name: agent.name, machine: machine?.name ?? "" })}
                     </Text>
                   ) : taskStatus === "waiting" ? (
                     <Text variant="caption" tone="secondary" numberOfLines={1}>
@@ -348,9 +364,14 @@ export function TaskPage() {
           viewport.current = event.nativeEvent.layout.height;
         }}
         // Only when there is more than fits: on iOS, scrolling a short page to its end slides it under the header.
+        // And only while the reader is at the end, so new content never pulls them away from what they scrolled up to read.
         onContentSizeChange={(_, height) => {
-          if (height > viewport.current) scroll.current?.scrollToEnd({ animated: false });
+          if (height > viewport.current && atEnd.current) scroll.current?.scrollToEnd({ animated: false });
         }}
+        onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+          atEnd.current = contentSize.height - contentOffset.y - layoutMeasurement.height < FOLLOW_END_PT;
+        }}
+        scrollEventThrottle={16}
         // The end of the log rests clear of the fade.
         contentContainerStyle={[column, { flexGrow: 1, justifyContent: "flex-end", paddingHorizontal: 18, paddingTop: space.lg, paddingBottom: FADE, gap: 14 }]}
       >
@@ -402,11 +423,11 @@ export function TaskPage() {
           ) : item.kind === "file" ? (
             <FileCard key={item.key} item={item} onOpen={() => (link && machine ? link.openFile(machine, task, agent.id, item.path, item.hash, item.name) : Promise.reject(new Error("hub.machine_offline")))} />
           ) : item.kind === "interrupted" ? (
-            <InterruptedCard key={item.key} machine={machine.name} agentName={agent.name} readOnly={readOnly} onContinue={() => send(t("interrupted.continueMessage"))} />
+            <InterruptedCard key={item.key} machine={machine?.name ?? ""} agentName={agent.name} readOnly={readOnly} onContinue={() => send(t("interrupted.continueMessage"))} />
           ) : item.kind === "time" ? (
             <Separator key={item.key} at={item.at} now={now} />
           ) : item.code === "budget.exhausted" ? (
-            <BudgetCard key={item.key} machine={machine.name} agent={agent} readOnly={readOnly} />
+            <BudgetCard key={item.key} machine={machine?.name ?? ""} agent={agent} readOnly={readOnly} />
           ) : (
             <FailedCard key={item.key} code={item.code} agentName={agent.name} />
           ),
@@ -507,7 +528,7 @@ export function TaskPage() {
                 {busy && !message ? (
                   <Button label={isStopping ? t("stop.stopping") : t("stop.button")} icon="stopped" variant="primary" size="large" disabled={status.online === false || !link || isStopping} onPress={() => void stop()} />
                 ) : (
-                  <Button label={t("send")} icon="send" variant="primary" size="large" disabled={(!message && attachments.length === 0) || !link || status.online === false} onPress={() => void send()} />
+                  <Button label={t("send")} icon="send" variant="primary" size="large" disabled={(!message && attachments.length === 0) || !link || !machine || sending || status.online === false} onPress={() => void send()} />
                 )}
               </View>
             </Card>

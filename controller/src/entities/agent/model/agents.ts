@@ -25,6 +25,17 @@ export type AgentRow = {
   git_repos: string | null;
 };
 
+/**
+ * True when the Agent's tally is from a day its Machine has moved past, so it is not today's (ADR 0043).
+ * The day is the Machine's own, which the Controller cannot work out from its clock: a newer day on any
+ * other Agent of the same Machine is the proof. ponytail: a Machine where no Agent has worked today yet still
+ * shows yesterday's tally; that needs the Machine to say its day (e.g. in `machine.status`).
+ */
+export function staleUsage(agent: Pick<AgentRow, "machine_id" | "usage_day">, agents: readonly Pick<AgentRow, "machine_id" | "usage_day">[]): boolean {
+  const day = agent.usage_day;
+  return day !== null && agents.some((other) => other.machine_id === agent.machine_id && other.usage_day !== null && other.usage_day > day);
+}
+
 /** The Approval timeout the Machine last sent, in seconds, or null when it never sent one. */
 export function approvalTimeoutOf(row: Pick<AgentRow, "approval_timeout_s">): number | null {
   return typeof row.approval_timeout_s === "number" ? row.approval_timeout_s : null;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import type React from "react";
-import { useAgents } from "../../../entities/agent";
+import { staleUsage, useAgents } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines, type Machine } from "../../../entities/machine";
 import { latestEvents, previewOf, useTaskSummaries } from "../../../entities/task";
@@ -236,7 +236,8 @@ export function UsagePage() {
                     key={agent.id}
                     title={agent.name}
                     used={agent.usage_tokens ?? 0}
-                    limit={agent.budget}
+                    // Yesterday's tally against today's Budget would say it is used up when it is not.
+                    limit={staleUsage(agent, agents) ? null : agent.budget}
                     line={list.find((m) => m.id === agent.machine_id)?.name ?? ""}
                     leading={<Character look={lookOfJson(agent.character)} mood={moodOf(latestOf(summaries.find((task) => task.agent_id === agent.id)), machineStatuses[agent.machine_id]?.online ?? null)} size={32} />}
                     href={`/agents/${agent.id}`}

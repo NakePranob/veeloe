@@ -14,12 +14,14 @@ import { Button, confirm, Empty, Field, Icon, inform, Note, Row, Screen, Section
 export function AllowlistPage() {
   const t = useT("agent-allowlist");
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
-  const agent = useAgents()?.find((a) => a.id === id);
-  const machine = useMachines()?.find((m) => m.id === agent?.machine_id);
+  const agents = useAgents();
+  const machines = useMachines();
+  const agent = agents?.find((a) => a.id === id);
+  const machine = machines?.find((m) => m.id === agent?.machine_id);
   if (!agent || !machine) {
     return (
       <Screen title={t("title")}>
-        <Empty icon="shield" title={t("missing.title")} detail={t("missing.body")} />
+        {agents && machines && <Empty icon="shield" title={t("missing.title")} detail={t("missing.body")} />}
       </Screen>
     );
   }

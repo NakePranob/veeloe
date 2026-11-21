@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "bun:test";
 import type { Agent } from "@veeloe/protocol-ts";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { allowlistOf, approvalTimeoutOf, egressOf, saveAgents, saveUsage } from "./agents";
+import { allowlistOf, approvalTimeoutOf, egressOf, saveAgents, saveUsage, staleUsage } from "./agents";
 
 // Real SQL on bun:sqlite, behind the few methods expo-sqlite gives the app.
 function connect(): Connection {
@@ -182,4 +182,14 @@ test("an answer that lists an Agent as in use takes it out of the trash", async 
   await saveAgents(database, "machine-1", [], [{ ...agent, deletedAt: 1, restoreUntil: 2 }]);
   await saveAgents(database, "machine-1", [agent], [{ ...agent, deletedAt: 1, restoreUntil: 2 }]);
   expect(await trashRow("a1")).toBeUndefined();
+});
+
+test("a tally is stale only once another Agent of the same Machine has a newer day", () => {
+  const today = { machine_id: "m1", usage_day: "2026-11-21" };
+  const yesterday = { machine_id: "m1", usage_day: "2026-11-20" };
+  const elsewhere = { machine_id: "m2", usage_day: "2026-11-22" };
+  expect(staleUsage(yesterday, [today, yesterday, elsewhere])).toBe(true);
+  expect(staleUsage(today, [today, yesterday, elsewhere])).toBe(false);
+  expect(staleUsage(yesterday, [yesterday, elsewhere])).toBe(false);
+  expect(staleUsage({ machine_id: "m1", usage_day: null }, [today])).toBe(false);
 });

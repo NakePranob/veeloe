@@ -50,7 +50,8 @@
     "used": "Used",
     "of": "{{used}} / {{window}} tokens",
     "compactAt": "Compacts at",
-    "threshold": "{{tokens}} tokens"
+    "threshold": "{{tokens}} tokens",
+    "a11y": "{{percent}}% of the context window used"
   },
   "budget": {
     "out": "Today's Budget is used up",

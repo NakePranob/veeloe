@@ -29,7 +29,7 @@ export function Tabs<T extends string>({ items, value, onChange }: { items: Tab<
               {shown &&
                 (item.urgent ? (
                   <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.orange }}>
-                    <Text variant="caption" strong style={{ fontSize: 11, color: colors.label }}>
+                    <Text variant="caption" strong style={{ fontSize: 11, color: colors.onOrange }}>
                       {item.count}
                     </Text>
                   </View>

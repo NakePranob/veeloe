@@ -76,8 +76,9 @@ export function Button({ label, onPress, variant = "chip", icon, disabled, size 
       style={size === "large" ? { alignSelf: "stretch" } : undefined}
     >
       {({ pressed }) => {
-        // A ghost button has nothing behind it until it is pressed.
-        const background = inked ? colors.accent : pressed ? colors.chipPressed : ghost ? "transparent" : (variant === "surface" || variant === "destructive" || onCard) && !disabled ? colors.surface : colors.chip;
+        // A ghost button has nothing behind it until it is pressed. On a card a disabled one keeps its white,
+        // since the chip grey is the card's own and the button would vanish; only its words fade.
+        const background = inked ? colors.accent : pressed ? colors.chipPressed : ghost ? "transparent" : onCard || ((variant === "surface" || variant === "destructive") && !disabled) ? colors.surface : colors.chip;
         const large = size === "large";
         const side = floating ? 48 : size === "small" ? 32 : large ? (icon ? 44 : 50) : 44;
         return (

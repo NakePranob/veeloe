@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
-import { useAgents, useTrashedAgents, type AgentTrashRow } from "../../../entities/agent";
+import { staleUsage, useAgents, useTrashedAgents, type AgentTrashRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, RETIRED_COLOR } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { STATUS_DOT, statusOf, useTaskSummaries } from "../../../entities/task";
@@ -69,7 +69,8 @@ export function AgentsPage() {
                 // Summaries come newest first, so the first is what the Agent did last.
                 const latest = summaries.find((task) => task.agent_id === agent.id);
                 const status = statusOf(latest, online);
-                const spent = !!agent.budget && (agent.usage_tokens ?? 0) >= agent.budget && online !== false;
+                // Yesterday's tally is not today's, so it never says the Budget is used up.
+                const spent = !!agent.budget && !staleUsage(agent, own) && (agent.usage_tokens ?? 0) >= agent.budget && online !== false;
                 const loud = spent || status === "waiting";
                 return (
                   <Tap key={agent.id} href={`/agents/${agent.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 7, paddingHorizontal: 10 }}>

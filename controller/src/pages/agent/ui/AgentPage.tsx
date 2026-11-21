@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { APPROVAL_TIMEOUT_S_DEFAULT, APPROVAL_TIMEOUT_S_MAX, APPROVAL_TIMEOUT_S_MIN } from "@veeloe/protocol-ts";
-import { allowlistOf, approvalTimeoutOf, gitReposOf, useAgents, type AgentRow } from "../../../entities/agent";
+import { allowlistOf, approvalTimeoutOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { previewOf, STATUS_DOT, statusOf, useTaskSummaries } from "../../../entities/task";
@@ -15,6 +15,9 @@ import { Button, Dot, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, 
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
+
+/** How long a save waits for the Machine's answer before the page lets it go. */
+const SAVE_ANSWER_MS = 15_000;
 
 
 // The Agent board: a stage in the Agent's colour with its head, name and two actions, then its Tasks,
@@ -36,6 +39,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const [sent, setSent] = useState<{ name: string; budget?: number } | null>(null);
   const [tried, setTried] = useState(false);
   const [notSent, setNotSent] = useState(false);
+  // Set before the confirm, so a second tap cannot ask or delete twice.
+  const [removing, setRemoving] = useState(false);
   // How long an Approval waits, as the Machine last said (ADR 0030).
   const approvalSeconds = approvalTimeoutOf(agent) ?? APPROVAL_TIMEOUT_S_DEFAULT;
   const offline = online === false || !link || notSent;
@@ -50,6 +55,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const { tokens: budgetTokens, valid: budgetValid } = budgetOf(budgetText);
   const budgetChanged = agent.budget === null ? budgetValid : budgetTokens !== agent.budget;
   const share = agent.budget ? Math.min(1, (agent.usage_tokens ?? 0) / agent.budget) : 0;
+  // A tally from a day the Machine has moved past shows as of that day, never as today's or used up.
+  const stale = staleUsage(agent, useAgents() ?? []);
   // One save for the name and the Budget: the header's button. An unchanged Budget is left out, and an invalid one disables it.
   const canSave = !!name.trim() && (dirty || budgetChanged) && (!budgetChanged || budgetValid) && !offline && sent === null;
 
@@ -72,6 +79,15 @@ function AgentView({ agent }: { agent: AgentRow }) {
   useEffect(() => {
     if (machineStatus.updateError) setSent(null);
   }, [machineStatus.updateError]);
+  // A send that found no link is tried again once the link or the Machine changes, and a save the Machine
+  // never answers, or one cut off by the Machine going away, is let go rather than locking the page.
+  useEffect(() => setNotSent(false), [link, online]);
+  useEffect(() => {
+    if (sent === null) return;
+    if (online === false) return setSent(null);
+    const timer = setTimeout(() => setSent(null), SAVE_ANSWER_MS);
+    return () => clearTimeout(timer);
+  }, [sent, online]);
 
   function save() {
     const next = name.trim();
@@ -87,12 +103,21 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const newTask = () => router.push({ pathname: "/tasks/[task]", params: { task: randomUUID(), agent: agent.id } });
 
   async function remove() {
+    if (removing) return;
     if (!link || !machine || offline) return inform(t("delete.failed"), t("needsOnline"));
-    if (!(await confirm({ title: t("delete.title", { name: agent.name }), message: t("delete.body"), action: t("delete.action"), cancel: t("delete.cancel", { name: agent.name }), destructive: true }))) return;
+    setRemoving(true);
     let sig: string | null = null;
-    await keySession.withFreshAuthentication(t("delete.prompt", { name: agent.name }), async () => {
-      sig = link.deleteAgent(machine, agent.id);
-    });
+    let authenticated = false;
+    try {
+      if (!(await confirm({ title: t("delete.title", { name: agent.name }), message: t("delete.body"), action: t("delete.action"), cancel: t("delete.cancel", { name: agent.name }), destructive: true }))) return;
+      authenticated = await keySession.withFreshAuthentication(t("delete.prompt", { name: agent.name }), async () => {
+        sig = link.deleteAgent(machine, agent.id);
+      });
+    } finally {
+      setRemoving(false);
+    }
+    // A cancelled unlock sent nothing and needs no alert; only a send that failed after it does.
+    if (!authenticated) return;
     if (!sig) inform(t("delete.failed"), t("needsOnline"));
     else router.replace("/");
   }
@@ -170,13 +195,13 @@ function AgentView({ agent }: { agent: AgentRow }) {
                 {t("budget.label")}
               </Text>
               <Text variant="caption" tone="body">
-                {away && machine?.usage_fetched_at ? t("budget.asOf", { when: when(machine.usage_fetched_at, language, now) }) : t("budget.perDay", { budget: formatTokens(agent.budget) })}
+                {stale && agent.usage_day ? t("budget.asOf", { when: agent.usage_day }) : away && machine?.usage_fetched_at ? t("budget.asOf", { when: when(machine.usage_fetched_at, language, now) }) : t("budget.perDay", { budget: formatTokens(agent.budget) })}
               </Text>
             </View>
           }
           value={formatTokens(agent.usage_tokens ?? 0)}
-          unit={`${t("budget.used", { percent: Math.round(share * 100) })}${share >= 1 ? t("budget.spent") : ""}`}
-          detail={<Meter value={share} label={t("budget.label")} />}
+          unit={`${t("budget.used", { percent: Math.round(share * 100) })}${share >= 1 && !stale ? t("budget.spent") : ""}`}
+          detail={stale ? undefined : <Meter value={share} label={t("budget.label")} />}
         />
       )}
 
@@ -204,7 +229,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
       {tried && machineStatus.updateError && sent === null && <Note tone="warning">{describeError({ code: machineStatus.updateError })}</Note>}
       {machineStatus.deleteError && <Note tone="warning">{describeError({ code: machineStatus.deleteError })}</Note>}
       <Section footer={away ? t("away.deleteFooter", { machine: machine?.name }) : t("delete.body")}>
-        <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} disabled={away} />
+        <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} disabled={away || removing} />
       </Section>
     </Screen>
   );
@@ -213,11 +238,13 @@ function AgentView({ agent }: { agent: AgentRow }) {
 export function AgentPage() {
   const t = useT("agent");
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
-  const agent = useAgents()?.find((a) => a.id === id);
+  const agents = useAgents();
+  const agent = agents?.find((a) => a.id === id);
   if (!agent) {
+    // Nothing until the list lands, so a slow read never flashes "missing".
     return (
       <Screen title="Agent">
-        <Empty icon="agent" title={t("missing.title")} detail={t("missing.body")} />
+        {agents && <Empty icon="agent" title={t("missing.title")} detail={t("missing.body")} />}
       </Screen>
     );
   }

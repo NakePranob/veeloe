@@ -5,10 +5,13 @@ import type { Machine } from "../../../entities/machine";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
 import { startHubClient } from "../../../shared/hub-client";
+import * as agentModel from "../../../entities/agent/model/agents";
+import * as allowlistModel from "../../../entities/agent/model/allowlist";
 
 // The entities' public API also brings their React hooks and expo-sqlite, which Bun cannot load.
 // Their models are plain code, so the test reads those.
-mock.module("../../../entities/agent", () => import("../../../entities/agent/model/agents"));
+// Agent's whole plain API, in a plain factory: allow-always.test mocks the same module, and two async factories hang Bun.
+mock.module("../../../entities/agent", () => ({ ...agentModel, ...allowlistModel }));
 mock.module("../../../entities/task", () => import("../../../entities/task/model/tasks"));
 mock.module("../../../entities/machine", () => import("../../../entities/machine/model/machines"));
 mock.module("../../../entities/device", () => import("../../../entities/device/model/devices"));

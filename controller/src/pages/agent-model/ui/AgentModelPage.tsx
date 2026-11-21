@@ -8,6 +8,9 @@ import { describeError, useT } from "../../../shared/i18n";
 import { Empty, Note, Row, Screen, Spinner } from "../../../shared/ui";
 import { modelsOf, ProviderModelSections } from "../../../widgets/provider-models";
 
+/** How long a save waits for the Machine's answer before the page lets it go. */
+const SAVE_ANSWER_MS = 15_000;
+
 // The AgentModel board: the Provider and model picker New Agent also uses, saved with the header button.
 function Picker({ agent }: { agent: AgentRow }) {
   const t = useT("agent-model");
@@ -30,6 +33,15 @@ function Picker({ agent }: { agent: AgentRow }) {
   useEffect(() => {
     if (status.updateError) setSent(null);
   }, [status.updateError]);
+  // A send that found no link is tried again once the link or the Machine changes, and a save the Machine
+  // never answers, or one cut off by the Machine going away, is let go rather than locking the page.
+  useEffect(() => setNotSent(false), [link, status.online]);
+  useEffect(() => {
+    if (sent === null) return;
+    if (status.online === false) return setSent(null);
+    const timer = setTimeout(() => setSent(null), SAVE_ANSWER_MS);
+    return () => clearTimeout(timer);
+  }, [sent, status.online]);
 
   function save() {
     if (!link || !machine || !model) return;
@@ -72,11 +84,12 @@ function Picker({ agent }: { agent: AgentRow }) {
 export function AgentModelPage() {
   const t = useT("agent-model");
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
-  const agent = useAgents()?.find((a) => a.id === id);
+  const agents = useAgents();
+  const agent = agents?.find((a) => a.id === id);
   if (!agent) {
     return (
       <Screen title={t("provider.heading")}>
-        <Empty icon="agent" title={t("missing.title")} detail={t("missing.body")} />
+        {agents && <Empty icon="agent" title={t("missing.title")} detail={t("missing.body")} />}
       </Screen>
     );
   }
