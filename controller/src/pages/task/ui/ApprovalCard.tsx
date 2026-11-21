@@ -26,12 +26,17 @@ interface Props {
   onSteer: () => void;
 }
 
-const OUTCOME: Record<Exclude<ApprovalStatus, "open">, { icon: IconName; color: "green" | "red"; key: string }> = {
+// The board's settled pills: green and red for an answer, a grey clock for one that timed out, a grey stop for one its Turn closed.
+const OUTCOME: Record<Exclude<ApprovalStatus, "open">, { icon: IconName; color: "green" | "red" | "secondaryLabel"; key: string }> = {
   approved: { icon: "done", color: "green", key: "approval.approved" },
   denied: { icon: "failed", color: "red", key: "approval.denied" },
-  expired: { icon: "failed", color: "red", key: "approval.expired" },
-  closed: { icon: "failed", color: "red", key: "approval.closed" },
+  expired: { icon: "time", color: "secondaryLabel", key: "approval.expired" },
+  // ponytail: the board draws a minus in a circle; Icon has no minus yet, so the stop circle stands in.
+  closed: { icon: "stopped", color: "secondaryLabel", key: "approval.closed" },
 };
+
+// Where the target goes in a sentence, so each language keeps its own order around the mono part.
+const MARK = "\u0000";
 
 // The one orange thing on the screen while it waits; once answered it settles
 // into the log like any other event (controller-prototype's ApprovalCard).
@@ -45,6 +50,8 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   // Member means. Each is checked against the part it came from, not the whole command (ADR 0030).
   const [entries, setEntries] = useState<{ entry: string; part: string }[] | null>(null);
   const [sent, setSent] = useState(false);
+  // The rarer answers wait behind the board's one "Other options" link.
+  const [more, setMore] = useState(false);
   const dark = useColorScheme() === "dark";
   const by = approval.answeredBy ? t("approval.by", { member: approval.answeredBy.member }) : "";
 
@@ -77,21 +84,41 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   const target = (domain ? approval.domain : approval.command) ?? "";
   // Answered, it settles into the log as a small grey pill: the outcome, who, and what.
   if (outcome) {
+    // A permanent yes says so and what it added. Only a domain answer carries "always": a command's allow-always
+    // goes out as an approve with entries, and the log does not say which entries (ponytail: show it when it does).
+    const always = approval.answeredBy?.decision === "always";
+    const [before, after] = t("approval.addedEgress", { target: MARK }).split(MARK);
+    const mono = (
+      <Text variant="caption" mono>
+        {target}
+      </Text>
+    );
     return (
       <Card style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, paddingVertical: 7, borderRadius: radius.md }}>
         <Icon name={outcome.icon} size="sm" color={outcome.color} />
-        <Text variant="footnote" style={{ flexShrink: 1 }}>
-          <Text variant="footnote" strong>
-            {t(outcome.key as "approval.approved" | "approval.denied" | "approval.expired" | "approval.closed")}
+        {approval.status === "closed" ? (
+          <Text variant="footnote" tone="secondary" style={{ flexShrink: 1 }}>
+            {t("approval.closed")}
           </Text>
-          {by}
-          {approval.status !== "closed" && " · "}
-          {approval.status !== "closed" && (
-            <Text variant="caption" mono>
-              {target}
+        ) : (
+          <Text variant="footnote" style={{ flexShrink: 1 }}>
+            <Text variant="footnote" strong>
+              {always ? t("approval.always") : t(outcome.key as "approval.approved" | "approval.denied" | "approval.expired")}
             </Text>
-          )}
-        </Text>
+            {approval.status === "expired" && ` ${t("approval.expiredNote")}`}
+            {!always && by}
+            {" · "}
+            {always ? (
+              <>
+                {before}
+                {mono}
+                {after}
+              </>
+            ) : (
+              mono
+            )}
+          </Text>
+        )}
       </Card>
     );
   }
@@ -137,14 +164,33 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
             </View>
           </View>
           {/* The board's expiry line; the rarer answers sit behind its link, as on the board. */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: space.sm }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: space.xs }}>
             <Text variant="caption">{left.unit === "hour" ? t("approval.expiresInHours", { count: left.count }) : t("approval.expiresIn", { count: left.count })}</Text>
-            {domain && canManage && <Link label={t("approval.allowAlways")} disabled={!online} onPress={() => void respond("always")} />}
-            {!domain && canManage && (
-              // The Protocol takes at most 20, so the card offers at most that many.
-              <Link label={t("approval.always")} disabled={!online} onPress={() => setEntries(missingParts(approval.command, allowlist).slice(0, 20).map((part) => ({ entry: part, part })))} />
+            {domain && canManage && (
+              <>
+                <Dot />
+                <Link label={t("approval.allowAlways")} disabled={!online} onPress={() => void respond("always")} />
+              </>
             )}
-            {!domain && <Link label={t("approval.steer")} disabled={!online} onPress={onSteer} />}
+            {!domain && !more && (
+              <>
+                <Dot />
+                <Link label={t("approval.more")} onPress={() => setMore(true)} />
+              </>
+            )}
+            {!domain && more && canManage && (
+              <>
+                <Dot />
+                {/* The Protocol takes at most 20, so the card offers at most that many. */}
+                <Link label={t("approval.always")} disabled={!online} onPress={() => setEntries(missingParts(approval.command, allowlist).slice(0, 20).map((part) => ({ entry: part, part })))} />
+              </>
+            )}
+            {!domain && more && (
+              <>
+                <Dot />
+                <Link label={t("approval.steer")} disabled={!online} onPress={onSteer} />
+              </>
+            )}
           </View>
         </>
       )}
@@ -189,6 +235,8 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
     </View>
   );
 }
+
+const Dot = () => <Text variant="caption">·</Text>;
 
 function Link({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
   return (

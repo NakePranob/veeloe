@@ -5,12 +5,10 @@
   },
   "provider": {
     "heading": "Provider และ model",
-    "footer": "รายชื่อ model มาจาก Provider ที่ตั้งบน Machine นี้ คนที่มี Manage เปลี่ยนทีหลังได้ และมีผลตั้งแต่ Task ถัดไป (ADR 0042)",
-    "none": "Machine นี้ยังไม่มี Provider",
-    "command": "veeloe provider add --name <ชื่อ> --url <base url>",
-    "nextTask": "เปลี่ยนแล้วมีผลตั้งแต่ Task ถัดไป Task ที่กำลังทำอยู่ใช้ model เดิมจนจบ เพราะเปลี่ยนกลาง Task ทำให้ prompt cache เริ่มใหม่ และ thinking ใช้ต่อไม่ได้ ถ้า Provider ล่ม Agent ทุกตัวบนเครื่องที่ใช้ตัวนั้นหยุดพร้อมกัน (ADR 0042)"
+    "nextTask": "เปลี่ยนแล้วมีผลตั้งแต่ Task ถัดไป Task ที่กำลังทำอยู่ใช้ model เดิมจนจบ เพราะเปลี่ยนกลาง Task ทำให้ prompt cache เริ่มใหม่ รายชื่อมาจาก Provider ที่ตั้งบน Machine นี้ (ADR 0042)"
   },
   "save": "บันทึก",
   "saving": "กำลังบันทึกบน Machine",
-  "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)"
+  "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",
+  "subtitle": "{{agent}} · {{machine}}"
 }

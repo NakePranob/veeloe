@@ -23,8 +23,13 @@ export function HomePage() {
         <Text variant="largeTitle" style={{ flex: 1 }}>
           {t("title")}
         </Text>
-        <Button label="Workspace" icon="settings" onPress={() => router.navigate("/workspace")} />
-        {machines && machines.length > 0 && <Button label={t("newAgent")} icon="add" variant="primary" onPress={() => router.push("/agents/new")} />}
+        {/* Welcome (no Machine yet) shows the name alone, as its board does. */}
+        {machines && machines.length > 0 && (
+          <>
+            <Button label="Workspace" icon="sliders" onPress={() => router.navigate("/workspace")} />
+            <Button label={t("newAgent")} icon="add" variant="primary" onPress={() => router.push("/agents/new")} />
+          </>
+        )}
       </View>
     </>
   );

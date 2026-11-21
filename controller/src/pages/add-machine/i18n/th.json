@@ -8,7 +8,10 @@
     "stopScan": "หยุดสแกน",
     "paste": "วางลิงก์",
     "continue": "ถัดไป",
-    "noCamera": "Veeloe ใช้กล้องที่นี่ไม่ได้ ให้วางลิงก์แทน"
+    "noCamera": "Veeloe ใช้กล้องที่นี่ไม่ได้ ให้วางลิงก์แทน",
+    "install": "ติดตั้ง Runtime บนเครื่องที่ Agent จะทำงาน",
+    "waiting": "รอ Machine…",
+    "scanHint": "ส่อง QR ให้อยู่ในกรอบ"
   },
   "confirm": {
     "heading": "ผูกกับ Machine เครื่องนี้ไหม",

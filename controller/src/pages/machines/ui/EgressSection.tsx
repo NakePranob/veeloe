@@ -5,9 +5,10 @@ import { egressOf as machineEgressOf, type Machine } from "../../../entities/mac
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { keySession } from "../../../shared/keystore";
 import { useT } from "../../../shared/i18n";
-import { Button, Field, inform, Row, Section, Select } from "../../../shared/ui";
+import { View } from "react-native";
+import { Button, Field, inform, Note, Row, Section, Select } from "../../../shared/ui";
 
-// controller-prototype's EgressSection: the domains every Agent on this Machine
+// The Machine board's Egress tab: the domains every Agent on this Machine
 // may reach, or the ones one Agent may (`agent-egress-ui`). Every change is signed
 // after a fresh authentication (ADR 0012), and the list shown is the one the
 // Machine signed back for that Agent (ADR 0008, 0029).
@@ -21,11 +22,7 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
   const agent = agents.find((entry) => entry.id === scope);
   const egress = agent ? agentEgressOf(agent) : machineEgressOf(machine);
   const agentNames = agents.map((entry) => entry.name);
-  const who = agent
-    ? t("egress.whoOne", { machine: machine.name, agent: agent.name })
-    : agentNames.length
-      ? t("egress.whoNamed", { machine: machine.name, agents: agentNames.join(", ") })
-      : t("egress.who", { machine: machine.name });
+  const who = agent ? t("egress.whoOne", { machine: machine.name, agent: agent.name }) : agentNames.length ? t("egress.whoNamed", { machine: machine.name, agents: agentNames.join(", ") }) : t("egress.who", { machine: machine.name });
 
   async function change(next: string[], prompt: string) {
     if (!status.online || !link) return inform(t("egress.offline.title"), t("egress.offline.body", { machine: machine.name }));
@@ -43,31 +40,48 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
   }
 
   return (
-    <Section title="Egress" footer={t(agent ? "egress.footerOne" : "egress.footer", { who })}>
-      {agents.length > 0 && (
-        <Select
-          label={t("egress.agent")}
-          value={agent?.id ?? ""}
-          onChange={(next) => {
-            setScope(next);
-            // A domain typed for one Agent is not a draft for another.
-            setDraft("");
-          }}
-          options={[{ value: "", label: t("egress.allAgents") }, ...agents.map((entry) => ({ value: entry.id, label: entry.name }))]}
-        />
-      )}
-      {egress.length === 0 && <Row title={t("egress.none.title")} detail={agent ? t("egress.none.detailOne") : t("egress.none.detail")} />}
-      {egress.map((domain) => (
-        <Row
-          key={domain}
-          icon="network"
-          iconColor="green"
-          title={domain}
-          mono
-          accessory={<Button variant="destructive" label={t("egress.remove")} onPress={() => void change(egress.filter((item) => item !== domain), t("egress.removePrompt", { domain, who }))} />}
-        />
-      ))}
-      <Field label={t("egress.add")} value={draft} onChangeText={setDraft} placeholder={t("egress.placeholder")} mono action={{ label: t("egress.add"), onPress: () => void add(), disabled: !draft.trim() }} />
-    </Section>
+    <View style={{ gap: 6 }}>
+      {/* The board's line names no Agents; the signing prompt below still does, since it is what the Owner confirms. */}
+      <Note tone="plain">{t(agent ? "egress.topOne" : "egress.top", { who: agent ? who : t("egress.who", { machine: machine.name }) })}</Note>
+      <Section footer={t("egress.footer")}>
+        {agents.length > 0 && (
+          <Select
+            cancel={t("pickCancel")}
+            label={t("egress.agent")}
+            value={agent?.id ?? ""}
+            onChange={(next) => {
+              setScope(next);
+              // A domain typed for one Agent is not a draft for another.
+              setDraft("");
+            }}
+            options={[{ value: "", label: t("egress.allAgents") }, ...agents.map((entry) => ({ value: entry.id, label: entry.name }))]}
+          />
+        )}
+        {egress.length === 0 && <Row title={t("egress.none.title")} detail={agent ? t("egress.none.detailOne") : t("egress.none.detail")} />}
+        {egress.map((domain) => (
+          <Row
+            key={domain}
+            icon="network"
+            iconColor="green"
+            title={domain}
+            mono
+            accessory={
+              <Button
+                variant="destructive"
+                size="small"
+                label={t("egress.remove")}
+                onPress={() =>
+                  void change(
+                    egress.filter((item) => item !== domain),
+                    t("egress.removePrompt", { domain, who }),
+                  )
+                }
+              />
+            }
+          />
+        ))}
+        <Field bare label={t("egress.add")} value={draft} onChangeText={setDraft} placeholder={t("egress.placeholder")} mono action={{ label: t("egress.add"), onPress: () => void add(), disabled: !draft.trim() }} />
+      </Section>
+    </View>
   );
 }

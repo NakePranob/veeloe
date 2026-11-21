@@ -9,27 +9,59 @@
   "agents_other": "{{count}} Agent",
   "online": "ออนไลน์",
   "offline": "ออฟไลน์",
+  "budgetTotal": "Budget วันนี้ รวม",
+  "budgetUnknown": "ยังไม่รู้ Budget วันนี้",
+  "usedOf": "{{used}} จาก {{limit}}",
+  "listLine": "{{status}} · {{agents}}",
   "missing": {
     "title": "ไม่พบ Machine นี้",
     "body": "Machine อาจถูกเลิกผูกแล้ว"
   },
   "status": {
-    "heading": "สถานะ",
     "checking": "กำลังตรวจ",
-    "version": "เวอร์ชัน Runtime",
     "disk": "พื้นที่ว่าง",
     "budget": "Budget วันนี้",
     "lastError": "error ล่าสุด",
-    "features": "ฟีเจอร์"
+    "seeProvider": "ดู Provider",
+    "features": "ฟีเจอร์ที่เครื่องนี้รองรับ"
   },
-  "onMachine": "Agent บนเครื่องนี้",
+  "tile": {
+    "needsYou": "รอคุณ {{count}}",
+    "working": "ทำงาน {{count}}",
+    "spent": "หมด {{count}}",
+    "budget": "{{used}} จาก {{limit}} วันนี้"
+  },
+  "tabs": {
+    "info": "เครื่อง"
+  },
+  "info": {
+    "footer": "ข้อมูลนี้ Runtime รายงานทุกครั้งที่ต่อ Hub"
+  },
   "noAgent": "ยังไม่มี Agent",
+  "agentsTab": {
+    "create": "สร้าง Agent บนเครื่องนี้",
+    "spent": "Budget หมด",
+    "search": "ค้นหา Agent บนเครื่องนี้",
+    "searchPlaceholder": "ค้นหา Agent {{count}} ตัว",
+    "noMatch": "ไม่พบ Agent ที่ตรงกัน",
+    "group": {
+      "needsYou": "ต้องการคุณ",
+      "working": "ทำงานอยู่",
+      "idle": "ว่าง"
+    },
+    "seeAll": "ดูทั้งหมด {{count}} ตัว",
+    "seeAllDetail": "อีก {{count}} ตัว ทำงาน {{working}} · ว่าง {{idle}}",
+    "footer": "ตัวเลขขวาคือ Budget วันนี้ของแต่ละตัว Agent อยู่เครื่องเดียวตลอด และแตะได้แค่ไฟล์กับ tool ของเครื่องนี้ (ADR 0002)",
+    "footerMany": "ตัวที่ต้องการคุณขึ้นก่อนเสมอ แสดง {{count}} ตัวแรก ที่เหลือดูได้ในหน้า Agent ทั้งหมด"
+  },
   "provider": {
-    "footer": "Provider ตั้งที่ Machine ด้วย veeloe provider add และ key อยู่บนเครื่องนั้นเท่านั้น (ADR 0042)",
+    "footer": "key ถูกปิดผนึกให้เครื่องนี้ก่อนส่ง และอยู่บนเครื่องนี้เท่านั้น ตั้งที่หน้าเครื่องด้วย veeloe provider add ก็ได้ (ADR 0042)",
     "none": "Machine นี้ยังไม่มี Provider",
     "command": "veeloe provider add --name <ชื่อ> --url <base url>",
     "models_one": "{{count}} model",
     "models_other": "{{count}} model",
+    "usedBy": "ใช้โดย {{agents}}",
+    "ok": "ใช้ได้",
     "add": "เพิ่ม Provider",
     "custom": "Provider อื่นๆ",
     "name": "ชื่อ Provider",
@@ -47,8 +79,7 @@
     "whoOne": "Agent {{agent}} บน {{machine}}",
     "agent": "Agent",
     "allAgents": "ทุก Agent",
-    "footer": "โดเมนเหล่านี้เปิดให้ {{who}} ออกไปได้ ไม่ใช่เฉพาะ Agent ตัวใดตัวหนึ่ง นอกรายการนี้ sandbox ปิดเน็ต ข้อมูลยังส่งออกไปโดเมนในรายการได้ จึงเพิ่มเฉพาะที่ไว้ใจ (ADR 0008)",
-    "footerOne": "โดเมนเหล่านี้เปิดให้เฉพาะ {{who}} ออกไปได้ Agent ตัวอื่นไม่เปลี่ยน นอกรายการนี้ sandbox ปิดเน็ต ข้อมูลยังส่งออกไปโดเมนในรายการได้ จึงเพิ่มเฉพาะที่ไว้ใจ (ADR 0008)",
+    "footer": "ข้อมูลยังส่งออกไปโดเมนในรายการได้ จึงเพิ่มเฉพาะที่ไว้ใจ ระหว่างทำงาน Agent ขอโดเมนใหม่ได้ด้วย Approval (ADR 0008)",
     "none": {
       "title": "ไม่มีโดเมนที่อนุญาต",
       "detail": "Agent ออกเน็ตไม่ได้เลย",
@@ -67,7 +98,9 @@
       "title": "โดเมนไม่ถูกต้อง",
       "body": "ใส่ชื่อโดเมนอย่างเดียว เช่น github.com หรือ *.npmjs.org ไม่ต้องมี https:// หรือ path"
     },
-    "duplicate": "มีโดเมนนี้แล้ว"
+    "duplicate": "มีโดเมนนี้แล้ว",
+    "top": "{{who}} ออกเน็ตได้เฉพาะโดเมนในรายการนี้ นอกนั้น sandbox ปิดไว้",
+    "topOne": "{{who}} ออกเน็ตได้เฉพาะโดเมนในรายการนี้ Agent ตัวอื่นไม่เปลี่ยน นอกนั้น sandbox ปิดไว้"
   },
-  "listLine": "Runtime {{version}} · {{agents}}"
+  "pickCancel": "ยกเลิก"
 }

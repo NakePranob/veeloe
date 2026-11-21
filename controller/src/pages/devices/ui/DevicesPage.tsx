@@ -8,52 +8,62 @@ import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Card, Chip, confirm, Field, inform, Note, Row, Screen, Section, space, Text } from "../../../shared/ui";
+import { Button, Card, Chip, confirm, Field, Icon, inform, Note, radius, Row, Screen, Section, space, Text } from "../../../shared/ui";
 import { revocationOf, revokeDevice } from "../model/revoke";
 
-// controller-prototype's DevicesPage: this Member's Controllers, who linked each and when,
-// and the way to cut one off (ADR 0031). Renaming and Linking by login are not in v0.1.
+// The Devices board: this device on top, the Member's other Controllers, the revoked ones,
+// and the way to cut one off (ADR 0031). Linking by login is not in v0.1.
 export function DevicesPage() {
   const t = useT("devices");
   const devices = useDevices() ?? [];
   const own = useMachineLink()?.ownKey;
   const live = devices.filter((d) => d.revoked_at === null);
+  const here = live.find((d) => d.key === own);
+  const others = live.filter((d) => d !== here);
   const revoked = devices.filter((d) => d.revoked_at !== null);
   return (
-    <Screen title={t("title")} right={{ label: t("linkNew"), icon: "add", onPress: () => router.push("/devices/link") }}>
-      <Card>
-        <Text variant="footnote">{t("intro")}</Text>
-      </Card>
-      <Section title={t("mine")} footer={t("footer")}>
-        {live.map((device) => (
-          <DeviceRow key={device.key} device={device} devices={devices} here={device.key === own} />
-        ))}
-      </Section>
-      {revoked.length > 0 && (
-        <Section title={t("revokedSection")}>
-          {revoked.map((device) => (
-            <Row key={device.key} title={device.name || t("firstDevice")} detail={t("revokedDetail")} />
+    <Screen title={t("title")} subtitle={t("count", { count: live.length })} right={{ label: t("linkNew"), icon: "add", onPress: () => router.push("/devices/link") }}>
+      {here && <Hero device={here} devices={devices} />}
+      {others.length > 0 && (
+        <Section title={t("others")}>
+          {others.map((device) => (
+            <DeviceRow key={device.key} device={device} devices={devices} />
           ))}
         </Section>
       )}
-      <Section title={t("linkNew")} footer={t("linkFooter")}>
-        <Row icon="add" title={t("linkQr")} detail={t("linkQrDetail")} href="/devices/link" />
-      </Section>
-      {live.length < 2 && (
-        <Note icon="info" iconColor="orange">
-          {t("oneDevice")}
-        </Note>
+      {revoked.length > 0 && (
+        <View style={{ gap: 6 }}>
+          <Text variant="footnote" strong tone="secondary" style={{ paddingHorizontal: 14 }}>
+            {t("revokedSection")}
+          </Text>
+          {/* Each revoked device on a card of its own, all of it grey: it no longer does anything. */}
+          {revoked.map((device) => (
+            <Card key={device.key} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md, borderRadius: 20 }}>
+              <Icon name="device" size="md" color="secondaryLabel" />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="subheadline" tone="secondary" selectable>
+                  {device.name || t("firstDevice")}
+                </Text>
+                <Text variant="caption" tone="secondary">
+                  {t("revokedDetail")}
+                </Text>
+              </View>
+            </Card>
+          ))}
+        </View>
       )}
+      {live.length < 2 && <Note tone="warning">{t("oneDevice")}</Note>}
+      <Note tone="plain">{t("intro")}</Note>
     </Screen>
   );
 }
 
-function DeviceRow({ device, devices, here }: { device: Device; devices: Device[]; here: boolean }) {
+// Renaming and revoking one device, with the certificates it signed that the Member keeps (ADR 0031).
+function useDeviceActions(device: Device, devices: Device[], here: boolean) {
   const t = useT("devices");
   const language = useLanguage();
   const database = useDatabase();
   const machines = useMachines();
-  const [open, setOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(device.name);
   const [problem, setProblem] = useState<string | null>(null);
@@ -100,39 +110,91 @@ function DeviceRow({ device, devices, here }: { device: Device; devices: Device[
     if (answer && !answer.ok) inform(t("failed"), describeError({ code: answer.code }));
   }
 
+  const rename = (
+    <>
+      <Field label={t("rename.label")} value={draft} onChangeText={setDraft} placeholder={t("rename.placeholder")} footer={problem ?? t("rename.footer")} />
+      <Row title={t("rename.save")} onPress={() => void saveRename()} />
+      <Row title={t("rename.cancel")} onPress={() => setRenaming(false)} />
+    </>
+  );
+  const options = (
+    <>
+      {signed.length > 0 && (
+        <>
+          <Row title={t("signed.title")} detail={t("signed.detail")} />
+          {signed.map((other) => (
+            <Row
+              key={other.key}
+              title={t("keep", { name: other.name })}
+              accessory={
+                <Switch
+                  aria-label={t("keep", { name: other.name })}
+                  value={keep.includes(other.key)}
+                  onValueChange={(on) => setDropped(on ? dropped.filter((k) => k !== other.key) : [...dropped, other.key])}
+                />
+              }
+            />
+          ))}
+        </>
+      )}
+      <Row icon="trash" title={t("revoke")} destructive onPress={() => void revoke()} />
+    </>
+  );
+  return { name, detail, renaming, startRename, rename, options };
+}
+
+// This device, large: its name, how it came, and its two buttons.
+function Hero({ device, devices }: { device: Device; devices: Device[] }) {
+  const t = useT("devices");
+  const [open, setOpen] = useState(false);
+  const { name, detail, renaming, startRename, rename, options } = useDeviceActions(device, devices, true);
+  return (
+    <>
+      <Card style={{ padding: 18, gap: 14, borderRadius: radius.lg }}>
+        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14 }}>
+          {/* A raised Card without its shadow is the white square the board puts the icon on. */}
+          <Card tone="surface" style={{ width: 56, height: 56, padding: 0, borderRadius: 18, alignItems: "center", justifyContent: "center" }}>
+            <Icon name="device" size="lg" color="label" />
+          </Card>
+          <View style={{ flex: 1, gap: 3 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.sm }}>
+              <Text variant="headline" selectable style={{ fontSize: 20 }}>
+                {name}
+              </Text>
+              <Chip tone="choice" selected label={t("thisDevice")} />
+            </View>
+            {/* ponytail: the board's "ใช้ล่าสุด ตอนนี้" needs a last-seen time the database does not keep. */}
+            <Text variant="footnote" tone="body">
+              {detail}
+            </Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", gap: space.sm }}>
+          <View style={{ flex: 1 }}>
+            <Button label={t("rename.short")} variant="surface" onPress={startRename} />
+          </View>
+          <Button label={t("more")} icon="more" variant="surface" onPress={() => setOpen(!open)} />
+        </View>
+      </Card>
+      {renaming && <Section>{rename}</Section>}
+      {open && <Section>{options}</Section>}
+    </>
+  );
+}
+
+// Another device of the Member's; it opens its rename and revoke under it.
+function DeviceRow({ device, devices }: { device: Device; devices: Device[] }) {
+  const t = useT("devices");
+  const [open, setOpen] = useState(false);
+  const { name, detail, renaming, startRename, rename, options } = useDeviceActions(device, devices, false);
+  // ponytail: the board's per-kind icon (iPad, laptop) and "ใช้ล่าสุด" line need an OS and a last-seen time the database does not keep.
   return (
     <View>
-      <Row title={name} detail={detail} accessory={here ? <Chip tone="choice" selected label={t("thisDevice")} /> : undefined} onPress={() => setOpen(!open)} />
+      <Row icon="device" title={name} detail={detail} accessory={<Icon name={open ? "collapse" : "expand"} size="sm" color="secondaryLabel" />} onPress={() => setOpen(!open)} />
       {open && (
-        <Card raised style={{ marginHorizontal: space.sm, marginBottom: space.sm, padding: 0, gap: 0, borderRadius: 16, boxShadow: "none" }}>
-          {renaming ? (
-            <>
-              <Field label={t("rename.label")} value={draft} onChangeText={setDraft} placeholder={t("rename.placeholder")} footer={problem ?? t("rename.footer")} />
-              <Row title={t("rename.save")} onPress={() => void saveRename()} />
-              <Row title={t("rename.cancel")} onPress={() => setRenaming(false)} />
-            </>
-          ) : (
-            <Row icon="edit" title={t("rename.action")} onPress={startRename} />
-          )}
-          {signed.length > 0 && (
-            <>
-              <Row title={t("signed.title")} detail={t("signed.detail")} />
-              {signed.map((other) => (
-                <Row
-                  key={other.key}
-                  title={t("keep", { name: other.name })}
-                  accessory={
-                    <Switch
-                      aria-label={t("keep", { name: other.name })}
-                      value={keep.includes(other.key)}
-                      onValueChange={(on) => setDropped(on ? dropped.filter((k) => k !== other.key) : [...dropped, other.key])}
-                    />
-                  }
-                />
-              ))}
-            </>
-          )}
-          <Row icon="trash" title={t("revoke")} destructive onPress={() => void revoke()} />
+        <Card tone="surface" style={{ marginHorizontal: space.sm, marginBottom: space.sm, padding: 0, gap: 0, borderRadius: 16 }}>
+          {renaming ? rename : <Row icon="edit" title={t("rename.action")} onPress={startRename} />}
+          {options}
         </Card>
       )}
     </View>

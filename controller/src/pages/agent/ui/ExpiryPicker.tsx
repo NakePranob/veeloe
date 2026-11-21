@@ -1,43 +1,29 @@
-import { useState } from "react";
 import { useT } from "../../../shared/i18n";
-import { Icon, Row } from "../../../shared/ui";
+import { Select } from "../../../shared/ui";
 
-/** The choices the prototype offers for how long an Approval waits (controller-prototype's EXPIRIES). */
+/** The choices the board offers for how long an Approval waits, in minutes. */
 export const EXPIRIES = [15, 30, 60, 240, 1440] as const;
 
-/** `15 minutes`, `1 hour`, `24 hours`, in the reader's language. */
+/** `15 minutes`, `1 hour`, `1 day`, in the reader's language. */
 export function approvalLabel(seconds: number, t: ReturnType<typeof useT<"agent">>) {
+  if (seconds >= 86400 && seconds % 86400 === 0) return t("approval.days", { count: seconds / 86400 });
   return seconds >= 3600 ? t("approval.hours", { count: seconds / 3600 }) : t("approval.minutes", { count: Math.round(seconds / 60) });
 }
 
-/**
- * One row that says how long an Approval waits and opens the choices in place,
- * as the prototype's Select does: the value on the right, the other options
- * under it with a tick on the one in use.
- */
+/** One row that says how long an Approval waits; iOS opens the system sheet of choices. */
 export function ExpiryPicker({ seconds, disabled, onPick }: { seconds: number; disabled: boolean; onPick: (seconds: number) => void }) {
   const t = useT("agent");
-  const [open, setOpen] = useState(false);
+  // A timeout set elsewhere (not one of the choices) still shows as the value.
+  const choices: number[] = EXPIRIES.map((minutes) => minutes * 60);
+  if (!choices.includes(seconds)) choices.push(seconds);
   return (
-    <>
-      <Row
-        title={t("approval.waiting")}
-        value={approvalLabel(seconds, t)}
-        onPress={disabled ? undefined : () => setOpen((was) => !was)}
-        accessory={<Icon name={open ? "collapse" : "expand"} size="sm" color="tertiaryLabel" />}
-      />
-      {open &&
-        EXPIRIES.map((minutes) => (
-          <Row
-            key={minutes}
-            title={approvalLabel(minutes * 60, t)}
-            onPress={() => {
-              setOpen(false);
-              if (minutes * 60 !== seconds) onPick(minutes * 60);
-            }}
-            accessory={minutes * 60 === seconds ? <Icon name="check" size="md" color="label" weight="semibold" /> : undefined}
-          />
-        ))}
-    </>
+    <Select
+      label={t("approval.waiting")}
+      value={String(seconds)}
+      options={choices.map((s) => ({ value: String(s), label: approvalLabel(s, t) }))}
+      onChange={(next) => onPick(Number(next))}
+      disabled={disabled}
+      cancel={t("delete.cancel")}
+    />
   );
 }

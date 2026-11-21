@@ -19,7 +19,8 @@
   "chart": {
     "label": "การใช้ token ต่อวันของ {{machine}}",
     "bar": "{{day}}: {{tokens}} token",
-    "none": "{{day}}: ไม่มีข้อมูล"
+    "none": "{{day}}: ไม่มีข้อมูล",
+    "today": "วันนี้"
   },
   "tasks": {
     "heading": "งานที่ใช้ token มากที่สุด",

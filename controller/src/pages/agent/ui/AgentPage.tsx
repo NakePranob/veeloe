@@ -4,32 +4,23 @@ import { useEffect, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { APPROVAL_TIMEOUT_S_DEFAULT, APPROVAL_TIMEOUT_S_MAX, APPROVAL_TIMEOUT_S_MIN } from "@veeloe/protocol-ts";
 import { allowlistOf, approvalTimeoutOf, gitReposOf, useAgents, type AgentRow } from "../../../entities/agent";
-import { Character, lookOfJson, moodOf } from "../../../entities/character";
+import { Character, lookOfJson, moodOf, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { previewOf, statusOf, useTaskSummaries, type TaskStatus } from "../../../entities/task";
+import { previewOf, STATUS_DOT, statusOf, useTaskSummaries } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatTokens, useNow, when } from "../../../shared/lib";
-import { Button, Dot, Empty, Field, Icon, Meter, Note, Row, Screen, Section, Spinner, Text, confirm, inform, space } from "../../../shared/ui";
+import { Button, Dot, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, Tile, confirm, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
 
-// What each Task is doing, as an icon on its row (the redesign's Agent board).
-function TaskIcon({ status }: { status: TaskStatus }) {
-  if (status === "working") return <Spinner />;
-  if (status === "done") return <Icon name="done" size="md" color="green" />;
-  if (status === "failed") return <Icon name="failed" size="md" color="red" />;
-  if (status === "waiting") return <Icon name="approval" size="md" color="orange" />;
-  if (status === "stuck") return <Icon name="warning" size="md" color="orange" />;
-  if (status === "interrupted") return <Icon name="stopped" size="md" color="secondaryLabel" />;
-  if (status === "offline") return <Icon name="offline" size="md" color="secondaryLabel" />;
-  return <Icon name="thread" size="md" color="secondaryLabel" />;
-}
 
-// The redesign's Agent board: the Agent's Tasks first, then its settings.
-// ponytail: only what this version has. Description, instructions, Memory, Skill and the rest come with their changes.
+// The Agent board: a stage in the Agent's colour with its head, name and two actions, then its Tasks,
+// today's Budget and its settings. The header keeps the save for the name and the Budget, where the board
+// draws a pencil to the Character (the Character row and the stage still open it).
+// ponytail: only what this version has. Description, instructions, Skill and the rest come with their changes.
 function AgentView({ agent }: { agent: AgentRow }) {
   const t = useT("agent");
   const status = useT("task-status");
@@ -103,59 +94,88 @@ function AgentView({ agent }: { agent: AgentRow }) {
     else router.replace("/");
   }
 
+  const look = lookOfJson(agent.character);
+  const latest = tasks[0];
+  const repos = gitReposOf(agent);
+
   return (
-    <Screen title={agent.name} right={{ label: t("save"), onPress: save, disabled: !canSave }}>
-      <View style={{ alignItems: "center", gap: space.sm }}>
-        <View>
-          <Character look={lookOfJson(agent.character)} mood={moodOf([], online)} size={120} />
-          {/* The pencil opens the Character editor, as the Character row does. */}
-          <View style={{ position: "absolute", right: 0, bottom: space.md }}>
-            <Button label={t("character.edit")} icon="edit" variant="primary" onPress={() => router.push(`/agents/${agent.id}/character`)} />
+    <Screen title="" right={{ label: t("save"), onPress: save, disabled: !canSave }}>
+      <Stage color={look.color} bleed gap={6}>
+        <View style={{ alignItems: "center", gap: space.xs }}>
+          <Character look={look} mood={moodOf(latest?.latest_kind ? [{ kind: latest.latest_kind, body: latest.latest_body }] : [], online)} size={112} />
+          <Text variant="largeTitle" selectable>
+            {agent.name}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {online !== null && <Dot color={online ? "green" : "tertiaryLabel"} size={7} />}
+            <Text variant="caption" tone="body" numberOfLines={1} style={{ flexShrink: 1 }}>
+              {online === null ? "" : `${t(online ? "online" : "offline")} · `}
+              <Text variant="caption" tone="body" mono role="link" onPress={() => router.push(`/machines/${agent.machine_id}`)} style={{ textDecorationLine: "underline" }}>
+                {machine?.name}
+              </Text>
+              {" · "}
+              <Text variant="caption" tone="body" mono>
+                {agent.model}
+              </Text>
+            </Text>
           </View>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-          {online !== null && <Dot color={online ? "green" : "tertiaryLabel"} />}
-          <Text variant="footnote" tone="secondary">
-            {machine?.name}
-            {online === null ? "" : ` · ${t(online ? "online" : "offline")}`}
-            {" · "}
-          </Text>
-          <Text variant="caption" tone="secondary" mono>
-            {agent.model}
-          </Text>
+        <View style={{ flexDirection: "row", alignSelf: "stretch", gap: space.sm }}>
+          <View style={{ flex: 1 }}>
+            <Button label={t("tasks.new")} leading="add" variant="primary" size="large" onPress={newTask} />
+          </View>
+          <Button label="Memory" leading="memory" variant="surface" size="large" onPress={() => router.push(`/agents/${agent.id}/memory`)} />
         </View>
-      </View>
+      </Stage>
       {offline && (
         <Note icon="offline" iconColor="orange">
           {t("needsOnline")}
         </Note>
       )}
-      {problem && (
-        <Note icon="warning" iconColor="orange">
-          {problem === "provider" ? t("problem.provider", { provider: agent.provider }) : t("problem.model", { provider: agent.provider, model: agent.model })}
-        </Note>
+      {problem && <Note tone="warning">{problem === "provider" ? t("problem.provider", { provider: agent.provider }) : t("problem.model", { provider: agent.provider, model: agent.model })}</Note>}
+
+      {/* ponytail: every Task of this Agent shows; a "see all" page comes when lists get long. */}
+      {tasks.length > 0 && (
+        <Section title={t("tasks.heading")} footer={t("tasks.footer")}>
+          {tasks.map((task) => (
+            <Row
+              key={task.id}
+              leading={<Dot color={STATUS_DOT[statusOf(task, online)]} size={9} />}
+              title={previewOf(task) || t("tasks.untitled")}
+              detail={task.events ? `${status(statusOf(task, online))} · ${when(task.updated_at, language, now)}` : status(statusOf(task, online))}
+              href={`/tasks/${task.id}?agent=${agent.id}`}
+            />
+          ))}
+        </Section>
       )}
 
-      <Section title="Task" footer={t("tasks.footer")}>
-        <Row leading={<Button label={t("tasks.new")} icon="add" variant="primary" onPress={newTask} />} title={t("tasks.new")} onPress={newTask} />
-        {tasks.map((task) => (
-          <Row
-            key={task.id}
-            leading={<TaskIcon status={statusOf(task, online)} />}
-            title={previewOf(task) || t("tasks.untitled")}
-            detail={task.events ? `${status(statusOf(task, online))} · ${when(task.updated_at, language, now)}` : status(statusOf(task, online))}
-            href={`/tasks/${task.id}?agent=${agent.id}`}
-          />
-        ))}
-      </Section>
+      {agent.budget !== null && (
+        <Tile
+          href="/usage"
+          top={
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.sm }}>
+              <Text variant="footnote" strong tone="secondary" style={{ flex: 1 }}>
+                {t("budget.label")}
+              </Text>
+              <Text variant="caption" tone="body">
+                {t("budget.perDay", { budget: formatTokens(agent.budget) })}
+              </Text>
+            </View>
+          }
+          value={formatTokens(agent.usage_tokens ?? 0)}
+          unit={`${t("budget.used", { percent: Math.round(share * 100) })}${share >= 1 ? t("budget.spent") : ""}`}
+          detail={<Meter value={share} label={t("budget.label")} />}
+        />
+      )}
 
-      <Section title="Agent">
+      <Section title={t("identity")}>
         <Row icon="character" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} />
         <Row icon="memory" title="Memory" detail={t("memory.detail")} href={`/agents/${agent.id}/memory`} />
         <Field label={t("name")} value={name} onChangeText={setName} />
       </Section>
 
-      <Section title={t("approval.heading")} footer={t("approval.footer")}>
+      <Section title={t("work.heading")} footer={t("work.footer")}>
+        <Row icon="key" title={t("provider.heading")} detail={problem === "provider" ? t("problem.choose") : undefined} value={problem === "provider" ? undefined : agent.model} href={`/agents/${agent.id}/model`} />
         <ExpiryPicker
           seconds={approvalSeconds}
           disabled={offline}
@@ -163,51 +183,15 @@ function AgentView({ agent }: { agent: AgentRow }) {
             if (link && machine) link.updateAgent(machine, { id: agent.id, approvalTimeoutS: next });
           }}
         />
-      </Section>
-
-      <Section title={t("more.heading")} footer={t("more.footer")}>
         <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} />
-        <Row icon="branch" title={t("git.row")} value={gitReposOf(agent) === null ? t("git.unsupported") : t("git.count", { count: gitReposOf(agent)!.length })} href={`/agents/${agent.id}/git`} />
-        <Row icon="key" title={t("provider.heading")} detail={problem === "provider" ? t("problem.choose") : `${agent.provider} · ${agent.model}`} href={`/agents/${agent.id}/model`} />
-      </Section>
-
-      <Section title={t("budget.heading")} footer={t("budget.footer")}>
-        {agent.budget !== null && (
-          <View style={{ gap: space.sm, padding: space.sm }}>
-            {/* The day so far, large, then the bar: the board's Budget card. */}
-            <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.xs }}>
-              <Text variant="headline" style={{ fontSize: 20 }}>{formatTokens(agent.usage_tokens ?? 0)}</Text>
-              <Text variant="subheadline" tone="secondary">
-                {t("budget.of", { budget: formatTokens(agent.budget) })}
-              </Text>
-            </View>
-            <Meter value={share} label={t("budget.label")} />
-            {/* The board shows only the figure and the bar; the words come back when the day is nearly spent. */}
-            {share >= 0.8 && (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-              {<Icon name="info" size="sm" color={share >= 1 ? "red" : "orange"} />}
-              <Text variant="footnote" tone="secondary">
-                {t("budget.used", { used: formatTokens(agent.usage_tokens ?? 0), budget: formatTokens(agent.budget), percent: Math.round(share * 100) })}
-                {share >= 1 ? t("budget.spent") : ""}
-              </Text>
-            </View>
-            )}
-          </View>
-        )}
-        <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" />
+        <Row icon="branch" title={t("git.row")} value={repos === null ? t("git.unsupported") : t("git.count", { count: repos.length })} href={`/agents/${agent.id}/git`} />
+        {/* Not on the board, which has no way to set the Budget yet; it saves with the name. */}
+        <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" footer={t("budget.footer")} />
       </Section>
       {sent !== null && <Row title={t("saving")} accessory={<Spinner />} />}
-      {tried && machineStatus.updateError && sent === null && (
-        <Note icon="warning" iconColor="orange">
-          {describeError({ code: machineStatus.updateError })}
-        </Note>
-      )}
-      {machineStatus.deleteError && (
-        <Note icon="warning" iconColor="orange">
-          {describeError({ code: machineStatus.deleteError })}
-        </Note>
-      )}
-      <Section title={t("delete.heading")} footer={t("delete.body", { name: agent.name })}>
+      {tried && machineStatus.updateError && sent === null && <Note tone="warning">{describeError({ code: machineStatus.updateError })}</Note>}
+      {machineStatus.deleteError && <Note tone="warning">{describeError({ code: machineStatus.deleteError })}</Note>}
+      <Section footer={t("delete.body")}>
         <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} />
       </Section>
     </Screen>

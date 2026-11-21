@@ -12,8 +12,6 @@
     "working": "Working",
     "waiting": "Waiting",
     "done": "Done",
-    "failed": "Failed",
-    "stuck": "Stuck",
     "offline": "Offline"
   },
   "color": "Colour",

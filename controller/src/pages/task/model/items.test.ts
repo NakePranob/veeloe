@@ -181,3 +181,9 @@ test("a Turn that ended lists the files edit and write changed, once each, and n
   const failed = items(turn([call("edit", { path: "c.rs" }, "1")], [result("1", "no match", true)])).items;
   expect(failed.some((i) => i.kind === "changes")).toBe(false);
 });
+
+test("a time line opens the log and marks each gap of more than an hour", () => {
+  const at = (seq: number, minutes: number, text: string) => ({ ...row(seq, "member.message", { text }), at: minutes * 60_000 });
+  const kinds = items([at(1, 0, "a"), at(2, 30, "b"), at(3, 120, "c")]).items.map((item) => item.kind);
+  expect(kinds).toEqual(["time", "member", "member", "time", "member"]);
+});

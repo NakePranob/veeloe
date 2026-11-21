@@ -8,7 +8,7 @@ import { useMachineLink } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { when } from "../../../shared/lib";
+import { useNow, when } from "../../../shared/lib";
 import { Button, Card, Field, Icon, Note, QrCode, Screen, Spinner, Text, column, inform, space } from "../../../shared/ui";
 import { approveLink, handOff, handoffData, nameProblem, openLink, type LinkAsk, type OpenLink } from "../model/link";
 
@@ -128,7 +128,8 @@ export function LinkDevicePage() {
         </ScrollView>
         {foot(
           <>
-            {wide(<Button size="large" label={t("cancel")} onPress={() => router.back()} />)}
+            {/* Back to a QR: the one shown was spent on this request, so it is a fresh one (single use, ADR 0031). */}
+            {wide(<Button size="large" label={t("cancel")} onPress={fresh} />)}
             {wide(<Button size="large" label={t("approve")} variant="primary" onPress={() => void approve()} />)}
           </>,
         )}
@@ -163,8 +164,10 @@ export function LinkDevicePage() {
         <Text variant="subheadline" style={{ textAlign: "center" }}>
           {t("show.heading")}
         </Text>
-        <Card style={{ alignItems: "center", borderRadius: 24 }}>
+        <Card style={{ alignItems: "center", borderRadius: 24, gap: space.md }}>
           <QrCode text={offer.text} label={t("show.label")} />
+          {/* ponytail: the board's short code ("K7F-29Q") beside the timer needs a code the Hub's Linking does not issue; add it with one. */}
+          <Countdown until={offer.link.expires * 1000} />
         </Card>
         <Text variant="footnote" tone="secondary" style={{ textAlign: "center" }}>
           {t("show.footer", { when: when(offer.link.expires * 1000, language) })}
@@ -186,6 +189,24 @@ export function LinkDevicePage() {
         {/* Shared to the owner's own new device, a tablet or laptop with no camera; a share sheet that is missing or dismissed changes nothing. */}
         <Button size="large" leading="share" label={t("show.share")} onPress={() => void Share.share({ message: offer.text }).catch(() => {})} />
       </View>
+    </View>
+  );
+}
+
+// The white pill on the QR card counting down to the QR's expiry; the page's own timer turns it into the expired step at 0.
+function Countdown({ until }: { until: number }) {
+  const t = useT("link-device");
+  const now = useNow(1000);
+  const seconds = Math.max(0, Math.ceil((until - now) / 1000));
+  const left = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  return (
+    <View role="timer" aria-label={t("show.expiresIn", { left })}>
+      <Card tone="surface" style={{ flexDirection: "row", alignItems: "center", gap: 5, height: 32, paddingVertical: 0, paddingHorizontal: 10, borderRadius: 16 }}>
+        <Icon name="time" size="sm" color="bodyLabel" />
+        <Text variant="footnote" mono strong tone="body">
+          {left}
+        </Text>
+      </Card>
     </View>
   );
 }

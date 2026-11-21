@@ -1,40 +1,28 @@
 {
-  "createShort": "Create",
   "new": "New Agent",
   "shuffle": "Shuffle Character",
-  "offline": "Offline",
   "name": "Name",
   "namePlaceholder": "e.g. Deployer",
+  "where": {
+    "heading": "Where it works, and with which model",
+    "footer": "An Agent stays on one Machine. The Runtime makes its Workdir at ~/.veeloe/agents/<id>/workdir (ADR 0002, 0032, 0042, 0043)."
+  },
   "machine": {
-    "heading": "On Machine",
-    "footer": "An Agent stays on one Machine and can touch only that machine's files and tools. The Runtime makes its Workdir at ~/.veeloe/agents/<id>/workdir; you can't pick the path (ADR 0002, 0032).",
-    "offline": "This Machine is offline. Start veeloe on it first."
+    "label": "On Machine",
+    "offline": "{{name}} · offline",
+    "online": "{{name}} · online"
   },
   "provider": {
-    "heading": "Provider and model",
-    "footer": "The models come from the Providers set on this Machine. Someone with Manage can change them later, from the next Task on (ADR 0042).",
-    "none": "This Machine has no Provider yet",
-    "command": "veeloe provider add --name <name> --url <base url>",
-    "nextTask": "A change takes effect from the next Task. A Task already going keeps its model to the end, since changing it midway restarts the prompt cache and loses its thinking. If a Provider goes down, every Agent on the Machine that uses it stops with it (ADR 0042)."
-  },
-  "creating": "Creating on the Machine",
-  "budget": {
-    "heading": "Today's Budget",
-    "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget. Set a spend limit at the Provider as well (ADR 0043).",
-    "label": "Today's Budget",
-    "used": "{{used}} of {{budget}} tokens ({{percent}}%)",
-    "spent": " · used up",
-    "field": "Budget per day (million tokens)",
-    "default": "The Budget starts at 10M tokens a day. You can change it later on the Agent's page (ADR 0043).",
-    "list": "Today's Budget {{percent}}%"
+    "label": "Provider and model",
+    "footer": "The models come from the Providers set on this Machine. Someone with Manage can change them later, from the next Task on (ADR 0042)."
   },
   "allowlist": {
-    "heading": "Commands that run without asking for an Approval",
-    "footer": "The read-only set is ticked for you; untick what you don't want before signing. There is no find, which has -exec and -delete, no sed, which has -i, and neither git nor npm on its own (ADR 0030).",
-    "row": "Allowlist",
-    "count_one": "{{count}} entry",
-    "count_other": "{{count}} entries"
+    "heading": "Commands that run right away",
+    "footer": "There is no find, sed, or git and npm on their own, since they can change or delete files. Untick what you don't want before creating (ADR 0030).",
+    "row_one": "Read-only set · {{count}} entry",
+    "row_other": "Read-only set · {{count}} entries"
   },
-  "characterLater": "You can change the Character later on the Agent's page.",
-  "create": "Create Agent"
+  "creating": "Creating on the Machine",
+  "create": "Create Agent",
+  "pickCancel": "Cancel"
 }

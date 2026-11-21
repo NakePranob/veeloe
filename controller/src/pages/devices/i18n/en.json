@@ -1,12 +1,15 @@
 {
   "title": "My devices",
+  "count_one": "{{count}} device",
+  "count_other": "{{count}} devices",
   "linkNew": "Link new device",
-  "mine": "Your devices",
-  "footer": "Device names are for this page and the notice sent when a device is linked. Every time one is linked, your other devices hear about it.",
+  "others": "Your other devices",
   "firstDevice": "First device",
   "linkedBy": "Linked by {{name}} · {{when}}",
   "thisDevice": "This device",
+  "more": "More options",
   "rename": {
+    "short": "Rename",
     "action": "Rename this device",
     "label": "Device name",
     "placeholder": "Work phone",
@@ -19,9 +22,6 @@
   },
   "revokedSection": "Revoked",
   "revokedDetail": "No longer in use. Link it again to use it",
-  "linkFooter": "Linking is only for your own devices. Other people join the Workspace by Invitation.",
-  "linkQr": "Link with a QR code",
-  "linkQrDetail": "Show a QR code for the new device to scan",
   "oneDevice": "You have one device. If you lose it, or change its biometric settings so its key stops working, no other device can sign for you, and you'll have to pair every Machine again. Link a second device now.",
   "signed": {
     "title": "Devices this one vouched for",

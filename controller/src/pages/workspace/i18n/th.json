@@ -1,21 +1,24 @@
 {
-  "onMachines": "บนเครื่อง",
-  "people": "คน",
-  "devices": "เครื่องของฉัน",
-  "usage": "การใช้ token",
-  "usageDetail": "ยอดต่อวัน ตามเครื่องและ Agent",
-  "oneDevice": "คุณมีเครื่องเดียว ถ้าเครื่องนี้หาย ต้องทำ Pairing ใหม่ที่ Machine ทุกเครื่อง Link เครื่องที่สองไว้ก่อนในหน้า เครื่องของฉัน",
-  "notifications": {
-    "heading": "การแจ้งเตือน",
-    "title": "แจ้งเตือนแบบ push",
-    "note": "Approval และ Turn ที่จบ โดยไม่มีข้อความ Task มีผลเฉพาะเครื่องนี้",
-    "on": "เปิด",
-    "off": "ปิด"
+  "machines": {
+    "online": "ออนไลน์ {{online}} จาก {{count}}"
   },
-  "language": {
-    "heading": "ภาษา",
-    "note": "มีผลเฉพาะเครื่องนี้",
-    "th": "ไทย",
-    "en": "English"
-  }
+  "agents": {
+    "line": "รอคุณ {{waiting}} · ทำงาน {{working}}"
+  },
+  "tokens": {
+    "title": "token วันนี้",
+    "detail": "ทุก Machine",
+    "chart": "token 7 วันล่าสุด ทุก Machine",
+    "bar": "{{day}}: {{tokens}} token"
+  },
+  "devices": {
+    "title": "เครื่องของฉัน",
+    "linkSecond": "Link เครื่องที่สองไว้"
+  },
+  "thisDevice": "ตั้งค่าเครื่องนี้",
+  "push": {
+    "title": "แจ้งเตือนแบบ push",
+    "detail": "Approval และ Turn ที่จบ ไม่มีข้อความ Task"
+  },
+  "note": "มีผลเฉพาะเครื่องนี้ เครื่องอื่นของคุณตั้งแยกกัน ภาษาเปลี่ยนได้ที่ปุ่มขวาบน"
 }

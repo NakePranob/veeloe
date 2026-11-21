@@ -5,44 +5,37 @@
   },
   "name": "Name",
   "provider": {
-    "heading": "Provider and model",
-    "footer": "The models come from the Providers set on this Machine. Someone with Manage can change them later, from the next Task on (ADR 0042).",
-    "none": "This Machine has no Provider yet",
-    "command": "veeloe provider add --name <name> --url <base url>",
-    "nextTask": "A change takes effect from the next Task. A Task already going keeps its model to the end, since changing it midway restarts the prompt cache and loses its thinking. If a Provider goes down, every Agent on the Machine that uses it stops with it (ADR 0042)."
+    "heading": "Provider and model"
   },
   "budget": {
-    "heading": "Today's Budget",
-    "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget (ADR 0043).",
     "label": "Today's Budget",
-    "used": "{{used}} of {{budget}} tokens ({{percent}}%)",
+    "perDay": "{{budget}} a day",
+    "used": "tokens · {{percent}}%",
     "spent": " · used up",
     "field": "Budget per day (million tokens)",
-    "default": "The Budget starts at 10M tokens a day. You can change it later on the Agent's page (ADR 0043).",
-    "list": "Today's Budget {{percent}}%",
-    "of": "of {{budget}} tokens"
+    "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget (ADR 0043)."
   },
   "tasks": {
+    "heading": "Latest Tasks",
     "new": "New Task",
     "footer": "Only the Tasks you started are here (ADR 0060).",
     "untitled": "No message yet"
   },
   "approval": {
-    "heading": "Approval",
-    "footer": "An Approval nobody answers before this time counts as denied (ADR 0003).",
     "waiting": "Approval waits",
     "minutes_one": "{{count}} minute",
     "minutes_other": "{{count}} minutes",
     "hours_one": "{{count}} hour",
-    "hours_other": "{{count}} hours"
+    "hours_other": "{{count}} hours",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days"
   },
-  "more": {
-    "heading": "More settings",
-    "footer": "A new model takes effect from the next Task; a Task already running keeps its model to the end (ADR 0042)"
+  "identity": "Identity",
+  "work": {
+    "heading": "How it works",
+    "footer": "A new model takes effect from the next Task. An Approval nobody answers before it expires counts as denied (ADR 0042, 0003)."
   },
   "allowlist": {
-    "heading": "Commands that run without asking for an Approval",
-    "footer": "The read-only set is ticked for you; untick what you don't want before signing. There is no find, which has -exec and -delete, no sed, which has -i, and neither git nor npm on its own (ADR 0030).",
     "row": "Allowlist",
     "count_one": "{{count}} entry",
     "count_other": "{{count}} entries"
@@ -51,8 +44,7 @@
   "saving": "Saving on the Machine",
   "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",
   "character": {
-    "detail": "How it looks and moves in the Inbox",
-    "edit": "Edit the Character"
+    "detail": "How it looks and moves in the Inbox"
   },
   "problem": {
     "provider": "Provider {{provider}} is no longer on the Machine, so this Agent can't answer. Pick a new Provider below.",
@@ -60,7 +52,6 @@
     "choose": "Pick a new Provider"
   },
   "delete": {
-    "heading": "Danger zone",
     "action": "Delete this Agent",
     "title": "Delete {{name}}?",
     "body": "The Agent stops and moves to Deleted Agents. Its Workdir and Task history stay on the Machine, and you can restore it for 30 days.",

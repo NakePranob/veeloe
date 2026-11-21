@@ -27,6 +27,9 @@ export function MemoryPage() {
   const status = useMemoryStatus(machine?.id ?? "", agent?.id ?? "");
   const online = machineStatus.online;
   const memory = status.memory;
+  const limit = MEMORY_LIMIT.toLocaleString(language);
+  const count = memory ? t("count", { chars: memory.chars.toLocaleString(language), limit }) : "";
+  const fetched = status.fetchedAt ? t("fetched", { when: when(status.fetchedAt, language, now) }) : "";
 
   // Ask on open and again when the Machine comes back; reading never writes anything.
   useEffect(() => {
@@ -44,13 +47,14 @@ export function MemoryPage() {
   return (
     <Screen
       title={t("title")}
+      subtitle={agent?.name}
       right={
         machine && agent
           ? { label: t("refresh"), icon: "refresh", onPress: () => void link?.requestMemory(machine, agent.id) }
           : undefined
       }
     >
-      <Note>{t("note")}</Note>
+      <Note tone="plain">{t("note")}</Note>
       {online === false && (
         <Note icon="offline" iconColor="orange">
           {t("needsOnline")}
@@ -71,24 +75,24 @@ export function MemoryPage() {
       )}
       {memory && !memory.exists && <Empty icon="memory" title={t("empty.title")} detail={t("empty.body")} />}
       {memory?.exists && (
-        <Section title={t("heading")}>
-          <View style={{ gap: space.sm, padding: space.sm }}>
+        <Section title={t("heading")} footer={status.fetchedAt ? `${count} · ${fetched}` : undefined}>
+          <View style={{ gap: 10, padding: 14 }}>
             {/* The file it is, as on the board's Memory card. */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-              <Icon name="file" size="sm" color="secondaryLabel" />
-              <Text variant="footnote" mono tone="secondary">
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+              <Icon name="file" size="sm" color="bodyLabel" />
+              <Text variant="footnote" mono strong tone="body">
                 MEMORY.md
               </Text>
             </View>
             {memory.chars > MEMORY_LIMIT && (
               <Text variant="footnote" tone="secondary">
-                {t("capped", { limit: MEMORY_LIMIT })}
+                {t("capped", { limit })}
               </Text>
             )}
             {memory.text ? (
               // Plain text only: Memory is Agent-written and may be poisoned, so nothing here
               // is interpreted as Markdown or HTML, and nothing is tappable.
-              <Text variant="subheadline" code>
+              <Text variant="footnote" mono style={{ lineHeight: 21 }}>
                 {memory.text}
               </Text>
             ) : (
@@ -97,10 +101,11 @@ export function MemoryPage() {
           </View>
         </Section>
       )}
-      {memory && status.fetchedAt ? (
-        <Text variant="footnote" tone="secondary" style={{ paddingHorizontal: space.sm }}>
-          {memory.exists ? `${t("count", { chars: memory.chars, limit: MEMORY_LIMIT })} · ` : ""}
-          {t("fetched", { when: when(status.fetchedAt, language, now) })}
+      {/* ponytail: the board's "today's notes" section (notes/<date>.md) has no data yet: the Runtime
+          sends only MEMORY.md. Add it when the memory reply carries the day's notes file. */}
+      {memory && !memory.exists && status.fetchedAt ? (
+        <Text variant="caption" tone="secondary" style={{ paddingHorizontal: 14, lineHeight: 18 }}>
+          {fetched}
         </Text>
       ) : null}
     </Screen>

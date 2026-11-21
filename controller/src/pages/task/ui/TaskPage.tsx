@@ -7,27 +7,29 @@ import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, View, type Scrol
 import { allowlistOf, useAgents, useTrashedAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { dismissPendingMessage, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents, useTaskRow } from "../../../entities/task";
+import { dismissPendingMessage, isBudgetOut, latestOf, statusOf, TaskStatusLabel, usePendingMessages, useTaskEvents, useTaskRow } from "../../../entities/task";
 import { MAX_ATTACHMENT_BYTES, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
-import { useNow, when } from "../../../shared/lib";
-import { Bubble, Button, Card, Chip, column, confirm, Fade, FADE, font, HeaderAction, Icon, Input, Inset, Label, space, Spinner, Text } from "../../../shared/ui";
-import { contextUsageOf, items, type Item } from "../model/items";
+import { formatTokens, useNow, when } from "../../../shared/lib";
+import { Bubble, Button, Card, Chip, column, confirm, Fade, FADE, font, HeaderAction, Icon, Input, Inset, Label, Meter, space, Spinner, Text } from "../../../shared/ui";
+import { contextUsageOf, items, type Item, type ToolCall } from "../model/items";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
 import { ContextMeter } from "./ContextMeter";
 import { ChangesRow, ToolCalls } from "./ToolCalls";
 
 
-function FailedCard({ code }: { code: string }) {
+function FailedCard({ code, agentName }: { code: string; agentName: string }) {
   const t = useT("task");
   return (
     <Card tone="danger" style={{ padding: 14, gap: 6 }}>
       <Label icon="failed" iconColor="red" variant="subheadline" tone="label" strong>
         <Text variant="subheadline" tone="danger" strong style={{ fontSize: 14 }}>{t("failedTitle")}</Text>
       </Label>
-      <Text variant="subheadline" tone="secondary" style={{ fontSize: 14, lineHeight: 21 }}>{describeError({ code })}</Text>
+      <Text variant="subheadline" tone="body" style={{ fontSize: 14, lineHeight: 21 }}>
+        {describeError({ code })} {t("failedBody", { name: agentName })}
+      </Text>
     </Card>
   );
 }
@@ -48,7 +50,7 @@ function CompactedCard({ item }: { item: Extract<Item, { kind: "compacted" }> })
     <Pressable onPress={() => setOpen(!open)} accessibilityRole="button">
       <Card style={{ padding: 14, gap: 6 }}>
         <Label icon="info" tone="label" strong variant="subheadline">{t("compacted.title")} · {when(item.at, language)}</Label>
-        <Text variant="subheadline" tone="secondary" numberOfLines={open ? undefined : 2} selectable style={{ fontSize: 14, lineHeight: 21 }}>
+        <Text variant="subheadline" tone="body" numberOfLines={open ? undefined : 2} selectable style={{ fontSize: 14, lineHeight: 21 }}>
           {item.summary}
         </Text>
         <Text variant="caption" strong style={{ textDecorationLine: "underline" }}>
@@ -95,7 +97,7 @@ function FileCard({ item, onOpen }: { item: Extract<Item, { kind: "file" }>; onO
     <Card style={{ paddingVertical: 10, paddingRight: 10, paddingLeft: 14, gap: space.sm }}>
       <View aria-label={t("file.offered")} style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
         <Inset chip>
-          <Icon name="attach" size="md" />
+          <Icon name="file" size="md" color="link" />
         </Inset>
         <View style={{ flex: 1 }}>
           <Text variant="subheadline" strong numberOfLines={1} style={{ fontSize: 14 }}>{item.name}</Text>
@@ -109,18 +111,28 @@ function FileCard({ item, onOpen }: { item: Extract<Item, { kind: "file" }>; onO
 }
 
 // The one failure with a way out: the Turn stopped because today's token Budget ran out (`daily-budget`).
-function BudgetCard({ machine, agent, readOnly }: { machine: string; agent: string; readOnly: boolean }) {
+function BudgetCard({ machine, agent, readOnly }: { machine: string; agent: AgentRow; readOnly: boolean }) {
   const t = useT("task");
+  const used = agent.usage_tokens ?? 0;
   return (
     <Card tone="warning" style={{ padding: 14 }}>
       <Label icon="info" iconColor="orange" tone="label" strong variant="subheadline">
         {t("budget.out")}
       </Label>
-      <Text variant="subheadline" tone="secondary" style={{ fontSize: 14, lineHeight: 21 }}>{t("budget.body", { machine })}</Text>
+      <Text variant="subheadline" tone="body" style={{ fontSize: 14, lineHeight: 21 }}>{t("budget.body", { machine })}</Text>
+      {/* How much of today's Budget went, from the Agent's usage; a deleted Agent's placeholder has none. */}
+      {!!agent.budget && (
+        <>
+          <Meter thin value={used / agent.budget} label={t("budget.out")} />
+          <Text variant="caption" tone="secondary">
+            {t("budget.used", { used: formatTokens(used), budget: formatTokens(agent.budget) })}
+          </Text>
+        </>
+      )}
       {/* A deleted Agent has no settings page, so the way to add Budget goes with it. */}
       {!readOnly && (
         <View style={{ flexDirection: "row" }}>
-          <Button label={t("budget.add")} variant="primary" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent } })} />
+          <Button label={t("budget.add")} variant="primary" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} />
         </View>
       )}
     </Card>
@@ -133,7 +145,7 @@ function InterruptedCard({ machine, agentName, onContinue, readOnly }: { machine
   return (
     <Card style={{ padding: 14 }}>
       <Label icon="offline" iconColor="label" tone="label" strong variant="subheadline">{t("interrupted.title", { machine })}</Label>
-      <Text variant="subheadline" tone="secondary" style={{ fontSize: 14, lineHeight: 21 }}>{t("interrupted.body", { name: agentName })}</Text>
+      <Text variant="subheadline" tone="body" style={{ fontSize: 14, lineHeight: 21 }}>{t("interrupted.body", { name: agentName })}</Text>
       {/* Carry on sends a message, which a deleted Agent can no longer take. */}
       {!readOnly && (
         <View style={{ flexDirection: "row" }}>
@@ -141,6 +153,22 @@ function InterruptedCard({ machine, agentName, onContinue, readOnly }: { machine
         </View>
       )}
     </Card>
+  );
+}
+
+// The boards' centred time line between groups far apart: today and yesterday by name, else the date.
+function Separator({ at, now }: { at: number; now: number }) {
+  const t = useT("task");
+  const language = useLanguage();
+  const date = new Date(at);
+  const time = date.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" });
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(new Date(now)) - day(date)) / 86_400_000);
+  const words = days === 0 ? t("separator.today", { time }) : days === 1 ? t("separator.yesterday", { time }) : t("separator.date", { date: date.toLocaleDateString(language, { day: "numeric", month: "short" }), time });
+  return (
+    <Text variant="caption" tone="secondary" style={{ alignSelf: "center" }}>
+      {words}
+    </Text>
   );
 }
 
@@ -201,6 +229,8 @@ export function TaskPage() {
   if (!agents || !trashedAgents || !machine || !events || !pending) return <Stack.Screen options={{ title: t("title") }} />;
   const { items: shown, working } = items(events, now);
   const message = text.trim();
+  // The command running now, when there is one, for the working line.
+  const running = shown.flatMap((item) => (item.kind === "tools" ? item.calls : [])).findLast((call: ToolCall) => call.state === "running" && call.tool === "bash" && call.target);
   const latest = latestOf(events);
   const taskStatus = statusOf(latest, status.online);
   const contextUsage = events ? contextUsageOf(events) : null;
@@ -261,28 +291,55 @@ export function TaskPage() {
           title: agent.name,
           // The Character left of the name, doing what this Task is doing, and the status under the name;
           // a tap opens the Agent's page, as the settings button does. A deleted Agent has no page.
-          headerTitle: () => (
-            <Pressable role="button" aria-label={t("openAgent", { name: agent.name })} disabled={readOnly} onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-              <Character look={lookOfJson(agent.character)} mood={moodOf(events, status.online)} size={52} />
-              <View>
-                <Text variant="headline" numberOfLines={1}>
-                  {agent.name}
-                </Text>
-                {/* A Task nobody has written in is not "done" yet. */}
-                {taskStatus === "failed" ? (
-                  <Text variant="caption" tone="danger" numberOfLines={1}>
-                    {t("failedTitle")}
+          // The boards' title for each state: a deleted Agent's grey name and trash, a new Task's own title, and
+          // otherwise the Character left of the name doing what this Task does. Waiting drops the head, since the
+          // Approval card under it already carries one. A tap opens the Agent's page, as the settings button does.
+          headerTitle: () =>
+            readOnly ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+                <Icon name="trash" size="md" color="tertiaryLabel" />
+                <View>
+                  <Text variant="headline" tone="secondary" numberOfLines={1}>
+                    {t("deletedAgent")}
                   </Text>
-                ) : (
-                  taskStatus !== "new" && <TaskStatusLabel status={taskStatus} variant="caption" />
-                )}
+                  <Text variant="caption" tone="secondary" numberOfLines={1}>
+                    {t("deletedSubtitle")}
+                  </Text>
+                </View>
               </View>
-            </Pressable>
-          ),
+            ) : (
+              <Pressable role="button" aria-label={t("openAgent", { name: agent.name })} onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+                {taskStatus !== "new" && taskStatus !== "waiting" && <Character look={lookOfJson(agent.character)} mood={moodOf(events, status.online)} size={52} />}
+                <View style={{ alignItems: taskStatus === "new" || taskStatus === "waiting" ? "center" : "flex-start" }}>
+                  <Text variant="headline" numberOfLines={1}>
+                    {taskStatus === "new" ? t("newTitle") : agent.name}
+                  </Text>
+                  {taskStatus === "new" ? (
+                    <Text variant="caption" tone="secondary" numberOfLines={1}>
+                      {t("newSubtitle", { name: agent.name, machine: machine.name })}
+                    </Text>
+                  ) : taskStatus === "waiting" ? (
+                    <Text variant="caption" tone="secondary" numberOfLines={1}>
+                      {t("waitingHeader")}
+                    </Text>
+                  ) : taskStatus === "failed" && isBudgetOut(latest) ? (
+                    <Text variant="caption" tone="secondary" numberOfLines={1}>
+                      {t("budgetHeader")}
+                    </Text>
+                  ) : taskStatus === "failed" ? (
+                    <Text variant="caption" tone="danger" numberOfLines={1}>
+                      {t("failedTitle")}
+                    </Text>
+                  ) : (
+                    <TaskStatusLabel status={taskStatus} variant="caption" />
+                  )}
+                </View>
+              </Pressable>
+            ),
         }}
       />
       {/* Other Tasks, a new Task and the settings all live on the Agent's page. */}
-      {!readOnly && <HeaderAction label={t("agent")} icon="settings" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} />}
+      {!readOnly && <HeaderAction label={t("agent")} icon="sliders" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} />}
       <ScrollView
         ref={scroll}
         keyboardShouldPersistTaps="handled"
@@ -346,10 +403,12 @@ export function TaskPage() {
             <FileCard key={item.key} item={item} onOpen={() => (link && machine ? link.openFile(machine, task, agent.id, item.path, item.hash, item.name) : Promise.reject(new Error("hub.machine_offline")))} />
           ) : item.kind === "interrupted" ? (
             <InterruptedCard key={item.key} machine={machine.name} agentName={agent.name} readOnly={readOnly} onContinue={() => send(t("interrupted.continueMessage"))} />
+          ) : item.kind === "time" ? (
+            <Separator key={item.key} at={item.at} now={now} />
           ) : item.code === "budget.exhausted" ? (
-            <BudgetCard key={item.key} machine={machine.name} agent={agent.id} readOnly={readOnly} />
+            <BudgetCard key={item.key} machine={machine.name} agent={agent} readOnly={readOnly} />
           ) : (
-            <FailedCard key={item.key} code={item.code} />
+            <FailedCard key={item.key} code={item.code} agentName={agent.name} />
           ),
         )}
         {pending.map((p, index) => (
@@ -368,6 +427,8 @@ export function TaskPage() {
                   </Pressable>
                 </View>
               ) : (
+                // ponytail: the board's "ลบ" on a queued message needs a way to take it back off the Machine's queue,
+                // which the Protocol does not have; removing only the local copy would still send it. Add it with that message.
                 <Label icon="time" variant="caption">
                   {busy ? t("queuedPosition", { position: index + 1 }) : t("sending")}
                 </Label>
@@ -375,14 +436,23 @@ export function TaskPage() {
             }
           />
         ))}
-        {working && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-            <Spinner />
-            <Text variant="footnote" tone="secondary">
-              {t("working")}
-            </Text>
-          </View>
-        )}
+        {working &&
+          (running ? (
+            // The board's grey pill naming the command under way.
+            <Card style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: space.sm, height: 32, paddingVertical: 0, paddingHorizontal: 12, borderRadius: 16 }}>
+              <Spinner />
+              <Text variant="caption" tone="body" mono numberOfLines={1} style={{ flexShrink: 1 }}>
+                {t("runningCommand", { target: running.target })}
+              </Text>
+            </Card>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+              <Spinner />
+              <Text variant="footnote" tone="secondary">
+                {t("working")}
+              </Text>
+            </View>
+          ))}
       </ScrollView>
       <Fade />
       {/* Clear of the home indicator, as in controller-prototype's TaskPage (insets.bottom under the Composer). */}

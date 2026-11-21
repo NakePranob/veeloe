@@ -8,7 +8,8 @@
     "link": "No camera on the new device? Open or paste this link there",
     "share": "Share link",
     "waiting": "Waiting for the new device…",
-    "secret": "This QR code and link hold a secret. Only give them to your own new device, and don't keep a photo of them."
+    "secret": "This QR code and link hold a secret. Only give them to your own new device, and don't keep a photo of them.",
+    "expiresIn": "Expires in {{left}}"
   },
   "expired": "This QR code expired before a new device used it.",
   "again": "Make a new QR code",

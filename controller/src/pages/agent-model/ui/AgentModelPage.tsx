@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Keyboard } from "react-native";
+import { Keyboard, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
@@ -8,8 +8,7 @@ import { describeError, useT } from "../../../shared/i18n";
 import { Empty, Note, Row, Screen, Spinner } from "../../../shared/ui";
 import { modelsOf, ProviderModelSections } from "../../../widgets/provider-models";
 
-// The Provider and model sections of New Agent, saved with the header button as New Agent creates with
-// it. Stands in for the prototype's two menus on the Agent page (agent-settings design).
+// The AgentModel board: the Provider and model picker New Agent also uses, saved with the header button.
 function Picker({ agent }: { agent: AgentRow }) {
   const t = useT("agent-model");
   const link = useMachineLink();
@@ -43,31 +42,29 @@ function Picker({ agent }: { agent: AgentRow }) {
   }
 
   return (
-    <Screen title={t("provider.heading")} right={{ label: t("save"), onPress: save, disabled: !changed || !listed || offline || !!sent }}>
-      {offline && (
-        <Note icon="offline" iconColor="orange">
-          {t("needsOnline")}
-        </Note>
-      )}
-      <ProviderModelSections
-        status={status}
-        provider={provider}
-        model={model}
-        footer={t("provider.footer")}
-        onProvider={(name) => {
-          setProvider(name);
-          setModel(name === agent.provider ? agent.model : null);
-        }}
-        onModel={setModel}
-      />
-      {/* The board ends on this, as a note under the model list. */}
-      <Note icon="info">{t("provider.nextTask")}</Note>
-      {sent && <Row title={t("saving")} accessory={<Spinner />} />}
-      {tried && status.updateError && !sent && (
-        <Note icon="warning" iconColor="orange">
-          {describeError({ code: status.updateError })}
-        </Note>
-      )}
+    <Screen title={t("provider.heading")} subtitle={machine ? t("subtitle", { agent: agent.name, machine: machine.name }) : agent.name} right={{ label: t("save"), onPress: save, disabled: !changed || !listed || offline || !!sent }}>
+      {/* The board spaces its blocks 14 apart, closer than the Screen's sections. */}
+      <View style={{ gap: 14 }}>
+        {offline && (
+          <Note icon="offline" iconColor="orange">
+            {t("needsOnline")}
+          </Note>
+        )}
+        <ProviderModelSections
+          status={status}
+          provider={provider}
+          model={model}
+          onProvider={(name) => {
+            setProvider(name);
+            setModel(name === agent.provider ? agent.model : null);
+          }}
+          onModel={setModel}
+        />
+        {sent && <Row title={t("saving")} accessory={<Spinner />} />}
+        {tried && status.updateError && !sent && <Note tone="warning">{describeError({ code: status.updateError })}</Note>}
+        {/* The board ends on this, as a plain paragraph under the model list. */}
+        <Note tone="plain">{t("provider.nextTask")}</Note>
+      </View>
     </Screen>
   );
 }

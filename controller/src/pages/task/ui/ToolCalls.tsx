@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { useToolOutput } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
-import { Card, Chip, Icon, icon, space, Spinner, Tap, Text } from "../../../shared/ui";
+import { Card, Chip, Icon, icon, radius, space, Spinner, Tap, Text } from "../../../shared/ui";
 import { summaryOf, type ToolCall } from "../model/items";
 
 // A command's output runs far longer than a screen: the end, where an error usually is.
@@ -17,15 +17,29 @@ function Status({ state }: { state: ToolCall["state"] }) {
   return state === "ok" ? <Icon name="done" color="green" /> : <Icon name="failed" color="red" />;
 }
 
-/** What a call did, in words: a verb for each tool the Runtime has, and the tool's own name for one this build does not know. */
-function useLabel() {
+// Where the target goes in a verb's words, so each language keeps its own order around it.
+const MARK = "\u0000";
+
+/**
+ * What a call did, in words: a verb for each tool the Runtime has, and the tool's own name for one this build
+ * does not know. The words are the body font and only the target is mono, as the boards draw it; Memory's note stays prose.
+ */
+function CallLabel({ call, tone = "label", numberOfLines, selectable }: { call: ToolCall; tone?: "label" | "danger"; numberOfLines?: number; selectable?: boolean }) {
   const t = useT("task");
-  return (call: ToolCall) => ((VERBS as readonly string[]).includes(call.tool) ? t(`tools.verbs.${call.tool as (typeof VERBS)[number]}`, { target: call.target }) : t("tools.other", { tool: call.tool }));
+  const known = (VERBS as readonly string[]).includes(call.tool);
+  const words = known ? t(`tools.verbs.${call.tool as (typeof VERBS)[number]}`, { target: MARK }) : t("tools.other", { tool: call.tool });
+  const [before, after] = words.split(MARK);
+  return (
+    <Text variant="footnote" tone={tone} numberOfLines={numberOfLines} selectable={selectable} style={{ flex: 1 }}>
+      {before}
+      {after !== undefined && (call.tool === "memory" ? <Text variant="footnote" tone="body">{call.target}</Text> : <Text variant="caption" mono tone={tone}>{call.target}</Text>)}
+      {after}
+    </Text>
+  );
 }
 
 function CallRow({ call }: { call: ToolCall }) {
   const t = useT("task");
-  const label = useLabel();
   const output = call.state === "unfinished" ? t("tools.unfinished") : call.output;
   return (
     <View style={{ flexDirection: "row", gap: space.sm }}>
@@ -33,9 +47,7 @@ function CallRow({ call }: { call: ToolCall }) {
         <Status state={call.state} />
       </View>
       <View style={{ flex: 1, gap: space.xs / 2 }}>
-        <Text variant="footnote" mono selectable>
-          {label(call)}
-        </Text>
+        <CallLabel call={call} selectable />
         {output ? (
           <Text variant="caption" tone="secondary" mono selectable>
             {tailOf(output)}
@@ -69,7 +81,6 @@ function Live({ id }: { id: string }) {
 // else the latest that failed with its last error line, else the last, and how many more it hides.
 export function ToolCalls({ calls }: { calls: ToolCall[] }) {
   const t = useT("task");
-  const label = useLabel();
   const [open, setOpen] = useState(false);
   const { call, error, hidden, hiddenFailed } = summaryOf(calls);
   return (
@@ -78,19 +89,20 @@ export function ToolCalls({ calls }: { calls: ToolCall[] }) {
         <View style={{ width: icon.md, alignItems: "center" }}>
           <Status state={call.state} />
         </View>
-        <Text variant="footnote" mono numberOfLines={1} tone={call.state === "failed" ? "danger" : "label"} style={{ flex: 1 }}>
-          {label(call)}
-        </Text>
+        <CallLabel call={call} numberOfLines={1} tone={call.state === "failed" ? "danger" : "label"} />
         {hidden > 0 && <Chip tone="count" label={t("tools.more", { count: hidden })} urgent={false} />}
         {hiddenFailed && <Icon name="failed" size="xs" color="red" />}
         <Icon name={open ? "collapse" : "expand"} size="xs" weight="semibold" />
       </Tap>
       {!open && call.state === "running" && <Live id={call.id} />}
       {!open && error && (
+        // The board's white code box under the failed call.
         <View style={{ paddingLeft: space.sm + icon.md + space.sm, paddingRight: space.sm, paddingBottom: space.sm }}>
-          <Text variant="caption" tone="secondary" mono numberOfLines={2} selectable>
-            {error}
-          </Text>
+          <Card tone="surface" style={{ paddingVertical: space.sm, paddingHorizontal: 10, borderRadius: 10 }}>
+            <Text variant="caption" tone="body" mono numberOfLines={2} selectable style={{ fontSize: 11, lineHeight: 16 }}>
+              {error}
+            </Text>
+          </Card>
         </View>
       )}
       {open && (
@@ -104,31 +116,37 @@ export function ToolCalls({ calls }: { calls: ToolCall[] }) {
   );
 }
 
-// The files a Turn changed with edit and write, under the Turn; a tap lists them.
+// The files a Turn changed with edit and write, under the Turn: the board's grey pill, and a tap lists them.
+// ponytail: the board's +/- line counts need per-edit diffs the log does not carry; add them when tool.result does.
 export function ChangesRow({ files }: { files: string[] }) {
   const t = useT("task");
   const [open, setOpen] = useState(false);
   return (
-    <Card style={{ padding: space.xs, gap: 0 }}>
-      <Tap onPress={() => setOpen(!open)} style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 44, paddingHorizontal: space.sm }}>
-        <Icon name="thread" size="md" color="label" />
-        <Text variant="footnote" strong style={{ flex: 1 }}>
-          {t("changes", { count: files.length })}
-        </Text>
-        <Icon name={open ? "collapse" : "expand"} size="xs" weight="semibold" />
-      </Tap>
+    <View style={{ gap: space.sm }}>
+      <Pressable
+        role="button"
+        aria-expanded={open}
+        hitSlop={6}
+        onPress={() => setOpen(!open)}
+        style={({ pressed }) => ({ alignSelf: "flex-start", opacity: pressed ? 0.6 : 1 })}
+      >
+        <Card style={{ flexDirection: "row", alignItems: "center", gap: space.sm, height: 32, paddingVertical: 0, paddingHorizontal: 12, borderRadius: radius.pill }}>
+          <Text variant="footnote">{t("changes", { count: files.length })}</Text>
+          <Icon name={open ? "collapse" : "expand"} size="xs" weight="semibold" />
+        </Card>
+      </Pressable>
       {open && (
-        <View style={{ gap: space.xs, padding: space.sm }}>
+        <Card style={{ gap: space.xs, padding: 14 }}>
           {files.map((file) => (
-            <Text key={file} variant="footnote" mono selectable>
+            <Text key={file} variant="caption" mono selectable>
               {file}
             </Text>
           ))}
           <Text variant="caption" tone="secondary">
             {t("changesNote")}
           </Text>
-        </View>
+        </Card>
       )}
-    </Card>
+    </View>
   );
 }

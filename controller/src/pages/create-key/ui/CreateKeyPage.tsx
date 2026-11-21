@@ -40,7 +40,7 @@ export function CreateKeyPage({ lost }: { lost: boolean }) {
             <Card style={{ width: 36, height: 36, borderRadius: 18, padding: 0, alignItems: "center", justifyContent: "center" }}>
               <Icon name={p.icon} color="label" />
             </Card>
-            <Text variant="subheadline" style={{ flex: 1, paddingTop: 7 }}>
+            <Text variant="subheadline" tone="body" style={{ flex: 1, paddingTop: 7, fontSize: 14, lineHeight: 21 }}>
               {t(`points.${p.key}`)}
             </Text>
           </View>

@@ -2,22 +2,27 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { useAgents, useTrashedAgents, type AgentTrashRow } from "../../../entities/agent";
-import { Character, lookOfJson, moodOf } from "../../../entities/character";
+import { Character, lookOfJson, moodOf, RETIRED_COLOR } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
+import { STATUS_DOT, statusOf, useTaskSummaries } from "../../../entities/task";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { useNow } from "../../../shared/lib";
-import { Button, Card, Empty, Icon, Note, Screen, Section, Tap, Text, confirm, inform, space } from "../../../shared/ui";
+import { Button, Card, Dot, Empty, Icon, Note, Screen, Section, Tap, Text, confirm, inform, space } from "../../../shared/ui";
 import { daysLeft } from "../model/trash";
 
-// The Agents on every paired Machine, then the ones a Machine deleted and still
-// lets us restore for 30 days (controller-prototype's AgentsPage, `agent-trash`).
+
+// The Agents board: each paired Machine's Agents under its name, then the ones a Machine deleted
+// and still lets us restore for 30 days (`agent-trash`).
+// ponytail: an offline Machine's "last seen" is left out: nothing stores when a Machine was last seen.
 export function AgentsPage() {
   const t = useT("agents");
+  const taskStatus = useT("task-status");
   const now = useNow();
   const agents = useAgents();
   const trashed = useTrashedAgents();
   const machines = useMachines() ?? [];
+  const summaries = useTaskSummaries() ?? [];
   const statuses = useMachineStatuses();
   const link = useMachineLink();
   // The row that was just asked for, until the Machine's answer moves it back.
@@ -33,7 +38,7 @@ export function AgentsPage() {
     if (restoring === row.id) return;
     const machine = machines.find((m) => m.id === row.machine_id);
     if (!link || !machine || statuses[row.machine_id]?.online === false) return inform(t("trash.failed"), t("needsOnline"));
-    if (!(await confirm({ title: t("trash.confirmTitle", { name: row.name }), message: t("trash.confirmBody"), action: t("trash.restore"), cancel: t("delete.cancel") }))) return;
+    if (!(await confirm({ title: t("trash.confirmTitle", { name: row.name }), message: t("trash.confirmBody"), action: t("trash.restore"), cancel: t("cancel") }))) return;
     setRestoring(row.id);
     if (!link.restoreAgent(machine, row.id)) {
       setRestoring(null);
@@ -42,64 +47,77 @@ export function AgentsPage() {
   }
 
   return (
-    <Screen title="Agent" bottom={<Button label={t("create")} variant="primary" size="large" leading="add" onPress={() => router.push("/agents/new")} />}>
-      {agents?.length === 0 ? (
-        <Empty icon="agent" title={t("none.title")} detail={t("none.body")} />
-      ) : (
-        <Card style={{ padding: 6, gap: 0 }}>
-          {agents?.map((agent) => {
-            const online = statuses[agent.machine_id]?.online ?? null;
-            const percent = agent.budget ? Math.round(((agent.usage_tokens ?? 0) / agent.budget) * 100) : null;
-            const spent = percent !== null && percent >= 100;
-            return (
-              <Tap key={agent.id} href={`/agents/${agent.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm, paddingHorizontal: 10, borderRadius: 16 }}>
-                <Character look={lookOfJson(agent.character)} mood={moodOf([], online)} size={52} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text strong tone={online === false ? "secondary" : "label"} style={{ fontSize: 16 }}>
-                    {agent.name}
-                  </Text>
-                  <Text variant="caption" tone="secondary" mono numberOfLines={1}>
-                    {agent.model}
-                  </Text>
-                  <Text variant="footnote" tone="secondary" numberOfLines={1}>
-                    {machines.find((m) => m.id === agent.machine_id)?.name}
-                    {online === false ? ` · ${t("offline")}` : ""}
-                    {percent !== null && online !== false ? (
-                      <Text variant="footnote" strong={spent} tone={spent ? "danger" : "secondary"}>
-                        {` · ${t("budget.list", { percent })}${spent ? t("budget.spent") : ""}`}
+    <Screen title="Agent" subtitle={agents?.length ? t("subtitle", { count: agents.length, machines: machines.length }) : undefined} right={{ label: t("create"), icon: "add", variant: "chip", onPress: () => router.push("/agents/new") }}>
+      {agents?.length === 0 && <Empty icon="agent" title={t("none.title")} detail={t("none.body")} />}
+      {machines.map((machine) => {
+        const own = agents?.filter((agent) => agent.machine_id === machine.id) ?? [];
+        if (own.length === 0) return null;
+        const online = statuses[machine.id]?.online ?? null;
+        return (
+          <View key={machine.id} style={{ gap: 6, opacity: online === false ? 0.6 : 1 }}>
+            <Tap href={`/machines/${machine.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: 14, minHeight: 28 }}>
+              <Dot color={online === false || online === null ? "tertiaryLabel" : "green"} />
+              <Text variant="footnote" strong mono>
+                {machine.name}
+              </Text>
+              <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
+                {t("count", { count: own.length })}
+              </Text>
+            </Tap>
+            <Card style={{ padding: space.xs, gap: 0 }}>
+              {own.map((agent) => {
+                // Summaries come newest first, so the first is what the Agent did last.
+                const latest = summaries.find((task) => task.agent_id === agent.id);
+                const status = statusOf(latest, online);
+                const spent = !!agent.budget && (agent.usage_tokens ?? 0) >= agent.budget && online !== false;
+                const loud = spent || status === "waiting";
+                return (
+                  <Tap key={agent.id} href={`/agents/${agent.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 7, paddingHorizontal: 10 }}>
+                    <Character look={lookOfJson(agent.character)} mood={moodOf(latest?.latest_kind ? [{ kind: latest.latest_kind, body: latest.latest_body }] : [], online)} size={40} />
+                    <View style={{ flex: 1, gap: 1 }}>
+                      <Text variant="subheadline" strong numberOfLines={1} tone={online === false ? "secondary" : "label"}>
+                        {`${agent.name} `}
+                        <Text variant="caption" tone="secondary" mono>
+                          {agent.model}
+                        </Text>
                       </Text>
-                    ) : null}
-                  </Text>
-                </View>
-                <Icon name="disclosure" size="sm" color="secondaryLabel" weight="semibold" />
-              </Tap>
-            );
-          })}
-        </Card>
-      )}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                        <Dot color={spent ? "red" : STATUS_DOT[status]} size={7} />
+                        <Text variant="caption" strong={loud} tone={spent ? "danger" : loud ? "label" : "body"} numberOfLines={1}>
+                          {spent ? t("spent") : taskStatus(status)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Icon name="disclosure" size="sm" color="secondaryLabel" weight="semibold" />
+                  </Tap>
+                );
+              })}
+            </Card>
+          </View>
+        );
+      })}
       {trashed && trashed.length > 0 && (
         <>
-          {failure && (
-            <Note icon="warning" iconColor="orange">
-              {describeError({ code: failure })}
-            </Note>
-          )}
+          {failure && <Note tone="warning">{describeError({ code: failure })}</Note>}
           <Section title={t("trash.title")} footer={t("trash.footer")}>
-            <View style={{ padding: 6 }}>
+            <View style={{ padding: space.xs }}>
               {trashed.map((row) => (
-                <View key={row.id} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm, paddingHorizontal: 10 }}>
+                <View key={row.id} style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 7, paddingHorizontal: 10 }}>
                   <View style={{ opacity: 0.6 }}>
-                    <Character look={lookOfJson(row.character)} mood="idle" size={44} still />
+                    <Character look={{ ...lookOfJson(row.character), color: RETIRED_COLOR }} mood="idle" size={40} still />
                   </View>
-                  <View style={{ flex: 1, gap: 2 }}>
+                  <View style={{ flex: 1, gap: 1 }}>
                     <Text variant="subheadline" strong tone="secondary">
                       {row.name}
                     </Text>
-                    <Text variant="footnote" tone="secondary">
-                      {`${machines.find((m) => m.id === row.machine_id)?.name ?? ""} · ${t("trash.days", { count: daysLeft(row, now) })}`}
+                    <Text variant="caption" tone="secondary">
+                      <Text variant="caption" tone="secondary" mono>
+                        {machines.find((m) => m.id === row.machine_id)?.name ?? ""}
+                      </Text>
+                      {` · ${t("trash.days", { count: daysLeft(row, now) })}`}
                     </Text>
                   </View>
-                  <Button label={restoring === row.id ? t("trash.restoring") : t("trash.restore")} variant="surface" size="small" disabled={restoring === row.id} onPress={() => void restore(row)} />
+                  <Button label={restoring === row.id ? t("trash.restoring") : t("trash.restore")} variant="surface" disabled={restoring === row.id} onPress={() => void restore(row)} />
                 </View>
               ))}
             </View>

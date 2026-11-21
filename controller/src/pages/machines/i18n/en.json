@@ -9,27 +9,59 @@
   "agents_other": "{{count}} Agents",
   "online": "Online",
   "offline": "Offline",
+  "budgetTotal": "Budget today, all",
+  "budgetUnknown": "Today's Budget not known yet",
+  "usedOf": "{{used}} of {{limit}}",
+  "listLine": "{{status}} · {{agents}}",
   "missing": {
     "title": "Machine not found",
     "body": "It may have been unpaired."
   },
   "status": {
-    "heading": "Status",
     "checking": "Checking",
-    "version": "Runtime version",
     "disk": "Free disk",
     "budget": "Budget today",
     "lastError": "Last error",
-    "features": "Features"
+    "seeProvider": "See Providers",
+    "features": "Features this Machine supports"
   },
-  "onMachine": "Agents on this Machine",
+  "tile": {
+    "needsYou": "{{count}} need you",
+    "working": "{{count}} working",
+    "spent": "{{count}} out",
+    "budget": "{{used}} of {{limit}} today"
+  },
+  "tabs": {
+    "info": "Machine"
+  },
+  "info": {
+    "footer": "The Runtime reports this each time it connects to the Hub."
+  },
   "noAgent": "No Agent yet",
+  "agentsTab": {
+    "create": "Create an Agent on this Machine",
+    "spent": "Budget used up",
+    "search": "Search Agents on this Machine",
+    "searchPlaceholder": "Search {{count}} Agents",
+    "noMatch": "No Agent matches",
+    "group": {
+      "needsYou": "Need you",
+      "working": "Working",
+      "idle": "Idle"
+    },
+    "seeAll": "See all {{count}}",
+    "seeAllDetail": "{{count}} more: {{working}} working · {{idle}} idle",
+    "footer": "The figure on the right is each Agent's Budget today. An Agent stays on one Machine and reaches only that Machine's files and tools (ADR 0002).",
+    "footerMany": "Agents that need you always come first. The first {{count}} are shown; see the rest on the all-Agents page."
+  },
   "provider": {
-    "footer": "Providers are set on the Machine with veeloe provider add, and their keys stay on it (ADR 0042).",
+    "footer": "The key is sealed to this Machine before it is sent and stays on it alone. You can also set it on the Machine with veeloe provider add (ADR 0042).",
     "none": "This Machine has no Provider yet",
     "command": "veeloe provider add --name <name> --url <base url>",
     "models_one": "{{count}} model",
     "models_other": "{{count}} models",
+    "usedBy": "used by {{agents}}",
+    "ok": "Working",
     "add": "Add Provider",
     "custom": "Custom Provider",
     "name": "Provider name",
@@ -47,8 +79,7 @@
     "whoOne": "the Agent {{agent}} on {{machine}}",
     "agent": "Agent",
     "allAgents": "All Agents",
-    "footer": "These domains are open to {{who}}, not to one Agent alone. Outside this list the sandbox lets no Agent out. Data can still leave to the domains listed, so add only ones you trust (ADR 0008).",
-    "footerOne": "These domains are open to {{who}} alone; the other Agents are untouched. Outside this list the sandbox lets it out nowhere. Data can still leave to the domains listed, so add only ones you trust (ADR 0008).",
+    "footer": "Data can still leave to the domains listed, so add only ones you trust. While working, an Agent can ask for a new domain through an Approval (ADR 0008).",
     "none": {
       "title": "No domains allowed",
       "detail": "Agents can't reach the internet at all",
@@ -67,7 +98,9 @@
       "title": "Not a valid domain",
       "body": "Enter a domain name only, such as github.com or *.npmjs.org, without https:// or a path."
     },
-    "duplicate": "This domain is already listed"
+    "duplicate": "This domain is already listed",
+    "top": "Only the domains on this list are open to {{who}}; the sandbox shuts out everything else.",
+    "topOne": "Only the domains on this list are open to {{who}}, and the other Agents are untouched. The sandbox shuts out everything else."
   },
-  "listLine": "Runtime {{version}} · {{agents}}"
+  "pickCancel": "Cancel"
 }

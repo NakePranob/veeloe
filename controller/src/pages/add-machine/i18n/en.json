@@ -8,7 +8,10 @@
     "stopScan": "Stop scanning",
     "paste": "Paste the link",
     "continue": "Continue",
-    "noCamera": "Veeloe can't use the camera here. Paste the link instead."
+    "noCamera": "Veeloe can't use the camera here. Paste the link instead.",
+    "install": "Install the Runtime on the computer the Agents will work on",
+    "waiting": "Waiting for the Machine…",
+    "scanHint": "Fit the QR code inside the frame"
   },
   "confirm": {
     "heading": "Pair with this Machine?",

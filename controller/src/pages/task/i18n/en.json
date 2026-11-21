@@ -12,13 +12,13 @@
   "offline": "The Machine is offline. Send once it's back.",
   "tools": {
     "verbs": {
-      "bash": "Ran {{target}}",
+      "bash": "{{target}}",
       "read": "Read {{target}}",
       "glob": "Found files {{target}}",
       "grep": "Searched {{target}}",
       "edit": "Edited {{target}}",
-      "write": "Wrote {{target}}",
-      "memory": "Noted in Memory",
+      "write": "Created {{target}}",
+      "memory": "Remembered: {{target}}",
       "send_file": "Sent {{target}}"
     },
     "other": "Used {{tool}}",
@@ -55,7 +55,8 @@
   "budget": {
     "out": "Today's Budget is used up",
     "body": "New work starts at 04:00 in {{machine}}'s time, or when you add Budget. Files it changed are still there.",
-    "add": "Add Budget"
+    "add": "Add Budget",
+    "used": "{{used}} of {{budget}} tokens used"
   },
   "approval": {
     "title": "Can I run this?",
@@ -68,7 +69,7 @@
     "by": " by {{member}}",
     "approved": "Approved",
     "denied": "Denied",
-    "expired": "Timed out, counted as denied",
+    "expired": "Timed out",
     "closed": "Its Turn ended before anyone answered",
     "waitingForApprover": "Waiting for someone with Approve",
     "sent": "Answer sent",
@@ -84,7 +85,9 @@
     "doesNotCover": "This does not cover the command, so it still asks.",
     "signAndApprove": "Sign and approve",
     "cancel": "Cancel",
-    "more": "Other options"
+    "more": "Other options",
+    "expiredNote": "counted as denied",
+    "addedEgress": "added {{target}} to Egress"
   },
   "openAgent": "Open {{name}}",
   "started": "{{machine}} · {{when}}",
@@ -114,5 +117,17 @@
   "changes_other": "Changed {{count}} files",
   "changesNote": "Counts only files the Agent changed with its edit and write tools",
   "failedTitle": "Turn failed",
-  "emptyTitle": "What should {{name}} help with?"
+  "emptyTitle": "What should {{name}} help with?",
+  "waitingHeader": "Waiting for your answer",
+  "budgetHeader": "Today's Budget is used up",
+  "newTitle": "New Task",
+  "newSubtitle": "{{name}} · {{machine}}",
+  "deletedSubtitle": "Read only",
+  "failedBody": "Files it already changed are still there. Send a message and {{name}} can carry on.",
+  "runningCommand": "Running {{target}}",
+  "separator": {
+    "today": "Today {{time}}",
+    "yesterday": "Yesterday {{time}}",
+    "date": "{{date}} {{time}}"
+  }
 }

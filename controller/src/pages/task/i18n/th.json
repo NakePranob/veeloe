@@ -12,13 +12,13 @@
   "offline": "Machine ออฟไลน์อยู่ ส่งได้เมื่อกลับมา",
   "tools": {
     "verbs": {
-      "bash": "รัน {{target}}",
+      "bash": "{{target}}",
       "read": "อ่าน {{target}}",
       "glob": "หาไฟล์ {{target}}",
       "grep": "ค้นหา {{target}}",
       "edit": "แก้ {{target}}",
-      "write": "เขียน {{target}}",
-      "memory": "จด Memory",
+      "write": "สร้าง {{target}}",
+      "memory": "จำไว้: {{target}}",
       "send_file": "ส่งไฟล์ {{target}}"
     },
     "other": "ใช้ {{tool}}",
@@ -55,7 +55,8 @@
   "budget": {
     "out": "Budget ของวันนี้หมดแล้ว",
     "body": "งานใหม่จะเริ่มตอน 04:00 ตามเวลาของ {{machine}} หรือเมื่อเพิ่ม Budget ไฟล์ที่แก้ไว้ยังอยู่",
-    "add": "เพิ่ม Budget"
+    "add": "เพิ่ม Budget",
+    "used": "ใช้ไป {{used}} จาก {{budget}} tokens"
   },
   "approval": {
     "title": "ขอรันอันนี้ได้ไหม?",
@@ -68,7 +69,7 @@
     "by": " โดย {{member}}",
     "approved": "อนุมัติแล้ว",
     "denied": "ปฏิเสธแล้ว",
-    "expired": "หมดเวลา นับว่าปฏิเสธ",
+    "expired": "หมดเวลา",
     "closed": "Turn จบก่อนมีคนตอบ",
     "waitingForApprover": "รอคนที่มี Approve ตอบ",
     "sent": "ส่งคำตอบแล้ว",
@@ -84,7 +85,9 @@
     "doesNotCover": "ไม่ครอบคำสั่งนี้ ยังต้องขออนุมัติ",
     "signAndApprove": "เซ็นและอนุมัติ",
     "cancel": "ยกเลิก",
-    "more": "ตัวเลือกอื่น"
+    "more": "ตัวเลือกอื่น",
+    "expiredNote": "นับว่าปฏิเสธ",
+    "addedEgress": "เพิ่ม {{target}} เข้า Egress"
   },
   "openAgent": "เปิดหน้า {{name}}",
   "started": "{{machine}} · {{when}}",
@@ -114,5 +117,17 @@
   "changes_other": "แก้ {{count}} ไฟล์",
   "changesNote": "นับเฉพาะไฟล์ที่ Agent แก้ด้วย tool แก้ไฟล์และเขียนไฟล์",
   "failedTitle": "Turn ล้มเหลว",
-  "emptyTitle": "ให้ {{name}} ช่วยอะไรดี?"
+  "emptyTitle": "ให้ {{name}} ช่วยอะไรดี?",
+  "waitingHeader": "รอคุณตอบ",
+  "budgetHeader": "Budget วันนี้หมด",
+  "newTitle": "Task ใหม่",
+  "newSubtitle": "{{name}} · {{machine}}",
+  "deletedSubtitle": "อ่านได้อย่างเดียว",
+  "failedBody": "ไฟล์ที่แก้ไปแล้วยังอยู่ ส่งข้อความเพื่อให้ {{name}} ทำต่อได้",
+  "runningCommand": "กำลังรัน {{target}}",
+  "separator": {
+    "today": "วันนี้ {{time}}",
+    "yesterday": "เมื่อวาน {{time}}",
+    "date": "{{date}} {{time}}"
+  }
 }

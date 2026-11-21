@@ -1,62 +1,35 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { useAgents } from "../../../entities/agent";
-import { useMachines } from "../../../entities/machine";
-import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
-import { describeError, useT } from "../../../shared/i18n";
-import { keySession } from "../../../shared/keystore";
-import { formatTokens } from "../../../shared/lib";
 import { View } from "react-native";
+import { useAgents } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
-import { Chip, Empty, Field, Icon, inform, Note, Row, Screen, Section, Stat, Text, space } from "../../../shared/ui";
-import { PROVIDER_PRESETS } from "../model/providers";
+import { useMachines } from "../../../entities/machine";
+import { latestEvents, statusOf, useTaskSummaries } from "../../../entities/task";
+import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
+import { useT } from "../../../shared/i18n";
+import { formatTokens } from "../../../shared/lib";
+import { Button, Card, Chip, Dot, Empty, Icon, Label, Meter, Row, Screen, Section, Tabs, Text, Tile } from "../../../shared/ui";
+import { countsOf, ordered, shareOf } from "../model/agents";
+import { AgentList, type AgentLine } from "./AgentList";
 import { EgressSection } from "./EgressSection";
+import { ProviderSection } from "./ProviderSection";
 
-// controller-prototype's MachinePage, with what this version has: status, its Agents, its Providers and its Egress.
-// ponytail: logs, updates, release and unpair from the app come with their own changes.
+type Part = "agent" | "provider" | "egress" | "info";
+
+// The Machine board: two tiles (its Agents, today's Budget), the last error, then a tab per part.
+// ponytail: the board's ⋯ menu (rename, unpair) and the OS line wait for those actions and that field to exist.
 export function MachinePage() {
   const t = useT("machines");
   const { machine: id } = useLocalSearchParams<{ machine: string }>();
   const machine = useMachines()?.find((m) => m.id === id);
   const agents = (useAgents() ?? []).filter((a) => a.machine_id === id);
+  const tasks = useTaskSummaries() ?? [];
   const status = useMachineStatus(id);
   const link = useMachineLink();
-  const [addingProvider, setAddingProvider] = useState(false);
-  const [providerPreset, setProviderPreset] = useState<string | null>(null);
-  const [providerName, setProviderName] = useState("");
-  const [providerUrl, setProviderUrl] = useState("");
-  const [providerKey, setProviderKey] = useState("");
+  const [part, setPart] = useState<Part>("agent");
   useEffect(() => {
     if (machine) link?.requestStatus(machine);
   }, [machine?.id, link]);
-
-  async function addProvider() {
-    if (!link || !machine) return;
-    const preset = PROVIDER_PRESETS.find((entry) => entry.id === providerPreset);
-    if (!providerKey.trim() || (!preset && (!providerName.trim() || !providerUrl.trim()))) return;
-    let sig: string | null = null;
-    await keySession.withFreshAuthentication(t("provider.prompt", { machine: machine.name }), async () => {
-      sig = await link.addProvider(machine, {
-        name: preset?.id ?? providerName.trim(),
-        url: preset?.url ?? providerUrl.trim(),
-        ...(preset ? { preset: preset.id } : {}),
-        key: providerKey,
-      });
-    });
-    if (!sig) return inform(t("provider.failed"), t("provider.failedBody"));
-    setProviderKey("");
-    setProviderPreset(null);
-    setAddingProvider(false);
-  }
-
-  function choosePreset(id: string | null) {
-    setProviderPreset(id);
-    const preset = PROVIDER_PRESETS.find((entry) => entry.id === id);
-    setProviderName(preset?.id ?? "");
-    setProviderUrl(preset?.url ?? "");
-  }
-  const percent = status.budgetToday && status.budgetToday.limitTokens > 0 ? Math.round((status.budgetToday.usedTokens / status.budgetToday.limitTokens) * 100) : null;
-  const budget = status.budgetToday && (status.budgetToday.usedTokens > 0 || status.budgetToday.limitTokens > 0) ? `${formatTokens(status.budgetToday.usedTokens)} / ${formatTokens(status.budgetToday.limitTokens)}` : undefined;
 
   if (!machine) {
     return (
@@ -66,97 +39,138 @@ export function MachinePage() {
     );
   }
 
-  return (
-    <Screen title={machine.name}>
-      <View style={{ alignItems: "center", gap: 6, paddingBottom: space.md }}>
-        <Icon name="machine" size="xl" color={status.online ? "green" : "tertiaryLabel"} />
-        <Text selectable style={{ fontSize: 26, fontWeight: "700" }}>
-          {machine.name}
-        </Text>
-        <View style={{ flexDirection: "row", gap: 6 }}>
-          <Chip label={status.online === null ? t("status.checking") : t(status.online ? "online" : "offline")} dot={status.online ? "green" : "tertiaryLabel"} />
-          {status.version && <Chip tone="mono" label={`Runtime ${status.version}`} />}
-        </View>
-      </View>
-      <View style={{ flexDirection: "row", gap: space.sm }}>
-        <Stat value={String(agents.length)} label="Agent" />
-        {status.diskFreeBytes !== null && <Stat value={(status.diskFreeBytes / 1_000_000_000).toFixed(0)} unit="GB" label={t("status.disk")} />}
-        {percent !== null && <Stat value={`${percent}%`} label={t("status.budget")} />}
-      </View>
+  // Each Agent by its latest Task, as the Inbox reads it; summaries come newest first.
+  const lines: AgentLine[] = ordered(
+    agents.map((agent) => {
+      const task = tasks.find((s) => s.agent_id === agent.id);
+      return { agent, status: statusOf(task, status.online), mood: moodOf(task ? latestEvents(task) : [], status.online), share: shareOf(agent.usage_tokens, agent.budget) };
+    }),
+  );
+  const counts = countsOf(lines);
+  const spent = lines.filter((line) => line.share !== null && line.share >= 1).length;
+  const budget = status.budgetToday && status.budgetToday.limitTokens > 0 ? status.budgetToday : null;
+  const providerTrouble = !!status.providerError || !!status.providers?.some((p) => (p as { error?: string }).error);
 
-      <Section title={t("status.heading")}>
-        <Row icon="network" title="Hub" value={machine.hub_url} />
-        {status.features && (
-          <Row
-            icon="shield"
-            title={t("status.features")}
-            accessory={
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, flex: 2 }}>
-                {status.features.map((feature) => (
-                  <Chip key={feature} tone="mono" label={feature} />
+  return (
+    <Screen title={machine.name} subtitle={status.online === null ? t("status.checking") : t(status.online ? "online" : "offline")}>
+      {/* The board spaces its blocks 14 apart, closer than the Screen's sections. */}
+      <View style={{ gap: 14 }}>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <Tile
+            height={136}
+            onPress={() => setPart("agent")}
+            top={
+              <View aria-hidden style={{ height: 44, flexDirection: "row", alignItems: "flex-end" }}>
+                {lines.slice(0, 3).map((line, i) => (
+                  <View key={line.agent.id} style={{ marginLeft: i ? -10 : 0 }}>
+                    <Character look={lookOfJson(line.agent.character)} mood={line.mood} size={34} backdrop="card" />
+                  </View>
                 ))}
+                {lines.length > 3 && (
+                  <Card tone="surface" style={{ marginLeft: -6, width: 34, height: 34, padding: 0, borderRadius: 17, alignItems: "center", justifyContent: "center" }}>
+                    <Text variant="caption" strong tone="body">{`+${lines.length - 3}`}</Text>
+                  </Card>
+                )}
+              </View>
+            }
+            value={String(agents.length)}
+            unit=" Agent"
+            detail={
+              <View style={{ gap: 2, paddingTop: 2 }}>
+                {counts.needsYou > 0 && (
+                  <Count dot="orange" strong>
+                    {t("tile.needsYou", { count: counts.needsYou })}
+                  </Count>
+                )}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <Count dot="blue">{t("tile.working", { count: counts.working })}</Count>
+                  {spent > 0 && (
+                    <>
+                      <Text variant="caption" tone="body">
+                        ·
+                      </Text>
+                      <Count dot="red" danger>
+                        {t("tile.spent", { count: spent })}
+                      </Count>
+                    </>
+                  )}
+                </View>
               </View>
             }
           />
-        )}
-        {budget && <Row icon="usage" title={t("status.budget")} value={budget} />}
-        {status.lastError && (
-          <View style={{ padding: space.md }}>
-            <Note icon="warning" iconColor="orange">{`${t("status.lastError")}\n${status.lastError}`}</Note>
-          </View>
-        )}
-      </Section>
-
-      <Section title={t("onMachine")}>
-        {agents.length === 0 && <Row title={t("noAgent")} />}
-        {agents.map((agent) => (
-          <Row
-            key={agent.id}
-            leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], status.online)} size={44} />}
-            title={agent.name}
-            detail={agent.model}
-            href={`/agents/${agent.id}`}
+          <Tile
+            height={136}
+            href="/usage"
+            top={<View style={{ height: 44, justifyContent: "center" }}>{budget && <Meter value={budget.usedTokens / budget.limitTokens} label={t("status.budget")} />}</View>}
+            value={budget ? `${Math.round((budget.usedTokens / budget.limitTokens) * 100)}%` : undefined}
+            unit={budget ? " Budget" : undefined}
+            title={budget ? undefined : "Budget"}
+            detail={budget ? t("tile.budget", { used: formatTokens(budget.usedTokens), limit: formatTokens(budget.limitTokens) }) : t("budgetUnknown")}
           />
-        ))}
-      </Section>
+        </View>
 
-      <Section title="Provider" footer={t("provider.footer")}>
-        {status.providers?.length === 0 && <Row icon="key" title={t("provider.none")} detail={t("provider.command")} />}
-        {status.providers?.map((provider) => {
-          const models = (provider as { models?: unknown[] }).models;
-          const error = (provider as { error?: string }).error;
-          return <Row key={provider.name} icon="key" title={provider.name} value={models ? t("provider.models", { count: models.length }) : undefined} detail={error ? describeError({ code: error }) : undefined} />;
-        })}
-        {addingProvider ? (
-          <>
-            {PROVIDER_PRESETS.map((preset) => (
-              <Row
-                key={preset.id}
-                icon="key"
-                title={preset.name}
-                detail={preset.url}
-                accessory={providerPreset === preset.id ? <Icon name="check" size="md" color="label" weight="semibold" /> : undefined}
-                onPress={() => choosePreset(preset.id)}
-              />
-            ))}
-            <Row icon="add" title={t("provider.custom")} accessory={providerPreset === null ? <Icon name="check" size="md" color="label" weight="semibold" /> : undefined} onPress={() => choosePreset(null)} />
-            {providerPreset === null && (
-              <>
-                <Field label={t("provider.name")} value={providerName} onChangeText={setProviderName} placeholder="main" mono />
-                <Field label={t("provider.url")} value={providerUrl} onChangeText={setProviderUrl} placeholder="https://api.example.com" mono />
-              </>
-            )}
-            <Field label={t("provider.key")} value={providerKey} onChangeText={setProviderKey} secure mono />
-            <Row icon="add" title={t("provider.save")} onPress={() => void addProvider()} />
-            <Row title={t("provider.cancel")} onPress={() => { setAddingProvider(false); setProviderPreset(null); }} />
-          </>
-        ) : (
-          <Row icon="add" title={t("provider.add")} onPress={() => { setAddingProvider(true); choosePreset(null); }} />
+        {status.lastError && (
+          <Card tone="warning" style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+            <Icon name="warning" size="sm" color="orange" />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="footnote" strong>
+                {t("status.lastError")}
+              </Text>
+              <Text variant="caption" mono tone="body" selectable>
+                {status.lastError}
+              </Text>
+            </View>
+            {providerTrouble && <Button variant="surface" size="small" label={t("status.seeProvider")} onPress={() => setPart("provider")} />}
+          </Card>
         )}
-        {status.providerError && <Row icon="warning" iconColor="orange" title={t("provider.failed")} detail={describeError({ code: status.providerError })} />}
-      </Section>
 
-      <EgressSection machine={machine} agents={agents} />
+        <Tabs<Part>
+          value={part}
+          onChange={setPart}
+          items={[
+            { value: "agent", label: "Agent" },
+            { value: "provider", label: "Provider" },
+            { value: "egress", label: "Egress" },
+            { value: "info", label: t("tabs.info") },
+          ]}
+        />
+
+        {part === "agent" && <AgentList lines={lines} online={status.online} />}
+        {part === "provider" && <ProviderSection machine={machine} agents={agents} />}
+        {part === "egress" && <EgressSection machine={machine} agents={agents} />}
+        {part === "info" && (
+          // ponytail: the board's OS row and `veeloe update` line wait for an OS field and that command.
+          <Section footer={t("info.footer")}>
+            <Row icon="network" title="Hub" value={machine.hub_url} />
+            {status.version && <Row icon="machine" title="Runtime" value={status.version} />}
+            {status.diskFreeBytes !== null && <Row icon="storage" title={t("status.disk")} value={`${(status.diskFreeBytes / 1_000_000_000).toFixed(0)} GB`} />}
+            {status.features && (
+              <View style={{ gap: 8, paddingHorizontal: 14, paddingVertical: 12 }}>
+                <Label icon="shield" iconColor="label" variant="subheadline" tone="label">
+                  {t("status.features")}
+                </Label>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                  {status.features.map((feature) => (
+                    <Chip key={feature} tone="mono" label={feature} />
+                  ))}
+                </View>
+              </View>
+            )}
+          </Section>
+        )}
+      </View>
     </Screen>
+  );
+}
+
+// One count on the Agent tile: a coloured dot and its words.
+function Count({ dot, strong, danger, children }: { dot: "orange" | "blue" | "red"; strong?: boolean; danger?: boolean; children: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+      <Dot color={dot} size={7} />
+      <Text variant="caption" strong={strong} tone={danger ? "danger" : strong ? "label" : "body"} numberOfLines={1}>
+        {children}
+      </Text>
+    </View>
   );
 }

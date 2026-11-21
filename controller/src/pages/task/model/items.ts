@@ -76,7 +76,12 @@ export type Item =
   | { key: string; kind: "compacted"; summary: string; at: number; tokensBefore?: number; tokensAfter?: number }
   | { key: string; kind: "file"; name: string; size: number; hash: string; path: string }
   /** The files edit and write changed in a Turn that just ended, each once, in the order first touched. */
-  | { key: string; kind: "changes"; files: string[] };
+  | { key: string; kind: "changes"; files: string[] }
+  /** A centred time line before the first item, and wherever the log went quiet for longer than SEPARATOR_GAP. */
+  | { key: string; kind: "time"; at: number };
+
+// ponytail: an hour of quiet starts a new group, as Messages does; tune it here if groups feel too fine or too coarse.
+const SEPARATOR_GAP = 60 * 60_000;
 
 const textOf = (content: unknown) =>
   Array.isArray(content)
@@ -108,6 +113,8 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
   let open = false;
   // The calls of the Turn under way, for the files it changed when it ends.
   let turnCalls: ToolCall[] = [];
+  // When the item before was shown, for the time lines; events without a time draw none.
+  let lastAt: number | undefined;
   for (const event of events) {
     let body: { text?: string; content?: unknown; reason?: string; code?: string; request?: string; kind?: string; domain?: string; agent?: string; task?: string; command?: string; parts?: string[]; expiresAt?: number; member?: string; decision?: string; message?: string; summary?: string; tokensBefore?: number; tokensAfter?: number; name?: string; size?: number; hash?: string; path?: string };
     try {
@@ -116,6 +123,7 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       continue;
     }
     const key = String(event.seq);
+    const before = out.length;
     if (event.kind === "member.message" && body.text) out.push({ key, kind: "member", text: body.text });
     else if (event.kind === "llm.message") {
       const text = textOf(body.content);
@@ -186,6 +194,10 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       const files = [...new Set(turnCalls.filter((c) => (c.tool === "edit" || c.tool === "write") && c.state === "ok" && c.target).map((c) => c.target))];
       if (files.length) out.push({ key: `${key}-changes`, kind: "changes", files });
       turnCalls = [];
+    }
+    if (event.at !== undefined && out.length > before) {
+      if (lastAt === undefined || event.at - lastAt > SEPARATOR_GAP) out.splice(before, 0, { key: `${key}-time`, kind: "time", at: event.at });
+      lastAt = event.at;
     }
   }
   // Nobody answered in time: it counts as denied (CONTEXT.md).

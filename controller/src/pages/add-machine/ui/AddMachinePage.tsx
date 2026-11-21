@@ -9,6 +9,9 @@ import { usePairMachine } from "../model/use-pair-machine";
 
 const linkProblem = { malformed: "pairing.link_malformed", "bad-signature": "pairing.link_bad_signature", expired: "pairing.link_expired" } as const;
 
+// The Runtime's installer, as the release publishes it (ADR 0009); a command, not words, so it is not translated.
+const INSTALL = "curl -fsSL https://github.com/NakePranob/veeloe/releases/latest/download/install.sh | sh";
+
 type OpenedParams = { link?: string; machine?: string; secret?: string; expires?: string; sig?: string };
 
 // Expo Go hands a `link=` value whose `&` arrives unescaped, which splits the
@@ -141,6 +144,14 @@ export function AddMachinePage() {
     </View>
   );
 
+  const command = (text: string) => (
+    <Card style={{ paddingVertical: space.sm, borderRadius: 16 }}>
+      <Text selectable mono variant="footnote">
+        {text}
+      </Text>
+    </Card>
+  );
+
   return (
     <View style={{ flex: 1 }}>
       {title}
@@ -151,20 +162,26 @@ export function AddMachinePage() {
         keyboardDismissMode="interactive"
         contentContainerStyle={{ gap: 20, paddingHorizontal: 20, paddingTop: space.md, paddingBottom: space.xl, ...column }}
       >
-        {step(
-          1,
-          t("enter.heading"),
-          <Card style={{ paddingVertical: space.sm }}>
-            <Text selectable mono variant="footnote">
-              {t("enter.command")}
-            </Text>
-          </Card>,
-        )}
+        {/* ponytail: the board's copy button in each command needs a clipboard module (expo-clipboard) the app does not have; the commands are selectable meanwhile. */}
+        {step(1, t("enter.install"), command(INSTALL))}
         {step(
           2,
+          t("enter.heading"),
+          <>
+            {command(t("enter.command"))}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+              <Spinner />
+              <Text variant="footnote" tone="secondary">
+                {t("enter.waiting")}
+              </Text>
+            </View>
+          </>,
+        )}
+        {step(
+          3,
           t("enter.body"),
           <>
-            <QrScanner labels={{ scan: t("enter.scan"), stop: t("enter.stopScan") }} onScan={accept} onNoCamera={() => setProblem(t("enter.noCamera"))} />
+            <QrScanner labels={{ scan: t("enter.scan"), stop: t("enter.stopScan"), hint: t("enter.scanHint") }} onScan={accept} onNoCamera={() => setProblem(t("enter.noCamera"))} />
             <Field label={t("enter.paste")} value={text} onChangeText={setText} placeholder="veeloe://pair?hub=…" multiline mono />
           </>,
         )}

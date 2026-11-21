@@ -31,7 +31,7 @@ export function LockPage() {
         </Text>
       </View>
       <View style={{ alignSelf: "stretch", paddingBottom: insets.bottom }}>
-        <Button label={t("action")} variant="primary" size="large" onPress={() => void keySession.unlock(prompt)} />
+        <Button label={t("action")} leading="faceId" variant="primary" size="large" onPress={() => void keySession.unlock(prompt)} />
       </View>
     </Centered>
   );

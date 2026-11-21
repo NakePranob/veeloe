@@ -19,7 +19,8 @@
   "chart": {
     "label": "Daily tokens for {{machine}}",
     "bar": "{{day}}: {{tokens}} tokens",
-    "none": "{{day}}: no data"
+    "none": "{{day}}: no data",
+    "today": "Today"
   },
   "tasks": {
     "heading": "Tasks that used the most tokens",

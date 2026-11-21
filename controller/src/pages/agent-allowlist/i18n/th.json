@@ -1,24 +1,24 @@
 {
   "title": "Allowlist",
-  "remove": "ลบ",
+  "subtitle_one": "{{name}} · {{count}} รายการ",
+  "subtitle_other": "{{name}} · {{count}} รายการ",
+  "remove": "เอาออก",
   "offline": "Machine ออฟไลน์อยู่ แก้ Allowlist ได้เมื่อเครื่องกลับมาออนไลน์",
-  "notAWall": "Allowlist ไม่ใช่กำแพง Agent ที่โดนหลอกแก้ไฟล์ได้โดยไม่ต้องขอ เช่นแก้ script test ใน package.json แล้วรัน npm test ที่อยู่ในรายการ หรือตั้ง core.fsmonitor ใน .git/config แล้วรัน git status กำแพงจริงคือ sandbox กับ Egress (ADR 0030, 0008)",
+  "notAWall": "Allowlist ไม่ใช่กำแพง Agent ที่โดนหลอกแก้ไฟล์ได้โดยไม่ต้องขอ เช่นแก้ script test ใน package.json แล้วรัน npm test ที่อยู่ในรายการ กำแพงจริงคือ sandbox กับ Egress (ADR 0030, 0008)",
   "missing": {
     "title": "ไม่พบ Agent นี้",
     "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
   },
   "runs": {
     "heading": "รันได้เลยไม่ต้องขอ Approval",
-    "footer": "เทียบทีละคำจากต้นคำสั่ง npm test ครอบ npm test -- --watch คำสั่งที่ต่อด้วย && ; | หรือ & ต้องผ่านทุกท่อน และ $( ), backtick กับ eval ขอ Approval ทุกครั้ง การอ่านเขียนไฟล์ไม่ผ่านรายการนี้ เพราะ sandbox คุมอยู่แล้ว",
+    "footer": "เทียบทีละคำจากต้นคำสั่ง npm test ครอบ npm test -- --watch คำสั่งที่ต่อด้วย && ; | หรือ & ต้องผ่านทุกท่อน และ $( ), backtick กับ eval ขอ Approval ทุกครั้ง รายการอย่าง git push ครอบ git push --force ด้วย ตั้งให้แคบเท่าที่ตั้งใจ",
     "empty": "ยังไม่มีรายการ",
     "emptyDetail": "ทุกคำสั่งของ Agent นี้ต้องขอ Approval"
   },
   "add": {
-    "heading": "เพิ่มรายการ",
-    "footer": "รายการอย่าง git push ครอบ git push --force origin main ด้วย ตั้งให้แคบเท่าที่ตั้งใจ",
-    "label": "คำนำหน้าของคำสั่ง",
+    "label": "เพิ่ม",
     "placeholder": "เช่น npm test",
-    "action": "เพิ่มใน Allowlist"
+    "action": "เพิ่ม"
   },
   "invalid": {
     "title": "เพิ่มไม่ได้",
@@ -35,7 +35,6 @@
   "try": {
     "heading": "ลองคำสั่ง",
     "label": "คำสั่งตัวอย่าง",
-    "footer": "พิมพ์คำสั่งตัวอย่างเพื่อดูว่า Agent จะรันเลยหรือต้องขอ Approval ถ้าพิมพ์รายการใหม่ไว้ข้างบน ผลจะรวมรายการนั้นให้ดูก่อนเพิ่ม",
     "invalidDraft": "รายการที่พิมพ์ยังเพิ่มไม่ได้ จึงยังไม่นับในผลข้างล่าง",
     "sampleDefault": "npm test -- --watch",
     "coveredBy": "ครอบโดย {{entry}}",

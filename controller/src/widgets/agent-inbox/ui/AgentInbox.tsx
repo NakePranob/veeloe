@@ -1,19 +1,49 @@
 import { randomUUID } from "expo-crypto";
 import { router } from "expo-router";
-import { useState, type ReactNode } from "react";
-import { FlatList, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Animated, FlatList, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { latestEvents, previewOf, useTaskSummaries, type TaskStatus, type TaskSummary } from "../../../entities/task";
+import { isBudgetOut, latestEvents, previewOf, useTaskSummaries, type TaskStatus, type TaskSummary } from "../../../entities/task";
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Button, Empty, Tabs, Tap, Text, column, font, space } from "../../../shared/ui";
+import { Button, Empty, Tabs, Tap, Text, column, font, space, useReduceMotion } from "../../../shared/ui";
 import { countsOf, inboxRows, rowsOf, type InboxTab } from "../model/inbox";
 
 // The board's row: a 60pt head, the name, one line, and on the right the answer pill or the time.
 const AVATAR = 60;
+
+// The board's working line ends in three dots that pulse one after another; still when the device asks for less motion.
+function Dots() {
+  const reduce = useReduceMotion();
+  const phase = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduce) return;
+    const loop = Animated.loop(Animated.timing(phase, { toValue: 1, duration: 1200, useNativeDriver: process.env.EXPO_OS !== "web" }));
+    loop.start();
+    return () => {
+      loop.stop();
+      phase.setValue(0);
+    };
+  }, [reduce, phase]);
+  return (
+    <>
+      {[0, 0.2, 0.4].map((delay) => (
+        <Animated.View
+          key={delay}
+          aria-hidden
+          style={{ marginLeft: delay === 0 ? 4 : 0, opacity: reduce ? 1 : phase.interpolate({ inputRange: [0, delay, delay + 0.33, Math.min(1, delay + 0.66), 1], outputRange: [0.25, 0.25, 1, 0.25, 0.25] }) }}
+        >
+          <Text variant="subheadline" tone="secondary" style={{ fontSize: 14 }}>
+            ●
+          </Text>
+        </Animated.View>
+      ))}
+    </>
+  );
+}
 
 interface RowProps {
   agent: AgentRow;
@@ -30,6 +60,7 @@ interface RowProps {
 function InboxRow({ agent, machine, online, task, status, now, selected, replace }: RowProps) {
   const t = useT("agent-inbox");
   const language = useLanguage();
+  // ponytail: the board's unread dot on a done row needs a read marker the database does not keep; add one with that column.
   // Tapping goes straight into the chat; an Agent with no Task yet gets an empty one.
   const open = () => {
     const href = { pathname: "/tasks/[task]", params: { task: task?.id ?? randomUUID(), agent: agent.id } } as const;
@@ -37,7 +68,9 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
     else router.push(href);
   };
   const quiet = status === "working" || status === "offline";
-  const line = status === "offline" ? t("offline", { machine }) : (task && previewOf(task)) || t("start", { name: agent.name });
+  // Today's Budget ran out: the row says so and offers the way out, the Agent's page.
+  const budgetOut = status === "failed" && isBudgetOut(task);
+  const line = status === "offline" ? t("offline", { machine }) : budgetOut ? t("budgetOut") : (task && previewOf(task)) || t("start", { name: agent.name });
   return (
     <Tap onPress={open} selected={selected} style={{ flexDirection: "row", alignItems: "center", gap: space.md, marginHorizontal: 10, paddingHorizontal: space.md, paddingVertical: space.sm }}>
       {({ pressed }) => (
@@ -53,15 +86,20 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
             <Text strong numberOfLines={1} tone={status === "offline" ? "secondary" : "label"} style={{ fontFamily: font.bold }}>
               {agent.name}
             </Text>
-            <Text variant="subheadline" tone={quiet ? "secondary" : "label"} numberOfLines={1} style={{ fontSize: 14 }}>
-              {line}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text variant="subheadline" tone={quiet ? "secondary" : "label"} numberOfLines={1} style={{ fontSize: 14, flexShrink: 1 }}>
+                {line}
+              </Text>
+              {status === "working" && <Dots />}
+            </View>
           </View>
           {/* Waiting on an Approval: the answer is one tap away, as the board's pill says; the row opens the chat. */}
           {status === "waiting" ? (
             <View pointerEvents="none">
-              <Button label={t("answer")} variant="primary" onPress={open} />
+              <Button label={t("answer")} variant="primary" size="small" onPress={open} />
             </View>
+          ) : budgetOut ? (
+            <Button label={t("addBudget")} size="small" onPress={() => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } })} />
           ) : task && task.events > 0 ? (
             <Text variant="caption" tone="secondary">
               {when(task.updated_at, language, now)}

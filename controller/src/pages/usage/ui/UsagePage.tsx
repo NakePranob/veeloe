@@ -4,15 +4,17 @@ import type React from "react";
 import { useAgents } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines, type Machine } from "../../../entities/machine";
-import { previewOf, useTaskSummaries } from "../../../entities/task";
+import { latestEvents, previewOf, useTaskSummaries } from "../../../entities/task";
 import { useUsageDays, type UsageDayRow } from "../../../entities/usage";
 import { useMachineLink, useMachineStatuses, useUsageStatuses, type UsageStatus } from "../../../features/machine-link";
 import { useDatabase, useLiveQuery } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, shiftDay, useNow, when, type Bar } from "../../../shared/lib";
-import { Bars, Chip, Empty, Meter, Note, Row, Screen, Section, Spinner, Tap, Text, space } from "../../../shared/ui";
+import { Bars, Button, Empty, Meter, Note, Row, Screen, Section, Spinner, Tap, Text, space } from "../../../shared/ui";
 import { daysBetween, rowsInRange, totalOf } from "../model/summary";
 import { DEFAULT_USAGE_WINDOW, isUsageWindow, saveUsageWindow, USAGE_WINDOWS } from "../model/window";
+
+const latestOf = (task: Parameters<typeof latestEvents>[0] | undefined) => (task ? latestEvents(task) : []);
 
 type AgentRow = { id: string; name: string; machine_id: string };
 
@@ -22,14 +24,14 @@ const WINDOW_KEY = { 1: "window.1", 3: "window.3", 7: "window.7", 30: "window.30
 function WindowPicker({ days }: { days: number }) {
   const t = useT("usage");
   const database = useDatabase();
+  // Four equal 44pt pills across the width, as the board draws them: the chosen one ink, the rest grey.
   return (
-    <View style={{ flexDirection: "row", gap: space.xs, paddingHorizontal: space.sm }}>
-      {USAGE_WINDOWS.map((window) => {
-        const selected = window === days;
-        return (
-          <Chip key={window} tone="choice" label={t(WINDOW_KEY[window])} selected={selected} onPress={() => void saveUsageWindow(database, window)} />
-        );
-      })}
+    <View style={{ flexDirection: "row", gap: 6 }}>
+      {USAGE_WINDOWS.map((window) => (
+        <View key={window} style={{ flex: 1 }}>
+          <Button label={t(WINDOW_KEY[window])} variant={window === days ? "primary" : "chip"} pressed={window === days} onPress={() => void saveUsageWindow(database, window)} />
+        </View>
+      ))}
     </View>
   );
 }
@@ -41,12 +43,33 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
   const t = useT("usage");
   const share = limit ? used / limit : null;
   const spent = share !== null && share >= 1;
+  // Offline: nothing to open and nothing fresh to measure, so the whole line goes grey with only what it used.
+  if (dim) {
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md }}>
+        {leading}
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="subheadline" strong tone="secondary" numberOfLines={1}>
+            {title}
+          </Text>
+          {line ? (
+            <Text variant="caption" tone="secondary">
+              {line}
+            </Text>
+          ) : null}
+        </View>
+        <Text variant="footnote" tone="secondary">
+          {formatTokens(used)}
+        </Text>
+      </View>
+    );
+  }
   return (
     <Tap href={href} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: 14, paddingVertical: space.md }}>
       {leading}
       <View style={{ flex: 1, gap: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.sm }}>
-          <Text variant="subheadline" strong tone={dim ? "secondary" : "label"} style={{ flex: 1 }} numberOfLines={1}>
+          <Text variant="subheadline" strong style={{ flex: 1 }} numberOfLines={1}>
             {title}
           </Text>
           <Text variant="footnote" tone="secondary">
@@ -55,7 +78,7 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
         </View>
         {share !== null && <Meter value={share} label={t("budget", { percent: Math.round(share * 100) })} />}
         {(line || share !== null) && (
-          <Text variant="caption" tone={spent ? "danger" : "secondary"}>
+          <Text variant="caption" tone={spent ? "danger" : "label"}>
             {[line, share !== null ? `${t("budget", { percent: Math.round(share * 100) })}${spent ? t("spent") : ""}` : ""].filter(Boolean).join(" · ")}
           </Text>
         )}
@@ -66,6 +89,7 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
 
 function Overview({ machines, agents, rows, statuses, days }: { machines: Machine[]; agents: AgentUsageRow[]; rows: UsageDayRow[]; statuses: Record<string, UsageStatus>; days: number }) {
   const t = useT("usage");
+  const language = useLanguage();
   const ids = new Set(agents.map((agent) => agent.id));
   // Each Machine's own today, or the last day it gave us; the window ends at the latest of them.
   const to = [...machines.map((m) => statuses[m.id]?.to ?? null), ...rows.filter((row) => ids.has(row.agent_id)).map((row) => row.day)].filter((d): d is string => !!d).sort().at(-1) ?? null;
@@ -90,13 +114,13 @@ function Overview({ machines, agents, rows, statuses, days }: { machines: Machin
           </Text>
           {loading && <Spinner />}
         </View>
-        <Text style={{ fontSize: 30, fontWeight: "700", letterSpacing: -0.6 }}>
+        <Text variant="figure">
           {formatTokens(today)}
           <Text variant="subheadline" tone="secondary">{" token"}</Text>
         </Text>
         {bars.length > 0 ? (
           <View style={{ marginTop: space.sm }}>
-            <Bars bars={bars} label={t("chart.label", { machine: t("all") })} height={104} />
+            <Bars bars={bars} label={t("chart.label", { machine: t("all") })} height={140} ticks={bars.map((bar, i) => tickOf(bar.key, i === bars.length - 1, bars.length, language, t("chart.today")))} peak={formatTokens(today)} />
           </View>
         ) : (
           <Text variant="footnote" tone="secondary">
@@ -106,6 +130,13 @@ function Overview({ machines, agents, rows, statuses, days }: { machines: Machin
       </View>
     </Section>
   );
+}
+
+/** The word under a day's bar: its short weekday, or "today" for the last; a month of bars names only today. */
+function tickOf(day: string, last: boolean, count: number, language: string, today: string) {
+  if (last) return today;
+  // Noon, so a time zone never moves the Machine's day onto its neighbour.
+  return count <= 7 ? new Date(`${day}T12:00:00`).toLocaleDateString(language, { weekday: "short" }) : "";
 }
 
 function TopTasks({ statuses, agents }: { statuses: Record<string, UsageStatus>; agents: AgentRow[] }) {
@@ -151,6 +182,8 @@ export function UsagePage() {
   const agents = useAgents() ?? [];
   const rows = useUsageDays() ?? [];
   const statuses = useUsageStatuses();
+  // Newest first, so the first Task of an Agent's is the one its face shows, as the Inbox reads it.
+  const summaries = useTaskSummaries() ?? [];
   const machineStatuses = useMachineStatuses();
   const saved = useLiveQuery<{ value: string }>("SELECT value FROM device_setting WHERE key = 'usage.window'", [], ["device_setting"]);
   const savedDays = Number(saved?.[0]?.value);
@@ -205,7 +238,7 @@ export function UsagePage() {
                     used={agent.usage_tokens ?? 0}
                     limit={agent.budget}
                     line={list.find((m) => m.id === agent.machine_id)?.name ?? ""}
-                    leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], machineStatuses[agent.machine_id]?.online ?? null)} size={32} />}
+                    leading={<Character look={lookOfJson(agent.character)} mood={moodOf(latestOf(summaries.find((task) => task.agent_id === agent.id)), machineStatuses[agent.machine_id]?.online ?? null)} size={32} />}
                     href={`/agents/${agent.id}`}
                   />
                 ))}

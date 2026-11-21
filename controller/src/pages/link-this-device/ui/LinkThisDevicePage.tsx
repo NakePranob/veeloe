@@ -148,7 +148,7 @@ export function LinkThisDevicePage() {
         <Text variant="subheadline" strong>
           {t("enter.heading")}
         </Text>
-        <QrScanner labels={{ scan: t("enter.scan"), stop: t("enter.stopScan") }} onScan={accept} onNoCamera={() => setProblem(t("enter.noCamera"))} />
+        <QrScanner labels={{ scan: t("enter.scan"), stop: t("enter.stopScan"), hint: t("enter.scanHint") }} onScan={accept} onNoCamera={() => setProblem(t("enter.noCamera"))} />
         <Field label={t("enter.paste")} value={text} onChangeText={setText} placeholder="veeloe://link?…" multiline mono />
         <Text variant="footnote" tone="secondary">
           {t("enter.footer")}

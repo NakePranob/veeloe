@@ -1,18 +1,17 @@
 import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Keyboard, View } from "react-native";
+import { Keyboard, Linking, View } from "react-native";
 import { GIT_REPOS_MAX } from "@veeloe/protocol-ts";
 import { gitReposOf, useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, Empty, Field, inform, Note, Row, Screen, Section, space } from "../../../shared/ui";
+import { Button, Card, Empty, Field, Icon, inform, Note, Screen, space, Text } from "../../../shared/ui";
 import { toRepo } from "../model/repo";
 
-// controller-prototype's AgentEgressPage, for repos: which GitHub repos this
-// Agent may clone, fetch and push through the git broker on its Machine, which
-// holds the token (ADR 0069, issue #32). Laid out like the Allowlist page.
+// The AgentGit board: which GitHub repos this Agent may clone, fetch and push
+// through the git broker on its Machine, which holds the token (ADR 0069, issue #32).
 export function GitReposPage() {
   const t = useT("agent-git");
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
@@ -39,6 +38,7 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
   const unsupported = stored === null;
   const repos = stored ?? [];
   const [entry, setEntry] = useState("");
+  const [adding, setAdding] = useState(false);
   const locked = offline || unsupported;
 
   /** Every change is signed after a fresh authentication (ADR 0012); false when nothing went. */
@@ -55,11 +55,14 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
     if (!repo) return inform(t("invalid.title"), t("invalid.body"));
     if (repos.includes(repo)) return inform(t("duplicate.title"), repo);
     if (repos.length >= GIT_REPOS_MAX) return inform(t("full.title"), t("full.body", { count: GIT_REPOS_MAX }));
-    if (await save([...repos, repo], t("authenticate.add", { repo, name: agentName }))) setEntry("");
+    if (await save([...repos, repo], t("authenticate.add", { repo, name: agentName }))) {
+      setEntry("");
+      setAdding(false);
+    }
   }
 
   return (
-    <Screen title={t("title")}>
+    <Screen title={t("title")} subtitle={t("subtitle", { name: agentName, count: repos.length })} right={{ label: t("add.action"), icon: "add", variant: "chip", onPress: () => setAdding((was) => !was), disabled: locked }}>
       {unsupported && (
         <Note icon="warning" iconColor="orange">
           {t("unsupported")}
@@ -70,24 +73,43 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
           {t("offline")}
         </Note>
       )}
-      <Section title={t("repos.heading")} footer={t("repos.footer", { id: agentId })}>
-        {repos.length === 0 && <Row title={t("repos.empty")} detail={t("repos.emptyDetail")} />}
+      {/* The header's + opens the field; with no repos yet it is the first thing to do, so it shows. */}
+      {(adding || (repos.length === 0 && !locked)) && <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono action={{ label: t("add.action"), onPress: add, disabled: !entry.trim() || locked }} />}
+      {repos.length === 0 && <Empty icon="branch" title={t("repos.empty")} detail={t("repos.emptyDetail")} />}
+      {/* One card per repo, its two actions under it (the board). */}
+      <View style={{ gap: 10 }}>
         {repos.map((repo) => (
-          <Row key={repo} title={repo} mono icon="branch" detail={t("repos.access", { id: agentId })} accessory={<Button
-            label={t("remove")}
-            variant="destructive"
-            disabled={locked}
-            onPress={() => void save(
-              repos.filter((other) => other !== repo),
-              t("authenticate.remove", { repo, name: agentName }),
-            )}
-          />} />
+          <Card key={repo} style={{ padding: 14, gap: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Icon name="branch" size="md" color="label" />
+              <Text variant="subheadline" mono strong selectable style={{ flex: 1 }}>
+                {repo}
+              </Text>
+            </View>
+            <Text variant="caption" tone="body">
+              {t("repos.access", { id: agentId })}
+            </Text>
+            <View style={{ flexDirection: "row", gap: space.sm }}>
+              <View style={{ flex: 1 }}>
+                <Button label={t("open")} leading="external" variant="surface" size="small" onPress={() => void Linking.openURL(`https://github.com/${repo}`)} />
+              </View>
+              <Button
+                label={t("remove")}
+                variant="destructive"
+                size="small"
+                disabled={locked}
+                onPress={() => void save(
+                  repos.filter((other) => other !== repo),
+                  t("authenticate.remove", { repo, name: agentName }),
+                )}
+              />
+            </View>
+          </Card>
         ))}
-      </Section>
-
-      <Section title={t("add.heading")} footer={t("add.footer")}>
-        <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono action={{ label: t("add.action"), onPress: add, disabled: !entry.trim() || locked }} />
-      </Section>
+      </View>
+      <Note tone="plain">{t("footer")}</Note>
     </Screen>
   );
 }
+
+/** The header's title with the Agent and its count under it, as the board draws it. */

@@ -1,16 +1,17 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
-import { Character, COLOR_NAMES, COLORS, DECALS, LookTile, lookOfJson, pick, SHELLS, shuffleLook, SIDES, Stage, Swatch, TOPS, type Look, type Mood } from "../../../entities/character";
+import { Character, COLOR_NAMES, COLORS, DECALS, LookTile, lookOfJson, MoodTile, pick, SHELLS, shuffleLook, SIDES, Stage, Swatch, TOPS, type Look, type Mood } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
-import { Button, column, HeaderAction, Note, space, Spinner, Tap, Text } from "../../../shared/ui";
+import { Button, Card, HeaderAction, Note, Screen, space, Spinner, Text } from "../../../shared/ui";
 import { characterToSend } from "../model/to-send";
 
 // The Moods the Member will see this look in, at inbox size, so they can tell they still read.
-const MOODS = ["idle", "thinking", "working", "waiting", "done", "failed", "stuck", "offline"] as const satisfies readonly Mood[];
+// ponytail: the board previews six; failed and stuck draw on the Inbox but are left out here, as on the board.
+const MOODS = ["idle", "thinking", "working", "waiting", "done", "offline"] as const satisfies readonly Mood[];
 
 // Every slot but the colour.
 const PARTS = [
@@ -23,7 +24,7 @@ const PARTS = [
 // A page opened from a link has the inbox underneath (the root layout's anchor), so there is always somewhere to go back to.
 const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={{ gap: space.sm }}>
       <Text variant="footnote" strong tone="secondary" role="heading" style={{ paddingHorizontal: space.xs }}>
@@ -73,26 +74,44 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
     setSent(JSON.stringify(character));
   }
 
+  // The parts it wears, under the head, as the board names them; an empty slot says nothing.
+  const summary = PARTS.filter(({ slot }) => draft[slot] !== "none")
+    .map(({ slot }) => t(`parts.${slot}.${draft[slot]}` as never) as string)
+    .join(" · ");
+  // What is being edited, with whose Character under it, as the board's header reads.
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[column, { padding: space.lg, gap: space.xl }]}>
-      <Stack.Screen
-        options={{
-          title: t("titleOf", { name: agent.name }),
-          // The Agent's name with what is being edited under it, as the Task header puts the status there.
-          headerTitle: () => (
-            <View style={{ alignItems: "center" }}>
-              <Text variant="headline" numberOfLines={1}>
-                {agent.name}
-              </Text>
-              <Text variant="caption" tone="secondary">
-                {t("title")}
-              </Text>
-            </View>
-          ),
-        }}
-      />
+    <Screen title={t("title")} subtitle={t("titleOf", { name: agent.name })}>
       <HeaderAction label={t("cancel")} placement="left" onPress={close} />
       <HeaderAction label={t("done")} onPress={done} disabled={!!sent || offline} />
+      {/* The head large on a stage of its colour under the header, the shuffle floating beside it, and the Moods to preview. */}
+      <Stage color={draft.color} bleed>
+        <View style={{ alignSelf: "stretch", alignItems: "center", gap: space.xs }}>
+          <Character look={draft} mood={preview} size={150} />
+          <View style={{ position: "absolute", right: space.lg, top: space.xl }}>
+            <Button
+              label={t("shuffle")}
+              icon="shuffle"
+              variant="floating"
+              onPress={() => {
+                setDraft(shuffleLook(others));
+                setTouched(new Set(["color", "shell", "top", "sides", "decal"]));
+              }}
+            />
+          </View>
+          {!!summary && (
+            <Text variant="footnote" strong tone="body">
+              {summary}
+            </Text>
+          )}
+        </View>
+        <Card raised style={{ alignSelf: "stretch", flexDirection: "row", justifyContent: "space-between", gap: 0, paddingVertical: space.sm, paddingHorizontal: 6 }}>
+          {MOODS.map((mood) => (
+            <MoodTile key={mood} color={draft.color} label={t(`moods.${mood}`)} selected={preview === mood} onPress={() => setPreview(mood)}>
+              <Character look={draft} mood={mood} size={38} still />
+            </MoodTile>
+          ))}
+        </Card>
+      </Stage>
       {offline && (
         <Note icon="offline" iconColor="orange">
           {t("offline")}
@@ -111,40 +130,15 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
           {describeError({ code: status.updateError })}
         </Note>
       )}
-      {/* The head large on a stage in its own colour, the shuffle floating beside it, and the Moods to preview. */}
-      <Stage color={draft.color}>
-        <View style={{ alignSelf: "stretch", alignItems: "center" }}>
-          <Character look={draft} mood={preview} size={150} />
-          <View style={{ position: "absolute", right: space.sm, top: space.sm }}>
-            <Button
-              label={t("shuffle")}
-              icon="shuffle"
-              variant="floating"
-              onPress={() => {
-                setDraft(shuffleLook(others));
-                setTouched(new Set(["color", "shell", "top", "sides", "decal"]));
-              }}
-            />
-          </View>
-        </View>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: space.xs }}>
-          {MOODS.map((mood) => (
-            <Tap key={mood} selected={preview === mood} onPress={() => setPreview(mood)} style={{ width: 52, alignItems: "center", gap: 2, paddingVertical: space.xs }}>
-              <Character look={draft} mood={mood} size={38} still />
-              <Text variant="caption" tone={preview === mood ? "label" : "secondary"} strong={preview === mood} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                {t(`moods.${mood}`)}
-              </Text>
-            </Tap>
+      <Group title={t("color")}>
+        <Card style={{ flex: 1, flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", padding: space.md }}>
+          {COLORS.map((color, i) => (
+            <Swatch key={color} color={color} label={t("colorOption", { name: t(`colors.${COLOR_NAMES[i]}`) })} selected={draft.color.toLowerCase() === color.toLowerCase()} onPress={() => choose("color", color)} />
           ))}
-        </View>
-      </Stage>
-      <Section title={t("color")}>
-        {COLORS.map((color, i) => (
-          <Swatch key={color} color={color} label={t("colorOption", { name: t(`colors.${COLOR_NAMES[i]}`) })} selected={draft.color.toLowerCase() === color.toLowerCase()} onPress={() => choose("color", color)} />
-        ))}
-      </Section>
+        </Card>
+      </Group>
       {PARTS.map(({ slot, options }) => (
-        <Section key={slot} title={t(`slots.${slot}`)}>
+        <Group key={slot} title={t(`slots.${slot}`)}>
           {options.map((value) => {
             const name = t(`parts.${slot}.${value}` as never) as string;
             return (
@@ -153,13 +147,13 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
               </LookTile>
             );
           })}
-        </Section>
+        </Group>
       ))}
-    </ScrollView>
+    </Screen>
   );
 }
 
-// controller-prototype's CharacterPage, laid out like the Memoji editor in Messages: the head large on top, then each part to pick.
+// The AgentCharacter board, laid out like the Memoji editor in Messages: the head large on top, then each part to pick.
 // Done waits for the Machine's answer before it closes, since the look is the Machine's to keep (ADR 0006).
 export function CharacterPage() {
   const t = useT("agent-character");

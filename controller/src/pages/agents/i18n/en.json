@@ -1,30 +1,14 @@
 {
   "create": "Create Agent",
-  "offline": "Offline",
   "none": {
     "title": "No Agent yet",
     "body": "Create the first Agent on a paired Machine"
   },
-  "budget": {
-    "heading": "Today's Budget",
-    "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget. Set a spend limit at the Provider as well (ADR 0043).",
-    "label": "Today's Budget",
-    "used": "{{used}} of {{budget}} tokens ({{percent}}%)",
-    "spent": " · used up",
-    "field": "Budget per day (million tokens)",
-    "default": "The Budget starts at 10M tokens a day. You can change it later on the Agent's page (ADR 0043).",
-    "list": "Today's Budget {{percent}}%"
-  },
   "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",
-  "delete": {
-    "heading": "Danger zone",
-    "action": "Delete this Agent",
-    "title": "Delete {{name}}?",
-    "body": "The Agent stops and moves to Deleted Agents. Its Workdir and Task history stay on the Machine, and you can restore it for 30 days.",
-    "cancel": "Cancel",
-    "prompt": "Delete {{name}}",
-    "failed": "Couldn't delete this Agent"
-  },
+  "count_one": "{{count}} Agent",
+  "count_other": "{{count}} Agents",
+  "spent": "Budget used up",
+  "cancel": "Cancel",
   "trash": {
     "title": "Deleted Agents",
     "footer": "A deleted Agent can be restored for 30 days. After that the Machine drops it from this list, but its Workdir and Task history stay on the disk (ADR 0032).",
@@ -35,5 +19,7 @@
     "confirmTitle": "Restore {{name}}?",
     "confirmBody": "The Agent goes back to work with its settings, and its old Tasks can carry on.",
     "failed": "Couldn't restore this Agent"
-  }
+  },
+  "subtitle_one": "{{count}} Agent on {{machines}} Machine",
+  "subtitle_other": "{{count}} Agents on {{machines}} Machine"
 }

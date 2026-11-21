@@ -1,4 +1,4 @@
-import { statusOf, type Latest, type TaskStatus } from "../../../entities/task";
+import { needsYou, statusOf, type Latest, type TaskStatus } from "../../../entities/task";
 
 export type InboxAgent = { id: string; machine_id: string };
 export type InboxTask = Latest & { id: string; agent_id: string; updated_at: number };
@@ -25,7 +25,7 @@ export type InboxTab = "all" | "needsYou" | "working" | "done";
 
 /** Which tab an Agent shows in besides All: one waiting on an Approval, failed or interrupted needs its Owner; one not started or offline is in All only. */
 export function tabOf(status: TaskStatus): Exclude<InboxTab, "all"> | null {
-  if (status === "waiting" || status === "stuck" || status === "failed" || status === "interrupted") return "needsYou";
+  if (needsYou(status)) return "needsYou";
   if (status === "working") return "working";
   if (status === "done") return "done";
   return null;
