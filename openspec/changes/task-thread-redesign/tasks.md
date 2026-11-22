@@ -3,7 +3,7 @@
 - [x] 1.1 เปลี่ยน `ToolCall` ใน `pages/task/model/items.ts` เป็น `{ id, tool, target, state, output?, error? }` โดยอ่าน `target` จาก input ของแต่ละ tool ทั้งแปดชนิด และ tool ที่ไม่รู้จักใช้ชื่อ tool; ตรวจด้วย test ใน `items.test.ts` หนึ่งกรณีต่อชนิดและหนึ่งกรณี tool ที่ไม่รู้จัก
 - [x] 1.2 เพิ่ม `summaryOf(calls)` ตามตารางใน design.md ข้อ 2 (running ก่อน, แล้ว failed ล่าสุดพร้อมบรรทัด error, แล้วตัวสุดท้าย, จำนวนที่ซ่อน, มี failed ซ่อนอยู่ไหม); ตรวจด้วย test ครบทุกแถวของตาราง
 - [x] 1.3 ให้ `items()` สร้าง Item `{ kind: "changes", files }` ตอน `turn.ended` จาก `edit` และ `write` ที่สำเร็จใน Turn นั้น ไม่ซ้ำและเรียงตามครั้งแรก; ตรวจด้วย test สามกรณีใน spec (สองไฟล์, แค่อ่าน, แก้ไม่สำเร็จ)
-- [ ] 1.4 ย้ายการหาข้อมูลและสถานะของหน้าจาก `TaskPage.tsx` ไป `pages/task/model/screen.ts` (`agent`, `machine`, `readOnly`, `busy`, `isStopping`, Agent ที่ถูกลบ) และแยกส่วนที่เป็นกฎออกเป็นฟังก์ชันล้วน; ตรวจด้วย test ของกรณี Agent ถูกลบ และกรณี Stop ที่ Machine ปฏิเสธ
+- [x] 1.4 ย้ายการหาข้อมูลและสถานะของหน้าจาก `TaskPage.tsx` ไป `pages/task/model/screen.ts` (`agent`, `machine`, `readOnly`, `busy`, `isStopping`, Agent ที่ถูกลบ) และแยกส่วนที่เป็นกฎออกเป็นฟังก์ชันล้วน; ตรวจด้วย test ของกรณี Agent ถูกลบ และกรณี Stop ที่ Machine ปฏิเสธ (กฎล้วนอยู่ใน `screen.ts` ส่วน hook `useTaskScreen` อยู่ใน `use-task-screen.ts` เพราะ Bun เก็บ mock ตัวเดียวต่อ module ทั้งรอบ test จึง mock hook ของ entity ใน test นี้ไม่ได้)
 
 ## 2. คำ
 
@@ -21,5 +21,5 @@
 
 ## 4. ตรวจ
 
-- [ ] 4.1 `bun run check`, `bun run test` และ `bun run test:e2e` ผ่าน
+- [x] 4.1 `bun run check`, `bun run test` และ `bun run test:e2e` ผ่าน
 - [ ] 4.2 เปิดหน้า Task บน iOS Simulator และ web ทั้งสองโหมดและสองภาษา ครบทุกชนิด Item ใน `pages/task/model/items.ts` พร้อมภาพหน้าจอใน PR

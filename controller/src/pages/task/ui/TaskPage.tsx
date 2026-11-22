@@ -2,15 +2,15 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlatList, KeyboardAvoidingView, View, type TextInputInstance } from "react-native";
-import { allowlistOf, deletedAgent, useAgents, useTrashedAgents } from "../../../entities/agent";
+import { allowlistOf } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
-import { useMachines } from "../../../entities/machine";
-import { latestOf, statusOf, titleOfEvents, usePendingMessages, useTaskEvents, useTaskRow } from "../../../entities/task";
-import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
+import { latestOf, statusOf, titleOfEvents, usePendingMessages, useTaskEvents } from "../../../entities/task";
+import { useMachineLink } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
 import { useNow } from "../../../shared/lib";
 import { Bubble, Card, column, Fade, FADE, HeaderAction, radius, space, Spinner, Text, useSplit } from "../../../shared/ui";
 import { contextUsageOf, items, type Item, type ToolCall } from "../model/items";
+import { useTaskScreen } from "../model/use-task-screen";
 import { useComposer } from "../model/use-composer";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
@@ -31,18 +31,7 @@ export function TaskPage() {
   const insets = useSafeAreaInsets();
   const t = useT("task");
   const { task, agent: agentId } = useLocalSearchParams<{ task: string; agent: string }>();
-  const agents = useAgents();
-  const trashedAgents = useTrashedAgents();
-  const found = agents?.find((a) => a.id === agentId);
-  // A deleted Agent still names its Tasks while it waits in the trash (`agent-trash`).
-  const gone = trashedAgents?.find((a) => a.id === agentId);
-  // Sending, Stop and settings need the Agent itself; the history does not.
-  const row = useTaskRow(task)?.[0];
-  const agent = found ?? deletedAgent(agentId, gone?.machine_id ?? row?.machine_id, gone?.name ?? t("deletedAgent"));
-  const machines = useMachines();
-  const machine = machines?.find((m) => m.id === agent.machine_id);
-  const readOnly = !found;
-  const status = useMachineStatus(machine?.id ?? "");
+  const screen = useTaskScreen(task, agentId);
   const link = useMachineLink();
   const events = useTaskEvents(task);
   const pending = usePendingMessages(task);
@@ -66,17 +55,16 @@ export function TaskPage() {
     atEnd.current = true;
     toEnd(true);
   };
-  const composer = useComposer({ task, agent, machine, link, readOnly, events: events ?? undefined, stopError: status.stopError, onSend: followEnd });
+  const composer = useComposer({ task, screen, link, events: events ?? undefined, onSend: followEnd });
   // The log only changes with its events; the clock matters only while an Approval is open and can still time out.
   const settled = useMemo(() => (events ? items(events, Date.now()) : null), [events]);
   const ticking = !!settled?.items.some((item) => item.kind === "approval" && item.approval.status === "open");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `ticking && now` makes the clock a dependency only while it can change the log
   const log = useMemo(() => (events && ticking ? items(events, now) : settled), [events, ticking, ticking && now, settled]);
 
-  // Until both lists land, neither "an Agent" nor "a deleted Agent" is known yet:
-  // showing the deleted state here would flash a wrong name and no composer.
   // A Machine no longer paired (or a deleted Agent's unknown one) still shows the log, read from the device.
-  if (!agents || !trashedAgents || !machines || !events || !pending || !log) return <Stack.Screen options={{ title: t("title") }} />;
+  if (!screen || !events || !pending || !log) return <Stack.Screen options={{ title: t("title") }} />;
+  const { agent, machine, readOnly, status } = screen;
   const { items: all, working } = log;
   const shown = all.length > drawn ? all.slice(-drawn) : all;
   // The command running now, when there is one, for the working line.

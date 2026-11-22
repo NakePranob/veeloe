@@ -1,16 +1,15 @@
 import { TASK_TITLE_MAX } from "@veeloe/protocol-ts";
 import { router, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
-import { deletedAgent, useAgents } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, shade as darken, tint } from "../../../entities/character";
-import { useMachines } from "../../../entities/machine";
 import { latestOf, statusOf, TaskStatusDot, titleOfEvents, useTaskEvents } from "../../../entities/task";
-import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
+import { useMachineLink } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, useNow, when } from "../../../shared/lib";
 import { Button, EditableTitle, Note, PartKey, PartsBar, Row, Screen, Section, space, Text } from "../../../shared/ui";
 import { contextPartsOf, factsOf, type ContextPart } from "../model/details";
 import { useComposer } from "../model/use-composer";
+import { useTaskScreen } from "../model/use-task-screen";
 
 // Fixed overhead in greys, the conversation in the Agent's colour: lifted, as it is, and taken darker, so parts differ in
 // lightness too, even for an Agent in a pale colour. A number lifts toward white; below zero takes it toward black.
@@ -29,14 +28,14 @@ export function TaskDetailsPage() {
   const language = useLanguage();
   const now = useNow();
   const { task, agent: agentId, from } = useLocalSearchParams<{ task: string; agent: string; from?: string }>();
-  const agent = useAgents()?.find((a) => a.id === agentId);
-  const machine = useMachines()?.find((m) => m.id === agent?.machine_id);
-  const status = useMachineStatus(machine?.id ?? "");
+  const screen = useTaskScreen(task, agentId);
   const link = useMachineLink();
   const events = useTaskEvents(task);
-  const composer = useComposer({ task, agent: agent ?? deletedAgent(agentId, undefined, ""), machine, link, readOnly: !agent, events: events ?? undefined, stopError: status.stopError });
+  const composer = useComposer({ task, screen, link, events: events ?? undefined });
 
-  if (!events || !agent) return <Screen title={t("details.title")}>{null}</Screen>;
+  // The sheet is for a live Agent's Task; a deleted Agent's shows nothing.
+  if (!events || !screen || screen.readOnly) return <Screen title={t("details.title")}>{null}</Screen>;
+  const { agent, machine, status } = screen;
   const offline = status.online === false || !link || !machine;
   const latest = latestOf(events);
   const taskStatus = statusOf(latest, status.online);
