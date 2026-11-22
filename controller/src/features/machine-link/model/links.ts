@@ -235,8 +235,9 @@ export function createMachineLinks({
         if (!ref || !about) return;
         if (error.code === "hub.machine_offline") {
           setStatus(about.machine, { online: false });
+          // Whatever went out found it offline, so ask again until it is back, or the screens say offline until a restart.
           const machine = machines.find((m) => m.id === about.machine);
-          if (about.kind === "hello" && machine) helloLater(machine);
+          if (machine) helloLater(machine);
         }
         if (about.kind === "hello") return;
         void failSent(about, ref, error.code);

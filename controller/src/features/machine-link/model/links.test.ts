@@ -273,6 +273,20 @@ test("a Machine that was offline is asked again until it answers", async () => {
   await until(() => links.status("machine-1").online === true);
 }, 10_000);
 
+test("a Machine found offline by a Memory read is asked again, so it comes back without a restart", async () => {
+  const { fake, machine, links } = await setup();
+  fake.push(signed("agent.listed", { agents: [], providers: [] }));
+  await until(() => links.status("machine-1").online === true);
+  links.requestMemory(machine, "a1");
+  await until(() => fake.hub.frames.some((f) => JSON.parse(f.signed).type === "memory.get"));
+  const read = fake.hub.frames.find((f) => JSON.parse(f.signed).type === "memory.get")!;
+  fake.push({ type: "hub.error", code: "hub.machine_offline", ref: read.sig });
+  await until(() => links.status("machine-1").online === false);
+  await until(() => fake.hub.frames.filter((f) => JSON.parse(f.signed).type === "agent.list").length === 2, 6000);
+  fake.push(signed("agent.listed", { agents: [], providers: [] }, { seq: 2 }));
+  await until(() => links.status("machine-1").online === true);
+}, 10_000);
+
 test("the Egress goes as one signed list, and the list kept is the one the Machine signed back", async () => {
   const { database, fake, machine, links } = await setup();
   expect(links.setEgress(machine, ["github.com", "*.npmjs.org"])).toBe(true);
