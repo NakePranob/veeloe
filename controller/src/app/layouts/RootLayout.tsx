@@ -78,7 +78,7 @@ export function RootLayout() {
   const { task } = useGlobalSearchParams<{ task?: string }>();
   const keyStatus = useKeyStatus();
   const trackActivity = useKeyActivity();
-  const { state, useHere, retry } = useAppDatabase();
+  const { state, takeOverHere, retry } = useAppDatabase();
   // Nothing with text draws until the bundled fonts are in, so no screen changes font after it shows.
   const fontsReady = useAppFonts();
   const base = useColorScheme() === "dark" ? DarkTheme : DefaultTheme;
@@ -113,7 +113,7 @@ export function RootLayout() {
           {keyStatus === "checking" && <View style={{ flex: 1, backgroundColor: colors.background }} />}
         </DatabaseProvider>
       ) : state.status === "elsewhere" ? (
-        <OtherTabPage onUseHere={() => void useHere()} />
+        <OtherTabPage onUseHere={() => void takeOverHere()} />
       ) : state.status === "failed" ? (
         <StorageUnavailablePage onRetry={retry} />
       ) : (

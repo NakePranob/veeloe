@@ -28,11 +28,14 @@
     "check:controller": "cd controller && bun scripts/check-i18n.ts",
     "build:runtime": "bun scripts/build-runtime.ts",
     "check:protocol": "cd packages/protocol && cargo test && cd ../protocol-ts && bun test src/fixtures && cd ../../hub && go test ./internal/shared/protocol/...",
-    "check:structure": "bun scripts/check-structure.ts"
+    "check:structure": "bun scripts/check-structure.ts",
+    "lint": "biome check",
+    "check:dead": "knip"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
     "@types/bun": "^1.3.14",
+    "knip": "6.47.0",
     "typescript": "~6.0.3"
   }
 }

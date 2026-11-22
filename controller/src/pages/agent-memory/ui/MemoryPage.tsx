@@ -10,7 +10,7 @@ import { Empty, Note, Screen, Section, Spinner, Text, space, Icon } from "../../
 
 // The count is shown against the same cap `runtime-core` applies to the prompt. It is fixed in
 // v0.1 (ADR 0036), so it lives here as a constant: when `MEMORY_LIMIT` moves, this must move too.
-export const MEMORY_LIMIT = 4_000;
+const MEMORY_LIMIT = 4_000;
 
 /** The Agent's Memory, read-only: what its next Turn's prompt gets from `MEMORY.md` (ADR 0036). */
 export function MemoryPage() {
@@ -32,6 +32,7 @@ export function MemoryPage() {
   const fetched = status.fetchedAt ? t("fetched", { when: when(status.fetchedAt, language, now) }) : "";
 
   // Ask on open and again when the Machine comes back; reading never writes anything.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on ids, since a live query hands back new row objects on every write and each would ask again
   useEffect(() => {
     if (link && machine && agent && online !== false) link.requestMemory(machine, agent.id);
   }, [link, machine?.id, agent?.id, online]);

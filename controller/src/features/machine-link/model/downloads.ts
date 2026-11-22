@@ -40,6 +40,7 @@ export function safeFileName(name: string): string {
     name
       .split(/[\\/]/)
       .at(-1)
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are exactly what a file name must not keep
       ?.replace(/[\0-\x1f\x7f:*?"<>|]/g, "_")
       .trim()
       .slice(0, 120) ?? "";

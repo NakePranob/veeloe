@@ -5,7 +5,7 @@ import type { Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { formatList } from "../../../shared/lib";
-import { keySession } from "../../../shared/keystore";
+import { keySession, type Signed } from "../../../shared/keystore";
 import { Button, Card, DotLabel, Field, Icon, inform, radius, Row, Section, Select, size, space, Text } from "../../../shared/ui";
 import { errorOf, modelsOf } from "../../../widgets/provider-models";
 import { PROVIDER_PRESETS } from "../model/providers";
@@ -33,7 +33,7 @@ export function ProviderSection({ machine, agents }: { machine: Machine; agents:
     if (!link || busy) return;
     if (!key.trim() || (!chosen && (!name.trim() || !url.trim()))) return;
     setBusy(true);
-    let result;
+    let result: Signed<unknown>;
     try {
       result = await keySession.signed(t("provider.prompt", { machine: machine.name }), () => link.addProvider(machine, { name: chosen?.id ?? name.trim(), url: chosen?.url ?? url.trim(), ...(chosen ? { preset: chosen.id } : {}), key }));
     } finally {

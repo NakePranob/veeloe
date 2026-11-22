@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import { motion, useColors, useReduceMotion, type Colors } from "../../../shared/ui";
@@ -75,7 +75,7 @@ function mix(hex: string, k: number, to = [26, 32, 48]) {
 function grey(hex: string) {
   const n = parseInt(hex.slice(1), 16);
   const l = Math.round(0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255));
-  return "#" + l.toString(16).padStart(2, "0").repeat(3);
+  return `#${l.toString(16).padStart(2, "0").repeat(3)}`;
 }
 
 // One slice of the head: an SVG on the shared grid, inside a view that moves on its own.
@@ -183,7 +183,7 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
     ];
     if (mood !== "done") targets.push([v.turn, to.turn]);
     if (reduce) {
-      targets.forEach(([value, target]) => value.setValue(target));
+      for (const [value, target] of targets) value.setValue(target);
       v.turn.setValue(to.turn);
       return;
     }
@@ -225,9 +225,9 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
     if (mood === "stuck") loops.push(Animated.loop(Animated.sequence([Animated.delay(2600), ...[1, 0, 1, 0].map((toValue) => Animated.timing(v.nod, { toValue, duration: 70, useNativeDriver: native }))])));
     if (mood !== "done" && mood !== "offline" && mood !== "failed")
       loops.push(Animated.loop(Animated.sequence([Animated.delay(3800), Animated.timing(v.blink, { toValue: 0.1, duration: 70, useNativeDriver: native }), Animated.timing(v.blink, { toValue: 1, duration: 110, useNativeDriver: native })])));
-    loops.forEach((loop) => loop.start());
+    for (const loop of loops) loop.start();
     return () => {
-      loops.forEach((loop) => loop.stop());
+      for (const loop of loops) loop.stop();
       for (const value of [v.float, v.nod]) Animated.timing(value, { toValue: 0, duration: motion.duration.fast, easing: motion.easeOut, useNativeDriver: native }).start();
       v.blink.setValue(1);
       v.pulse.setValue(1);

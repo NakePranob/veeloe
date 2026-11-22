@@ -127,7 +127,12 @@ export function createKeySession({ vault, now, generate }: { vault: Vault; now: 
      */
     async signed<T>(prompt: string, send: () => T | null | false | undefined | Promise<T | null | false | undefined>): Promise<Signed<T>> {
       let value: T | null | false | undefined = null;
-      if (!(await this.withFreshAuthentication(prompt, async () => void (value = await send())))) return { status: "cancelled" };
+      if (
+        !(await this.withFreshAuthentication(prompt, async () => {
+          value = await send();
+        }))
+      )
+        return { status: "cancelled" };
       return value === null || value === false || value === undefined ? { status: "failed" } : { status: "sent", value };
     },
   };

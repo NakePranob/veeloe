@@ -146,8 +146,6 @@ export const type = {
   caption2: { fontSize: 11, lineHeight: 14, fontFamily: font.regular },
 } as const;
 
-export const mono = font.mono;
-
 // Motion: short, eased out, never bouncy for routine changes.
 export const motion = {
   duration: { micro: 80, quick: 150, fast: 250, medium: 350 },

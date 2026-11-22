@@ -30,6 +30,7 @@ export function MachinePage() {
   const status = useMachineStatus(id);
   const link = useMachineLink();
   const [part, setPart] = useState<Part>("agent");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the id, since a live query hands back a new row on every write and each would ask again
   useEffect(() => {
     if (machine) link?.requestStatus(machine);
   }, [machine?.id, link]);

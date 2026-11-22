@@ -10,7 +10,9 @@ import { createMachineLinks, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, type Machin
 
 let current: MachineLinks | null = null;
 const changes = new Set<() => void>();
-const announce = () => changes.forEach((listener) => listener());
+const announce = () => {
+  for (const listener of changes) listener();
+};
 
 /**
  * For the app layer: keeps the connections up while the key is open, and drops them when it locks.
@@ -20,6 +22,7 @@ export function useMachineLinks({ onRevoked, onLinked }: { onRevoked: () => void
   const database = useDatabase();
   const unlocked = useKeyStatus() === "unlocked";
   const machines = useMachines();
+  const live = useCurrent();
   const handlers = useRef({ onRevoked, onLinked });
   handlers.current = { onRevoked, onLinked };
 
@@ -37,9 +40,10 @@ export function useMachineLinks({ onRevoked, onLinked }: { onRevoked: () => void
     };
   }, [database, unlocked]);
 
+  // Every new set of links (a new key, a new database) gets the Machines, not only the first.
   useEffect(() => {
-    if (machines && current) current.update(machines);
-  }, [machines, unlocked]);
+    if (machines && live) live.update(machines);
+  }, [machines, live]);
 }
 
 function useCurrent() {

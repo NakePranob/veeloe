@@ -188,6 +188,7 @@ export function UsagePage() {
   const latest = useRef(list);
   latest.current = list;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: ids and online are the triggers; the rows themselves are read through `latest`
   useEffect(() => {
     if (!link) return;
     for (const machine of latest.current) link.requestUsage(machine, days);
@@ -238,13 +239,14 @@ export function UsagePage() {
                 ))}
             </Section>
           )}
-          {list.map((machine) =>
-            statuses[machine.id]?.error ? (
+          {list.map((machine) => {
+            const error = statuses[machine.id]?.error;
+            return error ? (
               <Note key={machine.id} icon="warning" iconColor="orange">
-                {t("machineError", { machine: machine.name, error: describeError({ code: statuses[machine.id]!.error! }) })}
+                {t("machineError", { machine: machine.name, error: describeError({ code: error }) })}
               </Note>
-            ) : null,
-          )}
+            ) : null;
+          })}
         </>
       )}
       <TopTasks statuses={statuses} agents={agents} />

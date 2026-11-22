@@ -1,2 +1,2 @@
-export { dailyTotals, saveUsageFetchedAt, saveUsageHistory, USAGE_KEEP_DAYS, USAGE_TOPIC, type UsageDayRow } from "./model/usage";
+export { dailyTotals, saveUsageFetchedAt, saveUsageHistory, type UsageDayRow } from "./model/usage";
 export { useUsageDays } from "./model/use-usage";

@@ -70,7 +70,7 @@ export function listDevices(database: Database) {
 
 /** The keys a revocation of `device` takes with it, given what is kept: it, and what it linked, down the tree. */
 export function droppedWith(devices: readonly Device[], device: string, keep: readonly string[]): string[] {
-  const links = devices.filter((d) => d.linked_by && d.revoked_at === null).map((d) => ({ key: d.key, by: d.linked_by! }));
+  const links = devices.flatMap((d) => (d.linked_by && d.revoked_at === null ? [{ key: d.key, by: d.linked_by }] : []));
   return revokedWith(device, links, keep);
 }
 

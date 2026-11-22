@@ -23,6 +23,7 @@ export function useAgentUpdate<C extends Change>(agent: AgentRow, { landed, onLa
   const left = useRef(false);
 
   // A send that found no link is tried again once the link or the Machine changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: link and online are what trigger the retry, not values it reads
   useEffect(() => setNotSent(false), [link, online]);
   useEffect(() => {
     if (sent === null) return;

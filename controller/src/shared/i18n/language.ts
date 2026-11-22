@@ -1,4 +1,4 @@
-export const LANGUAGES = ["th", "en"] as const;
+const LANGUAGES = ["th", "en"] as const;
 export type Language = (typeof LANGUAGES)[number];
 
 export const isLanguage = (code: string | null | undefined): code is Language => LANGUAGES.includes(code as Language);

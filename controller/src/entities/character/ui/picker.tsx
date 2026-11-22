@@ -26,7 +26,7 @@ function mixToward(hex: string, to: string, k: number) {
     Math.round(x + (y - x) * k)
       .toString(16)
       .padStart(2, "0");
-  return "#" + ch(a >> 16, b >> 16) + ch((a >> 8) & 255, (b >> 8) & 255) + ch(a & 255, b & 255);
+  return `#${ch(a >> 16, b >> 16)}${ch((a >> 8) & 255, (b >> 8) & 255)}${ch(a & 255, b & 255)}`;
 }
 
 /**

@@ -4,5 +4,3 @@ export const PROVIDER_PRESETS = [
   { id: "opencode-go", name: "OpenCode Go", url: "https://opencode.ai/inference/go" },
   { id: "openrouter", name: "OpenRouter", url: "https://openrouter.ai/api" },
 ] as const;
-
-export type ProviderPreset = (typeof PROVIDER_PRESETS)[number];

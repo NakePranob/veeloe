@@ -31,16 +31,17 @@ export function ApprovalOutcome({ approval, target }: { approval: Approval; targ
   const marks = { outcome: mark(0), target: mark(1) };
   const line = always ? t("approval.outcomeAlways", marks) : approval.status === "expired" ? t("approval.outcomeExpired", marks) : member ? t("approval.outcomeBy", { ...marks, member }) : t("approval.outcome", marks);
   const parts: ReactNode[] = [
-    <Text variant="footnote" strong>
+    <Text key="outcome" variant="footnote" strong>
       {always ? t("approval.always") : t(outcome.key)}
     </Text>,
-    <Text variant="caption" mono>
+    <Text key="target" variant="caption" mono>
       {target}
     </Text>,
   ];
   return (
     <Pill icon={outcome.icon} color={outcome.color}>
       <Text variant="footnote" style={{ flexShrink: 1 }}>
+        {/* biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence, never reordered */}
         {splitMarks(line).map((piece, index) => (typeof piece === "number" ? <Fragment key={index}>{parts[piece]}</Fragment> : piece))}
       </Text>
     </Pill>

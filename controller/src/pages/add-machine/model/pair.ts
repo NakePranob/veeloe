@@ -3,7 +3,7 @@ import { startHubClient } from "../../../shared/hub-client";
 
 export type PairResult = { ok: true; machine: PairedMachine } | { ok: false; code: string };
 
-export type PairedMachine = { id: string; publicKey: string; name: string; hubUrl: string; workspace: string; member: string };
+type PairedMachine = { id: string; publicKey: string; name: string; hubUrl: string; workspace: string; member: string };
 
 export type PairOptions = {
   link: PairingLink;

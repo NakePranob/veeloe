@@ -31,6 +31,7 @@ export type ToolSummary = { call: ToolCall; error?: string; hidden: number; hidd
 /** The call that says what a group is doing: the one running, else the latest that failed, else the last. */
 export function summaryOf(calls: ToolCall[]): ToolSummary {
   const failed = calls.filter((c) => c.state === "failed");
+  // biome-ignore lint/style/noNonNullAssertion: a group always holds at least one call
   const call = calls.find((c) => c.state === "running") ?? failed.at(-1) ?? calls.at(-1)!;
   const error = call.state === "failed" ? call.output?.trim().split("\n").filter(Boolean).at(-1) : undefined;
   return { call, ...(error ? { error } : {}), hidden: calls.length - 1, hiddenFailed: failed.some((c) => c !== call) };
@@ -95,7 +96,7 @@ const textOf = (content: unknown) =>
 const TARGET: Record<string, string> = { bash: "command", read: "path", write: "path", edit: "path", send_file: "path", glob: "pattern", grep: "pattern", memory: "text" };
 const targetOf = (tool: string, input: unknown) => {
   const value = (input as Record<string, unknown> | null)?.[TARGET[tool] ?? ""];
-  return typeof value === "string" ? value.split("\n")[0]! : "";
+  return typeof value === "string" ? (value.split("\n")[0] ?? "") : "";
 };
 
 type ToolUse = { type: "tool_use"; id: string; name?: unknown; input?: unknown };

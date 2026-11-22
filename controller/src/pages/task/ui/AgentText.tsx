@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noArrayIndexKey: blocks and pieces are re-parsed from the text on every render and have no ids; text only grows at the end, so position is identity
 import { Linking, ScrollView, View } from "react-native";
 import { parseMarkdown, type Inline } from "../../../shared/lib";
 import { Inset, space, Text } from "../../../shared/ui";
@@ -97,6 +98,7 @@ export function AgentText({ text }: { text: string }) {
               </View>
             );
         }
+        return null;
       })}
     </View>
   );

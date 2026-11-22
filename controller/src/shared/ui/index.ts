@@ -13,9 +13,9 @@ export { Centered, CenteredStep, FooterBar, IconDisc, Spinner, Tap } from "./lay
 export { Meter } from "./meter";
 export { useReduceMotion } from "./reduce-motion";
 export { QrCode, QrScanner } from "./qr";
-export { Select, type SelectOption } from "./select";
-export { Tabs, type Tab } from "./tabs";
+export { Select } from "./select";
+export { Tabs } from "./tabs";
 export { Text, TextLink } from "./text";
 export { Tile } from "./tile";
 export { useAppFonts } from "./fonts";
-export { column, font, icon, motion, opacity, radius, size, SIDEBAR_WIDTH, space, type, useColors, useShadows, useSplit, type Colors } from "./theme";
+export { column, font, icon, motion, opacity, radius, size, SIDEBAR_WIDTH, space, useColors, useSplit, type Colors } from "./theme";

@@ -225,15 +225,16 @@ export function createMachineLinks({
       },
       onRevoked: () => onRevoked?.(),
       onHubError: (error) => {
-        const about = error.ref ? sentTo.get(error.ref) : undefined;
-        if (!about) return;
+        const ref = error.ref;
+        const about = ref ? sentTo.get(ref) : undefined;
+        if (!ref || !about) return;
         if (error.code === "hub.machine_offline") {
           setStatus(about.machine, { online: false });
           const machine = machines.find((m) => m.id === about.machine);
           if (about.kind === "hello" && machine) helloLater(machine);
         }
         if (about.kind === "hello") return;
-        void failSent(about, error.ref!, error.code);
+        void failSent(about, ref, error.code);
       },
     });
     clients.set(hubUrl, { client, machines });

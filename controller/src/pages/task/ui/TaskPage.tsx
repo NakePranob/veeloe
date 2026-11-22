@@ -54,6 +54,7 @@ export function TaskPage() {
   // The log only changes with its events; the clock matters only while an Approval is open and can still time out.
   const settled = useMemo(() => (events ? items(events, Date.now()) : null), [events]);
   const ticking = !!settled?.items.some((item) => item.kind === "approval" && item.approval.status === "open");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `ticking && now` makes the clock a dependency only while it can change the log
   const log = useMemo(() => (events && ticking ? items(events, now) : settled), [events, ticking, ticking && now, settled]);
 
   // Until both lists land, neither "an Agent" nor "a deleted Agent" is known yet:

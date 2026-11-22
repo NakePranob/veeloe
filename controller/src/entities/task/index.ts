@@ -10,7 +10,6 @@ export {
   isBudgetOut,
   latestEvents,
   latestOf,
-  latestTaskOf,
   listTasks,
   markPendingSent,
   needsYou,
@@ -21,7 +20,6 @@ export {
   type Latest,
   type PendingRow,
   type TaskEventRow,
-  type TaskRow,
   type TaskStatus,
   type TaskSummary,
 } from "./model/tasks";

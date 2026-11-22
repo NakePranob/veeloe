@@ -82,12 +82,6 @@ export function listTasks(database: Database) {
   return database.query<TaskRow>("SELECT * FROM task");
 }
 
-/** The Task to open when an Agent is tapped: the one with the latest activity. */
-export async function latestTaskOf(database: Database, agentId: string) {
-  const [row] = await database.query<{ id: string }>("SELECT id FROM task WHERE agent_id = ? ORDER BY updated_at DESC LIMIT 1", [agentId]);
-  return row?.id ?? null;
-}
-
 /** Kinds this build knows; a newer Runtime's kind is skipped when working out what a Task is doing. */
 const KNOWN: readonly string[] = Object.values(TaskEventKind);
 const KNOWN_SQL = KNOWN.map((kind) => `'${kind}'`).join(", ");
@@ -111,7 +105,7 @@ export function previewOf(summary: Pick<TaskSummary, "last_kind" | "last_body">)
   if (!summary.last_body) return "";
   try {
     const body = JSON.parse(summary.last_body) as { text?: unknown; content?: unknown };
-    if (summary.last_kind === "member.message") return typeof body.text === "string" ? body.text.split("\n")[0]! : "";
+    if (summary.last_kind === "member.message") return typeof body.text === "string" ? (body.text.split("\n")[0] ?? "") : "";
     const text = Array.isArray(body.content)
       ? body.content
           .filter((b) => b?.type === "text" && typeof b.text === "string")
@@ -126,7 +120,10 @@ export function previewOf(summary: Pick<TaskSummary, "last_kind" | "last_body">)
 
 /** The same as a summary's, from a Task's events in order, for the screen that already has them all. */
 export function latestOf(events: readonly Pick<TaskEventRow, "kind" | "body">[]): Latest {
-  for (let i = events.length - 1; i >= 0; i--) if (KNOWN.includes(events[i]!.kind)) return { latest_kind: events[i]!.kind, latest_body: events[i]!.body };
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i];
+    if (event && KNOWN.includes(event.kind)) return { latest_kind: event.kind, latest_body: event.body };
+  }
   return { latest_kind: null, latest_body: null };
 }
 

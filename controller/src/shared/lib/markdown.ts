@@ -30,7 +30,7 @@ const isTableRule = (line: string) => line.includes("|") && /^\|?\s*:?-{1,}:?\s*
 
 const INLINE = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\))/;
 
-export function parseInline(line: string): Inline[] {
+function parseInline(line: string): Inline[] {
   return line
     .split(INLINE)
     .filter(Boolean)
@@ -58,7 +58,7 @@ export function parseMarkdown(text: string): Block[] {
     };
     const lines = part.split("\n").map((line) => line.trim());
     for (let index = 0; index < lines.length; index++) {
-      const line = lines[index]!;
+      const line = lines[index] ?? "";
       const heading = line.match(/^#{1,3}\s+(.*)$/);
       const bullet = line.match(/^[-*•]\s+(.*)$/);
       const numbered = line.match(/^(\d+)[.)]\s+(.*)$/);
@@ -69,15 +69,15 @@ export function parseMarkdown(text: string): Block[] {
         flush();
         const header = cells(line).map(parseInline);
         const rows: Inline[][][] = [];
-        for (index += 2; index < lines.length && lines[index]!.includes("|"); index++) rows.push(cells(lines[index]!).map(parseInline));
+        for (index += 2; index < lines.length && lines[index]?.includes("|"); index++) rows.push(cells(lines[index] ?? "").map(parseInline));
         index--;
         blocks.push({ kind: "table", header, rows });
         continue;
       }
       if (quoted) {
         flush();
-        const quotedLines = [quoted[1]!];
-        while (/^>\s?/.test(lines[index + 1] ?? "")) quotedLines.push(lines[++index]!.replace(/^>\s?/, ""));
+        const quotedLines = [quoted[1] ?? ""];
+        while (/^>\s?/.test(lines[index + 1] ?? "")) quotedLines.push((lines[++index] ?? "").replace(/^>\s?/, ""));
         blocks.push({ kind: "quote", inline: parseInline(quotedLines.join("\n")) });
         continue;
       }

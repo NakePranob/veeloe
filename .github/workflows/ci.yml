@@ -29,6 +29,10 @@ jobs:
           # Ubuntu 24.04 stops unprivileged user namespaces through AppArmor, and bubblewrap needs them.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: bun run typecheck
+      - name: Biome (Controller format + lint)
+        run: bun run lint
+      - name: Dead files, exports and dependencies (knip)
+        run: bun run check:dead
       - name: Unit tests (Protocol, Controller, Controller prototype)
         # `bun run test` is the same three commands; split here so a hang names
         # the package it is in and a timeout turns it into a failure.

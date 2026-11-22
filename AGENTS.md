@@ -33,7 +33,12 @@ bun run check
 bun run test
 ```
 
-`check` runs every step and fails at the end: the type check, the structure
+`check` runs every step and fails at the end: the type check (the Controller
+also refuses unused locals and parameters; prefix an intended one with `_`),
+`lint` (Biome's format and lint over the Controller, `biome.json`), `check:dead`
+(knip: dead files, exports and dependencies in the Controller, `knip.jsonc`;
+an export only its own file uses loses `export`, and a slice's `index.ts`
+exports only what another slice uses), the structure
 of the Controller, Hub and Runtime (`check:structure`, ADR 0070), checks that
 the Controller's Thai and English words match (ADR 0065), the Rust Runtime's
 `cargo test --workspace`, and the Protocol against its vectors on both sides
@@ -121,7 +126,16 @@ git config core.hooksPath .githooks
 ```
 
 `.githooks/commit-msg` refuses a Thai subject line. Fix the message rather than
-passing `--no-verify`.
+passing `--no-verify`. `.githooks/pre-commit` runs Biome on the staged files
+only; when it refuses, run `bunx biome check --write` and stage the fixes.
+
+Biome rules worth knowing: `useExhaustiveDependencies` is an error, and a dependency
+left out on purpose (an id instead of a live-query row, a trigger the effect does
+not read) carries `biome-ignore` with the reason. `noNonNullAssertion` is an error
+in app code (check the value instead) and off in tests, as are the comma,
+assign-in-expression and `forEach`-return rules that only make test stubs noisy.
+`noArrayIndexKey` is allowed only, with a reason, for pieces of one fixed sentence
+or Markdown re-parsed on every render.
 
 ## Git conventions
 

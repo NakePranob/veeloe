@@ -9,7 +9,7 @@ import { useMachines } from "../../../entities/machine";
 import { previewOf, STATUS_DOT, statusOf, useTaskSummaries } from "../../../entities/task";
 import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
-import { keySession } from "../../../shared/keystore";
+import { keySession, type Signed } from "../../../shared/keystore";
 import { formatTokens, mark, splitMarks, useNow, when } from "../../../shared/lib";
 import { Button, Dot, DotLabel, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, TextLink, Tile, confirm, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
@@ -83,7 +83,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
     if (removing) return;
     if (!link || !machine || offline) return inform(t("delete.failed"), t("needsOnline"));
     setRemoving(true);
-    let result;
+    let result: Signed<unknown>;
     try {
       if (!(await confirm({ title: t("delete.title", { name: agent.name }), message: t("delete.body"), action: t("delete.action"), cancel: t("delete.cancel", { name: agent.name }), destructive: true }))) return;
       result = await keySession.signed(t("delete.prompt", { name: agent.name }), () => link.deleteAgent(machine, agent.id));
@@ -113,12 +113,13 @@ function AgentView({ agent }: { agent: AgentRow }) {
             <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
               {splitMarks(online === null ? t("stage.line", { machine: mark(0), model: mark(1) }) : t("stage.withState", { state: t(online ? "online" : "offline"), machine: mark(0), model: mark(1) })).map((piece, index) =>
                 piece === 0 ? (
-                  machine && <TextLink key={index} label={machine.name} mono tone="body" onPress={() => router.push(`/machines/${agent.machine_id}`)} />
+                  machine && <TextLink key="machine" label={machine.name} mono tone="body" onPress={() => router.push(`/machines/${agent.machine_id}`)} />
                 ) : piece === 1 ? (
-                  <Text key={index} variant="caption" tone="body" mono numberOfLines={1} style={{ flexShrink: 1 }}>
+                  <Text key="model" variant="caption" tone="body" mono numberOfLines={1} style={{ flexShrink: 1 }}>
                     {agent.model}
                   </Text>
                 ) : (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the words between the marks of one fixed sentence, never reordered
                   <Text key={index} variant="caption" tone="body">
                     {piece}
                   </Text>

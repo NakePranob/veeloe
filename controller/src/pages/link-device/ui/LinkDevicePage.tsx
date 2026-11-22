@@ -42,6 +42,7 @@ export function LinkDevicePage() {
   }
 
   // A QR as soon as there is a connection to say it on; a new one only when asked.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when a connection or Hub appears; a new offer must not start another
   useEffect(() => void (!offer && fresh()), [links, hub]);
 
   useEffect(() => {
@@ -64,7 +65,8 @@ export function LinkDevicePage() {
     if (!offer || !ask || !links || !machines) return;
     const why = nameProblem(name, devices);
     if (why) return inform(t("cannot"), why === "empty" ? t("name.empty") : t("name.taken", { name: name.trim() }));
-    const machine = machines.find((m) => m.hub_url === offer.link.hub)!;
+    const machine = machines.find((m) => m.hub_url === offer.link.hub);
+    if (!machine) return;
     const answer = await approveLink((use) => keySession.withFreshAuthentication(t("prompt", { name: name.trim() }), use), { link: offer.link, ask, name, machine });
     if (answer === null) return; // Cancelled: nothing was signed or sent, and the question stands.
     if (!answer.ok) return setProblem(describeError({ code: answer.code }));

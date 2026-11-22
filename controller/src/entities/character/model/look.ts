@@ -59,6 +59,7 @@ export const pick = (draft: Look, slot: keyof Look, value: string): Look => look
 
 export const sameLook = (a: Look, b: Look) => a.color.toLowerCase() === b.color.toLowerCase() && a.shell === b.shell && a.top === b.top && a.sides === b.sides && a.decal === b.decal;
 
+// biome-ignore lint/style/noNonNullAssertion: every option list is a non-empty constant
 const draw = <T>(options: readonly T[], random: () => number) => options[Math.floor(random() * options.length)]!;
 
 // A random look no other Agent has, so a shuffle never makes two Agents look alike.
@@ -77,5 +78,5 @@ export function tint(hex: string, amount: number): string {
     Math.round(v + (255 - v) * amount)
       .toString(16)
       .padStart(2, "0");
-  return "#" + lift(n >> 16) + lift((n >> 8) & 255) + lift(n & 255);
+  return `#${lift(n >> 16)}${lift((n >> 8) & 255)}${lift(n & 255)}`;
 }

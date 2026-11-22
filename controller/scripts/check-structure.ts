@@ -129,7 +129,7 @@ for (const path of files) {
     }
     if (from.layer === "shared") continue; // shared segments may use each other
     if (isTest(file)) continue;
-    const sliceDir = to.layer === "app" ? join(root, "src/app") : join(root, "src", to.layer, to.slice!);
+    const sliceDir = to.layer === "app" ? join(root, "src/app") : join(root, "src", to.layer, to.slice ?? "");
     if (!isRoot(target, sliceDir)) {
       fail("fsd-public-api", file, `imports ${spec}, a path inside ${rel(sliceDir)}; import its index.ts`);
     }

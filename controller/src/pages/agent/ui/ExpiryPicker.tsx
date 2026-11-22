@@ -2,10 +2,10 @@ import { useT } from "../../../shared/i18n";
 import { Select } from "../../../shared/ui";
 
 /** The choices the board offers for how long an Approval waits, in minutes. */
-export const EXPIRIES = [15, 30, 60, 240, 1440] as const;
+const EXPIRIES = [15, 30, 60, 240, 1440] as const;
 
 /** `15 minutes`, `1 hour`, `1 day`, in the reader's language. */
-export function approvalLabel(seconds: number, t: ReturnType<typeof useT<"agent">>) {
+function approvalLabel(seconds: number, t: ReturnType<typeof useT<"agent">>) {
   if (seconds >= 86400 && seconds % 86400 === 0) return t("approval.days", { count: seconds / 86400 });
   return seconds >= 3600 ? t("approval.hours", { count: seconds / 3600 }) : t("approval.minutes", { count: Math.round(seconds / 60) });
 }

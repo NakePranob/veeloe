@@ -41,6 +41,7 @@ export function LinkThisDevicePage() {
   }
 
   // A link that opened the app goes straight to the name, once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once on open, by design
   useEffect(() => void (opened && accept(opened)), []);
 
   async function ask() {

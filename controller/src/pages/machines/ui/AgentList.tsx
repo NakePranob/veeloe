@@ -28,7 +28,8 @@ export function AgentList({ lines, online }: { lines: AgentLine[]; online: boole
         {shown.map((line, i) => {
           const group = groupOf(line.status);
           // Groups are headed only in the long list, where the order alone would not say why.
-          const heading = many && !q && (i === 0 || groupOf(shown[i - 1]!.status) !== group);
+          const previous = shown[i - 1];
+          const heading = many && !q && (!previous || groupOf(previous.status) !== group);
           return (
             <View key={line.agent.id}>
               {heading && <GroupHeading group={group} count={total[group]} />}

@@ -26,8 +26,9 @@ function parse(body: string | null): Record<string, unknown> {
  */
 export function moodOf(events: readonly StoredEvent[], online: boolean | null): Mood {
   if (online === false) return "offline";
+  // A loop, not findLast: the root tsconfig that type-checks the tests targets ES2022.
   let last: StoredEvent | undefined;
-  for (let i = events.length - 1; i >= 0 && !last; i--) if (KNOWN.includes(events[i]!.kind)) last = events[i];
+  for (let i = events.length - 1; i >= 0 && !last; i--) if (KNOWN.includes(events[i]?.kind ?? "")) last = events[i];
   if (!last) return "idle";
   const body = parse(last.body);
   // An Approval waiting on a person: the hand goes up, and stays up until someone answers.

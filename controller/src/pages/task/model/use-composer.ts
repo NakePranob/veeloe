@@ -5,7 +5,7 @@ import { Keyboard } from "react-native";
 import type { AgentRow } from "../../../entities/agent";
 import type { Machine } from "../../../entities/machine";
 import { latestOf, statusOf, type TaskEventRow } from "../../../entities/task";
-import { MAX_ATTACHMENT_BYTES, useMachineLink } from "../../../features/machine-link";
+import { MAX_ATTACHMENT_BYTES, type useMachineLink } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
 import { confirm } from "../../../shared/ui";
 

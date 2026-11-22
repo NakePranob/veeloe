@@ -39,7 +39,7 @@ export function useAppDatabase() {
     })();
   }, [onTaken, open]);
 
-  const useHere = useCallback(async () => {
+  const takeOverHere = useCallback(async () => {
     await takeOverDatabase(onTaken);
     await open();
   }, [onTaken, open]);
@@ -53,5 +53,5 @@ export function useAppDatabase() {
     }
   }, [open]);
 
-  return { state, useHere, retry };
+  return { state, takeOverHere, retry };
 }

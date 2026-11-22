@@ -55,9 +55,11 @@ export async function approveLink(
 /** What the old device tells the new one, as the exact text its proof covers: the Machines on the link's Hub and the Member's keys. */
 export function handoffData(hub: string, machines: readonly Machine[], devices: readonly Device[]) {
   const here = machines.filter((m) => m.hub_url === hub);
+  const [first] = here;
+  if (!first) throw new Error(`no Machine on ${hub}`);
   return JSON.stringify({
-    workspace: here[0]!.workspace_id,
-    member: here[0]!.member_id,
+    workspace: first.workspace_id,
+    member: first.member_id,
     machines: here.map((m) => ({ id: m.id, key: m.public_key, name: m.name, hub: m.hub_url })),
     keys: devices.filter((d) => d.revoked_at === null).map((d) => ({ key: d.key, name: d.name })),
   });

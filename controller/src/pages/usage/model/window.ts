@@ -3,9 +3,9 @@ import { useLiveQuery, type Database } from "../../../shared/db";
 /** The windows the page offers, in Budget days. */
 export const USAGE_WINDOWS = [1, 3, 7, 30] as const;
 export type UsageWindow = (typeof USAGE_WINDOWS)[number];
-export const DEFAULT_USAGE_WINDOW: UsageWindow = 7;
+const DEFAULT_USAGE_WINDOW: UsageWindow = 7;
 
-export const isUsageWindow = (value: number): value is UsageWindow => (USAGE_WINDOWS as readonly number[]).includes(value);
+const isUsageWindow = (value: number): value is UsageWindow => (USAGE_WINDOWS as readonly number[]).includes(value);
 
 /** The window picked on this device, or the default until one is. */
 export function useUsageWindow(): UsageWindow {
