@@ -18,10 +18,12 @@ type Options = {
   /** Undefined while the log loads. */
   events: readonly TaskEventRow[] | undefined;
   stopError: string | null | undefined;
+  /** Called as a message goes out, so the log can jump to its end to show it. */
+  onSend?: () => void;
 };
 
 /** What the composer holds and does: the words and files to send, Send, Attach and the Stop brake. */
-export function useComposer({ task, agent, machine, link, readOnly, events, stopError }: Options) {
+export function useComposer({ task, agent, machine, link, readOnly, events, stopError, onSend }: Options) {
   const t = useT("task");
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<{ name: string; uri: string }[]>([]);
@@ -43,6 +45,7 @@ export function useComposer({ task, agent, machine, link, readOnly, events, stop
     Keyboard.dismiss();
     setProblem(null);
     setSending(true);
+    onSend?.();
     const sent = [];
     try {
       for (const file of files) {

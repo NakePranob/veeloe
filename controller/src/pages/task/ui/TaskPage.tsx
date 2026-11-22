@@ -50,7 +50,12 @@ export function TaskPage() {
   const viewport = useRef(0);
   // Whether the reader is at the end of the log, so new content follows only then.
   const atEnd = useRef(true);
-  const composer = useComposer({ task, agent, machine, link, readOnly, events: events ?? undefined, stopError: status.stopError });
+  // Whoever sends wants to see the message land, even after scrolling up to read: follow the end again.
+  const followEnd = () => {
+    atEnd.current = true;
+    scroll.current?.scrollToEnd({ animated: true });
+  };
+  const composer = useComposer({ task, agent, machine, link, readOnly, events: events ?? undefined, stopError: status.stopError, onSend: followEnd });
   // The log only changes with its events; the clock matters only while an Approval is open and can still time out.
   const settled = useMemo(() => (events ? items(events, Date.now()) : null), [events]);
   const ticking = !!settled?.items.some((item) => item.kind === "approval" && item.approval.status === "open");
