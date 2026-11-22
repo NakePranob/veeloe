@@ -153,7 +153,7 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
     <FlatList
       // The page's own header pads for the status bar, so the list adds no inset of its own.
       contentInsetAdjustmentBehavior="never"
-      contentContainerStyle={[column, { paddingBottom: 40 }]}
+      contentContainerStyle={[column, { flexGrow: 1, paddingBottom: 40 }]}
       data={rowsOf(rows, tab)}
       keyExtractor={(row) => row.agent.id}
       ListHeaderComponent={

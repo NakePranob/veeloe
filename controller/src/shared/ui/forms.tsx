@@ -31,7 +31,7 @@ export function Screen({ title, subtitle, right, bottom, children }: ScreenProps
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
-      contentContainerStyle={[column, { paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.xl, paddingBottom: space.xl * 2 }]}
+      contentContainerStyle={[column, { flexGrow: 1, paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.xl, paddingBottom: space.xl * 2 }]}
     >
       <Stack.Screen options={{ title, ...(subtitle != null && { headerTitle: () => <HeaderTitle title={title} subtitle={subtitle} /> }) }} />
       {right && <HeaderAction {...right} />}
@@ -255,9 +255,13 @@ export function Field({ label, value, onChangeText, placeholder, footer, multili
 // For a list with nothing in it: what it is for and what to do first.
 export function Empty({ icon, title, detail, action }: { icon: IconName; title: string; detail?: string; action?: ReactNode }) {
   return (
-    <View style={{ alignItems: "center", gap: space.sm, padding: space.xl }}>
-      <Icon name={icon} size="xl" color="tertiaryLabel" />
-      <Text variant="headline" style={{ textAlign: "center" }}>
+    // flex: 1 centres it in the room its list leaves, which grows to the screen (Screen, the inbox).
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, padding: space.xl }}>
+      {/* The icon in the title's colour, both faint. */}
+      <View style={{ opacity: 0.3 }}>
+        <Icon name={icon} size="xxl" color="label" />
+      </View>
+      <Text variant="headline" style={{ textAlign: "center", opacity: 0.3 }}>
         {title}
       </Text>
       {detail && (

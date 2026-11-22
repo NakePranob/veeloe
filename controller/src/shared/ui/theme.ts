@@ -159,7 +159,7 @@ export const motion = {
 
 // Icon sizes: xs beside a caption, sm beside a footnote, md beside a headline,
 // lg for a composer action, xl for an empty state.
-export const icon = { xs: 12, sm: 16, md: 20, lg: 32, xl: 44 };
+export const icon = { xs: 12, sm: 16, md: 20, lg: 32, xl: 44, xxl: 96 };
 
 // Content stops growing past a readable measure on a computer.
 export const column = { width: "100%", maxWidth: 720, alignSelf: "center" } as const;
