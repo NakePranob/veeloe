@@ -40,3 +40,10 @@ export function moodOf(events: readonly StoredEvent[], online: boolean | null): 
   if (last.kind === TaskEventKind.LlmMessage && Array.isArray(body.content) && body.content.some((block) => block?.type === "tool_use")) return "working";
   return "thinking";
 }
+
+const AT_REST: readonly Mood[] = ["idle", "done", "failed", "offline"];
+
+/** Whether the Character hops on this change: a Turn starting from rest, or finishing. A failed one never hops (controller-character). */
+export function hopsOn(was: Mood, mood: Mood): boolean {
+  return mood === "done" || (AT_REST.includes(was) && !AT_REST.includes(mood));
+}

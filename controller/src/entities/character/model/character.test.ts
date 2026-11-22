@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { COLORS, DECALS, DEFAULT_COLOR, lookOf, lookOfJson, sameLook, SHELLS, shuffleLook, SIDES, tint, TOPS } from "./look";
-import { moodOf } from "./mood";
+import { hopsOn, type Mood, moodOf } from "./mood";
 
 test("a shuffle draws only from the lists, and every option of every slot comes up", () => {
   const seen = { color: new Set<string>(), shell: new Set<string>(), top: new Set<string>(), sides: new Set<string>(), decal: new Set<string>() };
@@ -80,4 +80,15 @@ test("tint lifts a colour toward white", () => {
   expect(tint("#C4B1FF", 0)).toBe("#c4b1ff");
   expect(tint("#C4B1FF", 1)).toBe("#ffffff");
   expect(tint("#000000", 0.5)).toBe("#808080");
+});
+
+test("a Turn starting from rest hops and finishing hops, but a failed one never does", () => {
+  const all: Mood[] = ["idle", "thinking", "working", "waiting", "done", "failed", "stuck", "offline"];
+  for (const was of all) {
+    expect(hopsOn(was, "failed")).toBe(false);
+    expect(hopsOn(was, "done")).toBe(true);
+  }
+  expect(hopsOn("idle", "thinking")).toBe(true);
+  expect(hopsOn("failed", "working")).toBe(true);
+  expect(hopsOn("thinking", "working")).toBe(false);
 });

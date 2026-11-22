@@ -3,7 +3,7 @@ import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import { motion, useColors, useReduceMotion, type Colors } from "../../../shared/ui";
 import type { Decal, Look, Shell, Sides, Top } from "../model/look";
-import type { Mood } from "../model/mood";
+import { hopsOn, type Mood } from "../model/mood";
 
 interface Props {
   look: Look;
@@ -54,7 +54,6 @@ const POSE: Record<Mood, { tilt: number; turn: number; lift: number; look: [numb
 // How long one float up (or down) takes; working nods instead, offline rests on the ground.
 const FLOAT: Partial<Record<Mood, number>> = { idle: 1800, thinking: 2500, waiting: 1200, done: 1800 };
 
-const AT_REST: Mood[] = ["idle", "done", "failed", "offline"];
 const native = process.env.EXPO_OS !== "web";
 
 // The parts are the shell's colour, darker; white mixes in the lit side.
@@ -188,8 +187,7 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
       return;
     }
     const moves = targets.map(([value, toValue]) => Animated.spring(value, { toValue, speed: 14, bounciness: 8, useNativeDriver: native }));
-    const hops = mood === "done" || (AT_REST.includes(was) && !AT_REST.includes(mood));
-    if (hops) {
+    if (hopsOn(was, mood)) {
       v.hop.setValue(0);
       moves.push(Animated.timing(v.hop, { toValue: 1, duration: 700, easing: motion.easeOut, useNativeDriver: native }));
     }
