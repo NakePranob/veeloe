@@ -552,3 +552,10 @@ test("a running command's output is kept in memory by its tool call and the newe
   await until(() => links.output("toolu_1").bytes === 28);
   expect(links.output("toolu_1")).toMatchObject({ tail: "test b ... ok\n", elapsedMs: 2000 });
 });
+
+test("a Hub that drops means its Machines read offline, not checking forever", async () => {
+  const { fake, machine, links } = await setup();
+  expect(links.status(machine.id).online).not.toBe(false);
+  fake.drop();
+  await until(() => links.status(machine.id).online === false);
+});

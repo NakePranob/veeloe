@@ -18,6 +18,8 @@ export type HubClientOptions = {
   onLinkRequest?: (request: HubLinkRequest) => void;
   /** The Hub closed with 4403: this key was revoked. The client stops for good. */
   onRevoked?: () => void;
+  /** The connection closed or never opened; it retries on its own. Nothing behind this Hub can be reached until `onReady`. */
+  onDisconnected?: () => void;
   /** Where the last number from each sender is kept; in memory when a caller has nothing better. */
   seen?: SeenSequences;
   /** Awaited before the first connection, so a number kept on disk is in hand before any envelope is checked. */
@@ -33,7 +35,7 @@ export type HubClientOptions = {
  * (`protocol-envelope`): a Controller that forgot after a restart would accept
  * one replayed envelope.
  */
-export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, onCertificates, onLinkRequest, onRevoked, seen: kept, seenReady, backoff = createBackoff() }: HubClientOptions) {
+export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, onCertificates, onLinkRequest, onRevoked, onDisconnected, seen: kept, seenReady, backoff = createBackoff() }: HubClientOptions) {
   const url = `${hubUrl.replace(/\/+$/, "")}/connect`;
   const signEnvelope = createSigner(secretKey, clockSequence());
   const seen = kept ?? new MemorySeenSequences();
@@ -83,7 +85,9 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
         onRevoked?.();
         return;
       }
-      if (!stopped) retry = setTimeout(connect, backoff.next());
+      if (stopped) return;
+      onDisconnected?.();
+      retry = setTimeout(connect, backoff.next());
     };
   }
 

@@ -224,6 +224,11 @@ export function createMachineLinks({
         for (const listener of [...requestListeners]) listener(hubUrl, request);
       },
       onRevoked: () => onRevoked?.(),
+      // A Hub that cannot be reached tells nothing about its Machines: until it is back, they are as good as offline,
+      // so the screens stop showing "checking" and a head stops showing the last Task's mood.
+      onDisconnected: () => {
+        for (const machine of machines) setStatus(machine.id, { online: false });
+      },
       onHubError: (error) => {
         const ref = error.ref;
         const about = ref ? sentTo.get(ref) : undefined;
