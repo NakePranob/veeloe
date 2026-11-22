@@ -136,19 +136,40 @@ for (const path of files) {
   }
 }
 
-// colour-from-shared-ui (ADR 0072): pages and widgets take colour from shared/ui only.
-const colourRule = (rules.rules as { id: string; exceptions?: { path: string }[] }[]).find((rule) => rule.id === "colour-from-shared-ui");
-const colourExempt = (colourRule?.exceptions ?? []).map((exception) => exception.path);
+// Rules with exceptions: existing files the owner chose to keep, each with a reason in rules.json.
+const exempt = (id: string, file: string) => ((rules.rules as { id: string; exceptions?: { path: string }[] }[]).find((rule) => rule.id === id)?.exceptions ?? []).some((exception) => file.startsWith(exception.path));
+// The code without its comments, so a comment may quote the board's Thai or name a style. A "//" inside a string cuts it short, which only hides, never invents, a failure.
+const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
 for (const path of files) {
   if (!CODE.test(path)) continue;
   const file = rel(path);
   const where = place(path);
-  if (!where || (where.layer !== "pages" && where.layer !== "widgets") || isTest(file)) continue;
-  if (colourExempt.some((prefix) => file.startsWith(prefix))) continue;
-  const text = readFileSync(path, "utf8");
-  if (/\buse(Colors|Shadows)\b/.test(text)) fail("colour-from-shared-ui", file, "uses useColors or useShadows; take colour from a shared/ui component");
-  const hex = text.match(/["'`]#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})["'`]/);
-  if (hex) fail("colour-from-shared-ui", file, `has the colour ${hex[0]}; colours live in shared/ui/theme.ts`);
+  if (!where || isTest(file)) continue;
+  const text = code(readFileSync(path, "utf8"));
+  const screen = where.layer === "pages" || where.layer === "widgets";
+
+  // colour-from-shared-ui (ADR 0072): pages and widgets take colour from shared/ui only.
+  if (screen && !exempt("colour-from-shared-ui", file)) {
+    if (/\buse(Colors|Shadows)\b/.test(text)) fail("colour-from-shared-ui", file, "uses useColors or useShadows; take colour from a shared/ui component");
+    const hex = text.match(/["'`]#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})["'`]/);
+    if (hex) fail("colour-from-shared-ui", file, `has the colour ${hex[0]}; colours live in shared/ui/theme.ts`);
+  }
+  // type-from-shared-ui (ADR 0074): size and weight come from Text's variant and the type tokens.
+  if (screen && !exempt("type-from-shared-ui", file)) {
+    const prop = text.match(/\b(fontSize|fontFamily|fontWeight|letterSpacing|lineHeight)\s*:/);
+    if (prop) fail("type-from-shared-ui", file, `sets ${prop[1]}; use a Text variant, or add a type token in shared/ui/theme.ts`);
+  }
+  // links-are-pressables (ADR 0074): a Text opening tag with onPress, up to the next "<".
+  if (screen && !exempt("links-are-pressables", file) && /<Text(?=[\s>])[^<]*?\bonPress\b/.test(text)) {
+    fail("links-are-pressables", file, "puts onPress on <Text>; use TextLink, Button or Row");
+  }
+  // no-blind-casts (ADR 0074): a cast through never or unknown hides what the types would catch.
+  const cast = text.match(/\bas\s+(never|unknown\s+as)\b/);
+  if (cast && !exempt("no-blind-casts", file)) fail("no-blind-casts", file, `casts "${cast[0]}"; type it, or narrow it at the one place that checks it`);
+  // words-from-i18n (ADR 0074, 0065): Thai words live in a slice's i18n json.
+  const thai = text.match(/[\u0E00-\u0E7F]+/);
+  if (thai && !exempt("words-from-i18n", file)) fail("words-from-i18n", file, `has the Thai "${thai[0]}"; words come from the slice's i18n json`);
 }
 
 if (failures.length > 0) {

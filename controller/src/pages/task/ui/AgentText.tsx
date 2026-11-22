@@ -56,14 +56,14 @@ export function AgentText({ text }: { text: string }) {
             return (
               <View key={i} style={{ flexDirection: "row", gap: space.sm, paddingLeft: space.xs }}>
                 <Text tone="secondary">{block.marker}</Text>
-                <Text selectable style={{ flex: 1, lineHeight: 26 }}>
+                <Text variant="prose" selectable style={{ flex: 1 }}>
                   <Pieces inline={block.inline} />
                 </Text>
               </View>
             );
           case "paragraph":
             return (
-              <Text key={i} selectable style={{ lineHeight: 26 }}>
+              <Text key={i} variant="prose" selectable>
                 <Pieces inline={block.inline} />
               </Text>
             );

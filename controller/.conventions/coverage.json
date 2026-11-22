@@ -6,7 +6,11 @@
     "fsd-no-cross-slice": "caught",
     "fsd-public-api": "caught",
     "known-places": "caught",
+    "links-are-pressables": "caught",
+    "no-blind-casts": "caught",
     "routes-import-pages": "caught",
-    "unit-shape": "caught"
+    "type-from-shared-ui": "caught",
+    "unit-shape": "caught",
+    "words-from-i18n": "caught"
   }
 }

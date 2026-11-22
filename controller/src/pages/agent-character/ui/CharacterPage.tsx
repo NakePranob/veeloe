@@ -36,6 +36,8 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
   const t = useT("agent-character");
+  // Every part's name by slot, as one object: a slot and a value read from it need no key built from both.
+  const partNames: Record<string, Record<string, string>> = t("parts", { returnObjects: true });
   // Picking changes this draft only; Done sends it, and Cancel or a swipe drops it with the screen.
   const [draft, setDraft] = useState<Look>(() => lookOfJson(agent.character));
   // Only the slots touched go back changed, so a part this build does not know stays (ADR 0023).
@@ -61,7 +63,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
 
   // The parts it wears, under the head, as the board names them; an empty slot says nothing.
   const summary = PARTS.filter(({ slot }) => draft[slot] !== "none")
-    .map(({ slot }) => t(`parts.${slot}.${draft[slot]}` as never) as string)
+    .map(({ slot }) => partNames[slot][draft[slot]])
     .join(" · ");
   // What is being edited, with whose Character under it, as the board's header reads.
   return (
@@ -121,7 +123,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
       {PARTS.map(({ slot, options }) => (
         <Group key={slot} title={t(`slots.${slot}`)}>
           {options.map((value) => {
-            const name = t(`parts.${slot}.${value}` as never) as string;
+            const name = partNames[slot][value];
             return (
               <LookTile key={value} color={draft.color} label={t("option", { slot: t(`slots.${slot}`), name })} name={name} selected={draft[slot] === value} onPress={() => choose(slot, value)}>
                 <Character look={pick(draft, slot, value)} mood="idle" size={48} still />

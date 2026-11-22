@@ -8,7 +8,7 @@ Status: accepted
 
 **การตัดสินใจ:**
 
-- **ไฟล์ใน `src/pages` และ `src/widgets` ไม่ import `useColors` หรือ `useShadows` และไม่มี hex สี** สีตัวอักษรใช้ `Text` ผ่าน `tone` ส่วนพื้น การ์ด ป้าย spinner แถวที่กดได้ และหน้าเต็มจอ ใช้ชิ้นใน `shared/ui` (`Card`, `Chip`, `Tabs`, `Stat`, `Tap`, `Spinner`, `Centered` และอื่นๆ)
+- **ไฟล์ใน `src/pages` และ `src/widgets` ไม่ import `useColors` หรือ `useShadows` และไม่มี hex สี** สีตัวอักษรใช้ `Text` ผ่าน `tone` ส่วนพื้น การ์ด ป้าย spinner แถวที่กดได้ และหน้าเต็มจอ ใช้ชิ้นใน `shared/ui` (`Card`, `Chip`, `Tabs`, `Tile`, `Tap`, `Spinner`, `Centered` และอื่นๆ)
 - **`View` ใช้จัดวาง** ทั้ง `flexDirection`, `gap`, `padding`, `flex` และขนาด ส่วนพื้น มุมโค้ง และเงาเป็นงานของ `shared/ui` ส่วนนี้ไม่มีตัวตรวจ เพราะการ import `useColors` เป็นทางเดียวที่หน้าจะได้ค่าสีมาตั้งเอง
 - **`entities` ใช้สีได้** เพราะ `Character` วาดหัวจากสีของ Agent และมีสีจอของตัวเอง
 - **ข้อยกเว้นชั่วคราว** อยู่ใน `rules.json` พร้อมชื่อ change ที่จะลบ: `pages/task/ui` (`task-thread-redesign`) และ `pages/agent-character` (`character-look`)

@@ -132,6 +132,7 @@ export const opacity = { dim: 0.45, retired: 0.6 };
 // which iOS would synthesize over a bundled font.
 // largeTitle: an Agent's name on its stage. title: the one heading of a centred step or a form (lock, pairing).
 // callout: body text on a card or a notice, a step under subheadline. caption2: tab, bar and picker labels.
+// prose: what an Agent wrote, read at length, with more room between lines. rowTitle: an Agent's name on its Inbox row.
 export const type = {
   largeTitle: { fontSize: 30, lineHeight: 36, fontFamily: font.bold, letterSpacing: -0.9 },
   title: { fontSize: 22, lineHeight: 28, fontFamily: font.bold, letterSpacing: -0.4 },
@@ -139,6 +140,8 @@ export const type = {
   figure: { fontSize: 30, lineHeight: 36, fontFamily: font.display, letterSpacing: -0.6, fontVariant: ["tabular-nums"] },
   headline: { fontSize: 17, fontFamily: font.bold },
   body: { fontSize: 16, fontFamily: font.regular, lineHeight: 24 },
+  prose: { fontSize: 16, fontFamily: font.regular, lineHeight: 26 },
+  rowTitle: { fontSize: 16, fontFamily: font.bold, lineHeight: 24 },
   subheadline: { fontSize: 15, fontFamily: font.regular },
   callout: { fontSize: 14, lineHeight: 21, fontFamily: font.regular },
   footnote: { fontSize: 13, lineHeight: 20, fontFamily: font.regular },

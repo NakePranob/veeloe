@@ -9,7 +9,7 @@ import { isBudgetOut, latestEvents, previewOf, useTaskSummaries, type TaskStatus
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Button, Empty, Tabs, Tap, Text, column, font, space, useReduceMotion } from "../../../shared/ui";
+import { Button, Empty, Tabs, Tap, Text, column, space, useReduceMotion } from "../../../shared/ui";
 import { countsOf, inboxRows, rowsOf, type InboxTab } from "../model/inbox";
 
 // The board's row: a 60pt head, the name, one line, and on the right the answer pill or the time.
@@ -83,7 +83,7 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
             backdrop={pressed ? "chipPressed" : selected ? "chip" : replace ? "card" : "background"}
           />
           <View style={{ flex: 1, gap: space.xxs }}>
-            <Text strong numberOfLines={1} tone={status === "offline" ? "secondary" : "label"} style={{ fontFamily: font.bold }}>
+            <Text variant="rowTitle" numberOfLines={1} tone={status === "offline" ? "secondary" : "label"}>
               {agent.name}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>

@@ -18,4 +18,4 @@ export { Tabs } from "./tabs";
 export { Text, TextLink } from "./text";
 export { Tile } from "./tile";
 export { useAppFonts } from "./fonts";
-export { column, font, icon, motion, opacity, radius, size, SIDEBAR_WIDTH, space, useColors, useSplit, type Colors } from "./theme";
+export { column, icon, motion, opacity, radius, size, SIDEBAR_WIDTH, space, useColors, useSplit, type Colors } from "./theme";

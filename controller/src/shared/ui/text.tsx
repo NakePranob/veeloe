@@ -18,7 +18,7 @@ export function Text({ variant = "body", tone = "label", strong, mono, code, sty
   const colors = useColors();
   // A weight is a family of its own (theme.ts `font`), so strong and mono swap the family.
   // Headings are bold already, so strong leaves them be.
-  const heading = variant === "headline" || variant === "largeTitle" || variant === "title" || variant === "figure";
+  const heading = variant === "headline" || variant === "largeTitle" || variant === "title" || variant === "figure" || variant === "rowTitle";
   const family = mono || code ? (strong ? font.monoMedium : font.mono) : strong && !heading ? font.semibold : undefined;
   return <RNText {...props} style={[type[variant], { color: colors[TONE[tone]] }, family && { fontFamily: family }, code && { backgroundColor: colors.fill, padding: space.sm, borderRadius: radius.sm }, style]} />;
 }

@@ -81,7 +81,7 @@ export function MemoryPage() {
             {memory.text ? (
               // Plain text only: Memory is Agent-written and may be poisoned, so nothing here
               // is interpreted as Markdown or HTML, and nothing is tappable.
-              <Text variant="footnote" mono style={{ lineHeight: 21 }}>
+              <Text variant="footnote" mono>
                 {memory.text}
               </Text>
             ) : (

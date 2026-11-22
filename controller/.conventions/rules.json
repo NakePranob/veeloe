@@ -208,6 +208,128 @@
           "content": "import { View } from \"react-native\";\nimport { space } from \"../../../shared/ui\";\nexport const Row = () => <View style={{ flexDirection: \"row\", gap: space.md }} />;\n"
         }
       ]
+    },
+    {
+      "id": "type-from-shared-ui",
+      "statement": "A file in src/pages or src/widgets sets no fontSize, fontFamily, fontWeight, letterSpacing or lineHeight: size and weight come from Text's variant and the type tokens in shared/ui/theme.ts.",
+      "adr": "docs/adr/0074-controller-type-links-and-words-are-checked.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [],
+      "violation": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text } from \"../../../shared/ui\";\nexport const Big = () => <Text style={{ fontSize: 28 }}>x</Text>;\n"
+        },
+        {
+          "path": "src/widgets/agent-inbox/ui/zz_probe.tsx",
+          "content": "export const name = { fontFamily: \"Anuphan_700Bold\", lineHeight: 26 };\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text } from \"../../../shared/ui\";\n// fontSize: comes from the variant.\nexport const Big = () => <Text variant=\"title\" style={{ flex: 1 }}>x</Text>;\n"
+        },
+        {
+          "path": "src/shared/ui/zz_probe.ts",
+          "content": "export const prose = { fontSize: 16, lineHeight: 26 };\n"
+        }
+      ]
+    },
+    {
+      "id": "links-are-pressables",
+      "statement": "A file in src/pages or src/widgets puts no onPress on <Text>: a link or an action is TextLink, Button or Row, which keep a pressed state and a 44pt target.",
+      "adr": "docs/adr/0074-controller-type-links-and-words-are-checked.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [
+        {
+          "path": "src/pages/task/ui/AgentText.tsx",
+          "reason": "A link inside an Agent's Markdown sits mid-sentence, and only a nested Text keeps the line flowing; a Pressable would break the paragraph (ADR 0074)."
+        }
+      ],
+      "violation": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text } from \"../../../shared/ui\";\nexport const More = ({ go }: { go: () => void }) => (\n  <Text tone=\"link\"\n    onPress={go}>more</Text>\n);\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text, TextLink } from \"../../../shared/ui\";\nexport const More = ({ go }: { go: () => void }) => (\n  <>\n    <Text>Read</Text>\n    <TextLink label=\"more\" onPress={go} />\n  </>\n);\n"
+        }
+      ]
+    },
+    {
+      "id": "no-blind-casts",
+      "statement": "No file in src, tests aside, casts with `as never` or `as unknown as`: those hide a wrong key or shape the types would catch.",
+      "adr": "docs/adr/0074-controller-type-links-and-words-are-checked.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [
+        {
+          "path": "src/shared/i18n/errors/describe-error.ts",
+          "reason": "The one door for a code from a Runtime or the Hub, a string whose vocabulary only grows (ADR 0023); i18n.exists checks the key on the line before, so the cast is where it is checked (ADR 0074)."
+        }
+      ],
+      "violation": [
+        {
+          "path": "src/pages/home/model/zz_probe.ts",
+          "content": "export const key = (k: string) => k as never;\n"
+        },
+        {
+          "path": "src/shared/lib/zz_probe.ts",
+          "content": "export const scope = globalThis as unknown as { x?: number };\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/shared/lib/zz_probe.ts",
+          "content": "export const scope: { crypto?: unknown } = globalThis;\n"
+        },
+        {
+          "path": "src/shared/lib/zz_probe.test.ts",
+          "content": "export const fake = {} as never;\n"
+        }
+      ]
+    },
+    {
+      "id": "words-from-i18n",
+      "statement": "No .ts or .tsx file in src, tests aside, has Thai outside a comment: words come from the slice's i18n json (ADR 0065). English words cannot be told from code, so they are not checked.",
+      "adr": "docs/adr/0074-controller-type-links-and-words-are-checked.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [],
+      "violation": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text } from \"../../../shared/ui\";\nexport const Hi = () => <Text>สวัสดี</Text>;\n"
+        },
+        {
+          "path": "src/shared/lib/zz_probe.ts",
+          "content": "export const and = \" และ \";\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/shared/lib/zz_probe.ts",
+          "content": "// The board's \"และ\" comes from i18n.\nexport const and = (word: string) => ` ${word} `;\n"
+        },
+        {
+          "path": "src/shared/lib/zz_probe.test.ts",
+          "content": "export const sample = \"สวัสดี\";\n"
+        }
+      ]
     }
   ]
 }

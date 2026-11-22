@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { compareLanguages } from "./check-i18n-rules";
+import { compareLanguages, unusedKeys } from "./check-i18n-rules";
 
 test("matching languages have no problems, nested or flat", () => {
   expect(compareLanguages({ a: { b: "ก" }, "hub.machine_offline": "ข" }, { a: { b: "A" }, "hub.machine_offline": "B" })).toEqual([]);
@@ -20,4 +20,11 @@ test("English plural forms match Thai's one form", () => {
 
 test("a plural missing altogether is still missing", () => {
   expect(compareLanguages({}, { agents_one: "One Agent", agents_other: "{{count}} Agents" })).toEqual(["agents: missing in th.json"]);
+});
+
+test("a key no code names is unused; plurals, objects and template starts read", () => {
+  const messages = { title: "T", gone: "G", agents_one: "A", agents_other: "As", moods: { idle: "I" }, parts: { shell: { box: "B" } }, window: { day: "D" } };
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the string is source code that holds a template
+  const code = 't("title"); t("agents", { count }); t(`moods.${m}`); t("parts", { returnObjects: true }); const KEY = "window.";';
+  expect(unusedKeys(messages, [code])).toEqual(["gone"]);
 });

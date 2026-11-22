@@ -33,7 +33,7 @@ Native modules are in this build, so it does not run in Expo Go. `ios/` and `and
 
 Never write a sentence into a screen (ADR 0065):
 
-- Each slice owns its words in `i18n/th.json` and `i18n/en.json`, exports them from its `index.ts`, and is added to `src/app/i18n/resources.ts`. A new screen writes both languages in the same change.
+- Each slice owns its words in `i18n/th.json` and `i18n/en.json`, exports them from its `index.ts`, and is added to `src/app/i18n/resources.ts`. A new screen writes both languages in the same change. No Thai in `.ts`/`.tsx` outside comments and tests (`words-from-i18n`, ADR 0074), and `check-i18n` fails on a key no code reads; drop a key with the code that used it.
 - Read them with `useT("<slice>")`. Pass values as variables and never join sentences, because languages order words differently.
 - Terms from `CONTEXT.md`, such as Agent, Task and Approval, stay in English in every language.
 - A code from a Runtime or the Hub goes through `describeError`, with its words in `src/shared/i18n/errors/`. What an Agent wrote and names people gave are shown as received.
@@ -43,8 +43,9 @@ Never write a sentence into a screen (ADR 0065):
 The design system (tokens, components, entities, widgets, dark mode) is the "Design system" board on the redesign canvas: https://claude.ai/artifact/DEHC2ENNKRsri7YtPHaBPc. Change the board and the code together.
 
 - Navigation, headers, the back button, alerts and the menus a control opens are the platform's. Never rebuild them.
-- Buttons, chips, cards and everything else on the page are ours, from `src/shared/ui`. No borders or divider lines: space and surface set things apart, and only what floats over content has a shadow. Each control keeps a pressed state, a role and a 44pt target.
+- Buttons, chips, cards and everything else on the page are ours, from `src/shared/ui`. No borders or divider lines: space and surface set things apart, and only what floats over content has a shadow. Each control keeps a pressed state, a role and a 44pt target: a link is `TextLink`, `Button` or `Row`, never `onPress` on `Text` (`links-are-pressables`, ADR 0074).
 - Before writing or changing a screen, load the `expo-native-ui` and `expo-design-system` skills.
-- Colours come from `src/shared/ui/theme.ts` only. Icons are `Icon`; never emoji. Motion uses `motion` from the theme.
+- Colours come from `src/shared/ui/theme.ts` only (`colour-from-shared-ui`, ADR 0072), and text size and weight from `Text`'s `variant` (`type-from-shared-ui`, ADR 0074): a missing one is a new `type` token. Icons are `Icon`; never emoji. Motion uses `motion` from the theme.
+- No `as never` or `as unknown as` outside tests (`no-blind-casts`, ADR 0074): type it instead.
 - Name the app a screen follows and match its structure.
 - A screen is done once it has run on the iOS Simulator and on web, in light and dark and in both languages, with a screenshot of each. Checking on web alone is not enough, because web draws the header differently.
