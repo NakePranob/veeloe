@@ -24,5 +24,5 @@
 
 ## 4. ตรวจ
 
-- [ ] 4.1 `bun run check`, `bun run test`, `bun run test:e2e` และ `go test -race ./...` ใน `hub/` ผ่าน
+- [x] 4.1 `bun run check`, `bun run test`, `bun run test:e2e` และ `go test -race ./...` ใน `hub/` ผ่าน
 - [ ] 4.2 รันคำสั่งยาวจริงผ่าน `bun run dev` แล้วเห็น output สดบน iOS Simulator และจำลอง Provider ที่ไม่ตอบจนได้ Mood ค้างกับ push บนเครื่องจริง พร้อมภาพหน้าจอใน PR

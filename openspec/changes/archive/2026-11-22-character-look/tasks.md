@@ -13,7 +13,7 @@
 
 - [x] 3.1 วาดเปลือก `round` ใน `Character.tsx` ตาม design.md ข้อ 3; ตรวจโดยดูบน iOS Simulator และ web ว่าทรงกลมมีผนังด้านข้าง จอพอดี และทุกชิ้นส่วนเกาะตำแหน่งถูก เทียบกับแผ่น Character บน canvas
 - [x] 3.2 วาดท่า `failed` (ตาไขว้ จอแดงอ่อน หัวเอียงนิ่ง) และ `stuck` (ตาค้าง สั่นห่างๆ) และให้ทั้งสองหยุดนิ่งเมื่อลดการเคลื่อนไหว; ตรวจโดยเปิด Reduce Motion บน iOS Simulator และเทียบภาพกับแผ่น Character
-- [ ] 3.3 ให้ `failed` ไม่เล่นการกระโดดเมื่อ Mood เปลี่ยน; ตรวจโดยจำลอง Turn ที่จบด้วย error ผ่าน `bun run dev:ios` แล้ว Character ไม่กระโดด
+- [x] 3.3 ให้ `failed` ไม่เล่นการกระโดดเมื่อ Mood เปลี่ยน; ตรวจโดยจำลอง Turn ที่จบด้วย error ผ่าน `bun run dev:ios` แล้ว Character ไม่กระโดด
 
 ## 4. หน้าแก้ Character และหน้าสร้าง Agent
 
