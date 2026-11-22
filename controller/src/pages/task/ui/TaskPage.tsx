@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlatList, KeyboardAvoidingView, View, type TextInputInstance } from "react-native";
 import { allowlistOf, deletedAgent, useAgents, useTrashedAgents } from "../../../entities/agent";
@@ -22,6 +22,8 @@ import { ChangesRow, ToolCalls } from "./ToolCalls";
 
 /** How close to the end of the log, in points, still counts as reading the end. */
 const FOLLOW_END_PT = 80;
+/** How many of the newest log items draw at first; scrolling up to the top draws this many more each time. */
+const PAGE = 200;
 
 // Laid out like Messages: your messages in accent bubbles on the right. The
 // Agent's replies have no bubble, because they run long and carry code.
@@ -51,6 +53,9 @@ export function TaskPage() {
   // scrolling changes it: a scroll the page makes (to the end, mid-animation, while a card grows below)
   // must never read as "they scrolled up", or what arrives next is left off screen.
   const atEnd = useRef(true);
+  // ponytail: only the newest items draw, so a long Task opens fast; items() still reads every event (~20ms at 8,000 on a Mac),
+  // load events by page too if Tasks grow past that.
+  const [drawn, setDrawn] = useState(PAGE);
   const dragging = useRef(false);
   // The scroll view's own end, not FlatList's: FlatList adds up the cells it has measured (a guess for one not laid out
   // yet, such as an Approval card that just came) and leaves out the padding and the header's inset, so it stops short.
@@ -71,7 +76,8 @@ export function TaskPage() {
   // showing the deleted state here would flash a wrong name and no composer.
   // A Machine no longer paired (or a deleted Agent's unknown one) still shows the log, read from the device.
   if (!agents || !trashedAgents || !machines || !events || !pending || !log) return <Stack.Screen options={{ title: t("title") }} />;
-  const { items: shown, working } = log;
+  const { items: all, working } = log;
+  const shown = all.length > drawn ? all.slice(-drawn) : all;
   // The command running now, when there is one, for the working line.
   const running = shown.flatMap((item) => (item.kind === "tools" ? item.calls : [])).findLast((call: ToolCall) => call.state === "running" && call.tool === "bash" && call.target);
   const latest = latestOf(events);
@@ -136,9 +142,14 @@ export function TaskPage() {
         data={shown}
         keyExtractor={(item) => item.key}
         renderItem={renderItem}
-        // ponytail: every item renders on open, as the ScrollView did, so the first jump to the end lands on the real end;
-        // windowing still trims what scrolls far away. An inverted list would drop this, at the cost of the follow rule below.
+        // Every drawn item renders on open, so the first jump to the end lands on the real end; there are at most `drawn`.
         initialNumToRender={shown.length}
+        // Older items join above as the reader reaches the top, and what they were reading stays where it was.
+        // Only when the reader scrolled there: the list opens at its top before the jump to the end, which would load all.
+        onStartReached={() => {
+          if (dragging.current && all.length > drawn) setDrawn(drawn + PAGE);
+        }}
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
         // A short log too: iOS insets the content by the header, so its bottom rests that far under the composer until
