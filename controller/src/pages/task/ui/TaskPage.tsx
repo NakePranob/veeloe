@@ -47,7 +47,6 @@ export function TaskPage() {
   const now = useNow();
   const input = useRef<TextInputInstance>(null);
   const scroll = useRef<FlatList<Item>>(null);
-  const viewport = useRef(0);
   // Whether the reader is at the end of the log, so new content follows only then. Only the reader's own
   // scrolling changes it: a scroll the page makes (to the end, mid-animation, while a card grows below)
   // must never read as "they scrolled up", or what arrives next is left off screen.
@@ -139,13 +138,11 @@ export function TaskPage() {
         initialNumToRender={shown.length}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
-        onLayout={(event) => {
-          viewport.current = event.nativeEvent.layout.height;
-        }}
-        // Only when there is more than fits: on iOS, scrolling a short page to its end slides it under the header.
+        // A short log too: iOS insets the content by the header, so its bottom rests that far under the composer until
+        // it is scrolled to the end. Not the empty page, whose centred Character would slide under the header.
         // And only while the reader is at the end, so new content never pulls them away from what they scrolled up to read.
-        onContentSizeChange={(_, height) => {
-          if (height > viewport.current && atEnd.current) scroll.current?.scrollToEnd({ animated: false });
+        onContentSizeChange={() => {
+          if (atEnd.current && (shown.length > 0 || pending.length > 0)) scroll.current?.scrollToEnd({ animated: false });
         }}
         onScrollBeginDrag={() => {
           dragging.current = true;
@@ -153,7 +150,9 @@ export function TaskPage() {
         onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
           if (dragging.current) atEnd.current = contentSize.height - contentOffset.y - layoutMeasurement.height < FOLLOW_END_PT;
         }}
+        // iOS also fires this when the page's own animated scroll ends, with no momentum begun: that is not the reader's.
         onMomentumScrollEnd={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+          if (!dragging.current) return;
           dragging.current = false;
           atEnd.current = contentSize.height - contentOffset.y - layoutMeasurement.height < FOLLOW_END_PT;
         }}
