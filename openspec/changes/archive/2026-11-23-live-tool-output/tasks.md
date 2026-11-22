@@ -25,4 +25,4 @@
 ## 4. ตรวจ
 
 - [x] 4.1 `bun run check`, `bun run test`, `bun run test:e2e` และ `go test -race ./...` ใน `hub/` ผ่าน
-- [ ] 4.2 รันคำสั่งยาวจริงผ่าน `bun run dev` แล้วเห็น output สดบน iOS Simulator และจำลอง Provider ที่ไม่ตอบจนได้ Mood ค้างกับ push บนเครื่องจริง พร้อมภาพหน้าจอใน PR
+- [x] 4.2 รันคำสั่งยาวจริงผ่าน `bun run dev` แล้วเห็น output สดบน iOS Simulator และจำลอง Provider ที่ไม่ตอบจนได้ Mood ค้างกับ push บนเครื่องจริง พร้อมภาพหน้าจอใน PR (ตรวจ 2026-11-23 บน iOS Simulator: เห็น "step 5" กับ 0:08 สดใน ToolGroup และหลังเงียบเกินห้านาทีได้ Mood ค้าง ซึ่งหายเองเมื่อคำสั่งจบ; push ตัดออกตาม ADR 0076; เจอว่าตอนค้างปุ่ม Stop หายเพราะ `busyOf` ไม่นับ "stuck" แก้แล้วพร้อม test)
