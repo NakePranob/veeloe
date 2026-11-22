@@ -8,17 +8,17 @@
 - [x] 2.1 เปลี่ยนค่าใน `src/shared/ui/theme.ts` ตามกระดาน ทั้ง light และ dark: `background` ขาว, เพิ่ม `card`, `surface` สำหรับของลอย, สีสถานะใหม่พร้อม `blue` และ `redText`, `radius` ชุดใหม่, เงาเฉพาะของลอย และ `type` ขนาดกับน้ำหนักตามกระดาน; ตรวจด้วย `bun run check` และดู iOS Simulator ทั้งสองโหมดว่าพื้นขาวกับการ์ดเทา
 - [x] 2.2 ให้ `Section` และ `Card` ที่ไม่ `raised` ใช้พื้น `card` ไม่มีเงา และ `Card raised` ใช้ `surface` กับเงา; ตรวจโดยเปิดหน้า Workspace กับหน้า Agent บน iOS Simulator และ web แล้วไม่เห็นเงาใต้การ์ดหรือเส้นใดๆ
 - [x] 2.3 ติดตั้ง `expo-font` กับฟอนต์ Space Grotesk, Anuphan และ JetBrains Mono เฉพาะน้ำหนักที่ design.md ข้อ 3 ระบุ ด้วย `bunx expo install`; ตรวจว่า `bun install` และ `bunx expo run:ios` build ผ่าน และจดขนาด build ก่อนกับหลังไว้ใน PR
-- [ ] 2.4 โหลดฟอนต์ใน `RootLayout` และให้ splash ค้างจนโหลดเสร็จ; ตรวจโดยเปิดแอปแบบปิดเน็ตบน iOS Simulator แล้วหน้าแรกแสดงฟอนต์ของแอปทันทีโดยไม่กระพริบ
-- [ ] 2.5 ให้ `Text` เลือก family ตามน้ำหนักและ `mono` และใช้ Anuphan เป็นหลักสำหรับข้อความไทยปนอังกฤษ; ตรวจบน iOS Simulator, Android และ web ทั้งภาษาไทยและอังกฤษว่าวรรณยุกต์ไม่ถูกตัดและไม่มีตัวเป็นกล่องเปล่า พร้อมภาพหน้าจอใน PR
+- [x] 2.4 โหลดฟอนต์ใน `RootLayout` และให้ splash ค้างจนโหลดเสร็จ; ตรวจโดยเปิดแอปแบบปิดเน็ตบน iOS Simulator แล้วหน้าแรกแสดงฟอนต์ของแอปทันทีโดยไม่กระพริบ (ทำแบบไม่ใช้ splash: `RootLayout` วาดแค่พื้นจอจนฟอนต์พร้อม จึงไม่มีหน้าไหนเปลี่ยนฟอนต์หลังแสดง)
+- [x] 2.5 ให้ `Text` เลือก family ตามน้ำหนักและ `mono` และใช้ Anuphan เป็นหลักสำหรับข้อความไทยปนอังกฤษ; ตรวจบน iOS Simulator, Android และ web ทั้งภาษาไทยและอังกฤษว่าวรรณยุกต์ไม่ถูกตัดและไม่มีตัวเป็นกล่องเปล่า พร้อมภาพหน้าจอใน PR
 
 ## 3. ชิ้นใหม่ใน shared/ui
 
 - [x] 3.1 ให้ `Row` เป็นไอคอนเปล่าสีหมึกไม่มีช่องรอง สูงอย่างน้อย 52 และกดแล้วพื้นเปลี่ยนเป็น `chipPressed`; ตรวจโดยเปิดหน้า Workspace แล้วแถวตรงกับกระดาน Workspace และ `bun run check` ผ่าน
-- [ ] 3.2 เพิ่ม `Chip` (`tone` status, mono, count, choice; `selected`; `dot`) และส่งออกจาก `src/shared/ui/index.ts`; ตรวจด้วย `bun run check` และดูทุก `tone` ในหน้าตัวอย่างชั่วคราว ซึ่งลบก่อนปิด change
-- [ ] 3.3 เพิ่ม `Tabs` (`items` ชื่อกับจำนวน, `value`, `onChange`) ที่มี role tab และจำนวนส้มเฉพาะแท็บที่ระบุ; ตรวจด้วย `bun run check` และ VoiceOver อ่านชื่อแท็บกับสถานะที่เลือก
-- [ ] 3.4 เพิ่ม `Stat` (`value`, `unit`, `label`); ตรวจด้วย `bun run check` และดูในหน้าตัวอย่างชั่วคราว
-- [ ] 3.5 เพิ่ม `Button` แบบ `destructive` และ `floating` (ไอคอนกลมดำมีเงาที่ขยับวน และหยุดนิ่งเมื่อลดการเคลื่อนไหว); ตรวจโดยเปิด Reduce Motion บน iOS Simulator แล้วปุ่มลอยอยู่นิ่ง และพื้นที่กดอย่างน้อย 44
-- [ ] 3.6 เพิ่ม `action` ใน `Field` สำหรับปุ่มดำในช่องเดียวกัน; ตรวจด้วย `bun run check` และกดปุ่มในช่องบน iOS Simulator ได้โดยคีย์บอร์ดไม่ปิดก่อน
+- [x] 3.2 เพิ่ม `Chip` (`tone` status, mono, count, choice; `selected`; `dot`) และส่งออกจาก `src/shared/ui/index.ts`; ตรวจด้วย `bun run check` และดูทุก `tone` ในหน้าตัวอย่างชั่วคราว ซึ่งลบก่อนปิด change
+- [x] 3.3 เพิ่ม `Tabs` (`items` ชื่อกับจำนวน, `value`, `onChange`) ที่มี role tab และจำนวนส้มเฉพาะแท็บที่ระบุ; ตรวจด้วย `bun run check` และ VoiceOver อ่านชื่อแท็บกับสถานะที่เลือก
+- [x] 3.4 เพิ่ม `Stat` (`value`, `unit`, `label`); ตรวจด้วย `bun run check` และดูในหน้าตัวอย่างชั่วคราว (ทำเป็น `Tile` ที่มี `value`, `unit` และ `title` ใช้ในหน้า Workspace, Agent และ Machine)
+- [x] 3.5 เพิ่ม `Button` แบบ `destructive` และ `floating` (ไอคอนกลมดำมีเงาที่ขยับวน และหยุดนิ่งเมื่อลดการเคลื่อนไหว); ตรวจโดยเปิด Reduce Motion บน iOS Simulator แล้วปุ่มลอยอยู่นิ่ง และพื้นที่กดอย่างน้อย 44
+- [x] 3.6 เพิ่ม `action` ใน `Field` สำหรับปุ่มดำในช่องเดียวกัน; ตรวจด้วย `bun run check` และกดปุ่มในช่องบน iOS Simulator ได้โดยคีย์บอร์ดไม่ปิดก่อน
 - [x] 3.7 ให้ `Meter` เปลี่ยนสีตามระดับ (ปกติดำ, เกิน 80% ส้ม, หมดแดง) และเพิ่ม test ของกฎระดับสีนี้; ตรวจด้วย `bun run test`
 - [x] 3.8 วาดชิ้นใหม่ทั้งหมดบนกระดาน Design system ให้ตรงกับโค้ด (ชื่อ props และสถานะ); ตรวจโดยเทียบรายการชิ้นใน `src/shared/ui/index.ts` กับกระดาน
 

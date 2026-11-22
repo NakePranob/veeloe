@@ -11,9 +11,9 @@
 
 ## 3. UI
 
-- [ ] 3.1 แยก `TaskPage.tsx` เป็นไฟล์ตามโครงใน design.md ข้อ 4 โดยไม่เปลี่ยนพฤติกรรม; ตรวจด้วย `bun run test` และส่งข้อความ หยุด แนบไฟล์ และตอบ Approval ผ่าน `bun run dev:ios` ได้เหมือนก่อนแยก
-- [ ] 3.2 ทำ `ToolGroup` แบบหุบเป็นค่าเริ่มต้นตาม `summaryOf` และเปิดดูทุก call ได้ ตามแบบ `Chat-Tools` และ `Chat-Working` บน canvas; ตรวจบน iOS Simulator ว่าทุก scenario ของ requirement "หน้า Task แสดงคำสั่งที่ Agent รัน" ตรงกับที่เห็น
-- [ ] 3.3 ทำ `ChangesRow` ตามแบบบน canvas; ตรวจโดยให้ Agent แก้สองไฟล์ผ่าน `bun run dev:ios` แล้วเห็นแถว "แก้ 2 ไฟล์" ที่กดเปิดได้
+- [x] 3.1 แยก `TaskPage.tsx` เป็นไฟล์ตามโครงใน design.md ข้อ 4 โดยไม่เปลี่ยนพฤติกรรม; ตรวจด้วย `bun run test` และส่งข้อความ หยุด แนบไฟล์ และตอบ Approval ผ่าน `bun run dev:ios` ได้เหมือนก่อนแยก (แยกแล้วด้วยชื่อไฟล์ต่างจาก design.md ข้อ 4: `AgentText`/`PendingBubble` แทน `Message`, `ToolCalls` รวม `ToolGroup` กับแถวสรุปไฟล์, `LogCards` แทน `cards/*`, `TaskTitle` สำหรับ header)
+- [x] 3.2 ทำ `ToolGroup` แบบหุบเป็นค่าเริ่มต้นตาม `summaryOf` และเปิดดูทุก call ได้ ตามแบบ `Chat-Tools` และ `Chat-Working` บน canvas; ตรวจบน iOS Simulator ว่าทุก scenario ของ requirement "หน้า Task แสดงคำสั่งที่ Agent รัน" ตรงกับที่เห็น
+- [x] 3.3 ทำ `ChangesRow` ตามแบบบน canvas; ตรวจโดยให้ Agent แก้สองไฟล์ผ่าน `bun run dev:ios` แล้วเห็นแถว "แก้ 2 ไฟล์" ที่กดเปิดได้ (อยู่ใน `ToolCalls.tsx`)
 - [x] 3.4 ย้าย Character ไป header ด้วย `Stack.Screen options.headerTitle` ขนาด 36 ซ้ายชื่อ พร้อมสถานะใต้ชื่อ และแตะแล้วเปิดหน้า Agent; ตรวจบน iOS Simulator และ web
 - [x] 3.5 ปรับ Message (bubble สีหมึกของ Owner, ข้อความ Agent ไม่มี bubble, ข้อความรอคิว, บรรทัดเหตุการณ์), ApprovalCard (สีของ Agent และ Character ลอย) และ Composer (ช่องลอย ส่ง/หยุด) ตามแถวแชตบน canvas; ตรวจโดยเทียบทุกบอร์ด `Chat-*`, `B3-Talk` และ `B3-Task` กับ iOS Simulator
 - [x] 3.6 ลบ `useColors()` และ hex ออกจาก `pages/task/ui` และลบข้อยกเว้นของ `pages/task/ui` ใน `.conventions/rules.json`; ตรวจด้วย `bun run check:structure`
