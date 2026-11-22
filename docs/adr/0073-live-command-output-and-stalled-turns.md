@@ -34,5 +34,5 @@ Status: accepted
 ## Consequences
 
 - Controller รุ่นเก่าข้ามทั้ง `tool.output` และ `turn.stalled` ไปเอง (ADR 0023)
-- push ตอนค้างยังไม่มี รอ change `push-notifications` และจะส่งหนึ่งครั้งต่อ `turn.stalled`
+- push ตอนค้างยังไม่มี มาใน v0.6 พร้อม push ชนิดอื่น (ADR 0076) และจะส่งหนึ่งครั้งต่อ `turn.stalled`
 - คำสั่งที่เงียบนานแต่ยังทำงานอยู่ เช่น `sleep` จะถูกนับว่าค้าง ซึ่ง Owner เห็นเวลาที่รันไปแล้ว และตัดสินเองได้ว่าจะหยุดหรือรอต่อ

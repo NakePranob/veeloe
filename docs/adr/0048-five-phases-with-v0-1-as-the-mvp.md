@@ -1,14 +1,17 @@
 # แบ่งงานเป็นห้า phase และ v0.1 คือ MVP ที่ Owner คนเดียวสั่ง Agent บนเครื่องตัวเองจากมือถือ
 
 > **ADR 0064 เพิ่มเติม** Team มาพร้อม Project ใน v0.4
+>
+> **ADR 0076 เปลี่ยน** push ทุกชนิดย้ายออกจาก v0.1 ไปอยู่ v0.6 ซึ่งเป็น phase สุดท้าย
 
 ADR ตั้งแต่ 0001 ถึง 0047 ออกแบบไว้มากกว่าที่ต้องสร้างก่อนเปิดให้คนใช้ ถ้าไม่ตัดขอบเขต ticket ชุดใหม่จะไม่มีลำดับ และ v0.1 จะไม่มีวันเสร็จ เราจึงแบ่งตามลำดับที่เรื่องหนึ่งต้องพึ่งอีกเรื่อง v0.1 ต้องพิสูจน์แค่ว่าสั่ง Agent บนเครื่องตัวเองจากมือถือได้อย่างปลอดภัย และไม่เสียเงินเกินที่คิด ส่วนที่เหลือเพิ่มทีหลังได้แบบ additive (ADR 0023) ก่อนมี E2E Hub ของเราอ่านเนื้อหาได้ (ADR 0005) v0.1 และ v0.2 จึงมีแค่เจ้าของระบบใช้ และเปิดให้คนอื่นใช้ได้ตั้งแต่จบ v0.3
 
-1. **v0.1 (MVP)**: Hub ที่ส่งต่อข้อความ, Pairing, Linking เครื่องที่สองด้วย QR และการถอนกุญแจ (ADR 0031), สร้าง Agent และคุยใน Task, Attachment (ADR 0050), Approval, Stop, Allowlist, sandbox ที่ครอบทั้ง worker บน macOS และ Linux พร้อม localhost ของ Agent เอง และ Egress แยกต่อ Agent (ADR 0008, 0029, 0069), Provider ที่ตั้งบน Machine พร้อม proxy และ Budget (ADR 0042, 0043), Memory กับ compaction (ADR 0036, 0041), push ของ Approval, Turn ที่เสร็จ และ Budget (ADR 0044), Controller แบบ local-first พร้อม Character, log และสถานะของ Machine (ADR 0052) v0.1 มี Member คนเดียวคือ Owner
+1. **v0.1 (MVP)**: Hub ที่ส่งต่อข้อความ, Pairing, Linking เครื่องที่สองด้วย QR และการถอนกุญแจ (ADR 0031), สร้าง Agent และคุยใน Task, Attachment (ADR 0050), Approval, Stop, Allowlist, sandbox ที่ครอบทั้ง worker บน macOS และ Linux พร้อม localhost ของ Agent เอง และ Egress แยกต่อ Agent (ADR 0008, 0029, 0069), Provider ที่ตั้งบน Machine พร้อม proxy และ Budget (ADR 0042, 0043), Memory กับ compaction (ADR 0036, 0041), Controller แบบ local-first พร้อม Character, log และสถานะของ Machine (ADR 0052) v0.1 มี Member คนเดียวคือ Owner
 2. **v0.2 Agent ทำงานเองได้มากขึ้น**: Schedule, Idle Work, Watch, เส้นร้อย Task (ADR 0061), `web_fetch` และการค้นเว็บ, Skill, Connector, Library และการกู้คืน Agent ที่ถูกลบภายใน 30 วัน (ADR 0024 เป็นแบบอย่างของหน้าต่าง 30 วัน)
 3. **v0.3 องค์กรและเปิดให้คนอื่นใช้**: เริ่มจาก E2E (ADR 0063) แล้วตามด้วยโหมด Egress ทั้งเน็ต (ADR 0029), ชั้น Isolated ที่เป็น VM ต่อ Agent และการส่ง build แอป Apple ไป EAS (ADR 0069), Invitation ที่แนบ Grant ได้, Owner หลายคน, Grant ให้ Member คนอื่น, การเลือกผู้รับจาก Grant, ขอบเขตการอ่านตามคนสั่งพร้อมการเปิด worker ใหม่ (ADR 0059), กฎการเปิดดู Task กับค่าการค้น Task (ADR 0060), ยอดใช้ต่อ Member ต่อเดือน, บัญชีของ Member, Linking ด้วย login และการกู้บัญชีด้วย email (ADR 0013) และการย้าย Machine จากนั้นเป็นชุดเปิดตัว ได้แก่ Runtime ที่อัปเดตตัวเองแบบเซ็น (ADR 0009), `veeloe backup` กับ `restore` (ADR 0051), Demo Workspace กับการลบบัญชี (ADR 0024) และการเก็บเงินพร้อมโควตาตอน Pairing (ADR 0001) ถ้า phase นี้ใหญ่เกินไป แยกชุดเปิดตัวออกเป็น phase ของตัวเองได้
 4. **v0.4 Project**: Project, Ask ทั้งใน Project และนอก Project, Mention, Worktree และ Agent ที่รันหลาย Turn พร้อมกัน ไว้หลังสุดของงานแกน เพราะเปลี่ยน Runtime จาก worker ต่อ Agent เป็น worker ต่อ Turn (ADR 0020, 0047)
 5. **v0.5 Channel**: Telegram และ `/claim` (ADR 0028, 0058) Channel ไม่ต้องรอ Project ถ้าต้องการเร็วกว่านี้ ยกไปไว้หลัง v0.3 ได้ ถ้าจะเอามาก่อน v0.3 ต้องเอาขอบเขตการอ่านตามคนสั่งมาด้วย (ADR 0059, 0069)
+6. **v0.6 push**: push ทุกชนิดในตารางของ ADR 0044 อยู่ท้ายสุดเสมอ แม้ phase อื่นจะสลับลำดับกัน (ADR 0076)
 
 marketplace ของ Blueprint (ADR 0049) มาหลัง v0.3
 

@@ -14,7 +14,7 @@
 - [x] 2.1 ให้ `runtime-worker/src/tools/bash.rs` ส่ง chunk ของ output ผ่าน IPC ใหม่ใน `runtime-core/src/ipc.rs` ระหว่างที่คำสั่งรัน โดยไม่เปลี่ยนผลที่ LLM ได้; ตรวจด้วย `cargo test -p veeloe-runtime-worker` ว่าผลของ `bash` เหมือนเดิมทุก test เดิม
 - [x] 2.2 ให้ supervisor จำกัดอัตรา `tool.output` ไม่เกินหนึ่งครั้งต่อวินาทีต่อคำสั่ง ส่งเฉพาะท้ายไม่เกิน 2 KB และส่งเฉพาะ Controller ของ Member ที่เริ่ม Task; ตรวจด้วย test ใน `runtime-supervisor` ตาม scenario ของ `bash-tool` (build ที่พิมพ์ต่อเนื่อง, คำสั่งเงียบ, Member อื่น)
 - [x] 2.3 เพิ่มนาฬิกาค้างต่อ Turn ใน supervisor (เริ่มใหม่เมื่อมี event หรือ chunk, หยุดระหว่าง Approval รอ) และเขียน `turn.stalled` ครั้งเดียวต่อช่วงเงียบ โดยค่า `STALL_AFTER` ปรับได้ใน test; ตรวจด้วย `cargo test -p veeloe-runtime-supervisor -- --test-threads=1` ครบทุก scenario ของ requirement "Turn ที่เงียบเกินห้านาทีมี event turn.stalled"
-- [ ] 2.4 ส่ง push หนึ่งครั้งต่อ `turn.stalled` ถึง Member ที่เริ่ม Turn ด้วยข้อความกลางๆ ผ่าน client ของ `push-notifications` (ต้อง archive `push-notifications` ก่อน); ตรวจด้วย test ของ push ใน `runtime-supervisor` ว่ามีหนึ่งครั้งต่อ event และไม่ถึง Member อื่น
+- [ ] 2.4 (ย้ายไป v0.6 ตาม ADR 0076: ไม่ต้องทำก่อน archive change นี้) ส่ง push หนึ่งครั้งต่อ `turn.stalled` ถึง Member ที่เริ่ม Turn ด้วยข้อความกลางๆ ผ่าน client ของ `push-notifications` (ต้อง archive `push-notifications` ก่อน); ตรวจด้วย test ของ push ใน `runtime-supervisor` ว่ามีหนึ่งครั้งต่อ event และไม่ถึง Member อื่น
 
 ## 3. Controller
 
