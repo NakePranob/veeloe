@@ -890,15 +890,19 @@ fn bash_harness(
 async fn a_bash_command_in_the_allowlist_runs_without_asking() {
     let (harness, ran) = bash_harness(
         vec![
-            Ok(tool_use("tu-ls", "bash", json!({ "command": "ls -la" }))),
+            Ok(tool_use(
+                "tu-make",
+                "bash",
+                json!({ "command": "make test" }),
+            )),
             Ok(text("done")),
         ],
-        vec!["ls".into()],
+        vec!["make".into()],
     );
     harness.core.receive(message("go")).expect("receive");
     harness.core.idle().await;
 
-    assert_eq!(*ran.lock().expect("ran"), vec!["ls -la"]);
+    assert_eq!(*ran.lock().expect("ran"), vec!["make test"]);
     assert!(!kinds(&harness.core.events("t1").expect("events"))
         .contains(&"approval.requested".to_string()));
 }
@@ -1130,11 +1134,36 @@ async fn an_answer_to_no_waiting_approval_is_approval_unknown() {
 }
 
 #[tokio::test]
+async fn a_command_that_only_reads_runs_with_an_empty_allowlist() {
+    // ADR 0075: printing and reading need no entry, and a redirect into /dev/null writes nothing.
+    let (harness, ran) = bash_harness(
+        vec![
+            Ok(tool_use(
+                "tu-read",
+                "bash",
+                json!({ "command": "ls -la; cat MEMORY.md 2>/dev/null" }),
+            )),
+            Ok(text("done")),
+        ],
+        Vec::new(),
+    );
+    harness.core.receive(message("go")).expect("receive");
+    harness.core.idle().await;
+
+    assert_eq!(
+        *ran.lock().expect("ran"),
+        vec!["ls -la; cat MEMORY.md 2>/dev/null"]
+    );
+    assert!(!kinds(&harness.core.events("t1").expect("events"))
+        .contains(&"approval.requested".to_string()));
+}
+
+#[tokio::test]
 async fn a_new_allowlist_reaches_the_next_tool_call() {
     let ran = Arc::new(Mutex::new(Vec::new()));
     let harness = setup(Setup {
         replies: vec![
-            Ok(tool_use("tu-ls", "bash", json!({ "command": "ls" }))),
+            Ok(tool_use("tu-make", "bash", json!({ "command": "make" }))),
             Ok(text("done")),
         ],
         runners: vec![Arc::new(Bash {
@@ -1142,11 +1171,11 @@ async fn a_new_allowlist_reaches_the_next_tool_call() {
         })],
         ..Setup::default()
     });
-    harness.core.set_allowlist(vec!["ls".into()]);
+    harness.core.set_allowlist(vec!["make".into()]);
     harness.core.receive(message("go")).expect("receive");
     harness.core.idle().await;
 
-    assert_eq!(*ran.lock().expect("ran"), vec!["ls"]);
+    assert_eq!(*ran.lock().expect("ran"), vec!["make"]);
     assert!(!kinds(&harness.core.events("t1").expect("events"))
         .contains(&"approval.requested".to_string()));
 }

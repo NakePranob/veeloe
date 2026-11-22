@@ -433,7 +433,7 @@ async fn an_approval_answer_reaches_the_worker_and_allow_always_grows_the_allowl
         Arc::new(Sequence {
             replies: Mutex::new(std::collections::VecDeque::from([
                 json!({
-                    "content": [{ "type": "tool_use", "id": "tu-ls", "name": "bash", "input": { "command": "ls" } }],
+                    "content": [{ "type": "tool_use", "id": "tu-ls", "name": "bash", "input": { "command": "make" } }],
                     "stop_reason": "tool_use",
                 }),
                 json!({ "content": [{ "type": "text", "text": "done" }], "stop_reason": "end_turn" }),
@@ -479,7 +479,7 @@ async fn an_approval_answer_reaches_the_worker_and_allow_always_grows_the_allowl
         )
         .await;
 
-    // `ls` is not in the Allowlist yet, so the worker asks before running it.
+    // `make` is not in the Allowlist yet, so the worker asks before running it.
     let mut request = None;
     while request.is_none() {
         let envelope = controller.next().await;
@@ -498,7 +498,7 @@ async fn an_approval_answer_reaches_the_worker_and_allow_always_grows_the_allowl
                 "agent": "a1",
                 "request": request,
                 "decision": "approve",
-                "allowAlways": "ls",
+                "allowAlways": "make",
             }),
         )
         .await;
@@ -515,7 +515,7 @@ async fn an_approval_answer_reaches_the_worker_and_allow_always_grows_the_allowl
 
     // The answer ran the command, and allow-always wrote the entry down.
     let agent = slice.registry.get("a1").expect("get").expect("agent");
-    assert_eq!(agent.allowlist, vec!["ls".to_string()]);
+    assert_eq!(agent.allowlist, vec!["make".to_string()]);
 
     link.stop().await;
     slice.workers.stop_all();
