@@ -9,6 +9,11 @@ import { NO_OUTPUT, type ToolOutput } from "./statuses";
 import { createMachineLinks, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, type MachineLinks, type MachineStatus, type MemoryStatus, type UsageStatus } from "./links";
 
 let current: MachineLinks | null = null;
+
+// Fast Refresh runs this module again and starts from a fresh `current`, while the links it had
+// keep their sockets open: two sets then take turns pushing each other off the Hub and writing at
+// once. The live set is kept on globalThis too, so a new one always stops the one before it.
+const kept = globalThis as { __veeloeMachineLinks?: MachineLinks | null };
 const changes = new Set<() => void>();
 const announce = () => {
   for (const listener of changes) listener();
@@ -29,13 +34,16 @@ export function useMachineLinks({ onRevoked, onLinked }: { onRevoked: () => void
   useEffect(() => {
     const secretKey = unlocked ? keySession.secretKey() : null;
     if (!secretKey) return;
+    kept.__veeloeMachineLinks?.stop();
     const links = createMachineLinks({ database, secretKey, newId: randomUUID, deviceName: deviceName(), onRevoked: () => handlers.current.onRevoked() });
     links.onLinked((news) => handlers.current.onLinked(news));
     current = links;
+    kept.__veeloeMachineLinks = links;
     announce();
     return () => {
       links.stop();
       if (current === links) current = null;
+      if (kept.__veeloeMachineLinks === links) kept.__veeloeMachineLinks = null;
       announce();
     };
   }, [database, unlocked]);
