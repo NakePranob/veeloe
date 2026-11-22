@@ -30,7 +30,7 @@ function Pieces({ inline }: { inline: Inline[] }) {
   });
 }
 
-// controller-prototype's AgentText: the Markdown an Agent writes.
+// The Markdown an Agent writes.
 export function AgentText({ text }: { text: string }) {
   return (
     <View style={{ gap: space.sm }}>

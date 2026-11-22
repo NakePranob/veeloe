@@ -9,15 +9,6 @@
         "cd controller && exec bunx expo start --web --port 8082"
       ],
       "port": 8082
-    },
-    {
-      "name": "controller-prototype",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "cd controller-prototype && exec bunx expo start --web --port 8081"
-      ],
-      "port": 8081
     }
   ]
 }

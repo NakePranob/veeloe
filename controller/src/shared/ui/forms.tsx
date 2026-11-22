@@ -171,7 +171,7 @@ export function Row({ title, detail, value, icon, leading, iconColor, href, onLo
   return body(false);
 }
 
-// A Row with a switch: for a setting that is simply on or off (controller-prototype's ToggleRow).
+// A Row with a switch: for a setting that is simply on or off.
 export function ToggleRow({ title, detail, value, onChange, icon, mono }: { title: string; detail?: string; value: boolean; onChange: (value: boolean) => void; icon?: IconName; mono?: boolean }) {
   const colors = useColors();
   return <Row title={title} detail={detail} icon={icon} mono={mono} accessory={<Switch aria-label={title} value={value} onValueChange={onChange} trackColor={{ true: colors.accent }} />} />;

@@ -14,7 +14,7 @@ export const font = {
   monoMedium: "JetBrainsMono_500Medium",
 } as const;
 
-// The redesign canvas's "Design system" board. A white screen with grey cards on it,
+// The design system. A white screen with grey cards on it,
 // and nothing outlined. Hue is for state and the Agent's Character only:
 // orange means a person is needed now, and nothing else.
 const light = {

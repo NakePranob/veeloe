@@ -19,5 +19,5 @@ export const covers = (entry: string, command: string) => !isUnsafeCommand(comma
 /** A part that runs with no entry at all: it prints or reads and runs no other program (ADR 0075). */
 export const builtIn = (part: string) => !isUnsafeCommand(part) && builtInCovers(part);
 
-/** The parts "allow always" offers: only those not on the list yet and not built in (controller-prototype's missingParts). */
+/** The parts "allow always" offers: only those not on the list yet and not built in. */
 export const missingParts = (command: string, allowlist: readonly string[]) => commandParts(command).filter((part) => !allowed(part, allowlist));

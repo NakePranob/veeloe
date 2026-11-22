@@ -1,6 +1,5 @@
 // The Markdown an Agent writes: headings, bullet and numbered lists, ``` blocks,
 // `>` quotes, tables, and inside a line `code`, **bold** and [links](https://…).
-// Ported from controller-prototype.
 // ponytail: no nesting; add it when Agents nest lists.
 export interface Inline {
   text: string;

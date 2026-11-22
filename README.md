@@ -3,9 +3,7 @@
 AI agents that run on your own machines, work together as a team on each of
 them, and are controlled from anywhere. Each Project runs on a single machine.
 
-This repository holds the design of Veeloe and a throwaway Controller prototype
-on Demo data (`controller-prototype/`). The parts below are designed in
-`docs/adr/` and are not built yet:
+This repository holds Veeloe. The parts below are designed in `docs/adr/`:
 
 - **Protocol** — the shared language that Controllers, Runtimes and Hubs use
   to talk: envelope and message shapes, signing, and sealed keys.

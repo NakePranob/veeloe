@@ -5,7 +5,6 @@
   "workspaces": [
     "packages/*",
     "controller",
-    "controller-prototype",
     "e2e"
   ],
   "scripts": {
@@ -19,12 +18,11 @@
     "dev:restart": "bun scripts/dev.ts restart",
     "dev:seed": "bun scripts/dev.ts seed",
     "dev:ios": "bun e2e/ios-flow-harness.ts serve",
-    "test": "cd packages/protocol-ts && bun test && cd ../../controller-prototype && bun test && cd ../controller && bun test ./src ./scripts",
+    "test": "cd packages/protocol-ts && bun test && cd ../../controller && bun test ./src ./scripts",
     "test:e2e": "cd e2e && bun test",
     "check": "bun scripts/check-all.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p controller-prototype && tsc --noEmit -p controller",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p controller",
     "check:runtime": "cd packages/runtime && cargo test --workspace -- --test-threads=1",
-    "prototype": "cd controller-prototype && bunx expo start --web",
     "check:controller": "cd controller && bun scripts/check-i18n.ts",
     "build:runtime": "bun scripts/build-runtime.ts",
     "check:protocol": "cd packages/protocol && cargo test && cd ../protocol-ts && bun test src/fixtures && cd ../../hub && go test ./internal/shared/protocol/...",

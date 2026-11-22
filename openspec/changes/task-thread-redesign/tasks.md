@@ -22,4 +22,4 @@
 ## 4. ตรวจ
 
 - [ ] 4.1 `bun run check`, `bun run test` และ `bun run test:e2e` ผ่าน
-- [ ] 4.2 เปิดหน้า Task บน iOS Simulator และ web ทั้งสองโหมดและสองภาษา ครบทุกเหตุการณ์ในแถวแชตของ canvas พร้อมภาพหน้าจอใน PR
+- [ ] 4.2 เปิดหน้า Task บน iOS Simulator และ web ทั้งสองโหมดและสองภาษา ครบทุกชนิด Item ใน `pages/task/model/items.ts` พร้อมภาพหน้าจอใน PR

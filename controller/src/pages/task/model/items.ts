@@ -38,7 +38,7 @@ export function summaryOf(calls: ToolCall[]): ToolSummary {
 }
 
 /**
- * Where one Approval stands (controller-prototype's ApprovalStatus). `expired`: its
+ * Where one Approval stands. `expired`: its
  * time ran out with nobody answering, which counts as denied (CONTEXT.md).
  * `closed`: its Turn ended first, by Stop or a steer.
  */
@@ -66,7 +66,7 @@ export type Item =
   | { key: string; kind: "member"; text: string }
   | { key: string; kind: "agent"; text: string }
   | { key: string; kind: "error"; code: string }
-  /** Commands run back to back, with no words of the Agent between them (controller-prototype's items). */
+  /** Commands run back to back, with no words of the Agent between them. */
   | { key: string; kind: "tools"; calls: ToolCall[] }
   | { key: string; kind: "approval"; approval: Approval }
   /** A Member stopped the Turn that was running (ADR 0017). */

@@ -1,15 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   // Only the Controller and the root scripts; the other halves have their own tooling.
-  "ignoreWorkspaces": ["controller-prototype", "packages/*", "e2e"],
+  "ignoreWorkspaces": ["packages/*", "e2e"],
   // `check:protocol` runs `go test` in hub/.
   "ignoreBinaries": ["go"],
   "workspaces": {
     ".": {
       "entry": ["scripts/*.ts"],
-      "project": ["scripts/**/*.ts"],
-      // `typecheck` runs `tsc -p controller-prototype`, whose tsconfig extends expo; that workspace is ignored.
-      "ignoreDependencies": ["expo"]
+      "project": ["scripts/**/*.ts"]
     },
     "controller": {
       "entry": ["app/**/*.tsx", "src/**/*.test.ts", "scripts/*.ts"],

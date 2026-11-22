@@ -2,8 +2,7 @@
 
 This is Veeloe (`veeloe` on GitHub), under AGPL-3.0 (`LICENSE`). The design is
 here: the Runtime is being built in `packages/runtime`, the Protocol in
-`packages/protocol`, the Hub in `hub/` and the Controller in `controller/`, and `controller-prototype/` is a throwaway UI prototype on
-Demo data. It is **public** — everything pushed here, a commit message or a PR
+`packages/protocol`, the Hub in `hub/` and the Controller in `controller/`. It is **public** — everything pushed here, a commit message or a PR
 description included, is public the moment it lands. Never commit a secret: the Runtime release signing
 key, push and Expo credentials, billing keys and the hosted Hub's env stay in
 GitHub environments or the host, never in git.
@@ -43,7 +42,7 @@ of the Controller, Hub and Runtime (`check:structure`, ADR 0070), checks that
 the Controller's Thai and English words match (ADR 0065), the Rust Runtime's
 `cargo test --workspace`, and the Protocol against its vectors on both sides
 (`check:protocol`: Rust, TypeScript fixtures and the Hub's copy). `test` runs the
-unit tests of `packages/protocol-ts`, the Controller and its prototype; the Rust
+unit tests of `packages/protocol-ts` and the Controller; the Rust
 crates are tested by `check`, one test at a time (`--test-threads=1`): they start
 real supervisor, Hub and worker processes, and parallel runs flaked on timing.
 CI runs both, plus `go test -race ./...` in `hub/` and `bun run test:e2e`, which

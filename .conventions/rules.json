@@ -39,7 +39,7 @@
     },
     {
       "id": "known-places",
-      "notApplicable": "the root holds independently built halves (controller, hub, packages/runtime) that each keep their own .conventions; the rest (docs, e2e, scripts, packaging, openspec, controller-prototype) is not unit code, ADR 0070"
+      "notApplicable": "the root holds independently built halves (controller, hub, packages/runtime) that each keep their own .conventions; the rest (docs, e2e, scripts, packaging, openspec) is not unit code, ADR 0070"
     },
     {
       "id": "unit-shape",

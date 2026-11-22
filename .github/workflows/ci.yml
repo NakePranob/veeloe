@@ -33,13 +33,12 @@ jobs:
         run: bun run lint
       - name: Dead files, exports and dependencies (knip)
         run: bun run check:dead
-      - name: Unit tests (Protocol, Controller, Controller prototype)
-        # `bun run test` is the same three commands; split here so a hang names
+      - name: Unit tests (Protocol, Controller)
+        # `bun run test` is the same two commands; split here so a hang names
         # the package it is in and a timeout turns it into a failure.
         run: |
           set -x
           (cd packages/protocol-ts && timeout 120 bun test --timeout 15000)
-          (cd controller-prototype && timeout 180 bun test --timeout 15000)
           # One process per file: `mock.module` is process-global, and an async
           # factory for a module another file already mocked hangs Bun 1.3.14
           # on the runner (links.test.ts after inbox.test.ts). Each file stays

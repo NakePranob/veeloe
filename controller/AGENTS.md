@@ -1,4 +1,4 @@
-This is the Veeloe Controller, the real app. The design source of truth for a screen is its boards on the redesign canvas: https://claude.ai/artifact/DEHC2ENNKRsri7YtPHaBPc. Before writing or changing any screen, read its boards there in full, and match every state, label, hint line, button and its order, and control shape — a value that opens a picker in one row, not one row per option. Build a screen only once its boards show every state the code has (loading, empty, error, offline, light and dark); draw a missing state on the canvas first. A screen that invents its own layout or repeats a label down a list is wrong even if it works. Prove parity state by state against the canvas, then delete any temporary preview route or seed helper. `../controller-prototype/` is a throwaway on Demo data: do not build on it or follow it.
+This is the Veeloe Controller, the real app, and the only design source: there is no canvas or prototype to follow. A screen is built from `src/shared/ui` (its tokens in `theme.ts` and its pieces) and looks like the screens already built, the Agent page and the Task page first: white screen, grey cards with no shadow or border, ink pills, colour only for state and the Agent. Match the label, hint line, button order and control shape of the closest finished screen — a value that opens a picker in one row, not one row per option — and give every state the code has (loading, empty, error, offline, light and dark) its own look. A screen that invents its own layout or repeats a label down a list is wrong even if it works.
 
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
@@ -17,8 +17,6 @@ bunx expo install <package>  # ALWAYS use this to add a package: it resolves SDK
 bunx expo start --web        # web
 bunx expo run:ios            # a development build on the iOS Simulator
 ```
-
-The Expo and React Native versions match `controller-prototype` exactly: the workspace hoists one copy of each. Upgrade the two together.
 
 Native modules are in this build, so it does not run in Expo Go. `ios/` and `android/` are generated (Continuous Native Generation), so never edit them by hand: configure native behaviour in `app.json`.
 
@@ -40,7 +38,7 @@ Never write a sentence into a screen (ADR 0065):
 
 ## UI
 
-The design system (tokens, components, entities, widgets, dark mode) is the "Design system" board on the redesign canvas: https://claude.ai/artifact/DEHC2ENNKRsri7YtPHaBPc. Change the board and the code together.
+The design system (tokens, components, entities, widgets, dark mode) is the code itself: `src/shared/ui/theme.ts` and the pieces beside it. Add a piece there only when two screens need it.
 
 - Navigation, headers, the back button, alerts and the menus a control opens are the platform's. Never rebuild them.
 - Buttons, chips, cards and everything else on the page are ours, from `src/shared/ui`. No borders or divider lines: space and surface set things apart, and only what floats over content has a shadow. Each control keeps a pressed state, a role and a 44pt target: a link is `TextLink`, `Button` or `Row`, never `onPress` on `Text` (`links-are-pressables`, ADR 0074).
