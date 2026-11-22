@@ -51,3 +51,13 @@ export function dailyTotals(rows: readonly UsageDayRow[], agentIds: ReadonlySet<
   for (let day = from; day <= to; day = shiftDay(day, 1)) days.push({ day, tokens: byDay.get(day) ?? 0, known: byDay.has(day) });
   return days;
 }
+
+/**
+ * Each Agent's tokens from `from` to `to`, both ends included: the same rows and days `dailyTotals` counts, so a
+ * breakdown by Agent or Machine always adds up to the chart above it (`controller-usage`). An Agent with no row is absent.
+ */
+export function agentTotals(rows: readonly UsageDayRow[], from: string, to: string): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of rows) if (row.day >= from && row.day <= to) totals.set(row.agent_id, (totals.get(row.agent_id) ?? 0) + row.tokens);
+  return totals;
+}

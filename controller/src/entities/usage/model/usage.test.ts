@@ -2,7 +2,7 @@ import { Database as Sqlite } from "bun:sqlite";
 import { beforeEach, expect, test } from "bun:test";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { dailyTotals, saveUsageFetchedAt, saveUsageHistory } from "./usage";
+import { agentTotals, dailyTotals, saveUsageFetchedAt, saveUsageHistory } from "./usage";
 
 function connect(): Connection {
   const sqlite = new Sqlite(":memory:");
@@ -97,4 +97,22 @@ test("each day of a range is a column, across a month and a year, totalled over 
     { day: "2027-01-01", tokens: 50, known: true },
   ]);
   expect(dailyTotals(rows, new Set(["a1"]), "2027-01-02", "2027-01-01")).toEqual([]);
+});
+
+test("each Agent's total counts the same days as the chart, so the rows under it add up to it", () => {
+  const rows = [
+    { agent_id: "a1", day: "2026-11-21", tokens: 500 },
+    { agent_id: "a1", day: "2026-11-22", tokens: 100 },
+    { agent_id: "a2", day: "2026-11-22", tokens: 6 },
+    { agent_id: "a2", day: "2026-11-23", tokens: 9 },
+  ];
+  const totals = agentTotals(rows, "2026-11-22", "2026-11-22");
+  expect(totals).toEqual(
+    new Map([
+      ["a1", 100],
+      ["a2", 6],
+    ]),
+  );
+  const chart = dailyTotals(rows, new Set(["a1", "a2"]), "2026-11-22", "2026-11-22");
+  expect([...totals.values()].reduce((sum, tokens) => sum + tokens, 0)).toBe(chart.reduce((sum, day) => sum + day.tokens, 0));
 });

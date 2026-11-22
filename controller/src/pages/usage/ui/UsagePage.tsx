@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import type React from "react";
-import { staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
+import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines, type Machine } from "../../../entities/machine";
 import { latestEvents, previewOf, useTaskSummaries } from "../../../entities/task";
-import { dailyTotals, useUsageDays, type UsageDayRow } from "../../../entities/usage";
+import { agentTotals, dailyTotals, useUsageDays, type UsageDayRow } from "../../../entities/usage";
 import { useMachineLink, useMachineStatuses, useUsageStatuses, type UsageStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
@@ -83,17 +83,10 @@ function UsageLine({ title, used, limit, line, leading, href, dim }: { title: st
   );
 }
 
-function Overview({ machines, agents, rows, statuses, days }: { machines: Machine[]; agents: AgentRow[]; rows: UsageDayRow[]; statuses: Record<string, UsageStatus>; days: number }) {
+function Overview({ machines, agents, rows, statuses, from, to }: { machines: Machine[]; agents: AgentRow[]; rows: UsageDayRow[]; statuses: Record<string, UsageStatus>; from: string | null; to: string | null }) {
   const t = useT("usage");
   const language = useLanguage();
   const ids = new Set(agents.map((agent) => agent.id));
-  // Each Machine's own today, or the last day it gave us; the window ends at the latest of them.
-  const to =
-    [...machines.map((m) => statuses[m.id]?.to ?? null), ...rows.filter((row) => ids.has(row.agent_id)).map((row) => row.day)]
-      .filter((d): d is string => !!d)
-      .sort()
-      .at(-1) ?? null;
-  const from = to ? shiftDay(to, -(days - 1)) : null;
   const totals = from && to ? dailyTotals(rows, ids, from, to) : [];
   const today = totals.at(-1)?.tokens ?? 0;
   const loading = machines.some((m) => statuses[m.id]?.loading);
@@ -182,6 +175,17 @@ export function UsagePage() {
   const days = useUsageWindow();
 
   const list = machines ?? [];
+  const agentIds = new Set(agents.map((agent) => agent.id));
+  // Each Machine's own today, or the last day it gave us; the window ends at the latest of them.
+  const to =
+    [...list.map((m) => statuses[m.id]?.to ?? null), ...rows.filter((row) => agentIds.has(row.agent_id)).map((row) => row.day)]
+      .filter((d): d is string => !!d)
+      .sort()
+      .at(-1) ?? null;
+  const from = to ? shiftDay(to, -(days - 1)) : null;
+  // The rows count the chart's own days from the same history, so they add up to it (`controller-usage`).
+  const used = from && to ? agentTotals(rows, from, to) : new Map<string, number>();
+  const usedOf = (agent: AgentRow) => used.get(agent.id) ?? 0;
   const ids = list.map((machine) => machine.id).join(",");
   const online = list.map((machine) => `${machine.id}:${machineStatuses[machine.id]?.online}`).join(",");
   // The latest list without making the effect depend on the Machine rows, which the answer itself rewrites.
@@ -210,28 +214,29 @@ export function UsagePage() {
         <Empty icon="usage" title={t("empty.title")} detail={t("empty.body")} />
       ) : (
         <>
-          <Overview machines={list} agents={agents} rows={rows} statuses={statuses} days={days} />
+          <Overview machines={list} agents={agents} rows={rows} statuses={statuses} from={from} to={to} />
           <Section title={t("byMachine")}>
             {list.map((machine) => {
               const online = machineStatuses[machine.id]?.online ?? null;
-              const budget = machineStatuses[machine.id]?.budgetToday;
+              const machineUsed = agents.filter((agent) => agent.machine_id === machine.id).reduce((sum, agent) => sum + usedOf(agent), 0);
               const fetched = machine.usage_fetched_at ? when(machine.usage_fetched_at, language, now) : null;
               const state = online === null ? null : t(online ? "machine.online" : "machine.offline");
               const line = state && fetched ? t("machine.stateFetched", { state, when: fetched }) : fetched ? t("machine.fetched", { when: fetched }) : (state ?? "");
-              return <UsageLine key={machine.id} title={machine.name} used={budget?.usedTokens ?? 0} limit={budget?.limitTokens || null} line={line} href={`/machines/${machine.id}`} dim={online === false} />;
+              // What it used, never a ceiling: no Budget divides a Machine's total (`controller-usage`).
+              return <UsageLine key={machine.id} title={machine.name} used={machineUsed} limit={null} line={line} href={`/machines/${machine.id}`} dim={online === false} />;
             })}
           </Section>
           {agents.length > 0 && (
             <Section title={t("byAgent")}>
               {[...agents]
-                .sort((a, b) => (b.usage_tokens ?? 0) - (a.usage_tokens ?? 0))
+                .sort((a, b) => usedOf(b) - usedOf(a))
                 .map((agent) => (
                   <UsageLine
                     key={agent.id}
                     title={agent.name}
-                    used={agent.usage_tokens ?? 0}
-                    // Yesterday's tally against today's Budget would say it is used up when it is not.
-                    limit={staleUsage(agent, agents) ? null : agent.budget}
+                    used={usedOf(agent)}
+                    // Today's Budget only for one day the Machine just said is today; a cached day may be yesterday.
+                    limit={days === 1 && to !== null && statuses[agent.machine_id]?.to === to ? agent.budget : null}
                     line={list.find((m) => m.id === agent.machine_id)?.name ?? ""}
                     leading={<Character look={lookOfJson(agent.character)} mood={moodOf(latestOf(summaries.find((task) => task.agent_id === agent.id)), machineStatuses[agent.machine_id]?.online ?? null)} size={32} />}
                     href={`/agents/${agent.id}`}
