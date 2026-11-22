@@ -246,9 +246,14 @@ export function createMachineLinks({
     clients.set(hubUrl, { client, machines });
   }
 
+  // A stopped set stays stopped: a late update (Fast Refresh renders once more with it) would
+  // open a second socket with this key, and the two would push each other off the Hub.
+  let stopped = false;
+
   return {
     /** Starts, restarts or stops a connection wherever the Machines on a Hub changed. */
     update(machines: Machine[]) {
+      if (stopped) return;
       // Not Map.groupBy: Hermes does not have it.
       const byHub = new Map<string, Machine[]>();
       for (const m of machines) byHub.set(m.hub_url, [...(byHub.get(m.hub_url) ?? []), m]);
@@ -463,6 +468,7 @@ export function createMachineLinks({
     ownKey,
 
     stop() {
+      stopped = true;
       watchers.clear();
       linkListeners.clear();
       requestListeners.clear();

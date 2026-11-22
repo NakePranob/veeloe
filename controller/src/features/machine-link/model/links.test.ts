@@ -197,6 +197,14 @@ test("a change to an Agent goes signed with only its fields, and the Machine's e
   expect(links.updateAgent(machine, { id: "a1", name: "C" })).toBeNull();
 });
 
+test("a stopped set never connects again, so a late update cannot put a second socket on the Hub", async () => {
+  const { fake, machine, links } = await setup();
+  links.stop();
+  links.update([machine]);
+  await Bun.sleep(100);
+  expect(fake.hub.sockets.length).toBe(1);
+});
+
 test("deleting an Agent goes signed as agent.delete and its error is kept separately", async () => {
   const { fake, links, machine } = await setup();
   const sig = links.deleteAgent(machine, "a1");
