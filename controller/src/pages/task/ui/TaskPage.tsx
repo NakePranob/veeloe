@@ -48,8 +48,11 @@ export function TaskPage() {
   const input = useRef<TextInputInstance>(null);
   const scroll = useRef<FlatList<Item>>(null);
   const viewport = useRef(0);
-  // Whether the reader is at the end of the log, so new content follows only then.
+  // Whether the reader is at the end of the log, so new content follows only then. Only the reader's own
+  // scrolling changes it: a scroll the page makes (to the end, mid-animation, while a card grows below)
+  // must never read as "they scrolled up", or what arrives next is left off screen.
   const atEnd = useRef(true);
+  const dragging = useRef(false);
   // Whoever sends wants to see the message land, even after scrolling up to read: follow the end again.
   const followEnd = () => {
     atEnd.current = true;
@@ -144,8 +147,23 @@ export function TaskPage() {
         onContentSizeChange={(_, height) => {
           if (height > viewport.current && atEnd.current) scroll.current?.scrollToEnd({ animated: false });
         }}
+        onScrollBeginDrag={() => {
+          dragging.current = true;
+        }}
         onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+          if (dragging.current) atEnd.current = contentSize.height - contentOffset.y - layoutMeasurement.height < FOLLOW_END_PT;
+        }}
+        onMomentumScrollEnd={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+          dragging.current = false;
           atEnd.current = contentSize.height - contentOffset.y - layoutMeasurement.height < FOLLOW_END_PT;
+        }}
+        onScrollEndDrag={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+          dragging.current = false;
+          atEnd.current = contentSize.height - contentOffset.y - layoutMeasurement.height < FOLLOW_END_PT;
+        }}
+        // A flick keeps moving after the finger lifts; that glide is still the reader's.
+        onMomentumScrollBegin={() => {
+          dragging.current = true;
         }}
         scrollEventThrottle={16}
         // The end of the log rests clear of the fade.
