@@ -7,7 +7,7 @@
 ## Requirements
 
 ### Requirement: Task เป็น event log ที่ต่อท้ายอย่างเดียว
-supervisor SHALL เก็บทุก Task ของ Agent เป็นลำดับของ event ในฐานข้อมูลของ Agent ตัวนั้น และ SHALL เป็นผู้เดียวที่เขียน event ลงฐานข้อมูล worker SHALL ส่ง event ให้ supervisor ทาง IPC และ MUST NOT เขียนฐานข้อมูลเอง แต่ละ event SHALL มีเลขลำดับภายใน Task ที่เริ่มที่ 1 และเพิ่มทีละ 1 event MUST NOT ถูกแก้หรือลบ event ของ v0.1 SHALL มีข้อความของ Member พร้อมชื่อ Member, การเริ่ม Turn, ผลจาก LLM ตามที่ได้รับทุกตัวอักษรรวมถึง thinking block, การเรียก tool กับผลของ tool และการจบ Turn พร้อมเหตุผล ฐานข้อมูล SHALL อยู่นอกโฟลเดอร์ที่ sandbox เปิดให้ Agent เขียน และไม่อยู่ใน Workdir (ADR 0018, 0032) สำหรับ Agent ที่มีฐานข้อมูลอยู่ก่อนการย้ายเจ้าของผู้เขียน supervisor SHALL ทำให้ประวัติเดิมต่อเนื่องได้โดย Owner ไม่ต้องทำอะไร
+supervisor SHALL เก็บทุก Task ของ Agent เป็นลำดับของ event ในฐานข้อมูลของ Agent ตัวนั้น และ SHALL เป็นผู้เดียวที่เขียน event ลงฐานข้อมูล worker SHALL ส่ง event ให้ supervisor ทาง IPC และ MUST NOT เขียนฐานข้อมูลเอง แต่ละ event SHALL มีเลขลำดับภายใน Task ที่เริ่มที่ 1 และเพิ่มทีละ 1 event MUST NOT ถูกแก้หรือลบ event ของ v0.1 SHALL มีข้อความของ Member พร้อมชื่อ Member, การเริ่ม Turn, ผลจาก LLM ตามที่ได้รับทุกตัวอักษรรวมถึง thinking block, การเรียก tool กับผลของ tool, การจบ Turn พร้อมเหตุผล และชื่อของ Task (`task.titled`) ฐานข้อมูล SHALL อยู่นอกโฟลเดอร์ที่ sandbox เปิดให้ Agent เขียน และไม่อยู่ใน Workdir (ADR 0018, 0032) สำหรับ Agent ที่มีฐานข้อมูลอยู่ก่อนการย้ายเจ้าของผู้เขียน supervisor SHALL ทำให้ประวัติเดิมต่อเนื่องได้โดย Owner ไม่ต้องทำอะไร
 
 #### Scenario: Turn ที่จบปกติ
 - **WHEN** Owner ส่งข้อความแล้ว LLM ตอบ
@@ -20,6 +20,10 @@ supervisor SHALL เก็บทุก Task ของ Agent เป็นลำ�
 #### Scenario: worker ตายกลาง Turn
 - **WHEN** worker ตายหลัง supervisor บันทึก event ของ Turn แล้ว
 - **THEN** event ที่บันทึกแล้วยังอยู่ใน log หลังเปิด worker ใหม่
+
+#### Scenario: ชื่อของ Task
+- **WHEN** harness ได้ชื่อของ Task จาก LLM
+- **THEN** log มี `task.titled` เป็น event ถัดไปด้วยเลขที่ต่อกัน และไม่มี event เดิมตัวใดถูกแก้
 
 ### Requirement: Owner เริ่มและคุยต่อใน Task ได้
 ข้อความถึง Agent SHALL ระบุรหัสข้อความ, รหัส Task และข้อความ ข้อความแรกของรหัส Task ใหม่ SHALL เริ่ม Task ใหม่ และข้อความต่อมาใน Task เดิม SHALL ต่อจากบทสนทนาเดิม ข้อความที่มีรหัสข้อความซ้ำ SHALL NOT ถูกเพิ่มซ้ำ Turn SHALL ทำในนามของ Member ที่ส่งข้อความนั้น
