@@ -130,6 +130,32 @@ fn a_providers_key_and_the_presets_own_headers_go_upstream() {
     );
 }
 
+/// Naming a Task is a request of its own after the first Turn that ends done
+/// (`task-title`): answered here, so each stand-in's script counts only Turns.
+struct Titled<L>(Arc<L>);
+
+#[async_trait]
+impl<L: SupervisorLlm + 'static> SupervisorLlm for Titled<L> {
+    async fn answer(&self, agent: &str, request: LlmHttpRequest) -> LlmHttpResponse {
+        if request.body.contains("You name a conversation") {
+            return LlmHttpResponse {
+                status: 200,
+                headers: vec![("content-type".into(), "application/json".into())],
+                body: json!({
+                    "content": [{ "type": "text", "text": "Fixing CI" }],
+                    "stop_reason": "end_turn",
+                })
+                .to_string(),
+            };
+        }
+        self.0.answer(agent, request).await
+    }
+}
+
+fn titled<L: SupervisorLlm + 'static>(inner: Arc<L>) -> Arc<dyn SupervisorLlm> {
+    Arc::new(Titled(inner))
+}
+
 struct CannedLlm {
     requests: Mutex<Vec<LlmHttpRequest>>,
 }
@@ -178,7 +204,7 @@ async fn an_agent_is_created_and_its_worker_is_ready_and_runs_a_task() {
     let workers = Workers::new(
         home.path().to_path_buf(),
         worker_binary(),
-        Arc::clone(&llm) as Arc<dyn SupervisorLlm>,
+        titled(Arc::clone(&llm)),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -213,9 +239,10 @@ async fn an_agent_is_created_and_its_worker_is_ready_and_runs_a_task() {
                 |message| matches!(message, FromWorker::Event { event, .. } if event.kind == kind),
             )
         };
+    // The name comes right after the first Turn that ends done (`task-title`).
     assert!(
-        until(|| ended("turn.ended"), 10_000).await,
-        "the Task never ended: {:?}",
+        until(|| ended("task.titled"), 10_000).await,
+        "the Task never ended and was named: {:?}",
         heard.lock().expect("heard")
     );
     let events = heard.lock().expect("heard").clone();
@@ -235,7 +262,8 @@ async fn an_agent_is_created_and_its_worker_is_ready_and_runs_a_task() {
             "member.message",
             "turn.started",
             "llm.message",
-            "turn.ended"
+            "turn.ended",
+            "task.titled",
         ]
     );
     assert_eq!(
@@ -343,7 +371,7 @@ async fn a_sandboxed_worker_runs_a_turn_and_its_tools_stay_in_the_agents_folder(
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::clone(&llm) as Arc<dyn SupervisorLlm>,
+        titled(Arc::clone(&llm)),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -448,7 +476,7 @@ async fn a_sandboxed_worker_runs_a_turn_with_git_and_bun() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::clone(&llm) as Arc<dyn SupervisorLlm>,
+        titled(Arc::clone(&llm)),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -593,9 +621,9 @@ async fn a_command_sees_the_agents_ports_and_can_serve_on_them() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(PortsLlm {
+        titled(Arc::new(PortsLlm {
             requests: Mutex::new(0),
-        }) as Arc<dyn SupervisorLlm>,
+        })),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -798,7 +826,7 @@ async fn a_toolchain_that_cannot_run_is_reported_and_the_worker_still_turns() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::clone(&llm) as Arc<dyn SupervisorLlm>,
+        titled(Arc::clone(&llm)),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -978,10 +1006,10 @@ async fn a_command_and_the_file_tools_cannot_reach_the_task_log() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(TrespassLlm {
+        titled(Arc::new(TrespassLlm {
             log: log.to_string_lossy().to_string(),
             requests: Mutex::new(0),
-        }) as Arc<dyn SupervisorLlm>,
+        })),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -1036,7 +1064,7 @@ async fn a_command_and_the_file_tools_cannot_reach_the_task_log() {
     // and the Turn that ran after the attempts is in it.
     let kinds: Vec<&str> = log_events
         .iter()
-        .filter(|event| event.kind != "context.usage")
+        .filter(|event| event.kind != "context.usage" && event.kind != "task.titled")
         .map(|event| event.kind.as_str())
         .collect();
     assert_eq!(
@@ -1086,7 +1114,7 @@ async fn the_events_of_a_running_turn_outlive_the_worker_that_ran_it() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(SlowLlm) as Arc<dyn SupervisorLlm>,
+        titled(Arc::new(SlowLlm)),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -1179,9 +1207,9 @@ async fn an_existing_log_keeps_its_history_after_the_move() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(CannedLlm {
+        titled(Arc::new(CannedLlm {
             requests: Mutex::new(Vec::new()),
-        }) as Arc<dyn SupervisorLlm>,
+        })),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -1234,10 +1262,10 @@ async fn a_workers_commands_inherit_the_cpu_limit_from_config() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(OneCommandLlm {
+        titled(Arc::new(OneCommandLlm {
             command: "ulimit -t".into(),
             requests: Mutex::new(0),
-        }) as Arc<dyn SupervisorLlm>,
+        })),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -1369,9 +1397,9 @@ async fn a_worker_under_its_memory_limit_keeps_running() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(CannedLlm {
+        titled(Arc::new(CannedLlm {
             requests: Mutex::new(Vec::new()),
-        }) as Arc<dyn SupervisorLlm>,
+        })),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -1427,7 +1455,7 @@ async fn a_worker_over_its_memory_limit_is_killed_and_its_turn_is_interrupted() 
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(HangingLlm) as Arc<dyn SupervisorLlm>,
+        titled(Arc::new(HangingLlm)),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -1552,9 +1580,9 @@ async fn without_a_cgroup_every_worker_runs_and_the_fallback_is_said_once() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(CannedLlm {
+        titled(Arc::new(CannedLlm {
             requests: Mutex::new(Vec::new()),
-        }) as Arc<dyn SupervisorLlm>,
+        })),
         Arc::new(|_agent, _message| {}),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
         Arc::new(|_agent, command| command),
@@ -1609,12 +1637,12 @@ async fn a_sandboxed_workers_command_runs_under_its_seccomp_filter() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(OneCommandLlm {
+        titled(Arc::new(OneCommandLlm {
             // One expression, so the Allowlist sees one command: io_uring_setup
             // and the errno it left.
             command: "python3 -c \"print((lambda c: (lambda l: (l.syscall(425, 1, c.create_string_buffer(120)), c.get_errno()))(c.CDLL(None, use_errno=True)))(__import__('ctypes')))\"".into(),
             requests: Mutex::new(0),
-        }) as Arc<dyn SupervisorLlm>,
+        })),
         Arc::new(move |_agent, message| {
             recording.lock().expect("heard").push(message);
         }),
@@ -1676,9 +1704,9 @@ async fn a_scope_that_fails_before_ready_is_not_tried_again() {
     let workers = Workers::new(
         home_path.clone(),
         worker_binary(),
-        Arc::new(CannedLlm {
+        titled(Arc::new(CannedLlm {
             requests: Mutex::new(Vec::new()),
-        }) as Arc<dyn SupervisorLlm>,
+        })),
         Arc::new(|_agent, _message| {}),
         Arc::new(move |line| logging.lock().expect("lines").push(line.to_string())),
         Arc::new(|_agent, command| command),

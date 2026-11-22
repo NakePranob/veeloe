@@ -172,6 +172,28 @@ pub(crate) fn stop(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, b
     }
 }
 
+/// The Member names the Task; the worker checks they started it.
+pub(crate) fn rename(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, body: &Value) {
+    let Some((agent, task)) = target(machine, outbox, from, body) else {
+        return;
+    };
+    let Some(title) = body.get("title").and_then(Value::as_str) else {
+        return outbox.error(from, "task.unknown");
+    };
+    let sent = machine.workers.send(
+        &agent.id,
+        ToWorker::Retitle {
+            task,
+            title: title.to_string(),
+            member: from.member.clone(),
+            reference: from.reference.clone(),
+        },
+    );
+    if !sent {
+        outbox.error(from, "agent.unavailable");
+    }
+}
+
 /// A domain Approval goes to the proxy waiting on it; a command's to the worker.
 pub(crate) fn approval_answer(
     machine: &Machine<'_>,

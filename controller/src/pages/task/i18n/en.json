@@ -124,5 +124,75 @@
     "today": "Today {{time}}",
     "yesterday": "Yesterday {{time}}",
     "date": "{{date}} {{time}}"
-  }
+  },
+  "details": {
+    "title": "Task details",
+    "untitled": "No messages yet",
+    "titleLabel": "Task name: {{title}}, tap to rename",
+    "hintOffline": "You can rename it once the Machine is online",
+    "hintFirst": "This is the first message for now. The Agent names the Task when its first Turn ends, or tap to name it yourself.",
+    "offline": "The Machine is offline. You can rename the Task and stop a Turn once it is back. What is below is the latest this device has.",
+    "stop": "Stop this Turn",
+    "open": "Open Task",
+    "agent": "Go to Agent",
+    "context": {
+      "heading": "Context",
+      "of": "of {{window}} tokens · {{percent}}",
+      "bar": "{{used}} of {{window}} tokens used ({{percent}})",
+      "threshold": "The line at 70% is where the Runtime compacts the context on its own",
+      "thresholdCompacted": "The line at 70% is where the Runtime compacts the context on its own. This Task was compacted {{count}} times",
+      "free": "Free",
+      "freeHint": "Left for the next Turn",
+      "none": "No breakdown yet. It shows once the next Turn talks to the model",
+      "footer": "A rough count from the latest Turn, about 3 characters a token. The Provider's own count may differ a little (ADR 0041)"
+    },
+    "parts": {
+      "system": {
+        "label": "System prompt",
+        "hint": "How the Runtime tells the Agent to work"
+      },
+      "memory": {
+        "label": "Memory",
+        "hint": "MEMORY.md, pinned into every Turn"
+      },
+      "tools": {
+        "label": "Tools",
+        "hint": "The tool descriptions sent every time"
+      },
+      "summary": {
+        "label": "Compacted summary",
+        "hint": "Stands in for the earlier conversation"
+      },
+      "you": {
+        "label": "Your messages",
+        "hint": "What you sent in this Task"
+      },
+      "agent": {
+        "label": "The Agent's answers",
+        "hint": "Its words and the commands it called"
+      },
+      "results": {
+        "label": "Tool results",
+        "hint": "Files it read and what commands printed"
+      }
+    },
+    "facts": {
+      "heading": "Details",
+      "agent": "Agent",
+      "machine": "Machine",
+      "started": "Started",
+      "last": "Last activity",
+      "turns": "Turns"
+    },
+    "changed": {
+      "heading": "Files the Agent changed",
+      "none": "No files changed in this Task yet",
+      "footer": "Only files changed with edit and write. What a bash command changed cannot be told from the log."
+    },
+    "sent": {
+      "heading": "Files sent",
+      "none": "The Agent has not sent a file in this Task"
+    }
+  },
+  "openDetails": "Task details"
 }

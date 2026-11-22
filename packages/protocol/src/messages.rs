@@ -20,6 +20,7 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "approval.answer" => object.map(is_approval_answer).unwrap_or(false),
         "task.message" => object.map(is_task_message).unwrap_or(false),
         "task.stop" => object.map(is_task_stop).unwrap_or(false),
+        "task.rename" => object.map(is_task_rename).unwrap_or(false),
         "task.event" => object.map(is_task_event_body).unwrap_or(false),
         "tool.output" => object.map(is_tool_output).unwrap_or(false),
         "task.events" => object.map(is_task_events).unwrap_or(false),
@@ -497,6 +498,14 @@ fn is_task_stop(object: &Map<String, Value>) -> bool {
     text(object.get("agent")).map(is_agent_id).unwrap_or(false)
         && text(object.get("id"))
             .map(|id| (1..=64).contains(&chars(id)))
+            .unwrap_or(false)
+}
+
+/// One line of 1 to 60 characters, not only spaces.
+fn is_task_rename(object: &Map<String, Value>) -> bool {
+    text(object.get("agent")).map(is_agent_id).unwrap_or(false)
+        && text(object.get("title"))
+            .map(|title| !title.contains('\n') && !title.trim().is_empty() && chars(title) <= 60)
             .unwrap_or(false)
 }
 

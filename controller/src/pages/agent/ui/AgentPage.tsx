@@ -6,7 +6,7 @@ import { APPROVAL_TIMEOUT_S_DEFAULT } from "@veeloe/protocol-ts";
 import { allowlistOf, approvalTimeoutOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { previewOf, STATUS_DOT, statusOf, useTaskSummaries } from "../../../entities/task";
+import { STATUS_DOT, statusOf, titleOf, useTaskSummaries } from "../../../entities/task";
 import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession, type Signed } from "../../../shared/keystore";
@@ -155,9 +155,10 @@ function AgentView({ agent }: { agent: AgentRow }) {
             <Row
               key={task.id}
               leading={<Dot color={STATUS_DOT[statusOf(task, online)]} size={9} />}
-              title={previewOf(task) || t("tasks.untitled")}
+              title={titleOf(task) || t("tasks.untitled")}
               detail={task.events ? t("tasks.detail", { status: status(statusOf(task, online)), when: when(task.updated_at, language, now) }) : status(statusOf(task, online))}
               href={`/tasks/${task.id}?agent=${agent.id}`}
+              onLongPress={() => router.push({ pathname: "/tasks/[task]/details", params: { task: task.id, agent: agent.id, from: "agent" } })}
             />
           ))}
         </Section>

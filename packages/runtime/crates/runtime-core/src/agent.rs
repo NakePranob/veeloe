@@ -110,6 +110,8 @@ struct State {
     max_rounds: AtomicUsize,
     context_window: AtomicUsize,
     turn: Mutex<Option<JoinHandle<()>>>,
+    /// Naming a Task after its first Turn that ends `done`: beside the queue, not in it.
+    titling: Mutex<Option<JoinHandle<()>>>,
     /// When the running Turn last did anything: an event, or command output.
     activity: Mutex<Instant>,
     /// The current quiet stretch is already written down as stalled.
@@ -205,6 +207,7 @@ impl AgentCore {
                 max_rounds: AtomicUsize::new(MAX_ROUNDS),
                 context_window: AtomicUsize::new(128_000),
                 turn: Mutex::new(None),
+                titling: Mutex::new(None),
                 activity: Mutex::new(Instant::now()),
                 stalled: AtomicBool::new(false),
                 waiting_for_person: AtomicUsize::new(0),
@@ -280,6 +283,12 @@ impl AgentCore {
                 member,
                 reference,
             } => self.stop(&task, &id, &member, &reference),
+            ToWorker::Retitle {
+                task,
+                title,
+                member,
+                reference,
+            } => self.retitle(&task, &title, &member, &reference),
             ToWorker::Approval {
                 request,
                 decision,
@@ -463,6 +472,14 @@ impl AgentCore {
             .await
             .is_err();
             *state.running.lock().expect("running") = None;
+            // The answer is already written; the name comes after it, and the
+            // next Turn does not wait for it.
+            let titling = tokio::spawn(title_task(
+                Arc::clone(&state),
+                started.clone(),
+                owner.clone(),
+            ));
+            *state.titling.lock().expect("titling") = Some(titling);
             if failed {
                 // The log says the Turn ended even when the core itself failed,
                 // so a Task never stays open because of an internal error.
@@ -524,6 +541,33 @@ impl AgentCore {
         Ok(())
     }
 
+    /// The Member who started the Task names it; anyone else, or a Task that is
+    /// not there, hears `task.not_found`, as with Stop.
+    fn retitle(
+        &self,
+        task: &str,
+        title: &str,
+        member: &str,
+        reference: &str,
+    ) -> Result<(), AgentError> {
+        let starter = self.state.log().starter_of(task)?;
+        if starter.as_deref() != Some(member) {
+            return self.refuse(member, reference, "task.not_found", Some(task));
+        }
+        let title = clean_title(title);
+        if title.is_empty() {
+            return Ok(());
+        }
+        self.state.append(
+            task,
+            member,
+            "task.titled",
+            json!({ "title": title, "member": member }),
+            None,
+        )?;
+        Ok(())
+    }
+
     fn answer_approval(
         &self,
         request: &str,
@@ -582,11 +626,16 @@ impl AgentCore {
         Ok(())
     }
 
-    /// Resolves when the Turn running now, if any, has ended.
+    /// Resolves when the Turn running now, if any, has ended, and the Task it
+    /// may have named has its name.
     pub async fn idle(&self) {
         let handle = self.state.turn.lock().expect("turn").take();
         if let Some(handle) = handle {
             let _ = handle.await;
+        }
+        let titling = self.state.titling.lock().expect("titling").take();
+        if let Some(titling) = titling {
+            let _ = titling.await;
         }
     }
 
@@ -662,6 +711,7 @@ async fn run_turn(
                 "tokens": rough_tokens(&request.messages),
                 "window": window,
                 "threshold": window * 70 / 100,
+                "parts": context_parts(&request),
             }),
             None,
         );
@@ -958,6 +1008,172 @@ async fn flush_memory(state: &Arc<State>, task: &str, transcript: &str) -> Optio
     // The prompt asks for 400 characters; take exactly that even when it forgets.
     let answer: String = answer.chars().take(FLUSH_MAX_CHARS).collect();
     crate::memory::write_memory(&workdir, &answer, crate::memory::Mode::Append).ok()
+}
+
+/// How long a Task's name may be: code holds it, whatever the model writes.
+const TITLE_MAX_CHARS: usize = 60;
+/// How much of each side of the conversation the namer sees.
+const TITLE_SOURCE_CHARS: usize = 2_000;
+const TITLE_SYSTEM: &str =
+    "You name a conversation between a person and an AI Agent so the person can \
+     tell it apart in a list. Reply with only the name: one line, at most 60 characters, in the \
+     language the person wrote in, without quotes.";
+
+/// The Turn that just ended is the Task's first to end `done`: the one moment a
+/// Task is named. Read from the log, a failed try is never retried and needs no
+/// memory of its own. A Task the Member already named keeps their name.
+fn names_now(events: &[TaskEvent]) -> bool {
+    let done = |event: &TaskEvent| {
+        event.kind == "turn.ended"
+            && event.body.get("reason").and_then(Value::as_str) == Some("done")
+    };
+    events.last().is_some_and(done)
+        && events.iter().filter(|event| done(event)).count() == 1
+        && !named(events)
+}
+
+fn named(events: &[TaskEvent]) -> bool {
+    events.iter().any(|event| event.kind == "task.titled")
+}
+
+/// The model's answer as a name: its first line, without the quotes models like
+/// to add, cut to the cap.
+fn clean_title(answer: &str) -> String {
+    let line = answer.trim().lines().next().unwrap_or_default();
+    let line = line
+        .trim()
+        .trim_matches(|c| matches!(c, '"' | '\'' | '`' | '“' | '”' | '‘' | '’' | '«' | '»'))
+        .trim();
+    line.chars()
+        .take(TITLE_MAX_CHARS)
+        .collect::<String>()
+        .trim_end()
+        .to_string()
+}
+
+/// Name the Task from its first message and the answer that ended its first
+/// `done` Turn. A Provider failure, a spent Budget or an empty answer leave it
+/// unnamed; nothing here can fail a Turn.
+async fn title_task(state: Arc<State>, task: String, starter: String) {
+    let Ok(events) = state.log().events(&task, 0) else {
+        return;
+    };
+    if !names_now(&events) {
+        return;
+    }
+    let asked = events
+        .iter()
+        .find(|event| event.kind == "member.message")
+        .and_then(|event| event.body.get("text"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let answered = events
+        .iter()
+        .rev()
+        .find(|event| event.kind == "llm.message")
+        .and_then(|event| event.body.get("content"))
+        .and_then(Value::as_array)
+        .map(|content| text_content(content))
+        .unwrap_or_default();
+    let cut = |text: &str| text.chars().take(TITLE_SOURCE_CHARS).collect::<String>();
+    let request = LlmRequest {
+        task: task.clone(),
+        system: TITLE_SYSTEM.into(),
+        messages: vec![LlmMessage {
+            role: "user".into(),
+            content: vec![json!({
+                "type": "text",
+                "text": format!("Person:\n{}\n\nAgent:\n{}", cut(asked), cut(&answered)),
+            })],
+        }],
+        tools: Vec::new(),
+    };
+    let Ok(reply) = state.llm.send(request, &Cancel::new()).await else {
+        return;
+    };
+    let title = clean_title(&text_content(&reply.content));
+    // The Member may have named it while the model was thinking: theirs stays.
+    let renamed = state
+        .log()
+        .events(&task, 0)
+        .map(|events| named(&events))
+        .unwrap_or(true);
+    if !title.is_empty() && !renamed {
+        let _ = state.append(
+            &task,
+            &starter,
+            "task.titled",
+            json!({ "title": title }),
+            None,
+        );
+    }
+}
+
+const MEMORY_MARK: &str = "\n\nMEMORY.md as it is now:\n";
+const SUMMARY_MARK: &str = "Summary of the earlier part of this Task:";
+
+/// What each part of a request weighs, by the same rough count as `tokens`
+/// (ADR 0041), so the Controller can show where the context goes. `tokens`
+/// stays the measure compaction uses; these also count the system prompt, the
+/// tool definitions and tool calls and results. A part that weighs nothing is
+/// left out.
+fn context_parts(request: &LlmRequest) -> Value {
+    let (instructions, memory) = match request.system.split_once(MEMORY_MARK) {
+        Some((before, after)) => (before, after),
+        None => (request.system.as_str(), ""),
+    };
+    let tools: String = request
+        .tools
+        .iter()
+        .map(|tool| format!("{}{}{}", tool.name, tool.description, tool.input_schema))
+        .collect();
+    let mut parts = [
+        ("system", rough_text_tokens(instructions)),
+        ("memory", rough_text_tokens(memory)),
+        ("tools", rough_text_tokens(&tools)),
+        ("summary", 0),
+        ("you", 0),
+        ("agent", 0),
+        ("results", 0),
+    ];
+    let mut add = |part: &str, text: &str| {
+        if let Some(slot) = parts.iter_mut().find(|(name, _)| *name == part) {
+            slot.1 += rough_text_tokens(text);
+        }
+    };
+    for message in &request.messages {
+        for block in &message.content {
+            let kind = block
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let text = block
+                .get("text")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            match (message.role.as_str(), kind) {
+                ("user", "text") if text.starts_with(SUMMARY_MARK) => add("summary", text),
+                ("user", "text") => add("you", text),
+                (_, "tool_result") => add(
+                    "results",
+                    &block
+                        .get("content")
+                        .map(Value::to_string)
+                        .unwrap_or_default(),
+                ),
+                ("assistant", "tool_use") => add("agent", &block.to_string()),
+                ("assistant", _) => add("agent", text),
+                _ => add("you", &block.to_string()),
+            }
+        }
+    }
+    Value::Object(
+        parts
+            .into_iter()
+            .filter(|(_, tokens)| *tokens > 0)
+            .map(|(name, tokens)| (name.to_string(), json!(tokens)))
+            .collect(),
+    )
 }
 
 fn rough_tokens(messages: &[LlmMessage]) -> usize {
@@ -1298,6 +1514,79 @@ mod tests {
             at: 0,
             body: json!({}),
         }
+    }
+
+    fn ended(seq: i64, reason: &str) -> TaskEvent {
+        TaskEvent {
+            body: json!({ "reason": reason }),
+            ..event(seq, "turn.ended")
+        }
+    }
+
+    #[test]
+    fn a_task_is_named_once_after_its_first_turn_that_ends_done() {
+        assert!(names_now(&[event(1, "member.message"), ended(2, "done")]));
+        // A second done Turn: the first one already named it, or tried to.
+        assert!(!names_now(&[ended(2, "done"), ended(5, "done")]));
+        // The first Turn was stopped; the next done Turn names it.
+        assert!(!names_now(&[ended(2, "stopped")]));
+        assert!(names_now(&[ended(2, "stopped"), ended(5, "done")]));
+        assert!(!names_now(&[ended(2, "error")]));
+        // Only right after that Turn, not from a later event.
+        assert!(!names_now(&[ended(2, "done"), event(3, "member.message")]));
+    }
+
+    #[test]
+    fn a_request_is_counted_part_by_part_and_empty_parts_are_left_out() {
+        let request = LlmRequest {
+            task: "t1".into(),
+            system: format!("{}{MEMORY_MARK}{}", "s".repeat(30), "m".repeat(9)),
+            messages: vec![
+                LlmMessage {
+                    role: "user".into(),
+                    content: vec![
+                        json!({ "type": "text", "text": format!("{SUMMARY_MARK}\n{}", "x".repeat(20)) }),
+                    ],
+                },
+                LlmMessage {
+                    role: "user".into(),
+                    content: vec![json!({ "type": "text", "text": "hello" })],
+                },
+                LlmMessage {
+                    role: "assistant".into(),
+                    content: vec![json!({ "type": "text", "text": "abcdef" })],
+                },
+                LlmMessage {
+                    role: "user".into(),
+                    content: vec![
+                        json!({ "type": "tool_result", "tool_use_id": "tu1", "content": "123456789" }),
+                    ],
+                },
+            ],
+            tools: Vec::new(),
+        };
+        let parts = context_parts(&request);
+        assert_eq!(parts["system"], 10);
+        assert_eq!(parts["memory"], 3);
+        assert_eq!(parts["you"], 2);
+        assert_eq!(parts["agent"], 2);
+        assert!(parts["summary"].as_u64().is_some_and(|tokens| tokens > 6));
+        assert!(parts["results"].as_u64().is_some_and(|tokens| tokens >= 3));
+        assert!(parts.get("tools").is_none());
+    }
+
+    #[test]
+    fn a_name_is_one_line_without_quotes_and_within_the_cap() {
+        assert_eq!(
+            clean_title("  \"Fix the red CI build\"\nBecause..."),
+            "Fix the red CI build"
+        );
+        assert_eq!(clean_title("“แก้ build บน CI ที่แดง”"), "แก้ build บน CI ที่แดง");
+        assert_eq!(
+            clean_title(&"ก".repeat(80)).chars().count(),
+            TITLE_MAX_CHARS
+        );
+        assert_eq!(clean_title("  \n "), "");
     }
 
     #[test]

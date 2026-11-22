@@ -43,6 +43,15 @@ struct FakeLlm {
     replies: Mutex<VecDeque<Result<LlmReply, LlmError>>>,
     requests: Mutex<Vec<LlmRequest>>,
     gate: Mutex<Option<watch::Receiver<bool>>>,
+    /// Naming a Task is its own request beside the Turn's: it is answered from
+    /// here and kept out of `replies` and `requests`, so a test about a Turn
+    /// sees only that Turn. `None` fails it, which leaves the log as it was.
+    title: Mutex<Option<Result<LlmReply, LlmError>>>,
+    titles: Mutex<Vec<LlmRequest>>,
+}
+
+fn is_title(request: &LlmRequest) -> bool {
+    request.system.starts_with("You name a conversation")
 }
 
 impl FakeLlm {
@@ -61,6 +70,15 @@ impl FakeLlm {
 #[async_trait]
 impl Llm for FakeLlm {
     async fn send(&self, request: LlmRequest, _cancel: &Cancel) -> Result<LlmReply, LlmError> {
+        if is_title(&request) {
+            self.titles.lock().expect("titles").push(request);
+            return self
+                .title
+                .lock()
+                .expect("title")
+                .clone()
+                .unwrap_or_else(|| Err(LlmError::Failed("unnamed".into())));
+        }
         self.requests.lock().expect("requests").push(request);
         let gate = self.gate.lock().expect("gate").clone();
         if let Some(mut gate) = gate {
@@ -288,7 +306,7 @@ fn stop_in(task: &str, id: &str) -> ToWorker {
 fn kinds(events: &[TaskEvent]) -> Vec<String> {
     events
         .iter()
-        .filter(|event| event.kind != "context.usage")
+        .filter(|event| event.kind != "context.usage" && event.kind != "task.titled")
         .map(|event| event.kind.clone())
         .collect()
 }
@@ -355,7 +373,7 @@ async fn a_message_starts_a_task_and_a_turn_and_every_event_reaches_the_member_w
     );
     let seqs: Vec<i64> = events
         .iter()
-        .filter(|event| event.kind != "context.usage")
+        .filter(|event| event.kind != "context.usage" && event.kind != "task.titled")
         .map(|event| event.seq)
         .collect();
     assert_eq!(seqs, vec![1, 2, 4, 5]);
@@ -367,6 +385,148 @@ async fn a_message_starts_a_task_and_a_turn_and_every_event_reaches_the_member_w
         events.last().expect("last").body,
         json!({ "reason": "done" })
     );
+}
+
+fn titles(events: &[TaskEvent]) -> Vec<Value> {
+    events
+        .iter()
+        .filter(|event| event.kind == "task.titled")
+        .map(|event| event.body.clone())
+        .collect()
+}
+
+#[tokio::test]
+async fn the_first_turn_that_ends_done_names_the_task_from_its_first_message_and_answer() {
+    let harness = setup(Setup {
+        replies: vec![Ok(text("CI แดงเพราะ lint"))],
+        ..Setup::default()
+    });
+    *harness.llm.title.lock().expect("title") = Some(Ok(text("\"ดูว่าทำไม CI แดง\"\nเพราะ...")));
+    harness
+        .core
+        .receive(message("ช่วยดูว่าทำไม build บน CI แดง"))
+        .expect("receive");
+    harness.core.idle().await;
+
+    let events = harness.core.events("t1").expect("events");
+    assert_eq!(events.last().expect("last").kind, "task.titled");
+    assert_eq!(titles(&events), vec![json!({ "title": "ดูว่าทำไม CI แดง" })]);
+    let asked = harness.llm.titles.lock().expect("titles").clone();
+    assert_eq!(asked.len(), 1);
+    assert!(asked[0].tools.is_empty());
+    assert_eq!(asked[0].task, "t1");
+    let text = asked[0].messages[0].content[0]["text"]
+        .as_str()
+        .expect("text");
+    assert!(text.contains("ช่วยดูว่าทำไม build บน CI แดง") && text.contains("CI แดงเพราะ lint"));
+}
+
+#[tokio::test]
+async fn a_name_that_fails_leaves_the_turn_done_and_is_not_asked_again() {
+    let harness = setup(Setup::default());
+    *harness.llm.title.lock().expect("title") =
+        Some(Err(LlmError::Failed("provider.unreachable".into())));
+    harness.core.receive(message("one")).expect("receive");
+    harness.core.idle().await;
+    *harness.llm.title.lock().expect("title") = Some(Ok(text("Too late")));
+    harness.core.receive(message("two")).expect("receive");
+    harness.core.idle().await;
+
+    let events = harness.core.events("t1").expect("events");
+    assert!(titles(&events).is_empty());
+    let ends: Vec<&Value> = events
+        .iter()
+        .filter(|e| e.kind == "turn.ended")
+        .map(|e| &e.body)
+        .collect();
+    assert_eq!(
+        ends,
+        vec![&json!({ "reason": "done" }), &json!({ "reason": "done" })]
+    );
+    assert_eq!(harness.llm.titles.lock().expect("titles").len(), 1);
+}
+
+#[tokio::test]
+async fn a_named_task_is_not_named_again_and_a_failed_first_turn_waits_for_a_done_one() {
+    let harness = setup(Setup {
+        replies: vec![Err(LlmError::Failed("provider.unreachable".into()))],
+        ..Setup::default()
+    });
+    *harness.llm.title.lock().expect("title") = Some(Ok(text("Fixing CI")));
+    harness.core.receive(message("one")).expect("receive");
+    harness.core.idle().await;
+    assert!(titles(&harness.core.events("t1").expect("events")).is_empty());
+
+    harness.core.receive(message("two")).expect("receive");
+    harness.core.idle().await;
+    harness.core.receive(message("three")).expect("receive");
+    harness.core.idle().await;
+
+    let events = harness.core.events("t1").expect("events");
+    assert_eq!(titles(&events), vec![json!({ "title": "Fixing CI" })]);
+    assert_eq!(harness.llm.titles.lock().expect("titles").len(), 1);
+}
+
+fn retitle(title: &str, member: &str) -> ToWorker {
+    ToWorker::Retitle {
+        task: "t1".into(),
+        title: title.into(),
+        member: member.into(),
+        reference: format!("sig-{title}"),
+    }
+}
+
+#[tokio::test]
+async fn the_member_who_started_a_task_names_it_and_no_one_else_can() {
+    let harness = setup(Setup::default());
+    harness.core.receive(message("hello")).expect("receive");
+    harness.core.idle().await;
+    harness.link.take();
+
+    harness
+        .core
+        .receive(retitle("  ทบทวน git  ", "m_owner"))
+        .expect("retitle");
+    harness
+        .core
+        .receive(retitle("Mine now", "m_other"))
+        .expect("retitle");
+    harness.core.idle().await;
+
+    let events = harness.core.events("t1").expect("events");
+    assert_eq!(
+        titles(&events),
+        vec![json!({ "title": "ทบทวน git", "member": "m_owner" })]
+    );
+    let codes: Vec<String> = harness
+        .link
+        .take()
+        .into_iter()
+        .filter_map(|message| match message {
+            FromWorker::Error { code, .. } => Some(code),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(codes, vec!["task.not_found"]);
+}
+
+#[tokio::test]
+async fn a_task_the_member_named_before_its_first_turn_ended_keeps_their_name() {
+    let harness = setup(Setup::default());
+    *harness.llm.title.lock().expect("title") = Some(Ok(text("Fixing CI")));
+    harness.core.receive(message("hello")).expect("receive");
+    harness
+        .core
+        .receive(retitle("My name", "m_owner"))
+        .expect("retitle");
+    harness.core.idle().await;
+
+    let events = harness.core.events("t1").expect("events");
+    assert_eq!(
+        titles(&events),
+        vec![json!({ "title": "My name", "member": "m_owner" })]
+    );
+    assert!(harness.llm.titles.lock().expect("titles").is_empty());
 }
 
 #[tokio::test]

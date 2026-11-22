@@ -65,7 +65,10 @@ export {
   TaskListBodySchema,
   TaskListedBodySchema,
   TaskMessageBodySchema,
+  TaskRenameBodySchema,
   TaskStopBodySchema,
+  TASK_TITLE_MAX,
+  TaskTitled,
   ToolOutputBodySchema,
   TaskSyncBodySchema,
   type TaskEvent,
@@ -73,6 +76,7 @@ export {
   type TaskEventsBody,
   type TaskListedBody,
   type TaskMessageBody,
+  type TaskRenameBody,
   type TaskStopBody,
   type TaskSyncBody,
 } from "./messages/task";

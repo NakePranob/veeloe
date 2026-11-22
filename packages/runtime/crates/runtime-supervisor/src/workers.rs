@@ -860,6 +860,12 @@ fn failed(message: &ToWorker) -> Option<(String, String, Option<String>)> {
             member,
             reference,
             ..
+        }
+        | ToWorker::Retitle {
+            task,
+            member,
+            reference,
+            ..
         } => Some((member.clone(), reference.clone(), Some(task.clone()))),
         ToWorker::Approval {
             member, reference, ..

@@ -71,6 +71,16 @@ export function shuffleLook(others: Look[], random = Math.random): Look {
   }
 }
 
+/** A colour taken toward black: 0 is the colour, 1 is black. A part of a Task's context, darker than the Agent's colour. */
+export function shade(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const drop = (v: number) =>
+    Math.round(v * (1 - amount))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${drop(n >> 16)}${drop((n >> 8) & 255)}${drop(n & 255)}`;
+}
+
 /** A colour lifted toward white: 0 is the colour, 1 is white. The Character page's stage and a picked tile. */
 export function tint(hex: string, amount: number): string {
   const n = parseInt(hex.slice(1), 16);

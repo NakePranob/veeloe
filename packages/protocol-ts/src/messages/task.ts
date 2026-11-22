@@ -39,6 +39,18 @@ export const TaskStopBodySchema = z.looseObject({
 });
 export type TaskStopBody = z.infer<typeof TaskStopBodySchema>;
 
+/** A Task's name: one line of 1 to 60 characters (code points, as the Rust side counts them), not only spaces. */
+export const TASK_TITLE_MAX = 60;
+const title = z.string().refine((text) => !text.includes("\n") && text.trim() !== "" && [...text].length <= TASK_TITLE_MAX, "one line of 1 to 60 characters");
+
+/**
+ * Controller → Machine, with the Task's id in the header: the Member who started
+ * the Task names it. The Machine appends `task.titled { title, member }`, which
+ * stays the name until the next one; a resend only names it the same again.
+ */
+export const TaskRenameBodySchema = z.looseObject({ agent, title });
+export type TaskRenameBody = z.infer<typeof TaskRenameBodySchema>;
+
 /**
  * One event of a Task's log (ADR 0018). `kind` stays open: a newer Runtime adds
  * kinds, and a Controller skips the ones it does not know (ADR 0023).
@@ -113,3 +125,10 @@ export const TaskEventKind = {
   /** `{ request, member, decision, message? }`: who answered and how. */
   ApprovalAnswered: "approval.answered",
 } as const;
+
+/**
+ * `{ title }`: the Task's name, set after its first Turn that ends `done`; the
+ * latest one is the name. Kept out of `TaskEventKind` on purpose: that set is what
+ * a Task's status and Mood are worked out from, and a name says nothing about either.
+ */
+export const TaskTitled = "task.titled";

@@ -209,6 +209,7 @@ pub async fn dispatch(
         "task.message" => task_message::message(machine, outbox, from, body),
         "task.sync" => task_message::sync(machine, outbox, from, body),
         "task.stop" => task_message::stop(machine, outbox, from, body),
+        "task.rename" => task_message::rename(machine, outbox, from, body),
         "approval.answer" => task_message::approval_answer(machine, outbox, from, body),
         // An unknown type still names its Agent and Task, and hears
         // `agent.unknown` or `task.unknown` when either is missing.

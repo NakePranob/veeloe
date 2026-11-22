@@ -2,7 +2,23 @@ import { Database as Sqlite } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
-import { addPendingMessage, failPendingMessage, isBudgetOut, latestOf, LIST_TASK_SUMMARIES, markPendingSent, saveTaskEvents, statusOf, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskRow, type TaskSummary } from "./tasks";
+import {
+  addPendingMessage,
+  failPendingMessage,
+  isBudgetOut,
+  latestOf,
+  LIST_TASK_SUMMARIES,
+  markPendingSent,
+  saveTaskEvents,
+  statusOf,
+  TASK_TOPIC,
+  titleOf,
+  titleOfEvents,
+  type PendingRow,
+  type TaskEventRow,
+  type TaskRow,
+  type TaskSummary,
+} from "./tasks";
 
 // The same statements as expo-sqlite, over Bun's own SQLite.
 function connection(sqlite: Sqlite): Connection {
@@ -85,6 +101,37 @@ test("a summary's status comes from its latest known event: failed, still runnin
   await saveTaskEvents(database, where, [event(4, "turn.started"), event(5, "turn.ended", { reason: "done" }), event(6, "future.thing")]);
   expect(await status()).toBe("done");
   expect(statusOf(undefined, false)).toBe("offline");
+  // A name after the Turn says nothing about what the Task is doing.
+  await saveTaskEvents(database, where, [event(7, "task.titled", { title: "Fixing CI" })]);
+  expect(await status()).toBe("done");
+});
+
+test("a Task's title is its latest name, else its first message's first line, and stays put as the Task goes on", async () => {
+  const database = await open();
+  const title = async () => titleOf((await database.query<TaskSummary>(LIST_TASK_SUMMARIES))[0]!);
+  await saveTaskEvents(database, where, [event(1, "turn.started")]);
+  expect(await title()).toBe("");
+  await saveTaskEvents(database, where, [event(2, "member.message", { id: "m1", text: "ช่วยดู CI\nมันแดง" }), event(3, "llm.message", { content: [{ type: "text", text: "ได้" }] })]);
+  expect(await title()).toBe("ช่วยดู CI");
+  await saveTaskEvents(database, where, [event(4, "task.titled", { title: "ดูว่าทำไม CI แดง" }), event(5, "member.message", { id: "m2", text: "อีกเรื่อง" })]);
+  expect(await title()).toBe("ดูว่าทำไม CI แดง");
+  await saveTaskEvents(database, where, [event(6, "task.titled", { title: "CI กับ lint" })]);
+  expect(await title()).toBe("CI กับ lint");
+  const updated = async () => (await database.query<TaskSummary>(LIST_TASK_SUMMARIES))[0]?.updated_at;
+  const before = await updated();
+  await saveTaskEvents(database, where, [{ ...event(7, "task.titled", { title: "ชื่อใหม่", member: "m1" }), at: 9_999_999_999_999 }]);
+  expect(await updated()).toBe(before);
+  expect(titleOf({ title_body: "not json", first_body: null })).toBe("");
+  expect(titleOf({ title_body: JSON.stringify({ title: 3 }), first_body: JSON.stringify({ text: "hi" }) })).toBe("hi");
+});
+
+test("a Task's page reads the same name from its events: the latest one, or the first message until then", () => {
+  const row = (kind: string, body: object) => ({ kind, body: JSON.stringify(body) });
+  const first = row("member.message", { text: "what is git rebase" });
+  expect(titleOfEvents([])).toBe("");
+  expect(titleOfEvents([first, row("member.message", { text: "Thanks" })])).toBe("what is git rebase");
+  expect(titleOfEvents([first, row("task.titled", { title: "Understanding git rebase" }), row("member.message", { text: "Thanks" })])).toBe("Understanding git rebase");
+  expect(titleOfEvents([first, row("task.titled", { title: "Old" }), row("task.titled", { title: "New" })])).toBe("New");
 });
 
 test("an error naming the envelope marks only that message as failed", async () => {

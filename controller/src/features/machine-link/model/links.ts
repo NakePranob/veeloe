@@ -408,6 +408,14 @@ export function createMachineLinks({
     },
 
     /**
+     * Names this Task (`task.rename`). The name shows once the Machine's `task.titled`
+     * lands. The sig, or null when the Hub is not connected and nothing went.
+     */
+    renameTask(machine: Machine, { agent, task, title }: { agent: string; task: string; title: string }) {
+      return sendTo(machine, "other", { type: "task.rename", task, body: { agent, title } });
+    },
+
+    /**
      * The answer to one waiting Approval. Nothing shows as answered until the
      * Machine's `approval.answered` event says so (ADR 0006). The sig, or null
      * when the Hub is not connected and nothing went.

@@ -1,4 +1,4 @@
-import { TaskEventKind, type TaskEvent } from "@veeloe/protocol-ts";
+import { TaskEventKind, TaskTitled, type TaskEvent } from "@veeloe/protocol-ts";
 import type { Database } from "../../../shared/db";
 import { plainFirstLine } from "../../../shared/lib";
 
@@ -14,7 +14,8 @@ export type PendingRow = { id: string; task_id: string; text: string; created_at
  * where the next sync starts. A Member's message coming back clears its pending copy.
  */
 export function saveTaskEvents(database: Database, { task, agent, machine }: { task: string; agent: string; machine: string }, events: TaskEvent[]) {
-  const latest = events.reduce((at, e) => Math.max(at, e.at), 0);
+  // A new name is not activity: it leaves the Task where it sits in the Inbox and on the Agent page.
+  const latest = events.reduce((at, e) => (e.kind === TaskTitled ? at : Math.max(at, e.at)), 0);
   return database.write([TASK_TOPIC], async (transaction) => {
     await transaction.run("INSERT OR IGNORE INTO task (id, agent_id, machine_id, updated_at) VALUES (?, ?, ?, ?)", [task, agent, machine, latest]);
     for (const event of events) {
@@ -89,15 +90,17 @@ const KNOWN_SQL = KNOWN.map((kind) => `'${kind}'`).join(", ");
 /** The latest event of a kind this build knows: what a Task is doing, and how its Character carries itself. */
 export type Latest = { latest_kind: string | null; latest_body: string | null };
 
-/** A Task as lists show it: when it last moved, what it is doing, and its latest words. */
-export type TaskSummary = TaskRow & Latest & { events: number; last_kind: string | null; last_body: string | null };
+/** A Task as lists show it: when it last moved, what it is doing, its latest words, its name and its first message. */
+export type TaskSummary = TaskRow & Latest & { events: number; last_kind: string | null; last_body: string | null; title_body: string | null; first_body: string | null };
 
 export const LIST_TASK_SUMMARIES = `SELECT t.*,
   (SELECT count(*) FROM task_event WHERE task_id = t.id) AS events,
   (SELECT kind FROM task_event WHERE task_id = t.id AND kind IN (${KNOWN_SQL}) ORDER BY seq DESC LIMIT 1) AS latest_kind,
   (SELECT body FROM task_event WHERE task_id = t.id AND kind IN (${KNOWN_SQL}) ORDER BY seq DESC LIMIT 1) AS latest_body,
   (SELECT kind FROM task_event WHERE task_id = t.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1) AS last_kind,
-  (SELECT body FROM task_event WHERE task_id = t.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1) AS last_body
+  (SELECT body FROM task_event WHERE task_id = t.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1) AS last_body,
+  (SELECT body FROM task_event WHERE task_id = t.id AND kind = '${TaskTitled}' ORDER BY seq DESC LIMIT 1) AS title_body,
+  (SELECT body FROM task_event WHERE task_id = t.id AND kind = 'member.message' ORDER BY seq LIMIT 1) AS first_body
   FROM task t ORDER BY t.updated_at DESC`;
 
 /** The latest words in a Task, as one plain line: the Member's, or the first line of the Agent's text. */
@@ -116,6 +119,26 @@ export function previewOf(summary: Pick<TaskSummary, "last_kind" | "last_body">)
   } catch {
     return "";
   }
+}
+
+/** What a Task is about: the name the Runtime gave it, or its first message's first line until then. Unlike `previewOf`, it stays put as the Task goes on. */
+export function titleOf(summary: Pick<TaskSummary, "title_body" | "first_body">): string {
+  const field = (body: string | null, key: "title" | "text") => {
+    try {
+      const value = (JSON.parse(body ?? "null") as Record<string, unknown> | null)?.[key];
+      return typeof value === "string" ? (value.trim().split("\n")[0] ?? "") : "";
+    } catch {
+      return "";
+    }
+  };
+  return field(summary.title_body, "title") || field(summary.first_body, "text");
+}
+
+/** `titleOf` from a Task's events in order, for its own page. */
+export function titleOfEvents(events: readonly Pick<TaskEventRow, "kind" | "body">[]): string {
+  const titled = events.filter((event) => event.kind === TaskTitled);
+  const first = events.find((event) => event.kind === "member.message");
+  return titleOf({ title_body: titled[titled.length - 1]?.body ?? null, first_body: first?.body ?? null });
 }
 
 /** The same as a summary's, from a Task's events in order, for the screen that already has them all. */

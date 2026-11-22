@@ -342,6 +342,12 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
             "turn.ended"
         ]
     );
+    // The first Turn that ends done names the Task, right after it.
+    let named = body_of(&controller.next().await);
+    assert_eq!(named["kind"], "task.titled");
+    assert!(named["body"]["title"]
+        .as_str()
+        .is_some_and(|title| !title.is_empty()));
 
     // A sync is answered with the events after a number.
     controller
@@ -355,8 +361,8 @@ async fn a_members_message_a_sync_a_list_and_a_stop_reach_the_worker_and_are_ans
     assert_eq!(answer["type"], "task.events");
     let body = body_of(&answer);
     assert_eq!(body["agent"], "a1");
-    // context.usage, llm.message and turn.ended come after the first two.
-    assert_eq!(body["events"].as_array().expect("events").len(), 3);
+    // context.usage, llm.message, turn.ended and task.titled come after the first two.
+    assert_eq!(body["events"].as_array().expect("events").len(), 4);
 
     // A list names the Task this Member started.
     controller.send("task.list", None, json!({})).await;

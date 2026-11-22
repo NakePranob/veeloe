@@ -655,6 +655,59 @@
       "valid": false
     },
     {
+      "name": "name a Task",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "ทบทวน git rebase"
+      },
+      "valid": true
+    },
+    {
+      "name": "a Task's name of 60 characters, emoji counted once",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "กกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกก🚀"
+      },
+      "valid": true
+    },
+    {
+      "name": "a Task's name over 60 characters",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "กกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกก"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Task's name of only spaces",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "   "
+      },
+      "valid": false
+    },
+    {
+      "name": "a Task's name over two lines",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "CI\nแดง"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Task's name with no Agent",
+      "type": "task.rename",
+      "body": {
+        "title": "CI"
+      },
+      "valid": false
+    },
+    {
       "name": "an event",
       "type": "task.event",
       "body": {

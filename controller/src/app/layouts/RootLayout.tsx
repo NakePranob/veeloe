@@ -102,8 +102,10 @@ export function RootLayout() {
                   <Stack.Screen name="index" options={split ? { headerShown: false } : {}} />
                   {/* In split view the inbox is already beside the Task, so there is nothing to go back to.
                       Web ignores headerBackVisible when a deep link anchors the inbox underneath, hence headerLeft. */}
-                  <Stack.Screen name="tasks/[task]" options={split ? { headerBackVisible: false, headerLeft: () => null } : {}} />
+                  <Stack.Screen name="tasks/[task]/index" options={split ? { headerBackVisible: false, headerLeft: () => null } : {}} />
                   <Stack.Screen name="agents/[agent]/character" options={sheet} />
+                  {/* The Task details sheet has no header: the grabber and the swipe close it, as the board draws it. */}
+                  <Stack.Screen name="tasks/[task]/details" options={{ ...sheet, headerShown: false, sheetGrabberVisible: true }} />
                 </Stack>
               </View>
             </View>

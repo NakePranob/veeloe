@@ -327,7 +327,12 @@ async fn a_turn_runs_the_tool_loop_through_the_llm_adapter_and_ends_with_done() 
             "turn.ended",
         ]
     );
-    let requests = transport.requests();
+    // The Task's name is asked for after the Turn; it is not part of the tool loop.
+    let requests: Vec<_> = transport
+        .requests()
+        .into_iter()
+        .filter(|request| !request.body.contains("You name a conversation"))
+        .collect();
     assert_eq!(requests.len(), 2);
     // The tool result goes back in the second request, as the Messages API wants it.
     let body: Value = serde_json::from_str(&requests[1].body).expect("json");

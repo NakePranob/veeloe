@@ -4,8 +4,10 @@ import type { Server } from "bun";
 export type FakeProvider = {
   url: string;
   server: Server<undefined>;
-  /** Every request it got, headers lower-cased. */
+  /** Every request it got, headers lower-cased, except the ones naming a Task. */
   requests: { method: string; path: string; headers: Record<string, string>; body: unknown }[];
+  /** The requests that name a Task after its first done Turn: answered "Fixing CI", without `reply`, so a test's canned Turn answers stay in step. */
+  titles: { headers: Record<string, string>; body: unknown }[];
   /** What `POST /v1/messages` answers; the default says hello. A Promise lets a test act before the answer lands. */
   reply: (body: { model?: string; messages?: unknown[]; stream?: boolean }) => Response | Promise<Response>;
 };
@@ -14,7 +16,7 @@ export const FAKE_KEY = "test-provider-key";
 
 /** Takes FAKE_KEY in the header `auth` names, as Anthropic (x-api-key) or a gateway (bearer) would. */
 export function fakeProvider({ auth = "x-api-key" as "x-api-key" | "bearer" } = {}): FakeProvider {
-  const provider = { requests: [] } as unknown as FakeProvider;
+  const provider = { requests: [], titles: [] } as unknown as FakeProvider;
   provider.reply = (body) => (body?.stream ? sse([{ type: "text", text: "hello" }]) : Response.json(message([{ type: "text", text: "hello" }])));
   provider.server = Bun.serve({
     port: 0,
@@ -23,6 +25,10 @@ export function fakeProvider({ auth = "x-api-key" as "x-api-key" | "bearer" } = 
       const path = new URL(req.url).pathname;
       const headers = Object.fromEntries(req.headers);
       const body = req.method === "POST" ? await req.json().catch(() => null) : null;
+      if (isTitle(body)) {
+        provider.titles.push({ headers, body });
+        return body.stream ? sse([{ type: "text", text: "Fixing CI" }]) : Response.json(message([{ type: "text", text: "Fixing CI" }]));
+      }
       provider.requests.push({ method: req.method, path, headers, body });
       const given = auth === "bearer" ? headers.authorization : headers["x-api-key"];
       const want = auth === "bearer" ? `Bearer ${FAKE_KEY}` : FAKE_KEY;
@@ -34,6 +40,12 @@ export function fakeProvider({ auth = "x-api-key" as "x-api-key" | "bearer" } = 
   });
   provider.url = `http://127.0.0.1:${provider.server.port}`;
   return provider;
+}
+
+/** The request the Runtime sends to name a Task, told apart by its system prompt. */
+function isTitle(body: unknown): body is { stream?: boolean } {
+  const system = (body as { system?: unknown } | null)?.system;
+  return typeof system === "string" && system.startsWith("You name a conversation");
 }
 
 /** A whole Messages API answer around `content`. */

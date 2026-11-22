@@ -95,6 +95,8 @@ interface RowProps {
   leading?: ReactNode;
   iconColor?: keyof Colors;
   href?: Href;
+  // A long press on a row with an href, such as a Task row opening its details.
+  onLongPress?: () => void;
   onPress?: () => void;
   destructive?: boolean;
   mono?: boolean;
@@ -110,7 +112,7 @@ interface RowProps {
 }
 
 // One line in a section. It opens something when it has an href or onPress.
-export function Row({ title, detail, value, icon, leading, iconColor, href, onPress, destructive, mono, accessory, disabled, add, expanded, selected }: RowProps) {
+export function Row({ title, detail, value, icon, leading, iconColor, href, onLongPress, onPress, destructive, mono, accessory, disabled, add, expanded, selected }: RowProps) {
   const colors = useColors();
   const body = (pressed: boolean) => (
     <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md, backgroundColor: pressed ? colors.chipPressed : "transparent" }}>
@@ -153,7 +155,7 @@ export function Row({ title, detail, value, icon, leading, iconColor, href, onPr
   if (href) {
     return (
       <Link href={href} asChild>
-        <Pressable role="link" {...state}>
+        <Pressable role="link" onLongPress={onLongPress} {...state}>
           {({ pressed }) => body(pressed)}
         </Pressable>
       </Link>

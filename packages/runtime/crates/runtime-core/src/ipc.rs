@@ -80,6 +80,15 @@ pub enum ToWorker {
         #[serde(rename = "ref")]
         reference: String,
     },
+    /// The Member who started this Task names it (`task.rename`).
+    #[serde(rename = "retitle")]
+    Retitle {
+        task: String,
+        title: String,
+        member: String,
+        #[serde(rename = "ref")]
+        reference: String,
+    },
     /// The Agent was renamed, or its Allowlist or Approval timeout changed: the
     /// next tool call uses all three (ADR 0023).
     #[serde(rename = "agent")]

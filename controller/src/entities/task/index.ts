@@ -21,6 +21,8 @@ export {
   type PendingRow,
   type TaskEventRow,
   type TaskStatus,
+  titleOf,
+  titleOfEvents,
   type TaskSummary,
 } from "./model/tasks";
 export { usePendingMessages, useTaskEvents, useTaskRow, useTaskSummaries } from "./model/use-tasks";

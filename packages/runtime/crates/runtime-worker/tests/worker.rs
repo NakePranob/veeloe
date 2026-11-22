@@ -136,6 +136,15 @@ async fn the_worker_loop_runs_a_task_end_to_end_with_a_fake_supervisor() {
                 FromWorker::LlmRequest {
                     id, headers, body, ..
                 } => {
+                    // The Task's name is asked for after the Turn, outside the tool loop.
+                    if body.contains("You name a conversation") {
+                        let named = json!({
+                            "content": [{ "type": "text", "text": "Reading a note" }],
+                            "stop_reason": "end_turn",
+                        });
+                        answering.receive(answer(&id, named)).expect("answer");
+                        continue;
+                    }
                     heard.lock().expect("requests").push((headers, body));
                     let next = bodies.pop_front().expect("a canned answer");
                     answering.receive(answer(&id, next)).expect("answer");
@@ -196,7 +205,12 @@ async fn the_worker_loop_runs_a_task_end_to_end_with_a_fake_supervisor() {
             "tool.result",
             "llm.message",
             "turn.ended",
+            "task.titled",
         ]
+    );
+    assert_eq!(
+        events.last().expect("titled").body["title"],
+        "Reading a note"
     );
     // The real `read` tool ran inside the Workdir, and its answer went back.
     let shown: Vec<_> = events

@@ -115,14 +115,18 @@ test("an Agent is made, answers twice in one Task with the whole conversation, a
   const second = provider.requests.filter((r) => r.path === "/v1/messages").at(-1)!.body as { model: string; messages: unknown[] };
   expect(second.model).toBe("model-a");
   expect(second.messages).toHaveLength(3);
-  expect(JSON.stringify(provider.requests.map((r) => r.headers))).not.toContain("x-veeloe");
+  expect(JSON.stringify([...provider.requests, ...provider.titles].map((r) => r.headers))).not.toContain("x-veeloe");
+  // The first Turn named the Task, from its first message.
+  const named = await first.waitFor((m) => m.type === "task.event" && m.task === "task-e2e" && m.body.kind === "task.titled");
+  expect(named.body.body).toEqual({ title: "Fixing CI" });
+  expect(JSON.stringify(provider.titles[0]?.body)).toContain("สวัสดี");
   first.client.stop();
 
   const late = controller();
   await late.ready;
   late.send("task.sync", { agent: "agent-e2e", after }, "task-e2e");
   const page = await late.waitFor((m) => m.type === "task.events");
-  expect(page.type === "task.events" && page.body.events.map((e) => e.kind).filter((kind) => kind !== "context.usage")).toEqual(["member.message", "turn.started", "llm.message", "turn.ended"]);
+  expect(page.type === "task.events" && page.body.events.map((e) => e.kind).filter((kind) => kind !== "context.usage" && kind !== "task.titled")).toEqual(["member.message", "turn.started", "llm.message", "turn.ended"]);
   late.client.stop();
 }, 60_000);
 
@@ -232,6 +236,8 @@ test("usage.list answers with the Machine's own days, the Tasks behind the token
     owner.send("task.message", { agent: "agent-usage", id: `${task}-m`, text }, task);
     await owner.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "turn.ended");
     expect(ended(task)).toBe(before + 1);
+    // Naming the Task is that Task's request too, and it lands after the Turn.
+    await owner.waitFor((m) => m.type === "task.event" && m.task === task && m.body.kind === "task.titled");
   }
 
   owner.send("usage.list", { request: "usage-e2e", days: 1, agent: "agent-usage" });
@@ -241,7 +247,7 @@ test("usage.list answers with the Machine's own days, the Tasks behind the token
     request: "usage-e2e",
     from: today,
     to: today,
-    agents: [{ agent: "agent-usage", days: [{ day: today, tokens: 8 }], tasks: [{ task: "task-usage-1", tokens: 4 }, { task: "task-usage-2", tokens: 4 }], sources: [{ source: "task", tokens: 8 }] }],
+    agents: [{ agent: "agent-usage", days: [{ day: today, tokens: 16 }], tasks: [{ task: "task-usage-1", tokens: 8 }, { task: "task-usage-2", tokens: 8 }], sources: [{ source: "task", tokens: 16 }] }],
   });
 
   owner.send("usage.list", { request: "usage-week", days: 7, agent: "agent-usage" });
