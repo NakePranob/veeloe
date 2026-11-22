@@ -18,7 +18,5 @@
     "done": "ยังไม่มี Agent ที่ทำเสร็จ"
   },
   "answer": "ตอบ",
-  "offline": "{{machine}} ออฟไลน์",
-  "budgetOut": "Budget วันนี้หมด งานค้างอยู่",
   "addBudget": "เพิ่ม Budget"
 }

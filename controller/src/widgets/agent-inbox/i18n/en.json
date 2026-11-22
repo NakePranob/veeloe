@@ -18,7 +18,5 @@
     "done": "No Agent has finished yet"
   },
   "answer": "Answer",
-  "offline": "{{machine}} is offline",
-  "budgetOut": "Today's Budget is used up, work is on hold",
   "addBudget": "Add Budget"
 }

@@ -5,14 +5,14 @@ import { Animated, FlatList, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { isBudgetOut, latestEvents, previewOf, useTaskSummaries, type TaskStatus, type TaskSummary } from "../../../entities/task";
+import { isBudgetOut, latestEvents, previewOf, TaskStatusDot, useTaskSummaries, type TaskStatus, type TaskSummary } from "../../../entities/task";
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
 import { Button, Empty, Tabs, Tap, Text, column, space, useReduceMotion } from "../../../shared/ui";
 import { countsOf, inboxRows, rowsOf, type InboxTab } from "../model/inbox";
 
-// The board's row: a 60pt head, the name, one line, and on the right the answer pill or the time.
+// A row: a 60pt head; the name, its state in colour and its latest words; on the right the answer pill or the time.
 const AVATAR = 60;
 
 // The board's working line ends in three dots that pulse one after another; still when the device asks for less motion.
@@ -67,10 +67,10 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
     if (replace) router.replace(href);
     else router.push(href);
   };
-  const quiet = status === "working" || status === "offline";
-  // Today's Budget ran out: the row says so and offers the way out, the Agent's page.
+  // Today's Budget ran out: the state says so in red and the row offers the way out, the Agent's page.
   const budgetOut = status === "failed" && isBudgetOut(task);
-  const line = status === "offline" ? t("offline", { machine }) : budgetOut ? t("budgetOut") : (task && previewOf(task)) || t("start", { name: agent.name });
+  // An offline row names the Machine that is away; the state above it already says offline.
+  const line = status === "offline" ? machine : (task && previewOf(task)) || t("start", { name: agent.name });
   return (
     <Tap onPress={open} selected={selected} style={{ flexDirection: "row", alignItems: "center", gap: space.md, marginHorizontal: 10, paddingHorizontal: space.md, paddingVertical: space.sm }}>
       {({ pressed }) => (
@@ -87,11 +87,12 @@ function InboxRow({ agent, machine, online, task, status, now, selected, replace
               {agent.name}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text variant="callout" tone={quiet ? "secondary" : "label"} numberOfLines={1} style={{ flexShrink: 1 }}>
-                {line}
-              </Text>
+              <TaskStatusDot status={status} spent={budgetOut} />
               {status === "working" && <Dots />}
             </View>
+            <Text variant="callout" tone="secondary" numberOfLines={1}>
+              {line}
+            </Text>
           </View>
           {/* Waiting on an Approval: the answer is one tap away, as the board's pill says; the row opens the chat. */}
           {status === "waiting" ? (
