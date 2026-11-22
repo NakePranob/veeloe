@@ -85,6 +85,8 @@ export {
   isUnsafeCommand,
   matchesAllowlist,
   READ_ONLY_ALLOWLIST,
+  builtInCovers,
+  entryCovers,
   splitCommand,
   type Allowlist,
 } from "./messages/allowlist";

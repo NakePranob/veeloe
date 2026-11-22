@@ -43,7 +43,8 @@
     "runs": "Runs without asking for an Approval",
     "wouldRun": "Would run right away if you add {{entry}}",
     "asks": "Asks for an Approval",
-    "asksAlways": "Asks every time: the parts cannot be told apart reliably ($( ), backtick or eval)"
+    "asksAlways": "Asks every time: the parts cannot be told apart reliably ($( ), backtick or eval)",
+    "builtIn": "Needs no entry: it only prints or reads (ADR 0075)"
   },
   "cancel": "Cancel",
   "authenticate": {

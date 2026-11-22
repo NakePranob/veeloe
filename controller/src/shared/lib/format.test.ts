@@ -15,13 +15,13 @@ test("a list is joined by the language, not by a comma written into the code", (
 });
 
 test("a list still joins where Intl.ListFormat is missing, as on Hermes", () => {
-  const kept = Intl.ListFormat;
-  // @ts-expect-error: Hermes on iOS has no ListFormat
-  Intl.ListFormat = undefined;
+  const intl = Intl as { ListFormat?: unknown };
+  const kept = intl.ListFormat;
+  intl.ListFormat = undefined;
   try {
     expect(formatList(["a", "b"], "en")).toBe("a, b");
     expect(formatList(["ก", "ข"], "th")).toBe("ก ข");
   } finally {
-    Intl.ListFormat = kept;
+    intl.ListFormat = kept;
   }
 });

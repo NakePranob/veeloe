@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Keyboard, View } from "react-native";
-import { allowed, allowlistOf, commandParts, covers, READ_ONLY_COMMANDS, useAgents } from "../../../entities/agent";
+import { allowed, allowlistOf, builtIn, commandParts, covers, READ_ONLY_COMMANDS, useAgents } from "../../../entities/agent";
 import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
@@ -101,7 +101,7 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
             </Text>
             {only && (
               <Text variant="caption" tone="secondary">
-                {usedBy ? t("try.coveredBy", { entry: usedBy }) : validDraft && covers(draft, only) ? t("try.wouldCover", { entry: draft }) : t("try.notCovered")}
+                {usedBy ? t("try.coveredBy", { entry: usedBy }) : builtIn(only) ? t("try.builtIn") : validDraft && covers(draft, only) ? t("try.wouldCover", { entry: draft }) : t("try.notCovered")}
               </Text>
             )}
           </View>
@@ -111,14 +111,15 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
           parts.map((part) => {
             const entryUsed = allowlist.find((item) => covers(item, part));
             const added = validDraft && covers(draft, part);
+            const free = !entryUsed && builtIn(part);
             return (
               <Row
                 key={part}
                 mono
-                icon={entryUsed || added ? "done" : "approval"}
-                iconColor={entryUsed || added ? "green" : "orange"}
+                icon={entryUsed || added || free ? "done" : "approval"}
+                iconColor={entryUsed || added || free ? "green" : "orange"}
                 title={part}
-                detail={entryUsed ? t("try.coveredBy", { entry: entryUsed }) : added ? t("try.wouldCover", { entry: draft }) : t("try.notCovered")}
+                detail={entryUsed ? t("try.coveredBy", { entry: entryUsed }) : free ? t("try.builtIn") : added ? t("try.wouldCover", { entry: draft }) : t("try.notCovered")}
               />
             );
           })}

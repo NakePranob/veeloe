@@ -93,3 +93,26 @@ fn a_sequence_only_moves_after_every_check_passes() {
     );
     assert_eq!(seen.last(&sender), Some(seq));
 }
+
+#[test]
+fn allowlist_decisions_match_the_shared_vectors() {
+    let text =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("vectors/allowlist.json"))
+            .expect("read allowlist.json");
+    let doc: Value = serde_json::from_str(&text).expect("parse allowlist.json");
+    for vector in doc["vectors"].as_array().expect("vectors") {
+        let command = vector["command"].as_str().expect("command");
+        let allowlist: Vec<String> = vector["allowlist"]
+            .as_array()
+            .expect("allowlist")
+            .iter()
+            .map(|entry| entry.as_str().expect("entry").to_string())
+            .collect();
+        let allowed = vector["allowed"].as_bool().expect("allowed");
+        assert_eq!(
+            veeloe_protocol::matches_allowlist(command, &allowlist),
+            allowed,
+            "{command:?}"
+        );
+    }
+}

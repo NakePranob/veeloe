@@ -41,7 +41,8 @@ describe("isUnsafeCommand", () => {
     expect(isUnsafeCommand("echo hi>out.txt")).toBe(true);
     expect(isUnsafeCommand("cat < /etc/shadow")).toBe(true);
     expect(isUnsafeCommand("cat <<EOF")).toBe(true);
-    expect(isUnsafeCommand("cmd 2>&1")).toBe(true);
+    expect(isUnsafeCommand("cmd 2>out.txt")).toBe(true);
+    expect(isUnsafeCommand("cmd >&out.txt")).toBe(true);
     expect(isUnsafeCommand("diff <(a) <(b)")).toBe(true);
   });
 
@@ -91,17 +92,18 @@ describe("matchesAllowlist", () => {
   });
 
   test("a pipe to an uncovered command needs approval", () => {
-    expect(matchesAllowlist("ls | sort", list)).toBe(false);
-    expect(matchesAllowlist("ls | sort", [...list, "sort"])).toBe(true);
+    expect(matchesAllowlist("ls | xargs rm", list)).toBe(false);
+    expect(matchesAllowlist("ls | xargs rm", [...list, "xargs rm"])).toBe(true);
   });
 
   test("extra whitespace still matches word by word", () => {
     expect(matchesAllowlist("git   status", ["git status"])).toBe(true);
   });
 
-  test("an empty command or empty allowlist never passes", () => {
+  test("an empty command never passes, and an empty allowlist passes only the built-ins (ADR 0075)", () => {
     expect(matchesAllowlist("", list)).toBe(false);
-    expect(matchesAllowlist("ls", [])).toBe(false);
+    expect(matchesAllowlist("npm test", [])).toBe(false);
+    expect(matchesAllowlist("ls", [])).toBe(true);
   });
 });
 

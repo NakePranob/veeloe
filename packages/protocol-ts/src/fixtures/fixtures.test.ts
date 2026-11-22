@@ -4,6 +4,7 @@ import { verifySignature } from "../crypto/ed25519";
 import { MemorySeenSequences, verify } from "../envelope/verify";
 import { parseFrame } from "../frame";
 import { parseMessage } from "../messages";
+import { matchesAllowlist } from "../messages/allowlist";
 import { handshakeBytes, HubAuthSchema } from "../messages/hub-auth";
 import { pairingProof } from "../messages/pairing-claim";
 import { parsePairingLink } from "../messages/pairing-link";
@@ -78,4 +79,11 @@ test("the linking vectors agree with the code that reads them", async () => {
 test("every message vector is read as expected", async () => {
   const { vectors } = await Bun.file(`${root}/vectors/messages.json`).json();
   for (const v of vectors) expect([v.name, parseMessage({ type: v.type, body: v.body }).kind === "message"]).toEqual([v.name, v.valid]);
+});
+
+test("every Allowlist vector gets the same decision as the Rust Runtime", async () => {
+  const { vectors } = await Bun.file(`${root}/vectors/allowlist.json`).json();
+  for (const v of vectors as { command: string; allowlist: string[]; allowed: boolean }[]) {
+    expect({ command: v.command, allowed: matchesAllowlist(v.command, v.allowlist) }).toEqual({ command: v.command, allowed: v.allowed });
+  }
 });

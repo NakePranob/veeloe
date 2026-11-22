@@ -43,7 +43,8 @@
     "runs": "รันได้เลยไม่ต้องขอ Approval",
     "wouldRun": "รันได้เลยถ้าเพิ่ม {{entry}}",
     "asks": "ต้องขอ Approval",
-    "asksAlways": "ต้องขอ Approval ทุกครั้ง: แยกท่อนให้แน่ใจไม่ได้ ($( ), backtick หรือ eval)"
+    "asksAlways": "ต้องขอ Approval ทุกครั้ง: แยกท่อนให้แน่ใจไม่ได้ ($( ), backtick หรือ eval)",
+    "builtIn": "ไม่ต้องอยู่ใน Allowlist: แค่แสดงผลหรืออ่าน (ADR 0075)"
   },
   "cancel": "ยกเลิก",
   "authenticate": {

@@ -1,6 +1,6 @@
 # คำสั่งที่ไม่เรียกโปรแกรมอื่นและไม่ออกนอก Workdir ผ่านได้โดยไม่ต้องอยู่ใน Allowlist
 
-Status: proposed
+Status: accepted
 
 เปลี่ยน ADR 0030 สองจุด: เดิม "ไม่มีคำสั่งที่ผ่านเสมอโดยไม่อยู่ในรายการ" และ redirect ทุกแบบต้องขอ Approval
 
@@ -10,14 +10,16 @@ ADR 0030 บอกไว้แล้วว่า Allowlist มีไว้กั
 
 - **ชุดคำสั่งที่ผ่านเสมอ (built-in)** ไม่ต้องอยู่ใน Allowlist ของ Agent ตัวตรวจถือว่าท่อนนั้นผ่านเหมือนอยู่ในรายการ ใช้กับทุก Agent รวมตัวที่มีอยู่แล้ว เพราะไม่ต้องแก้รายการที่ Member เซ็นไว้
   - แสดงผลอย่างเดียว: `echo`, `printf`, `true`, `false`, `pwd`, `date` (ไม่มีอาร์กิวเมนต์ที่ขึ้นต้นด้วย `-s` หรือ `--set`), `which`, `basename`, `dirname`
-  - อ่านอย่างเดียว: `ls`, `cat`, `head`, `tail`, `wc`, `file`, `stat`, `du`, `tree`, `sort`, `uniq`, `cut`, `tr`, `diff`, `cmp`, `grep`, `egrep`, `fgrep`
+  - อ่านอย่างเดียว: `ls`, `cat`, `head`, `tail`, `wc`, `file`, `stat`, `du`, `tree`, `uniq`, `cut`, `tr`, `diff`, `cmp`, `grep`, `egrep`, `fgrep`
+  - `sort` ยกเว้นเมื่อมี `--compress-program` (รันโปรแกรมที่ระบุ)
   - `rg` ยกเว้นเมื่อมี `--pre` หรือ `--pre-glob` (สองตัวนี้รันโปรแกรมอื่น)
   - `find` ยกเว้นเมื่อมี `-exec`, `-execdir`, `-ok`, `-okdir`, `-delete`, `-fprint`, `-fprintf` หรือ `-fls`
-  - git ที่ไม่แก้ repo: `git status`, `git diff`, `git log`, `git show`, `git branch` (ไม่มีอาร์กิวเมนต์อื่นนอกจาก flag), `git rev-parse`, `git blame`, `git ls-files`
+  - git ที่ไม่แก้ repo: `git status`, `git diff`, `git log`, `git show`, `git rev-parse`, `git blame`, `git ls-files` และ `git branch` ที่มีแค่ flag แสดงรายการ (`-a`, `-r`, `-v`, `-vv`, `-l`, `--all`, `--remotes`, `--verbose`, `--list`, `--show-current`, `--color`, `--no-color`) คำสั่งย่อยต้องตามหลัง `git` ทันที: `git -c …` หรือ `git -C …` ยังต้องขอ เพราะ `-c` ตั้ง config ที่รันโปรแกรมได้
+  - ก่อนเทียบ flag ตัวตรวจตัด quote และ backslash ออกแบบที่ bash ทำ `'-ex'ec` และ `-e\xec` จึงถูกจับเป็น `-exec`
 - **redirect ไป `/dev/null` และการรวม stream ไม่นับเป็น redirect** ได้แก่ `>/dev/null`, `2>/dev/null`, `&>/dev/null`, `1>/dev/null` และ `2>&1` / `1>&2` ส่วน redirect อื่นทั้งหมด (`> file`, `>> file`, `<`, heredoc) ยังต้องขอ Approval เหมือนเดิม
 - **ที่ยังต้องขอเหมือนเดิม:** ทุกอย่างที่รันโปรแกรมอื่นต่อ (`bash -c`, `sh`, `xargs`, `env`, `make`, `npm run …`, `$(...)`, backtick, `eval`, `exec`), ออกเน็ต, ติดตั้งแพ็กเกจ, `rm` และคำสั่งที่เปลี่ยน repo (`git commit`, `git checkout`, `git config` และอื่นๆ) ยกเว้นที่ Member เพิ่มเข้า Allowlist เอง
-- **ชุดเริ่มต้นตอนสร้าง Agent** (`READ_ONLY_ALLOWLIST`) เหลือว่าง เพราะทุกตัวในชุดเดิมอยู่ในชุดที่ผ่านเสมอแล้ว หน้าสร้าง Agent จะบอกว่าคำสั่งอ่านอย่างเดียวรันได้เลยโดยไม่ต้องเลือก
-- **กฎนี้อยู่ในตัวตรวจทั้งสองฝั่งพร้อมกัน:** ฝั่ง Rust ใน Runtime เป็นตัวตัดสิน ฝั่ง TypeScript ใน `packages/protocol-ts` ใช้ให้ Controller บอกว่ารายการครอบคำสั่งไหน ทั้งสองฝั่งต้องผ่าน test vectors ชุดเดียวกันใน `check:protocol` ทุกแบบที่ยกเว้นไว้ข้างบน (`rg --pre`, `find -exec`, `> file`) ต้องมี vector ที่ยืนยันว่ายังต้องขอ Approval
+- **ชุดเริ่มต้นตอนสร้าง Agent** (`READ_ONLY_ALLOWLIST`) ยังคงไว้ในรอบนี้ ทุกตัวในชุดนั้นอยู่ในชุดที่ผ่านเสมอแล้วจึงซ้ำกันโดยไม่มีผลเสีย จะลดลงเมื่อบอร์ด NewAgent และ Allowlist วาดว่ามีชุดที่รันได้เลย หน้า "ลองคำสั่ง" ของ Allowlist บอกแล้วว่าท่อนไหนผ่านได้โดยไม่ต้องอยู่ในรายการ
+- **กฎนี้อยู่ในตัวตรวจทั้งสองฝั่งพร้อมกัน:** ฝั่ง Rust ใน Runtime เป็นตัวตัดสิน ฝั่ง TypeScript ใน `packages/protocol-ts` ใช้ให้ Controller บอกว่ารายการครอบคำสั่งไหน ทั้งสองฝั่งต้องผ่าน test vectors ชุดเดียวกันที่ `packages/protocol/vectors/allowlist.json` ใน `check:protocol` ทุกแบบที่ยกเว้นไว้ข้างบน (`rg --pre`, `find -exec`, `> file`) ต้องมี vector ที่ยืนยันว่ายังต้องขอ Approval
 
 ## Considered Options
 

@@ -20,8 +20,8 @@ pub mod signer;
 pub mod uri;
 
 pub use allowlist::{
-    entry_covers, is_unsafe_command, matches_allowlist, split_command, ALLOWLIST_MAX,
-    READ_ONLY_ALLOWLIST,
+    built_in_covers, entry_covers, is_unsafe_command, matches_allowlist, split_command,
+    ALLOWLIST_MAX, READ_ONLY_ALLOWLIST,
 };
 pub use envelope::{
     verify, Envelope, MemorySeenSequences, Rejection, Route, SeenSequences, SignedPart, Verified,
