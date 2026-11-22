@@ -52,7 +52,7 @@ pub(crate) async fn add(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbou
     outbox.to_member(
         &from.member,
         "agent.listed",
-        crate::tasks::agents_listed(registry, &models),
+        crate::tasks::agents_listed(registry, &models, machine.budgets),
         None,
     );
 }

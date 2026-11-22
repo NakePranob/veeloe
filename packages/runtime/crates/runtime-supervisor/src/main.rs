@@ -630,12 +630,31 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap_or(true)
         })
         .on_usage(move |agent, task, tokens| {
-            if let Ok(Some(agent)) = usage_routing.registry.get(agent) {
-                let _ = usage_budgets.add(
+            let Ok(Some(agent)) = usage_routing.registry.get(agent) else {
+                return;
+            };
+            let Ok(usage) = usage_budgets.add(
+                &agent,
+                veeloe_runtime_supervisor::usage::now_ms(),
+                task.unwrap_or(""),
+                tokens,
+            ) else {
+                return;
+            };
+            let members: Vec<String> = usage_routing
+                .trust
+                .lock()
+                .expect("trust")
+                .owners
+                .iter()
+                .map(|owner| owner.member.clone())
+                .collect();
+            if let Some(outbox) = usage_routing.outbox.lock().expect("outbox").as_ref() {
+                veeloe_runtime_supervisor::tasks::tell_usage(
+                    outbox.as_ref(),
+                    &members,
                     &agent,
-                    veeloe_runtime_supervisor::usage::now_ms(),
-                    task.unwrap_or(""),
-                    tokens,
+                    &usage,
                 );
             }
         })

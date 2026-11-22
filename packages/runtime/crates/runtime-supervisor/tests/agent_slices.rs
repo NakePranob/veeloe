@@ -212,7 +212,7 @@ async fn an_agent_is_created_listed_and_updated_and_no_provider_key_is_ever_sent
     assert_eq!(outbox.last().0, "agent.listed");
     // A new Agent starts with no way out, and its own row says so (issue #43).
     assert_eq!(outbox.last().1["agents"][0]["egress"], json!([]));
-    assert_eq!(agents_listed(&registry, &[])["egress"], json!([]));
+    assert_eq!(agents_listed(&registry, &[], None)["egress"], json!([]));
 
     workers.stop_all();
 }
@@ -536,6 +536,60 @@ async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
     assert_eq!(type_, "machine.status");
     assert_eq!(body["budgetToday"]["limitTokens"], 5_000_000);
     workers.stop_all();
+}
+
+/// Every counted answer reaches every Member as `agent.usage`, and `agent.listed`
+/// carries the same tally for a Controller that missed it.
+#[tokio::test]
+async fn a_counted_answer_tells_every_member_and_the_list_catches_up() {
+    use veeloe_runtime_supervisor::tasks::tell_usage;
+    use veeloe_runtime_supervisor::usage::{budget_day, now_ms, Budgets, UsageStore};
+
+    let home = tempdir().expect("home");
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    let agent = Agent {
+        id: "a1".into(),
+        name: "Builder".into(),
+        provider: "main".into(),
+        model: "model-a".into(),
+        character: None,
+        allowlist: Vec::new(),
+        egress: Vec::new(),
+        approval_timeout_s: 3_600,
+        budget: Some(1_000),
+        deleted_at: None,
+        git_repos: Vec::new(),
+    };
+    registry.add(&agent).expect("add");
+    let budgets = Budgets::new(UsageStore::open(&home.path().join("usage.db")).expect("store"));
+    let outbox = Recording::default();
+    let members = vec!["member-1".to_string(), "member-2".to_string()];
+
+    budgets.add(&agent, now_ms(), "t1", 30).expect("add");
+    let usage = budgets.add(&agent, now_ms(), "t2", 12).expect("add");
+    tell_usage(&outbox, &members, &agent, &usage);
+
+    let today = budget_day(now_ms());
+    let sent = outbox.sent.lock().expect("sent").clone();
+    assert_eq!(sent.len(), 2);
+    for ((member, type_, body), want) in sent.iter().zip(&members) {
+        assert_eq!(member, want);
+        assert_eq!(type_, "agent.usage");
+        assert_eq!(
+            body,
+            &json!({ "agent": "a1", "day": today, "tokens": 42, "budget": 1_000 })
+        );
+        assert_eq!(
+            veeloe_protocol::messages::message_is_valid(type_, body),
+            Some(true)
+        );
+    }
+
+    let listed = agents_listed(&registry, &[], Some(&budgets));
+    assert_eq!(
+        listed["agents"][0]["usage"],
+        json!({ "day": today, "tokens": 42 })
+    );
 }
 
 /// Issue #43: `egress.set` names an Agent and checks Manage at it; without an

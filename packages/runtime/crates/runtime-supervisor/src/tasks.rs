@@ -108,7 +108,12 @@ impl Outbox for MachineOutbox {
 /// stays for a Controller that reads one list: it is the union of every Agent's,
 /// which is exactly what each Agent's list was before the split and what the
 /// legacy `egress.set` still sets everywhere.
-pub fn agents_listed(registry: &AgentRegistry, providers: &[Value]) -> Value {
+pub fn agents_listed(
+    registry: &AgentRegistry,
+    providers: &[Value],
+    budgets: Option<&crate::usage::Budgets>,
+) -> Value {
+    let now = crate::usage::now_ms();
     let mut agents: Vec<Value> = Vec::new();
     let mut trash: Vec<Value> = Vec::new();
     let mut union: Vec<String> = Vec::new();
@@ -134,6 +139,11 @@ pub fn agents_listed(registry: &AgentRegistry, providers: &[Value]) -> Value {
         if let Some(budget) = agent.budget {
             value["budget"] = json!(budget);
         }
+        // Today's tally, so a Controller that was not connected for `agent.usage`
+        // catches up.
+        if let Some(Ok(usage)) = budgets.map(|budgets| budgets.usage_of(&agent, now)) {
+            value["usage"] = json!({ "day": usage.day, "tokens": usage.tokens });
+        }
         // A deleted Agent keeps every field it had, so the Controller can show it
         // in the trash and bring it back (`agent-trash`).
         match (agent.deleted_at, agent.restore_until()) {
@@ -146,6 +156,25 @@ pub fn agents_listed(registry: &AgentRegistry, providers: &[Value]) -> Value {
         }
     }
     json!({ "agents": agents, "trash": trash, "providers": providers, "egress": union })
+}
+
+/// Today's tally after a counted answer, to every Member in trust: they are who
+/// set a Budget in v0.1 (ADR 0034, 0043).
+pub fn tell_usage(
+    outbox: &dyn Outbox,
+    members: &[String],
+    agent: &crate::agents::Agent,
+    usage: &crate::usage::Usage,
+) {
+    let body = json!({
+        "agent": agent.id,
+        "day": usage.day,
+        "tokens": usage.tokens,
+        "budget": crate::usage::Budgets::limit_of(agent),
+    });
+    for member in members {
+        outbox.to_member(member, "agent.usage", body.clone(), None);
+    }
 }
 
 pub(crate) fn agent_of(body: &Value) -> &str {

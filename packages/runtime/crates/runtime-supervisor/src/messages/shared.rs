@@ -24,5 +24,6 @@ pub(crate) async fn listed(machine: &Machine<'_>) -> Value {
     agents_listed(
         registry,
         &models::info(machine.providers, machine.http).await,
+        machine.budgets,
     )
 }
