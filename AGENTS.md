@@ -19,6 +19,13 @@ GitHub Releases are for the Runtime only — its updater takes the latest
 release as its own (ADR 0009, 0025). The Hub ships as an image on GHCR, the
 Controller through EAS.
 
+To ship: bump nothing by hand, and push a version tag from `develop` (`git tag v0.1.0`,
+`git push origin v0.1.0`; `v0.1.0-rc.1` for a pre-release that `releases/latest` skips).
+`runtime-release.yml` builds `veeloe` for macOS arm64 and Linux x86_64 and arm64,
+stamps the tag's version into it, and publishes them with `SHA256SUMS` and
+`packaging/install.sh`; `hub-image.yml` pushes `ghcr.io/<owner>/veeloe-hub` with the
+same version. The Controller is built by hand with EAS (`controller/AGENTS.md`).
+
 Outside contributors sign the CLA (CLA Assistant) on their first PR. Do not
 merge an outside contribution until the CLA check is green: relicensing and
 the App Store build both depend on it (ADR 0016).
