@@ -15,8 +15,15 @@ export function agentOf(agentId: string, agents: readonly AgentRow[], trashed: r
   return { agent: deletedAgent(agentId, gone?.machine_id ?? taskMachine, gone?.name ?? deletedName), readOnly: true };
 }
 
-/** A Turn is running: the Machine queues a new message until it ends. */
-export const busyOf = (events: readonly Pick<TaskEventRow, "kind" | "body">[] | undefined) => !!events && statusOf(latestOf(events), true) === "working";
+/**
+ * A Turn is running: the Machine queues a new message until it ends. A stalled Turn (ADR 0073) is still open, and is
+ * when the Owner most needs Stop.
+ */
+export function busyOf(events: readonly Pick<TaskEventRow, "kind" | "body">[] | undefined): boolean {
+  if (!events) return false;
+  const status = statusOf(latestOf(events), true);
+  return status === "working" || status === "stuck";
+}
 
 /**
  * Whether the brake still says it is stopping. It stops saying so once the Turn ended (by the Stop or by itself) or the
