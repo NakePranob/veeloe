@@ -9,14 +9,14 @@ import { Button, Centered, Text, space } from "../../../shared/ui";
 // The board's Character: Veeloe's own head, not an Agent's.
 const LOOK: Look = { color: COLORS[0], shell: "box", top: "antenna", sides: "none", decal: "none" };
 
-// A phone asks at once. A browser refuses a passkey without a press, so web waits for the button.
+// Asks for Face ID or the fingerprint at once; the button asks again after a cancel.
 export function LockPage() {
   const t = useT("lock");
   const insets = useSafeAreaInsets();
   const prompt = t("prompt");
 
   useEffect(() => {
-    if (process.env.EXPO_OS !== "web") void keySession.unlock(prompt);
+    void keySession.unlock(prompt);
   }, [prompt]);
 
   return (

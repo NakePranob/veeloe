@@ -1,5 +1,7 @@
 # ใช้ Ed25519 ด้วย @noble ทั้งระบบ และเก็บกุญแจใน Keychain/Keystore ของ OS
 
+> **ADR 0077 เปลี่ยน** Controller บน React Native ไม่มีเว็บแล้ว กุญแจอยู่ใน Keychain หรือ Keystore และปลดด้วย biometric อย่างเดียว ส่วนที่เขียนถึงกุญแจใน IndexedDB กับ passkey รอ ADR ของ Controller บนเว็บที่จะเขียนใหม่
+
 ฝั่ง TypeScript ทุกที่ (Runtime บน Bun, Controller บน Hermes และบนเว็บ) ใช้ @noble (curves, ciphers, hashes) เพราะเป็น JS ล้วนที่ผ่าน audit แล้ว และใช้ตัวเดียวได้ทุกที่ ลายเซ็นทั้งของ Controller และของ Runtime ใช้ Ed25519 ส่วน sealed box สำหรับ key ของ Provider (ADR 0005) ประกอบเองจาก X25519 กับ XSalsa20-Poly1305 ให้ตรงกับรูปแบบของ libsodium บนมือถือต้องเติม getRandomValues จาก expo-crypto ฝั่ง Hub ใช้ Ed25519 จาก stdlib ของ Go ไว้ตรวจตัวตนตอนต่อเข้ามาเท่านั้น
 
 กุญแจบนมือถือเก็บด้วย expo-secure-store (Keychain/Keystore) บนเว็บเก็บใน IndexedDB และบน Machine เก็บเป็นไฟล์สิทธิ์ 0600 ในโฟลเดอร์ของ Runtime

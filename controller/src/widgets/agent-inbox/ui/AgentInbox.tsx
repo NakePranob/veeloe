@@ -21,7 +21,7 @@ function Dots() {
   const phase = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduce) return;
-    const loop = Animated.loop(Animated.timing(phase, { toValue: 1, duration: 1200, useNativeDriver: process.env.EXPO_OS !== "web" }));
+    const loop = Animated.loop(Animated.timing(phase, { toValue: 1, duration: 1200, useNativeDriver: true }));
     loop.start();
     return () => {
       loop.stop();

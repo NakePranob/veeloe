@@ -40,8 +40,7 @@ export function Button({ label, onPress, variant = "chip", icon, disabled, size 
   const reduce = useReduceMotion();
   const scale = useRef(new Animated.Value(1)).current;
   const drift = useRef(new Animated.Value(0)).current;
-  const native = process.env.EXPO_OS !== "web";
-  const press = (to: number) => Animated.timing(scale, { toValue: to, duration: motion.duration.quick, easing: motion.easeOut, useNativeDriver: native }).start();
+  const press = (to: number) => Animated.timing(scale, { toValue: to, duration: motion.duration.quick, easing: motion.easeOut, useNativeDriver: true }).start();
   const floating = variant === "floating" && !disabled;
   // A floating button drifts up and down, and stays still when the device asks for less motion.
   useEffect(() => {
@@ -51,13 +50,13 @@ export function Button({ label, onPress, variant = "chip", icon, disabled, size 
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(drift, { toValue: -5, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
-        Animated.timing(drift, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+        Animated.timing(drift, { toValue: -5, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(drift, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [floating, reduce, drift, native]);
+  }, [floating, reduce, drift]);
   // A disabled ink button stays ink, faded, as on the board.
   const inked = variant === "primary" || variant === "floating";
   const ghost = variant === "ghost";

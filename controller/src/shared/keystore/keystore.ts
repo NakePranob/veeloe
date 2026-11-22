@@ -20,12 +20,9 @@ export function useKeyActivity() {
     const appState = AppState.addEventListener("change", (state) => {
       if (state === "active") keySession.check();
     });
-    const onKey = () => keySession.touch();
-    if (process.env.EXPO_OS === "web") window.addEventListener("keydown", onKey, true);
     return () => {
       clearInterval(timer);
       appState.remove();
-      if (process.env.EXPO_OS === "web") window.removeEventListener("keydown", onKey, true);
     };
   }, []);
   return useCallback(() => keySession.touch(), []);

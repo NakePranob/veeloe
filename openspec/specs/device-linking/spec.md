@@ -28,8 +28,8 @@ Controller ที่สร้างกุญแจแล้วแต่ยัง
 - **WHEN** เจ้าของสแกน เปิด หรือวางลิงก์ที่ยังไม่หมดอายุบนเครื่องใหม่ แล้วกด ขอ Link
 - **THEN** แอปส่งคำขอไป Hub ในลิงก์ และรอให้เจ้าของอนุมัติบนเครื่องเดิม
 
-#### Scenario: เบราว์เซอร์ไม่มีกล้อง
-- **WHEN** เครื่องใหม่เป็นเบราว์เซอร์ที่ไม่มีกล้อง
+#### Scenario: ใช้กล้องไม่ได้
+- **WHEN** เครื่องใหม่ไม่ได้ให้สิทธิ์กล้อง
 - **THEN** เจ้าของวางลิงก์ที่คัดลอกหรือแชร์มาจากเครื่องเดิมได้ และไม่ต้องกรอก Hub
 
 #### Scenario: ลิงก์หมดอายุหรือรูปแบบผิด
@@ -142,15 +142,15 @@ Runtime SHALL เชื่อกุญแจใน `device.link` เป็นข
 Controller ของ Member SHALL แจ้งเจ้าของเมื่อได้ใบรับรอง `device.link` ใหม่ที่ไม่ได้เซ็นเอง โดยบอกชื่อเครื่องใหม่และเครื่องที่ Link
 
 #### Scenario: Link จากอีกเครื่อง
-- **WHEN** มือถือ Link เบราว์เซอร์ ขณะที่ iPad ของ Member คนเดียวกันเปิดแอปอยู่
+- **WHEN** มือถือ Link เครื่อง Android ขณะที่ iPad ของ Member คนเดียวกันเปิดแอปอยู่
 - **THEN** iPad แจ้งว่ามีเครื่องใหม่ถูก Link พร้อมชื่อเครื่องทั้งสอง
 
 ### Requirement: Machine ที่ Pair จากเครื่องไหนก็เชื่อทุกเครื่องของ Member
 `pairing.claim` SHALL มีกุญแจอื่นที่ยังใช้งานของ Member ผู้ Pair ในส่วนที่เซ็น Machine ที่ Pair ใหม่ SHALL เชื่อกุญแจเหล่านั้นเป็นของ Member คนเดียวกัน Runtime ที่ไม่รู้จักช่องนี้ SHALL ยังเชื่อแค่กุญแจผู้ Pair ตามเดิม (ADR 0023)
 
 #### Scenario: Pair Machine ใหม่จากเครื่องที่ Link มา
-- **WHEN** เบราว์เซอร์ที่ Link จากมือถือ ทำ Pairing กับ Machine ใหม่
-- **THEN** Machine ใหม่รับคำสั่งจากทั้งเบราว์เซอร์และมือถือ
+- **WHEN** เครื่อง Android ที่ Link จากมือถือ ทำ Pairing กับ Machine ใหม่
+- **THEN** Machine ใหม่รับคำสั่งจากทั้งเครื่อง Android และมือถือ
 
 ### Requirement: เครื่องใหม่เห็น Task เดิม
 Controller SHALL ส่ง `task.list` ถึงทุก Machine ตอนต่อเข้ามา Runtime SHALL ตอบ `task.listed` ด้วย Task ที่ Member ผู้ขอเปิดดูได้ (ADR 0060) พร้อม Agent ของแต่ละ Task และ Controller SHALL ใช้ `task.sync` ดึง event ของ Task ที่ยังไม่มีบนเครื่อง

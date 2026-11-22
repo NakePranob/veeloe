@@ -14,7 +14,6 @@ import { linkThisDeviceI18n } from "../../pages/link-this-device";
 import { homeI18n } from "../../pages/home";
 import { lockI18n } from "../../pages/lock";
 import { machinesI18n } from "../../pages/machines";
-import { otherTabI18n } from "../../pages/other-tab";
 import { storageUnavailableI18n } from "../../pages/storage-unavailable";
 import { taskI18n } from "../../pages/task";
 import { usageI18n } from "../../pages/usage";
@@ -46,7 +45,6 @@ const slices = {
   home: homeI18n,
   lock: lockI18n,
   machines: machinesI18n,
-  "other-tab": otherTabI18n,
   "storage-unavailable": storageUnavailableI18n,
   task: taskI18n,
   usage: usageI18n,

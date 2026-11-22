@@ -37,7 +37,7 @@ Protocol SHALL มีข้อความ `approval.answer` จาก Controlle
 
 #### Scenario: ต้องยืนยันตัวก่อนอนุมัติ
 - **WHEN** Owner กดอนุมัติหรืออนุญาตตลอดในแอป
-- **THEN** Controller ขอยืนยันตัว (Face ID, ลายนิ้วมือ หรือ passkey) ก่อนเซ็น `approval.answer` และถ้าไม่ผ่านจะไม่มีซองออกไป (ADR 0012)
+- **THEN** Controller ขอยืนยันตัว (Face ID หรือลายนิ้วมือ) ก่อนเซ็น `approval.answer` และถ้าไม่ผ่านจะไม่มีซองออกไป (ADR 0012)
 
 #### Scenario: ตอบอนุมัติ
 - **WHEN** Owner ส่ง `approval.answer` ที่อนุมัติด้วยรหัสคำขอที่รออยู่

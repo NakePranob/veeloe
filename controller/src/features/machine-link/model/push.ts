@@ -15,20 +15,18 @@ export function setActiveTask(task: string | null) {
   activeTask = task;
 }
 
-if (process.env.EXPO_OS !== "web") {
-  Notifications.setNotificationHandler({
-    handleNotification: async (notification) => {
-      const task = notification.request.content.data?.task;
-      const onScreen = typeof task === "string" && task === activeTask;
-      return {
-        shouldShowBanner: !onScreen,
-        shouldShowList: !onScreen,
-        shouldPlaySound: !onScreen,
-        shouldSetBadge: false,
-      };
-    },
-  });
-}
+Notifications.setNotificationHandler({
+  handleNotification: async (notification) => {
+    const task = notification.request.content.data?.task;
+    const onScreen = typeof task === "string" && task === activeTask;
+    return {
+      shouldShowBanner: !onScreen,
+      shouldShowList: !onScreen,
+      shouldPlaySound: !onScreen,
+      shouldSetBadge: false,
+    };
+  },
+});
 
 function projectId(): string | undefined {
   const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
@@ -52,7 +50,7 @@ export function usePushRegistration() {
     if (!PUSH_READY) return;
     if (started.current || !machines?.length) return;
     started.current = true;
-    if (process.env.EXPO_OS === "web" || !Device.isDevice) return;
+    if (!Device.isDevice) return;
     let cancelled = false;
     void (async () => {
       await Notifications.setNotificationChannelAsync("default", {

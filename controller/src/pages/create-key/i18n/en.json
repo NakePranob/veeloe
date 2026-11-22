@@ -10,10 +10,7 @@
     "action": "Create new key"
   },
   "prompt": "Unlock your Veeloe key",
-  "unsupported": {
-    "web": "This browser has no passkey that can verify you, so Veeloe can't create a key here.",
-    "app": "Set up Face ID or a fingerprint on this device, or use Veeloe on the web."
-  },
+  "unsupported": "Set up Face ID or a fingerprint on this device first, so Veeloe can create a key.",
   "failed": "The key wasn't created. Try again.",
   "points": {
     "secret": "The secret part never leaves this device. The Hub only knows the public key.",

@@ -54,8 +54,6 @@ const POSE: Record<Mood, { tilt: number; turn: number; lift: number; look: [numb
 // How long one float up (or down) takes; working nods instead, offline rests on the ground.
 const FLOAT: Partial<Record<Mood, number>> = { idle: 1800, thinking: 2500, waiting: 1200, done: 1800 };
 
-const native = process.env.EXPO_OS !== "web";
-
 // The parts are the shell's colour, darker; white mixes in the lit side.
 function mix(hex: string, k: number, to = [26, 32, 48]) {
   const n = parseInt(hex.slice(1), 16);
@@ -186,17 +184,17 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
       v.turn.setValue(to.turn);
       return;
     }
-    const moves = targets.map(([value, toValue]) => Animated.spring(value, { toValue, speed: 14, bounciness: 8, useNativeDriver: native }));
+    const moves = targets.map(([value, toValue]) => Animated.spring(value, { toValue, speed: 14, bounciness: 8, useNativeDriver: true }));
     if (hopsOn(was, mood)) {
       v.hop.setValue(0);
-      moves.push(Animated.timing(v.hop, { toValue: 1, duration: 700, easing: motion.easeOut, useNativeDriver: native }));
+      moves.push(Animated.timing(v.hop, { toValue: 1, duration: 700, easing: motion.easeOut, useNativeDriver: true }));
     }
     if (mood === "done")
       moves.push(
         Animated.sequence([
-          Animated.timing(v.turn, { toValue: -1, duration: 250, easing: motion.easeOut, useNativeDriver: native }),
-          Animated.timing(v.turn, { toValue: 1, duration: 350, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
-          Animated.spring(v.turn, { toValue: 0, speed: 14, bounciness: 8, useNativeDriver: native }),
+          Animated.timing(v.turn, { toValue: -1, duration: 250, easing: motion.easeOut, useNativeDriver: true }),
+          Animated.timing(v.turn, { toValue: 1, duration: 350, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.spring(v.turn, { toValue: 0, speed: 14, bounciness: 8, useNativeDriver: true }),
         ]),
       );
     const all = Animated.parallel(moves);
@@ -210,8 +208,8 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
     const swing = (value: Animated.Value, from: number, to: number, duration: number) =>
       Animated.loop(
         Animated.sequence([
-          Animated.timing(value, { toValue: to, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
-          Animated.timing(value, { toValue: from, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+          Animated.timing(value, { toValue: to, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(value, { toValue: from, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         ]),
       );
     const loops: Animated.CompositeAnimation[] = [];
@@ -220,13 +218,13 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
     if (mood === "waiting") loops.push(swing(v.wave, 0, 1, 800));
     if (mood === "thinking") loops.push(swing(v.pulse, 1, 0.25, 600));
     // A short shiver every few seconds, using the nod.
-    if (mood === "stuck") loops.push(Animated.loop(Animated.sequence([Animated.delay(2600), ...[1, 0, 1, 0].map((toValue) => Animated.timing(v.nod, { toValue, duration: 70, useNativeDriver: native }))])));
+    if (mood === "stuck") loops.push(Animated.loop(Animated.sequence([Animated.delay(2600), ...[1, 0, 1, 0].map((toValue) => Animated.timing(v.nod, { toValue, duration: 70, useNativeDriver: true }))])));
     if (mood !== "done" && mood !== "offline" && mood !== "failed")
-      loops.push(Animated.loop(Animated.sequence([Animated.delay(3800), Animated.timing(v.blink, { toValue: 0.1, duration: 70, useNativeDriver: native }), Animated.timing(v.blink, { toValue: 1, duration: 110, useNativeDriver: native })])));
+      loops.push(Animated.loop(Animated.sequence([Animated.delay(3800), Animated.timing(v.blink, { toValue: 0.1, duration: 70, useNativeDriver: true }), Animated.timing(v.blink, { toValue: 1, duration: 110, useNativeDriver: true })])));
     for (const loop of loops) loop.start();
     return () => {
       for (const loop of loops) loop.stop();
-      for (const value of [v.float, v.nod]) Animated.timing(value, { toValue: 0, duration: motion.duration.fast, easing: motion.easeOut, useNativeDriver: native }).start();
+      for (const value of [v.float, v.nod]) Animated.timing(value, { toValue: 0, duration: motion.duration.fast, easing: motion.easeOut, useNativeDriver: true }).start();
       v.blink.setValue(1);
       v.pulse.setValue(1);
     };

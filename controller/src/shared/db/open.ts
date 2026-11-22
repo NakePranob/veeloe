@@ -2,11 +2,7 @@ import { openDatabaseAsync } from "expo-sqlite";
 import { createDatabase, migrate } from "./database";
 import { MIGRATIONS } from "./migrations";
 
-async function connect() {
-  // The browser may clear this anyway, and the database is a cache there, so a refusal changes nothing (ADR 0021).
-  if (process.env.EXPO_OS === "web") void navigator.storage?.persist?.().catch(() => undefined);
-  return openDatabaseAsync("veeloe.db");
-}
+const connect = () => openDatabaseAsync("veeloe.db");
 
 // On globalThis, not a module variable: Fast Refresh re-runs this module, and a fresh
 // variable would open a second Database on the same native connection.

@@ -14,9 +14,9 @@ interface Props {
   variant?: "primary" | "chip" | "ghost";
 }
 
-// Stack.Toolbar has no web side, and web draws its own header, so there the button is ours.
+// Android's header button is ours, since Stack.Toolbar is iOS's.
 // Setting an option outlives the component, so leaving takes the button with it.
-function WebHeaderAction({ label, onPress, icon, disabled, placement = "right", variant }: Props) {
+function OwnHeaderAction({ label, onPress, icon, disabled, placement = "right", variant }: Props) {
   const navigation = useNavigation();
   const option = placement === "left" ? "headerLeft" : "headerRight";
   useEffect(() => () => navigation.setOptions({ [option]: undefined }), [navigation, option]);
@@ -25,9 +25,9 @@ function WebHeaderAction({ label, onPress, icon, disabled, placement = "right", 
 
 // A button in the header is the platform's own, the same as the back button beside it.
 export function HeaderAction(props: Props) {
-  // Stack.Toolbar is an iOS native toolbar; Android and web draw the header
-  // button with our own Button (Android has no @expo/ui dependency).
-  if (process.env.EXPO_OS !== "ios") return <WebHeaderAction {...props} />;
+  // Stack.Toolbar is an iOS native toolbar; Android draws the header button
+  // with our own Button (Android has no @expo/ui dependency).
+  if (process.env.EXPO_OS !== "ios") return <OwnHeaderAction {...props} />;
   const { label, onPress, icon, disabled, placement = "right" } = props;
   return (
     <Stack.Toolbar placement={placement}>

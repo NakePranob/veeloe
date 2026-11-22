@@ -1,6 +1,6 @@
 This is the Veeloe Controller, the real app, and the only design source: there is no canvas or prototype to follow. A screen is built from `src/shared/ui` (its tokens in `theme.ts` and its pieces) and looks like the screens already built, the Agent page and the Task page first: white screen, grey cards with no shadow or border, ink pills, colour only for state and the Agent. Match the label, hint line, button order and control shape of the closest finished screen — a value that opens a picker in one row, not one row per option — and give every state the code has (loading, empty, error, offline, light and dark) its own look. A screen that invents its own layout or repeats a label down a list is wrong even if it works.
 
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+This is an Expo/React Native app for iPhone, iPad and Android only: no web (ADR 0077). A web and desktop Controller will be written again, with Tauri and Next.js, once the features settle. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
 ## Expo has changed — do not trust your training data
 
@@ -14,7 +14,6 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 
 ```bash
 bunx expo install <package>  # ALWAYS use this to add a package: it resolves SDK-compatible versions
-bunx expo start --web        # web
 bunx expo run:ios            # a development build on the iOS Simulator
 bunx eas-cli build --profile preview --platform ios      # an internal build to install on a phone
 bunx eas-cli build --profile production --platform ios   # the App Store build (bumps the build number itself)
@@ -50,4 +49,4 @@ The design system (tokens, components, entities, widgets, dark mode) is the code
 - Colours come from `src/shared/ui/theme.ts` only (`colour-from-shared-ui`, ADR 0072), and text size and weight from `Text`'s `variant` (`type-from-shared-ui`, ADR 0074): a missing one is a new `type` token. Icons are `Icon`; never emoji. Motion uses `motion` from the theme.
 - No `as never` or `as unknown as` outside tests (`no-blind-casts`, ADR 0074): type it instead.
 - Name the app a screen follows and match its structure.
-- A screen is done once it has run on the iOS Simulator and on web, in light and dark and in both languages, with a screenshot of each. Checking on web alone is not enough, because web draws the header differently.
+- A screen is done once it has run on the iOS Simulator, on an iPhone and an iPad size, in light and dark and in both languages, with a screenshot of each; check Android too where it draws differently (the header button, sheets).

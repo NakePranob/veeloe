@@ -4,7 +4,6 @@ import { useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CreateKeyPage } from "../../pages/create-key";
 import { LockPage } from "../../pages/lock";
-import { OtherTabPage } from "../../pages/other-tab";
 import { StorageUnavailablePage } from "../../pages/storage-unavailable";
 import { listDevices } from "../../entities/device";
 import { useMachineLinks } from "../../features/machine-link";
@@ -14,15 +13,11 @@ import { useKeyActivity, useKeyStatus } from "../../shared/keystore";
 import { Button, Card, inform, SIDEBAR_WIDTH, space, Text, useAppFonts, useColors, useSplit } from "../../shared/ui";
 import { AgentInbox } from "../../widgets/agent-inbox";
 import { resources } from "../i18n/resources";
-import "../styles/web-reset";
 import { forgetThisDevice } from "./forget-device";
 import { useAppDatabase } from "./use-app-database";
 
-// Web draws its own header, with our button right against the screen's edge.
-const webHeader = process.env.EXPO_OS === "web" ? { headerRightContainerStyle: { paddingRight: space.lg } } : {};
-
 // The Character editor slides up over the Agent's page, as in the prototype. Android's sheet draws
-// no header, so Cancel and Done would be lost: there it is a modal. On web the stack shows one screen, so it is a page.
+// no header, so Cancel and Done would be lost: there it is a modal.
 const sheet = process.env.EXPO_OS === "android" ? ({ presentation: "modal", animation: "slide_from_bottom" } as const) : ({ presentation: "formSheet" } as const);
 
 // Before anything draws. The saved language replaces it once the database opens.
@@ -78,7 +73,7 @@ export function RootLayout() {
   const { task } = useGlobalSearchParams<{ task?: string }>();
   const keyStatus = useKeyStatus();
   const trackActivity = useKeyActivity();
-  const { state, takeOverHere, retry } = useAppDatabase();
+  const { state, retry } = useAppDatabase();
   // Nothing with text draws until the bundled fonts are in, so no screen changes font after it shows.
   const fontsReady = useAppFonts();
   const base = useColorScheme() === "dark" ? DarkTheme : DefaultTheme;
@@ -98,10 +93,9 @@ export function RootLayout() {
             <View style={{ flex: 1, flexDirection: "row", backgroundColor: colors.background }}>
               {split && <Sidebar selectedTaskId={task} />}
               <View style={{ flex: 1 }}>
-                <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTitleAlign: "center", headerBackButtonDisplayMode: "minimal", ...webHeader }}>
+                <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTitleAlign: "center", headerBackButtonDisplayMode: "minimal" }}>
                   <Stack.Screen name="index" options={split ? { headerShown: false } : {}} />
-                  {/* In split view the inbox is already beside the Task, so there is nothing to go back to.
-                      Web ignores headerBackVisible when a deep link anchors the inbox underneath, hence headerLeft. */}
+                  {/* In split view the inbox is already beside the Task, so there is nothing to go back to. */}
                   <Stack.Screen name="tasks/[task]/index" options={split ? { headerBackVisible: false, headerLeft: () => null } : {}} />
                   <Stack.Screen name="agents/[agent]/character" options={sheet} />
                   {/* The Task details sheet has no header: the grabber and the swipe close it, as the board draws it. */}
@@ -114,8 +108,6 @@ export function RootLayout() {
           {(keyStatus === "none" || keyStatus === "lost") && <CreateKeyPage lost={keyStatus === "lost"} />}
           {keyStatus === "checking" && <View style={{ flex: 1, backgroundColor: colors.background }} />}
         </DatabaseProvider>
-      ) : state.status === "elsewhere" ? (
-        <OtherTabPage onUseHere={() => void takeOverHere()} />
       ) : state.status === "failed" ? (
         <StorageUnavailablePage onRetry={retry} />
       ) : (

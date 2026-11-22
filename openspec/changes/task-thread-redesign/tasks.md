@@ -22,4 +22,4 @@
 ## 4. ตรวจ
 
 - [x] 4.1 `bun run check`, `bun run test` และ `bun run test:e2e` ผ่าน
-- [ ] 4.2 เปิดหน้า Task บน iOS Simulator และ web ทั้งสองโหมดและสองภาษา ครบทุกชนิด Item ใน `pages/task/model/items.ts` พร้อมภาพหน้าจอใน PR
+- [ ] 4.2 เปิดหน้า Task บน iOS Simulator (ขนาด iPhone และ iPad; ไม่มีเว็บแล้วตาม ADR 0077) ทั้งสองโหมดและสองภาษา ครบทุกชนิด Item ใน `pages/task/model/items.ts` พร้อมภาพหน้าจอใน PR

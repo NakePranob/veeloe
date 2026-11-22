@@ -43,7 +43,7 @@ export function CreateKeyPage({ lost }: { lost: boolean }) {
         ))}
         {problem && (
           <Text variant="subheadline" role="alert" style={{ textAlign: "center" }}>
-            {problem === "failed" ? t("failed") : t(process.env.EXPO_OS === "web" ? "unsupported.web" : "unsupported.app")}
+            {problem === "failed" ? t("failed") : t("unsupported")}
           </Text>
         )}
       </ScrollView>

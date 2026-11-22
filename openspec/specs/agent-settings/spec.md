@@ -55,9 +55,9 @@ supervisor SHALL ตอบ `agent.unknown` เมื่อไม่มี Agent 
 ### Requirement: ทุกเครื่องของ Member เห็นค่าใหม่
 เมื่อเปลี่ยนสำเร็จ supervisor SHALL ส่ง `agent.listed` ที่มีรายชื่อ Agent ทั้งหมดถึงทุก Member ใน trust ไม่ใช่แค่คนสั่ง Hub ส่งถึงทุก Controller ของ Member นั้น Controller SHALL ทับค่าเดิมของ Agent ด้วยค่าที่ Machine ส่งมาเท่านั้น และ SHALL ไม่แสดงค่าที่ตัวเองส่งไปว่าเปลี่ยนแล้วก่อนได้ `agent.listed`
 
-#### Scenario: แก้จากมือถือ เว็บเห็น
-- **WHEN** Owner เปลี่ยนชื่อ Agent จาก iPhone ขณะที่เว็บที่ Link แล้วเปิดหน้า Agent นั้นอยู่
-- **THEN** เว็บแสดงชื่อใหม่โดยไม่ต้องกดอะไร
+#### Scenario: แก้จากมือถือ iPad เห็น
+- **WHEN** Owner เปลี่ยนชื่อ Agent จาก iPhone ขณะที่ iPad ที่ Link แล้วเปิดหน้า Agent นั้นอยู่
+- **THEN** iPad แสดงชื่อใหม่โดยไม่ต้องกดอะไร
 
 ### Requirement: เปลี่ยน Provider หรือ model มีผลตั้งแต่ Task ถัดไป
 supervisor SHALL ตรึง Provider กับ model ให้แต่ละ Task ตั้งแต่คำขอแรกของ Task นั้นไป LLM และ SHALL ใช้ค่าที่ตรึงไว้กับทุกคำขอต่อจากนั้นของ Task เดียวกัน แม้ค่าของ Agent เปลี่ยนไปแล้วหรือ Runtime เริ่มใหม่ Task ที่เริ่มหลังเปลี่ยน SHALL ใช้ค่าใหม่ ยกเว้นเมื่อ Provider ที่ Task ตรึงไว้ไม่อยู่บน Machine แล้ว ซึ่ง supervisor SHALL ตรึง Task นั้นใหม่กับค่าปัจจุบันของ Agent การเปลี่ยนค่า SHALL ไม่ตัด Turn ที่ทำอยู่ และ SHALL ไม่เริ่ม worker ใหม่ (ADR 0042)

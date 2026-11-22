@@ -13,7 +13,8 @@ This repository holds Veeloe. The parts below are designed in `docs/adr/`:
   Task's history on that Machine.
 - **Hub** — the relay between Controllers and Runtimes. It runs no Agent and
   stores no Task content.
-- **Controller** — the mobile and web app. Every command it sends is signed by
+- **Controller** — the app for iPhone, iPad and Android (a web and desktop
+  Controller comes later, ADR 0077). Every command it sends is signed by
   the Member's own key.
 
 Status: pre-alpha. None of the parts works yet.
