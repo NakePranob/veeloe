@@ -52,10 +52,13 @@ export function TaskPage() {
   // must never read as "they scrolled up", or what arrives next is left off screen.
   const atEnd = useRef(true);
   const dragging = useRef(false);
+  // The scroll view's own end, not FlatList's: FlatList adds up the cells it has measured (a guess for one not laid out
+  // yet, such as an Approval card that just came) and leaves out the padding and the header's inset, so it stops short.
+  const toEnd = (animated: boolean) => scroll.current?.getNativeScrollRef()?.scrollToEnd({ animated });
   // Whoever sends wants to see the message land, even after scrolling up to read: follow the end again.
   const followEnd = () => {
     atEnd.current = true;
-    scroll.current?.scrollToEnd({ animated: true });
+    toEnd(true);
   };
   const composer = useComposer({ task, agent, machine, link, readOnly, events: events ?? undefined, stopError: status.stopError, onSend: followEnd });
   // The log only changes with its events; the clock matters only while an Approval is open and can still time out.
@@ -142,7 +145,7 @@ export function TaskPage() {
         // it is scrolled to the end. Not the empty page, whose centred Character would slide under the header.
         // And only while the reader is at the end, so new content never pulls them away from what they scrolled up to read.
         onContentSizeChange={() => {
-          if (atEnd.current && (shown.length > 0 || pending.length > 0)) scroll.current?.scrollToEnd({ animated: false });
+          if (atEnd.current && (shown.length > 0 || pending.length > 0)) toEnd(false);
         }}
         onScrollBeginDrag={() => {
           dragging.current = true;
