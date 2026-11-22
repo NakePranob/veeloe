@@ -25,7 +25,21 @@ export type MachineStatus = {
   budgetToday: { usedTokens: number; limitTokens: number } | null;
 };
 
-export const UNKNOWN_MACHINE_STATUS: MachineStatus = { online: null, providers: null, createError: null, updateError: null, deleteError: null, restoreError: null, stopError: null, providerError: null, version: null, features: null, lastError: null, diskFreeBytes: null, budgetToday: null };
+export const UNKNOWN_MACHINE_STATUS: MachineStatus = {
+  online: null,
+  providers: null,
+  createError: null,
+  updateError: null,
+  deleteError: null,
+  restoreError: null,
+  stopError: null,
+  providerError: null,
+  version: null,
+  features: null,
+  lastError: null,
+  diskFreeBytes: null,
+  budgetToday: null,
+};
 
 /** One page's usage request for one Machine: what it asked for, and how it went. */
 export type UsageStatus = {

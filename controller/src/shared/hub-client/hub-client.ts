@@ -33,20 +33,7 @@ export type HubClientOptions = {
  * (`protocol-envelope`): a Controller that forgot after a restart would accept
  * one replayed envelope.
  */
-export function startHubClient({
-  hubUrl,
-  secretKey,
-  trustedKeys,
-  onReady,
-  onEnvelope,
-  onHubError,
-  onCertificates,
-  onLinkRequest,
-  onRevoked,
-  seen: kept,
-  seenReady,
-  backoff = createBackoff(),
-}: HubClientOptions) {
+export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, onCertificates, onLinkRequest, onRevoked, seen: kept, seenReady, backoff = createBackoff() }: HubClientOptions) {
   const url = `${hubUrl.replace(/\/+$/, "")}/connect`;
   const signEnvelope = createSigner(secretKey, clockSequence());
   const seen = kept ?? new MemorySeenSequences();
@@ -101,7 +88,10 @@ export function startHubClient({
   }
 
   // The first connection waits for the kept numbers; a failure there still connects, as before.
-  void began.then(() => !stopped && connect(), () => !stopped && connect());
+  void began.then(
+    () => !stopped && connect(),
+    () => !stopped && connect(),
+  );
   return {
     /** The sent envelope's sig, which answers name it by; null when not connected, and nothing was signed or sent. */
     send(out: Outgoing): string | null {

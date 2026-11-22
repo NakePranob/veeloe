@@ -36,6 +36,12 @@ export function decodeChunks(chunks: readonly string[]): Uint8Array {
 
 /** A name that can go under the cache folder on every platform, and still says what the file is. */
 export function safeFileName(name: string): string {
-  const base = name.split(/[\\/]/).at(-1)?.replace(/[\0-\x1f\x7f:*?"<>|]/g, "_").trim().slice(0, 120) ?? "";
+  const base =
+    name
+      .split(/[\\/]/)
+      .at(-1)
+      ?.replace(/[\0-\x1f\x7f:*?"<>|]/g, "_")
+      .trim()
+      .slice(0, 120) ?? "";
   return base === "" || base === "." || base === ".." ? "file" : base;
 }

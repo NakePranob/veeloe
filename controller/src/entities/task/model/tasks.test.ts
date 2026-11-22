@@ -68,7 +68,10 @@ test("a summary's status comes from its latest known event: failed, still runnin
   const status = async () => {
     const summaries = await database.query<TaskSummary>(LIST_TASK_SUMMARIES);
     const events = await database.query<TaskEventRow>("SELECT * FROM task_event WHERE task_id = 't1' ORDER BY seq");
-    const fromSummary = statusOf(summaries.find((s) => s.id === "t1"), true);
+    const fromSummary = statusOf(
+      summaries.find((s) => s.id === "t1"),
+      true,
+    );
     // The Task screen works it out from the events it has, and must agree with the lists.
     expect(statusOf(latestOf(events), true)).toBe(fromSummary);
     return fromSummary;
@@ -93,7 +96,10 @@ test("an error naming the envelope marks only that message as failed", async () 
   expect(await failPendingMessage(database, "sig-2", "agent.busy")).toBe(true);
   expect(await failPendingMessage(database, "sig-unknown", "agent.busy")).toBe(false);
   const rows = await database.query<PendingRow>("SELECT id, error FROM pending_message ORDER BY id");
-  expect(rows).toEqual([{ id: "m1", error: null }, { id: "m2", error: "agent.busy" }] as never);
+  expect(rows).toEqual([
+    { id: "m1", error: null },
+    { id: "m2", error: "agent.busy" },
+  ] as never);
 });
 
 test("a Turn a Stop ended is finished, and one a restart cut off says so", () => {

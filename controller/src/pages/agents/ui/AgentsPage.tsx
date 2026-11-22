@@ -11,7 +11,6 @@ import { useNow } from "../../../shared/lib";
 import { Button, Card, Dot, Empty, Icon, Note, opacity, Screen, Section, Tap, Text, confirm, inform, space } from "../../../shared/ui";
 import { daysLeft } from "../model/trash";
 
-
 // The Agents board: each paired Machine's Agents under its name, then the ones a Machine deleted
 // and still lets us restore for 30 days (`agent-trash`).
 // ponytail: an offline Machine's "last seen" is left out: nothing stores when a Machine was last seen.

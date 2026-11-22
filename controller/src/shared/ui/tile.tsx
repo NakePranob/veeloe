@@ -46,13 +46,13 @@ export function Tile({ icon, top, value, unit, title, detail, height, href, onPr
         </Text>
       )}
       <OnCard.Provider value>
-      {typeof detail === "string" ? (
-        <Text variant="caption" tone="body" numberOfLines={1}>
-          {detail}
-        </Text>
-      ) : (
-        detail
-      )}
+        {typeof detail === "string" ? (
+          <Text variant="caption" tone="body" numberOfLines={1}>
+            {detail}
+          </Text>
+        ) : (
+          detail
+        )}
       </OnCard.Provider>
     </View>
   );

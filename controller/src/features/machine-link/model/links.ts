@@ -1,4 +1,18 @@
-import { createBackoff, fromBase64url, hashBytes, parseMessage, publicKeyOf, sealFor, toBase64url, type AgentCreateBody, type AgentUpdateBody, type ApprovalAnswerBody, type DeviceLink, type HubLinkRequest, type SignedPart } from "@veeloe/protocol-ts";
+import {
+  createBackoff,
+  fromBase64url,
+  hashBytes,
+  parseMessage,
+  publicKeyOf,
+  sealFor,
+  toBase64url,
+  type AgentCreateBody,
+  type AgentUpdateBody,
+  type ApprovalAnswerBody,
+  type DeviceLink,
+  type HubLinkRequest,
+  type SignedPart,
+} from "@veeloe/protocol-ts";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";

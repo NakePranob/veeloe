@@ -62,7 +62,11 @@ export function MachinesPage() {
               const budget = status?.budgetToday;
               const count = t("agents", { count: agents.filter((a) => a.machine_id === machine.id).length });
               return (
-                <Tap key={machine.id} href={`/machines/${machine.id}`} style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md, opacity: on === false ? opacity.retired : 1 }}>
+                <Tap
+                  key={machine.id}
+                  href={`/machines/${machine.id}`}
+                  style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md, opacity: on === false ? opacity.retired : 1 }}
+                >
                   <Icon name="machine" size="md" color={on ? "green" : "tertiaryLabel"} />
                   <View style={{ flex: 1, gap: space.smd }}>
                     <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.sm }}>

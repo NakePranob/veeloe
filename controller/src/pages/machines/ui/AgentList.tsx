@@ -91,4 +91,3 @@ function AgentRowView({ line, online, compact }: { line: AgentLine; online: bool
     </Tap>
   );
 }
-

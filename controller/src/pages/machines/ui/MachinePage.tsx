@@ -35,11 +35,7 @@ export function MachinePage() {
   }, [machine?.id, link]);
 
   if (!machine) {
-    return (
-      <Screen title="Machine">
-        {machines && <Empty icon="machine" title={t("missing.title")} detail={t("missing.body")} />}
-      </Screen>
-    );
+    return <Screen title="Machine">{machines && <Empty icon="machine" title={t("missing.title")} detail={t("missing.body")} />}</Screen>;
   }
 
   // Each Agent by its latest Task, as the Inbox reads it; summaries come newest first.
@@ -152,4 +148,3 @@ export function MachinePage() {
     </Screen>
   );
 }
-

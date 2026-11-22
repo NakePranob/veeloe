@@ -20,7 +20,9 @@ export function FailedCard({ code, agentName }: { code: string; agentName: strin
   return (
     <Card tone="danger" style={{ padding: space.inset, gap: space.smd }}>
       <Label icon="failed" iconColor="red" variant="subheadline" tone="label" strong>
-        <Text variant="callout" tone="danger" strong>{t("failedTitle")}</Text>
+        <Text variant="callout" tone="danger" strong>
+          {t("failedTitle")}
+        </Text>
       </Label>
       <Text variant="callout" tone="body">
         {describeError({ code })} {t("failedBody", { name: agentName })}
@@ -36,7 +38,9 @@ export function CompactedCard({ item }: { item: Extract<Item, { kind: "compacted
   return (
     <Pressable onPress={() => setOpen(!open)} accessibilityRole="button">
       <Card style={{ padding: space.inset, gap: space.smd }}>
-        <Label icon="info" tone="label" strong variant="subheadline">{t("compacted.title", { when: when(item.at, language) })}</Label>
+        <Label icon="info" tone="label" strong variant="subheadline">
+          {t("compacted.title", { when: when(item.at, language) })}
+        </Label>
         <Text variant="callout" tone="body" numberOfLines={open ? undefined : 2} selectable>
           {item.summary}
         </Text>
@@ -71,8 +75,12 @@ export function FileCard({ item, onOpen }: { item: Extract<Item, { kind: "file" 
           <Icon name="file" size="md" color="link" />
         </Inset>
         <View style={{ flex: 1 }}>
-          <Text variant="callout" strong numberOfLines={1}>{item.name}</Text>
-          <Text variant="caption" tone="secondary">{t("file.size", { size: Math.max(1, Math.round(item.size / 1024)) })}</Text>
+          <Text variant="callout" strong numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text variant="caption" tone="secondary">
+            {t("file.size", { size: Math.max(1, Math.round(item.size / 1024)) })}
+          </Text>
         </View>
         <Button label={opening ? t("file.opening") : t("file.open")} variant="primary" disabled={opening} onPress={() => void open()} />
       </View>
@@ -91,7 +99,9 @@ export function BudgetCard({ machine, agent, readOnly }: { machine: string; agen
       <Label icon="info" iconColor="orange" tone="label" strong variant="subheadline">
         {t("budget.out")}
       </Label>
-      <Text variant="callout" tone="body">{t("budget.body", { machine })}</Text>
+      <Text variant="callout" tone="body">
+        {t("budget.body", { machine })}
+      </Text>
       {/* How much of today's Budget went, from the Agent's usage; a deleted Agent's stand-in has none. */}
       {!!agent.budget && (
         <>
@@ -116,8 +126,12 @@ export function InterruptedCard({ machine, agentName, onContinue, readOnly }: { 
   const t = useT("task");
   return (
     <Card style={{ padding: space.inset }}>
-      <Label icon="offline" iconColor="label" tone="label" strong variant="subheadline">{t("interrupted.title", { machine })}</Label>
-      <Text variant="callout" tone="body">{t("interrupted.body", { name: agentName })}</Text>
+      <Label icon="offline" iconColor="label" tone="label" strong variant="subheadline">
+        {t("interrupted.title", { machine })}
+      </Label>
+      <Text variant="callout" tone="body">
+        {t("interrupted.body", { name: agentName })}
+      </Text>
       {/* Carry on sends a message, which a deleted Agent can no longer take. */}
       {!readOnly && (
         <View style={{ flexDirection: "row" }}>

@@ -89,9 +89,7 @@ export function TaskPage() {
         online={status.online !== false && !!link}
         now={now}
         // Answering takes a fresh unlock in v0.3 (ADR 0012); the Controller already asks for it when it unlocks.
-        onAnswer={({ decision, allowAlways }) =>
-          link && machine ? link.answerApproval(machine, { agent: agent.id, task, request: item.approval.request, decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) }) : null
-        }
+        onAnswer={({ decision, allowAlways }) => (link && machine ? link.answerApproval(machine, { agent: agent.id, task, request: item.approval.request, decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) }) : null)}
         onSteer={() => input.current?.focus()}
       />
     ) : item.kind === "stopped" ? (

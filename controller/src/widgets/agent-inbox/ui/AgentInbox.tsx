@@ -162,7 +162,13 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
           {tabs}
         </>
       }
-      ListEmptyComponent={tab !== "all" ? <Empty icon="inbox" title={t(`emptyTab.${tab}`)} /> : <Empty icon="agent" title={t("noAgents.title")} detail={t("noAgents.body")} action={<Button label={t("noAgents.action")} variant="primary" onPress={() => router.push("/agents/new")} />} />}
+      ListEmptyComponent={
+        tab !== "all" ? (
+          <Empty icon="inbox" title={t(`emptyTab.${tab}`)} />
+        ) : (
+          <Empty icon="agent" title={t("noAgents.title")} detail={t("noAgents.body")} action={<Button label={t("noAgents.action")} variant="primary" onPress={() => router.push("/agents/new")} />} />
+        )
+      }
       // No separators: rows are set apart by their spacing, not by lines.
       renderItem={({ item }) => (
         <InboxRow

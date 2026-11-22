@@ -45,16 +45,26 @@ beforeEach(async () => {
 const rows = () => database.query<{ agent_id: string; day: string; tokens: number }>("SELECT agent_id, day, tokens FROM usage_day ORDER BY agent_id, day");
 
 test("a Machine's answer is kept day by day, and a later answer for the same day replaces it", async () => {
-  await saveUsageHistory(database, "machine-1", body([{ agent: "a1", days: [{ day: "2026-11-05", tokens: 100 }, { day: "2026-11-06", tokens: 200 }] }]));
+  await saveUsageHistory(
+    database,
+    "machine-1",
+    body([
+      {
+        agent: "a1",
+        days: [
+          { day: "2026-11-05", tokens: 100 },
+          { day: "2026-11-06", tokens: 200 },
+        ],
+      },
+    ]),
+  );
   expect(await rows()).toEqual([
     { agent_id: "a1", day: "2026-11-05", tokens: 100 },
     { agent_id: "a1", day: "2026-11-06", tokens: 200 },
   ]);
 
   await saveUsageHistory(database, "machine-1", body([{ agent: "a1", days: [{ day: "2026-11-06", tokens: 250 }] }]));
-  expect(await rows()).toEqual([
-    { agent_id: "a1", day: "2026-11-06", tokens: 250 },
-  ]);
+  expect(await rows()).toEqual([{ agent_id: "a1", day: "2026-11-06", tokens: 250 }]);
 });
 
 test("the answered range is the truth: days it omits, days it corrects and Agents it leaves out all go", async () => {

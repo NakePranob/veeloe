@@ -27,10 +27,13 @@ export function saveCertificates(database: Database, { member, own, ownName, now
       if (body.type === "device.link") {
         const [row] = await transaction.all<{ linked_by: string | null }>("SELECT linked_by FROM device WHERE key = ?", [body.key]);
         if (row?.linked_by) continue;
-        await transaction.run(
-          "INSERT INTO device (key, member_id, name, linked_by, linked_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (key) DO UPDATE SET name = excluded.name, linked_by = excluded.linked_by, linked_at = excluded.linked_at",
-          [body.key, member, body.name, body.by, body.at],
-        );
+        await transaction.run("INSERT INTO device (key, member_id, name, linked_by, linked_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (key) DO UPDATE SET name = excluded.name, linked_by = excluded.linked_by, linked_at = excluded.linked_at", [
+          body.key,
+          member,
+          body.name,
+          body.by,
+          body.at,
+        ]);
         if (body.by !== own && body.key !== own && body.at > now - NEWS_MS) news.push(body);
       } else {
         const links = await transaction.all<{ key: string; by: string }>("SELECT key, linked_by AS by FROM device WHERE linked_by IS NOT NULL");

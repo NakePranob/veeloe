@@ -17,13 +17,6 @@ export function ExpiryPicker({ seconds, disabled, onPick }: { seconds: number; d
   const choices: number[] = EXPIRIES.map((minutes) => minutes * 60);
   if (!choices.includes(seconds)) choices.push(seconds);
   return (
-    <Select
-      label={t("approval.waiting")}
-      value={String(seconds)}
-      options={choices.map((s) => ({ value: String(s), label: approvalLabel(s, t) }))}
-      onChange={(next) => onPick(Number(next))}
-      disabled={disabled}
-      cancel={t("delete.cancel")}
-    />
+    <Select label={t("approval.waiting")} value={String(seconds)} options={choices.map((s) => ({ value: String(s), label: approvalLabel(s, t) }))} onChange={(next) => onPick(Number(next))} disabled={disabled} cancel={t("delete.cancel")} />
   );
 }

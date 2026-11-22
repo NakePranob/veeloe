@@ -11,7 +11,10 @@ export const SHOWN = 6;
 /** In the board's order (needs you, working, the rest), keeping each group's own order. */
 export function ordered<R extends { status: TaskStatus }>(rows: R[]): R[] {
   const rank: Record<Group, number> = { needsYou: 0, working: 1, idle: 2 };
-  return rows.map((row, i) => ({ row, i })).sort((a, b) => rank[groupOf(a.row.status)] - rank[groupOf(b.row.status)] || a.i - b.i).map(({ row }) => row);
+  return rows
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => rank[groupOf(a.row.status)] - rank[groupOf(b.row.status)] || a.i - b.i)
+    .map(({ row }) => row);
 }
 
 /** How many Agents are in each group. */

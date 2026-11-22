@@ -97,11 +97,7 @@ function Editor({ agent, others }: { agent: AgentRow; others: Look[] }) {
           ))}
         </Card>
       </Stage>
-      {offline && (
-        <Note tone="offline">
-          {t("offline")}
-        </Note>
-      )}
+      {offline && <Note tone="offline">{t("offline")}</Note>}
       {save.sending && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }}>
           <Spinner />

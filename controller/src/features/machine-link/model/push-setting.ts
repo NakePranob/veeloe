@@ -7,9 +7,7 @@ export const PUSH_READY = false;
 
 /** This Controller's own switch; the other devices of the Member keep theirs (ADR 0044). */
 export async function savePushEnabled(database: Database, enabled: boolean) {
-  await database.write(["device_setting"], ({ run }) =>
-    run("INSERT INTO device_setting (key, value) VALUES ('push', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", [enabled ? "on" : "off"]),
-  );
+  await database.write(["device_setting"], ({ run }) => run("INSERT INTO device_setting (key, value) VALUES ('push', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", [enabled ? "on" : "off"]));
 }
 
 export function usePushEnabled() {

@@ -137,13 +137,13 @@ function AgentView({ agent }: { agent: AgentRow }) {
       </Stage>
       {away ? (
         <Note tone="warning">
-          <Text variant="footnote" strong tone="body">{t("away.title", { machine: machine?.name })} </Text>
+          <Text variant="footnote" strong tone="body">
+            {t("away.title", { machine: machine?.name })}{" "}
+          </Text>
           {t("away.body", { name: agent.name })}
         </Note>
       ) : (
-        offline && (
-          <Note tone="offline">{t("needsOnline")}</Note>
-        )
+        offline && <Note tone="offline">{t("needsOnline")}</Note>
       )}
       {problem && <Note tone="warning">{problem === "provider" ? t("problem.provider", { provider: agent.provider }) : t("problem.model", { provider: agent.provider, model: agent.model })}</Note>}
 
@@ -171,7 +171,11 @@ function AgentView({ agent }: { agent: AgentRow }) {
                 {t("budget.label")}
               </Text>
               <Text variant="caption" tone="body">
-                {stale && agent.usage_day ? t("budget.asOf", { when: agent.usage_day }) : away && machine?.usage_fetched_at ? t("budget.asOf", { when: when(machine.usage_fetched_at, language, now) }) : t("budget.perDay", { budget: formatTokens(agent.budget, language) })}
+                {stale && agent.usage_day
+                  ? t("budget.asOf", { when: agent.usage_day })
+                  : away && machine?.usage_fetched_at
+                    ? t("budget.asOf", { when: when(machine.usage_fetched_at, language, now) })
+                    : t("budget.perDay", { budget: formatTokens(agent.budget, language) })}
               </Text>
             </View>
           }
@@ -218,11 +222,7 @@ export function AgentPage() {
   const agent = agents?.find((a) => a.id === id);
   if (!agent) {
     // Nothing until the list lands, so a slow read never flashes "missing".
-    return (
-      <Screen title="Agent">
-        {agents && <Empty icon="agent" title={t("missing.title")} detail={t("missing.body")} />}
-      </Screen>
-    );
+    return <Screen title="Agent">{agents && <Empty icon="agent" title={t("missing.title")} detail={t("missing.body")} />}</Screen>;
   }
   // Keyed by the Agent so a draft name never carries over to another one.
   return <AgentView key={agent.id} agent={agent} />;

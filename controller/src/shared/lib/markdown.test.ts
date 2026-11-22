@@ -18,7 +18,10 @@ test("a quote keeps its lines together, and a table keeps its header and rows", 
     {
       kind: "table",
       header: [[{ text: "Name" }], [{ text: "Value" }]],
-      rows: [[[{ text: "a" }], [{ text: "1" }]], [[{ text: "b" }], [{ text: "2" }]]],
+      rows: [
+        [[{ text: "a" }], [{ text: "1" }]],
+        [[{ text: "b" }], [{ text: "2" }]],
+      ],
     },
   ]);
 });

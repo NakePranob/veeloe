@@ -24,7 +24,11 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
   const agent = agents.find((entry) => entry.id === scope);
   const egress = agent ? agentEgressOf(agent) : machineEgressOf(machine);
   const agentNames = agents.map((entry) => entry.name);
-  const who = agent ? t("egress.whoOne", { machine: machine.name, agent: agent.name }) : agentNames.length ? t("egress.whoNamed", { machine: machine.name, agents: formatList(agentNames, language) }) : t("egress.who", { machine: machine.name });
+  const who = agent
+    ? t("egress.whoOne", { machine: machine.name, agent: agent.name })
+    : agentNames.length
+      ? t("egress.whoNamed", { machine: machine.name, agents: formatList(agentNames, language) })
+      : t("egress.who", { machine: machine.name });
 
   async function change(next: string[], prompt: string) {
     if (!status.online || !link) return inform(t("egress.offline.title"), t("egress.offline.body", { machine: machine.name }));

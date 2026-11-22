@@ -16,7 +16,5 @@ export function useUsageWindow(): UsageWindow {
 
 /** Remembered on this device, like the language. */
 export function saveUsageWindow(database: Database, days: UsageWindow) {
-  return database.write(["device_setting"], ({ run }) =>
-    run("INSERT INTO device_setting (key, value) VALUES ('usage.window', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", [String(days)]),
-  );
+  return database.write(["device_setting"], ({ run }) => run("INSERT INTO device_setting (key, value) VALUES ('usage.window', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", [String(days)]));
 }

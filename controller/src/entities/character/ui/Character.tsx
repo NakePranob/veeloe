@@ -60,7 +60,16 @@ const native = process.env.EXPO_OS !== "web";
 // The parts are the shell's colour, darker; white mixes in the lit side.
 function mix(hex: string, k: number, to = [26, 32, 48]) {
   const n = parseInt(hex.slice(1), 16);
-  return "#" + [n >> 16, (n >> 8) & 255, n & 255].map((v, i) => Math.round(v + (to[i] - v) * k).toString(16).padStart(2, "0")).join("");
+  return (
+    "#" +
+    [n >> 16, (n >> 8) & 255, n & 255]
+      .map((v, i) =>
+        Math.round(v + (to[i] - v) * k)
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+  );
 }
 
 function grey(hex: string) {
@@ -68,7 +77,6 @@ function grey(hex: string) {
   const l = Math.round(0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255));
   return "#" + l.toString(16).padStart(2, "0").repeat(3);
 }
-
 
 // One slice of the head: an SVG on the shared grid, inside a view that moves on its own.
 function Layer({ style, children }: { style?: object; children: ReactNode }) {
@@ -111,16 +119,7 @@ function TopPart({ top, y, c }: { top: Top; y: number; c: string }) {
 function SidePart({ sides, x: [l, r], y, c }: { sides: Sides; x: [number, number]; y: number; c: string }) {
   if (sides === "ears") return [l, r].map((x) => <Circle key={x} cx={x} cy={y} r={7.5} fill={c} />);
   if (sides === "pods") return [l, r].map((x) => <Rect key={x} x={x - 5} y={y - 11} width={10} height={22} rx={5} fill={c} />);
-  if (sides === "fins")
-    return (
-      <Path
-        d={`M${l + 3} ${y + 4}L${l - 8} ${y - 12}L${l + 3} ${y - 6}ZM${r - 3} ${y + 4}L${r + 8} ${y - 12}L${r - 3} ${y - 6}Z`}
-        fill={c}
-        stroke={c}
-        strokeWidth={3}
-        strokeLinejoin="round"
-      />
-    );
+  if (sides === "fins") return <Path d={`M${l + 3} ${y + 4}L${l - 8} ${y - 12}L${l + 3} ${y - 6}ZM${r - 3} ${y + 4}L${r + 8} ${y - 12}L${r - 3} ${y - 6}Z`} fill={c} stroke={c} strokeWidth={3} strokeLinejoin="round" />;
   return null;
 }
 
@@ -129,8 +128,7 @@ function DecalPart({ decal, visor: [vx, vy, vw, vh], c }: { decal: Decal; visor:
   if (decal === "brow") return <Rect x={fx - 14} y={vy - 8} width={28} height={4} rx={2} fill={c} />;
   if (decal === "lights") return [-6, 0, 6].map((d) => <Circle key={d} cx={fx + d} cy={vy - 6} r={2.1} fill={c} />);
   const gy = vy + vh + 4;
-  if (decal === "grille")
-    return [-6, 0, 6].map((d) => <Rect key={d} x={fx + d - 1.4} y={gy} width={2.8} height={Math.min(7, 81 - gy)} rx={1.4} fill={c} />);
+  if (decal === "grille") return [-6, 0, 6].map((d) => <Rect key={d} x={fx + d - 1.4} y={gy} width={2.8} height={Math.min(7, 81 - gy)} rx={1.4} fill={c} />);
   return null;
 }
 
@@ -224,37 +222,19 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
     if (mood === "waiting") loops.push(swing(v.wave, 0, 1, 800));
     if (mood === "thinking") loops.push(swing(v.pulse, 1, 0.25, 600));
     // A short shiver every few seconds, using the nod.
-    if (mood === "stuck")
-      loops.push(
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(2600),
-            ...[1, 0, 1, 0].map((toValue) => Animated.timing(v.nod, { toValue, duration: 70, useNativeDriver: native })),
-          ]),
-        ),
-      );
+    if (mood === "stuck") loops.push(Animated.loop(Animated.sequence([Animated.delay(2600), ...[1, 0, 1, 0].map((toValue) => Animated.timing(v.nod, { toValue, duration: 70, useNativeDriver: native }))])));
     if (mood !== "done" && mood !== "offline" && mood !== "failed")
-      loops.push(
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(3800),
-            Animated.timing(v.blink, { toValue: 0.1, duration: 70, useNativeDriver: native }),
-            Animated.timing(v.blink, { toValue: 1, duration: 110, useNativeDriver: native }),
-          ]),
-        ),
-      );
+      loops.push(Animated.loop(Animated.sequence([Animated.delay(3800), Animated.timing(v.blink, { toValue: 0.1, duration: 70, useNativeDriver: native }), Animated.timing(v.blink, { toValue: 1, duration: 110, useNativeDriver: native })])));
     loops.forEach((loop) => loop.start());
     return () => {
       loops.forEach((loop) => loop.stop());
-      for (const value of [v.float, v.nod])
-        Animated.timing(value, { toValue: 0, duration: motion.duration.fast, easing: motion.easeOut, useNativeDriver: native }).start();
+      for (const value of [v.float, v.nod]) Animated.timing(value, { toValue: 0, duration: motion.duration.fast, easing: motion.easeOut, useNativeDriver: native }).start();
       v.blink.setValue(1);
       v.pulse.setValue(1);
     };
   }, [mood, reduce, v]);
 
-  const deg = (value: Animated.Value, range: number[], out: number[]) =>
-    value.interpolate({ inputRange: range, outputRange: out.map((n) => `${n}deg`) });
+  const deg = (value: Animated.Value, range: number[], out: number[]) => value.interpolate({ inputRange: range, outputRange: out.map((n) => `${n}deg`) });
   const slide = (k: number) => ({ translateX: v.turn.interpolate({ inputRange: [-1, 1], outputRange: [-k * u, k * u] }) });
 
   return (
@@ -298,12 +278,7 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
                   <SidePart sides={look.sides} x={s.side} y={fy} c={part} />
                 </Layer>
                 {/* The top part sways with the float and boings after a hop, a beat behind the head. */}
-                <Animated.View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    { transformOrigin: `50% ${s.top}%`, transform: [{ rotate: deg(v.hop, [0, 0.3, 0.5, 0.7, 0.85, 1], [0, 14, -10, 6, -3, 0]) }] },
-                  ]}
-                >
+                <Animated.View style={[StyleSheet.absoluteFill, { transformOrigin: `50% ${s.top}%`, transform: [{ rotate: deg(v.hop, [0, 0.3, 0.5, 0.7, 0.85, 1], [0, 14, -10, 6, -3, 0]) }] }]}>
                   <Layer style={{ transformOrigin: `50% ${s.top}%`, transform: [slide(2.5), { rotate: deg(v.float, [0, 1], [-3, 3]) }] }}>
                     <TopPart top={look.top} y={s.top} c={part} />
                   </Layer>
@@ -347,11 +322,7 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
                     <Layer
                       style={{
                         transformOrigin: `50% ${fy}%`,
-                        transform: [
-                          { translateX: Animated.multiply(v.lookX, u) },
-                          { translateY: Animated.multiply(v.lookY, u) },
-                          { scaleY: Animated.multiply(v.open, v.blink) },
-                        ],
+                        transform: [{ translateX: Animated.multiply(v.lookX, u) }, { translateY: Animated.multiply(v.lookY, u) }, { scaleY: Animated.multiply(v.open, v.blink) }],
                       }}
                     >
                       {[-12, 12].map((dx) =>
@@ -382,16 +353,7 @@ export function Character({ look, mood, size = 44, still, backdrop }: Props) {
                   {/* Waiting on a person: the one orange in the app floats up beside the head and waves. */}
                   {mood === "waiting" && (
                     <Layer style={{ transformOrigin: `${s.hand[0]}% ${s.hand[1] + 18}%`, transform: [{ rotate: deg(v.wave, [0, 1], [-10, 14]) }] }}>
-                      <Rect
-                        x={s.hand[0] - 7.5}
-                        y={s.hand[1] - 8.5}
-                        width={15}
-                        height={17}
-                        rx={5.5}
-                        fill={colors.orange}
-                        stroke={backdrop ? colors[backdrop] : "none"}
-                        strokeWidth={backdrop ? 3 : 0}
-                      />
+                      <Rect x={s.hand[0] - 7.5} y={s.hand[1] - 8.5} width={15} height={17} rx={5.5} fill={colors.orange} stroke={backdrop ? colors[backdrop] : "none"} strokeWidth={backdrop ? 3 : 0} />
                     </Layer>
                   )}
                 </Animated.View>

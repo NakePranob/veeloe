@@ -110,10 +110,7 @@ for (const path of files) {
 
     if (parts[0] === "app") {
       // A route re-exports a page; the root layout may take src/app.
-      const ok =
-        (to?.layer === "pages" && to.slice && isRoot(target, join(root, "src/pages", to.slice))) ||
-        (to?.layer === "app" && isRoot(target, join(root, "src/app"))) ||
-        (!to && !rel(target).startsWith("src/"));
+      const ok = (to?.layer === "pages" && to.slice && isRoot(target, join(root, "src/pages", to.slice))) || (to?.layer === "app" && isRoot(target, join(root, "src/app"))) || (!to && !rel(target).startsWith("src/"));
       if (!ok) fail("routes-import-pages", file, `imports ${spec}; a route imports only src/pages/<name> or src/app`);
       continue;
     }

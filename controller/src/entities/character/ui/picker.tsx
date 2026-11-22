@@ -22,7 +22,10 @@ function useTint(color: string, amount: { light: number; dark: number }) {
 function mixToward(hex: string, to: string, k: number) {
   const a = parseInt(hex.slice(1), 16);
   const b = parseInt(to.slice(1), 16);
-  const ch = (x: number, y: number) => Math.round(x + (y - x) * k).toString(16).padStart(2, "0");
+  const ch = (x: number, y: number) =>
+    Math.round(x + (y - x) * k)
+      .toString(16)
+      .padStart(2, "0");
   return "#" + ch(a >> 16, b >> 16) + ch((a >> 8) & 255, (b >> 8) & 255) + ch(a & 255, b & 255);
 }
 
@@ -36,7 +39,21 @@ export function Stage({ color, bleed, gap = space.md, children }: { color: strin
   if (!bleed) return <View style={{ alignItems: "center", gap, padding: space.lg, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: background }}>{children}</View>;
   return (
     // The Screen pads its column by space.lg and starts space.sm down; the stage cancels both.
-    <View style={{ alignItems: "center", gap, marginHorizontal: -space.lg, marginTop: -space.sm, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, borderCurve: "continuous", backgroundColor: background }}>
+    <View
+      style={{
+        alignItems: "center",
+        gap,
+        marginHorizontal: -space.lg,
+        marginTop: -space.sm,
+        paddingHorizontal: space.lg,
+        paddingTop: space.sm,
+        paddingBottom: space.lg,
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
+        borderCurve: "continuous",
+        backgroundColor: background,
+      }}
+    >
       <Stack.Screen options={{ headerStyle: { backgroundColor: background }, headerShadowVisible: false, headerTransparent: false }} />
       {/* What a pull past the top uncovers is the same tint, not the white screen. */}
       <View style={{ position: "absolute", left: 0, right: 0, bottom: "100%", height: 1000, backgroundColor: background }} />

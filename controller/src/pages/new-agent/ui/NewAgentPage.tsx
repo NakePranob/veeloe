@@ -79,13 +79,15 @@ export function NewAgentPage() {
 
       <Section title={t("where.heading")} footer={t("where.footer")}>
         {machine && (
-          <Select cancel={t("pickCancel")}
+          <Select
+            cancel={t("pickCancel")}
             label={t("machine.label")}
             value={machine.id}
             options={machines.map((m) => ({
               value: m.id,
               // ponytail: Select has no detail line, so the state rides in the value; the board's OS line has no data.
-              label: statuses[m.id]?.online === false ? t("machine.offline", { name: m.name }) : statuses[m.id]?.online ? t("machine.online", { name: m.name }) : m.name }))}
+              label: statuses[m.id]?.online === false ? t("machine.offline", { name: m.name }) : statuses[m.id]?.online ? t("machine.online", { name: m.name }) : m.name,
+            }))}
             onChange={(id) => {
               setMachineId(id);
               setProvider(null);

@@ -29,9 +29,7 @@ export function createSeenSequences(database: Database) {
       if (kept !== undefined && seq <= kept) return;
       last.set(senderKey, seq);
       writes = database
-        .write(["seen"], (transaction) =>
-          transaction.run("INSERT INTO seen_sequence (sender_key, seq) VALUES (?, ?) ON CONFLICT(sender_key) DO UPDATE SET seq = excluded.seq WHERE excluded.seq > seen_sequence.seq", [senderKey, seq]),
-        )
+        .write(["seen"], (transaction) => transaction.run("INSERT INTO seen_sequence (sender_key, seq) VALUES (?, ?) ON CONFLICT(sender_key) DO UPDATE SET seq = excluded.seq WHERE excluded.seq > seen_sequence.seq", [senderKey, seq]))
         .catch(() => undefined);
     },
   };

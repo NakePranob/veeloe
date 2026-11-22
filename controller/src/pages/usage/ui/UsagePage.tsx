@@ -88,7 +88,11 @@ function Overview({ machines, agents, rows, statuses, days }: { machines: Machin
   const language = useLanguage();
   const ids = new Set(agents.map((agent) => agent.id));
   // Each Machine's own today, or the last day it gave us; the window ends at the latest of them.
-  const to = [...machines.map((m) => statuses[m.id]?.to ?? null), ...rows.filter((row) => ids.has(row.agent_id)).map((row) => row.day)].filter((d): d is string => !!d).sort().at(-1) ?? null;
+  const to =
+    [...machines.map((m) => statuses[m.id]?.to ?? null), ...rows.filter((row) => ids.has(row.agent_id)).map((row) => row.day)]
+      .filter((d): d is string => !!d)
+      .sort()
+      .at(-1) ?? null;
   const from = to ? shiftDay(to, -(days - 1)) : null;
   const totals = from && to ? dailyTotals(rows, ids, from, to) : [];
   const today = totals.at(-1)?.tokens ?? 0;

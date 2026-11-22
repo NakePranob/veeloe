@@ -19,11 +19,7 @@ export function AllowlistPage() {
   const agent = agents?.find((a) => a.id === id);
   const machine = machines?.find((m) => m.id === agent?.machine_id);
   if (!agent || !machine) {
-    return (
-      <Screen title={t("title")}>
-        {agents && machines && <Empty icon="shield" title={t("missing.title")} detail={t("missing.body")} />}
-      </Screen>
-    );
+    return <Screen title={t("title")}>{agents && machines && <Empty icon="shield" title={t("missing.title")} detail={t("missing.body")} />}</Screen>;
   }
   // Keyed by the Agent so a draft entry never carries over to another one.
   return <AllowlistView key={agent.id} agentId={agent.id} agentName={agent.name} machineId={machine.id} stored={allowlistOf(agent)} />;
@@ -67,25 +63,30 @@ function AllowlistView({ agentId, agentName, machineId, stored }: { agentId: str
   const usedBy = only ? allowlist.find((item) => covers(item, only)) : undefined;
   return (
     <Screen title={t("title")} subtitle={t("subtitle", { name: agentName, count: allowlist.length })}>
-      {offline && (
-        <Note tone="offline">
-          {t("offline")}
-        </Note>
-      )}
+      {offline && <Note tone="offline">{t("offline")}</Note>}
       {/* Every entry in one card, each with its remove, and the add field closing the card (the board). */}
       <Section title={t("runs.heading")} footer={t("runs.footer")}>
         {allowlist.length === 0 && <Row title={t("runs.empty")} detail={t("runs.emptyDetail")} />}
         {allowlist.map((item) => (
-          <Row key={item} title={item} mono accessory={<Button
-            label={t("remove")}
-            variant="destructive"
-            size="small"
-            disabled={offline}
-            onPress={() => void save(
-              allowlist.filter((other) => other !== item),
-              t("authenticate.remove", { entry: item, name: agentName }),
-            )}
-          />} />
+          <Row
+            key={item}
+            title={item}
+            mono
+            accessory={
+              <Button
+                label={t("remove")}
+                variant="destructive"
+                size="small"
+                disabled={offline}
+                onPress={() =>
+                  void save(
+                    allowlist.filter((other) => other !== item),
+                    t("authenticate.remove", { entry: item, name: agentName }),
+                  )
+                }
+              />
+            }
+          />
         ))}
         <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono bare action={{ label: t("add.action"), onPress: () => void add(), disabled: !draft || offline }} />
       </Section>

@@ -1,15 +1,4 @@
-import {
-  buildLinkingLink,
-  checkLinkRequestProof,
-  LINKING_TTL_SECONDS,
-  linkingProof,
-  parseMessage,
-  signCertificate,
-  toBase64url,
-  type HubLinkRequest,
-  type LinkingLink,
-  type SignedPart,
-} from "@veeloe/protocol-ts";
+import { buildLinkingLink, checkLinkRequestProof, LINKING_TTL_SECONDS, linkingProof, parseMessage, signCertificate, toBase64url, type HubLinkRequest, type LinkingLink, type SignedPart } from "@veeloe/protocol-ts";
 import type { Device } from "../../../entities/device";
 import type { Machine } from "../../../entities/machine";
 import { postCertificate, type HubAnswer } from "../../../shared/hub-client";

@@ -14,7 +14,13 @@ const stops: (() => void)[] = [];
 afterEach(() => stops.splice(0).forEach((f) => f()));
 
 /** A Hub that answers the REST call and speaks the handshake; a test plays the relay through `onClaim`. */
-function fakeHub({ pairings = () => Response.json({ workspace: "w-1", member, machine: machineId }), onClaim = () => {} }: { pairings?: (body: unknown) => Response; onClaim?: (frame: { sig: string; signed: string; from: string }, reply: (frame: unknown) => void) => void } = {}) {
+function fakeHub({
+  pairings = () => Response.json({ workspace: "w-1", member, machine: machineId }),
+  onClaim = () => {},
+}: {
+  pairings?: (body: unknown) => Response;
+  onClaim?: (frame: { sig: string; signed: string; from: string }, reply: (frame: unknown) => void) => void;
+} = {}) {
   const hub = { requests: [] as unknown[], claims: [] as { from: string; signed: string; sig: string }[], url: "", server: undefined as unknown as ReturnType<typeof Bun.serve> };
   hub.server = Bun.serve<{ nonce: string; authed?: boolean }>({
     port: 0,

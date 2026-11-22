@@ -124,13 +124,7 @@ function useDeviceActions(device: Device, devices: Device[], here: boolean) {
             <Row
               key={other.key}
               title={t("keep", { name: other.name })}
-              accessory={
-                <Switch
-                  aria-label={t("keep", { name: other.name })}
-                  value={keep.includes(other.key)}
-                  onValueChange={(on) => setDropped(on ? dropped.filter((k) => k !== other.key) : [...dropped, other.key])}
-                />
-              }
+              accessory={<Switch aria-label={t("keep", { name: other.name })} value={keep.includes(other.key)} onValueChange={(on) => setDropped(on ? dropped.filter((k) => k !== other.key) : [...dropped, other.key])} />}
             />
           ))}
         </>

@@ -99,5 +99,8 @@ export function parseMarkdown(text: string): Block[] {
 export function plainFirstLine(text: string) {
   const block = parseMarkdown(text).find((candidate) => candidate.kind !== "code");
   if (!block || !("inline" in block)) return "";
-  return block.inline.map((piece) => piece.text).join("").split("\n")[0];
+  return block.inline
+    .map((piece) => piece.text)
+    .join("")
+    .split("\n")[0];
 }

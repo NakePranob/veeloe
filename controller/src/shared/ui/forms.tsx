@@ -75,9 +75,7 @@ export function Section({ title, footer, children }: { title?: string; footer?: 
           {title}
         </Text>
       )}
-      {children != null && (
-        <Card style={{ padding: 0, gap: 0, overflow: "hidden" }}>{children}</Card>
-      )}
+      {children != null && <Card style={{ padding: 0, gap: 0, overflow: "hidden" }}>{children}</Card>}
       {footer && (
         <Text variant="caption" tone="secondary" style={{ paddingHorizontal: space.inset }}>
           {footer}
@@ -155,7 +153,9 @@ export function Row({ title, detail, value, icon, leading, iconColor, href, onPr
   if (href) {
     return (
       <Link href={href} asChild>
-        <Pressable role="link" {...state}>{({ pressed }) => body(pressed)}</Pressable>
+        <Pressable role="link" {...state}>
+          {({ pressed }) => body(pressed)}
+        </Pressable>
       </Link>
     );
   }
@@ -201,7 +201,20 @@ export function Field({ label, value, onChangeText, placeholder, footer, multili
   return (
     // In a Section's card the box is white with a little inset; on the screen it is one grey box.
     <View style={{ gap: space.xs, opacity: disabled ? opacity.dim : 1, ...(inCard ? { paddingTop: space.xs, paddingHorizontal: space.smd, paddingBottom: space.smd } : null) }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: bare ? 44 : size.row, paddingLeft: space.inset, paddingRight: action ? space.xs : space.inset, paddingVertical: bare ? space.xs : 7, borderRadius: bare ? radius.pill : radius.md, borderCurve: "continuous", backgroundColor: inCard ? colors.surface : colors.card }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: space.sm,
+          minHeight: bare ? 44 : size.row,
+          paddingLeft: space.inset,
+          paddingRight: action ? space.xs : space.inset,
+          paddingVertical: bare ? space.xs : 7,
+          borderRadius: bare ? radius.pill : radius.md,
+          borderCurve: "continuous",
+          backgroundColor: inCard ? colors.surface : colors.card,
+        }}
+      >
         {icon && <Icon name={icon} size="sm" color="secondaryLabel" />}
         <View style={{ flex: 1, gap: space.xxs }}>
           {!bare && (
@@ -223,11 +236,7 @@ export function Field({ label, value, onChangeText, placeholder, footer, multili
             autoCapitalize={mono ? "none" : "sentences"}
             autoCorrect={!mono}
             onSubmitEditing={action && !action.disabled ? action.onPress : undefined}
-            style={[
-              type.body,
-              { minHeight: multiline ? 72 : 24, padding: 0, color: colors.label, textAlignVertical: multiline ? "top" : "center" },
-              mono && { fontFamily: font.mono, fontSize: 14 },
-            ]}
+            style={[type.body, { minHeight: multiline ? 72 : 24, padding: 0, color: colors.label, textAlignVertical: multiline ? "top" : "center" }, mono && { fontFamily: font.mono, fontSize: 14 }]}
           />
         </View>
         {action && <Button label={action.label} variant="primary" size={bare ? "small" : undefined} onPress={action.onPress} disabled={action.disabled} />}
@@ -275,7 +284,12 @@ export function Note({ icon = "info", iconColor = "secondaryLabel", tone, childr
   const box = tone === "warning";
   const offline = tone === "offline";
   return (
-    <View style={[{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.sm }, box && { paddingHorizontal: space.inset, paddingVertical: space.md, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: colors.orangeSoft }]}>
+    <View
+      style={[
+        { flexDirection: "row", gap: space.sm, paddingHorizontal: space.sm },
+        box && { paddingHorizontal: space.inset, paddingVertical: space.md, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: colors.orangeSoft },
+      ]}
+    >
       <Icon name={box ? "warning" : offline ? "offline" : icon} size="sm" color={box || offline ? "orange" : iconColor} />
       <Text variant="footnote" tone={box ? "body" : "secondary"} style={{ flex: 1 }}>
         {children}

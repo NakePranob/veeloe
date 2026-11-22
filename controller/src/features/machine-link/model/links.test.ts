@@ -156,7 +156,15 @@ test("a new Agent goes with the Character the page picked, and the one the Machi
   expect(links.createAgent(machine, { name: "A", provider: "main", model: "model-a", character })).toBe("id-1");
   await until(() => fake.hub.frames.length === 3);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "agent.create", body: { id: "id-1", name: "A", character } });
-  fake.push(signed("agent.listed", { agents: [{ id: "id-1", name: "A", provider: "main", model: "model-a", character }, { id: "old", name: "B", provider: "main", model: "model-a" }], providers: [] }));
+  fake.push(
+    signed("agent.listed", {
+      agents: [
+        { id: "id-1", name: "A", provider: "main", model: "model-a", character },
+        { id: "old", name: "B", provider: "main", model: "model-a" },
+      ],
+      providers: [],
+    }),
+  );
   await until(async () => (await database.query("SELECT * FROM agent")).length === 2);
   const rows = await database.query<{ id: string; character: string | null }>("SELECT id, character FROM agent ORDER BY id");
   expect(rows.map((r) => [r.id, r.character && JSON.parse(r.character)])).toEqual([
@@ -345,7 +353,18 @@ test("Tasks the Machine lists are added and synced from the start, without touch
   fake.push(signed("task.event", { agent: "a1", seq: 1, kind: "member.message", at: 1, body: {} }, { seq: 2, task: "known" }));
   await until(async () => (await database.query("SELECT * FROM task")).length === 1);
   fake.hub.frames.length = 0;
-  fake.push(signed("task.listed", { tasks: [{ id: "known", agent: "a1", updated: 99 }, { id: "new", agent: "a2", updated: 50 }] }, { seq: 3 }));
+  fake.push(
+    signed(
+      "task.listed",
+      {
+        tasks: [
+          { id: "known", agent: "a1", updated: 99 },
+          { id: "new", agent: "a2", updated: 50 },
+        ],
+      },
+      { seq: 3 },
+    ),
+  );
   await until(() => fake.hub.frames.length === 1);
   expect(sentTypes(fake.hub.frames)).toEqual([expect.objectContaining({ type: "task.sync", task: "new", body: { agent: "a2", after: 0 } })]);
   expect(await database.query("SELECT id, synced_seq, updated_at FROM task ORDER BY id")).toEqual([

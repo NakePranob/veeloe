@@ -5,9 +5,7 @@ const VARIABLE = /\{\{\s*([^\s,}]+)/g;
 
 /** Flat `a.b.c` keys with their text. A key's own dots, as in `hub.machine_offline`, stay. */
 function flatten(messages: Messages, prefix = ""): [string, string][] {
-  return Object.entries(messages).flatMap(([key, value]) =>
-    typeof value === "object" && value !== null ? flatten(value as Messages, `${prefix}${key}.`) : ([[`${prefix}${key}`, String(value)]] as [string, string][]),
-  );
+  return Object.entries(messages).flatMap(([key, value]) => (typeof value === "object" && value !== null ? flatten(value as Messages, `${prefix}${key}.`) : ([[`${prefix}${key}`, String(value)]] as [string, string][])));
 }
 
 /**

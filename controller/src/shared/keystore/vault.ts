@@ -12,10 +12,7 @@ const MARKER = "controller-public-key";
 // needs one key without a prompt. A release build ignores the flag.
 const INSECURE_DEV = __DEV__ && process.env.EXPO_PUBLIC_INSECURE_KEY === "1";
 
-const locked = (prompt: string) =>
-  INSECURE_DEV
-    ? SECRET_OPTIONS
-    : { ...SECRET_OPTIONS, requireAuthentication: true, authenticationPrompt: prompt };
+const locked = (prompt: string) => (INSECURE_DEV ? SECRET_OPTIONS : { ...SECRET_OPTIONS, requireAuthentication: true, authenticationPrompt: prompt });
 
 export const vault: Vault = {
   isSupported: async () => INSECURE_DEV || SecureStore.canUseBiometricAuthentication(),

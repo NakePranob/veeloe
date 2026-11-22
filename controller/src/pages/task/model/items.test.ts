@@ -8,7 +8,12 @@ test("the Owner's words, the Agent's text without its thinking, and a failed Tur
   const result = items([
     row(1, "member.message", { text: "deploy" }),
     row(2, "turn.started", {}),
-    row(3, "llm.message", { content: [{ type: "thinking", thinking: "hmm" }, { type: "text", text: "on it" }] }),
+    row(3, "llm.message", {
+      content: [
+        { type: "thinking", thinking: "hmm" },
+        { type: "text", text: "on it" },
+      ],
+    }),
     row(5, "turn.ended", { reason: "error", code: "provider.unreachable" }),
     row(6, "future.kind", {}),
   ]);
@@ -46,7 +51,14 @@ test("commands back to back fold into one item, each with its own result, and a 
     row(7, "turn.ended", { reason: "done" }),
   ]);
   expect(shown).toHaveLength(2);
-  expect(shown[0]).toMatchObject({ kind: "tools", calls: [{ target: "pwd", state: "ok" }, { target: "ls /nope", state: "failed", output: "No such file\nexit code: 1" }, { target: "echo hi", state: "ok" }] });
+  expect(shown[0]).toMatchObject({
+    kind: "tools",
+    calls: [
+      { target: "pwd", state: "ok" },
+      { target: "ls /nope", state: "failed", output: "No such file\nexit code: 1" },
+      { target: "echo hi", state: "ok" },
+    ],
+  });
 });
 
 test("a command the Turn ended before it answered is unfinished, and a tool without a command shows its name", () => {
@@ -55,7 +67,13 @@ test("a command the Turn ended before it answered is unfinished, and a tool with
     row(2, "llm.message", { content: [use("u1", "sleep 1000"), { type: "tool_use", id: "u2", name: "read", input: { path: "a" } }] }),
     row(3, "turn.ended", { reason: "error", code: "agent.unavailable" }),
   ]);
-  expect(shown[0]).toMatchObject({ kind: "tools", calls: [{ target: "sleep 1000", state: "unfinished" }, { tool: "read", state: "unfinished" }] });
+  expect(shown[0]).toMatchObject({
+    kind: "tools",
+    calls: [
+      { target: "sleep 1000", state: "unfinished" },
+      { tool: "read", state: "unfinished" },
+    ],
+  });
   expect(shown[1]).toMatchObject({ kind: "error" });
 });
 
@@ -98,10 +116,7 @@ test("a domain Approval shows the domain instead of a command (issue #44)", () =
 
 test("the Machine's own expiry counts as expired, not as a denial by someone", () => {
   const { items: shown } = items(
-    [
-      row(1, "approval.requested", { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 2000 }),
-      row(2, "approval.answered", { request: "ap_1", decision: "deny", message: "expired without an answer" }),
-    ],
+    [row(1, "approval.requested", { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 2000 }), row(2, "approval.answered", { request: "ap_1", decision: "deny", message: "expired without an answer" })],
     1000,
   );
   expect(shown[0]).toMatchObject({ kind: "approval", approval: { status: "expired" } });
@@ -109,11 +124,7 @@ test("the Machine's own expiry counts as expired, not as a denial by someone", (
 });
 
 test("a Turn that ends before anyone answers closes the Approval", () => {
-  const { items: shown } = items([
-    row(1, "turn.started", {}),
-    row(2, "approval.requested", { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 60_000 }),
-    row(3, "turn.ended", { reason: "done" }),
-  ]);
+  const { items: shown } = items([row(1, "turn.started", {}), row(2, "approval.requested", { request: "ap_1", command: "rm -rf dist", parts: ["rm -rf dist"], expiresAt: 60_000 }), row(3, "turn.ended", { reason: "done" })]);
   expect(shown[0]).toMatchObject({ kind: "approval", approval: { status: "closed" } });
 });
 
@@ -131,12 +142,7 @@ test("an approve with a reason keeps both, and a bad Approval row draws nothing"
 });
 
 test("a Stop shows who braked, and the Turn it ended is the last thing in the log", () => {
-  const { items: shown, working } = items([
-    row(1, "turn.started", {}),
-    row(2, "llm.message", { content: [{ type: "text", text: "starting" }] }),
-    row(3, "turn.stopped", { member: "m_kai" }),
-    row(4, "turn.ended", { reason: "stopped" }),
-  ]);
+  const { items: shown, working } = items([row(1, "turn.started", {}), row(2, "llm.message", { content: [{ type: "text", text: "starting" }] }), row(3, "turn.stopped", { member: "m_kai" }), row(4, "turn.ended", { reason: "stopped" })]);
   expect(working).toBe(false);
   expect(shown.map((i) => i.kind)).toEqual(["agent", "stopped"]);
   expect(shown.at(-1)).toMatchObject({ kind: "stopped", member: "m_kai" });
@@ -159,10 +165,30 @@ const result = (id: string, content: string, is_error = false) => ({ type: "tool
 test("every tool names what it worked on, and a tool this build does not know shows by its name", () => {
   const events = [
     row(1, "turn.started", {}),
-    row(2, "llm.message", { content: [call("read", { path: "src/a.rs" }, "r"), call("glob", { pattern: "**/*.rs" }, "g"), call("grep", { pattern: "timeout" }, "s"), call("edit", { path: "src/a.rs", old_string: "a", new_string: "b" }, "e"), call("write", { path: "b.md", content: "x" }, "w"), call("send_file", { path: "out.pdf" }, "f"), call("memory", { text: "note\nmore" }, "m"), call("web_fetch", { url: "x" }, "x")] }),
+    row(2, "llm.message", {
+      content: [
+        call("read", { path: "src/a.rs" }, "r"),
+        call("glob", { pattern: "**/*.rs" }, "g"),
+        call("grep", { pattern: "timeout" }, "s"),
+        call("edit", { path: "src/a.rs", old_string: "a", new_string: "b" }, "e"),
+        call("write", { path: "b.md", content: "x" }, "w"),
+        call("send_file", { path: "out.pdf" }, "f"),
+        call("memory", { text: "note\nmore" }, "m"),
+        call("web_fetch", { url: "x" }, "x"),
+      ],
+    }),
   ];
   const calls = (items(events).items[0] as { calls: { tool: string; target: string }[] }).calls;
-  expect(calls.map((c) => [c.tool, c.target])).toEqual([["read", "src/a.rs"], ["glob", "**/*.rs"], ["grep", "timeout"], ["edit", "src/a.rs"], ["write", "b.md"], ["send_file", "out.pdf"], ["memory", "note"], ["web_fetch", ""]]);
+  expect(calls.map((c) => [c.tool, c.target])).toEqual([
+    ["read", "src/a.rs"],
+    ["glob", "**/*.rs"],
+    ["grep", "timeout"],
+    ["edit", "src/a.rs"],
+    ["write", "b.md"],
+    ["send_file", "out.pdf"],
+    ["memory", "note"],
+    ["web_fetch", ""],
+  ]);
 });
 
 test("a folded group names the running call, else the latest failed with its last error line, else the last", () => {

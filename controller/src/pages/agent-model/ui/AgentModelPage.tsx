@@ -35,11 +35,7 @@ function Picker({ agent }: { agent: AgentRow }) {
     <Screen title={t("provider.heading")} subtitle={machine ? t("subtitle", { agent: agent.name, machine: machine.name }) : agent.name} right={{ label: t("save"), onPress: submit, disabled: !changed || !listed || offline || save.sending }}>
       {/* The board spaces its blocks 14 apart, closer than the Screen's sections. */}
       <View style={{ gap: space.inset }}>
-        {offline && (
-          <Note tone="offline">
-            {t("needsOnline")}
-          </Note>
-        )}
+        {offline && <Note tone="offline">{t("needsOnline")}</Note>}
         <ProviderModelSections
           status={status}
           provider={provider}
@@ -65,11 +61,7 @@ export function AgentModelPage() {
   const agents = useAgents();
   const agent = agents?.find((a) => a.id === id);
   if (!agent) {
-    return (
-      <Screen title={t("provider.heading")}>
-        {agents && <Empty icon="agent" title={t("missing.title")} detail={t("missing.body")} />}
-      </Screen>
-    );
+    return <Screen title={t("provider.heading")}>{agents && <Empty icon="agent" title={t("missing.title")} detail={t("missing.body")} />}</Screen>;
   }
   return <Picker key={agent.id} agent={agent} />;
 }

@@ -116,7 +116,10 @@ test("each Agent's Egress is kept as its own JSON, and an answer without one doe
   expect((await rows()).map((row) => egressOf(row))).toEqual([["github.com"], ["*.npmjs.org"]]);
 
   // An Agent added later starts empty, while the one still listed keeps its list.
-  await saveAgents(database, "machine-1", [{ id: "a2", name: "B", provider: "main", model: "model-a" }, { ...other, id: "a3", name: "C" }]);
+  await saveAgents(database, "machine-1", [
+    { id: "a2", name: "B", provider: "main", model: "model-a" },
+    { ...other, id: "a3", name: "C" },
+  ]);
   expect((await rows()).map((row) => [row.id, egressOf(row)])).toEqual([
     ["a2", ["*.npmjs.org"]],
     ["a3", []],

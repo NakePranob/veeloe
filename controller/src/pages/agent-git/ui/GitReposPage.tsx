@@ -20,11 +20,7 @@ export function GitReposPage() {
   const agent = agents?.find((a) => a.id === id);
   const machine = machines?.find((m) => m.id === agent?.machine_id);
   if (!agent || !machine) {
-    return (
-      <Screen title={t("title")}>
-        {agents && machines && <Empty icon="branch" title={t("missing.title")} detail={t("missing.body")} />}
-      </Screen>
-    );
+    return <Screen title={t("title")}>{agents && machines && <Empty icon="branch" title={t("missing.title")} detail={t("missing.body")} />}</Screen>;
   }
   // Keyed by the Agent so a draft entry never carries over to another one.
   return <GitReposView key={agent.id} agentId={agent.id} agentName={agent.name} machineId={machine.id} stored={gitReposOf(agent)} />;
@@ -68,13 +64,11 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
           {t("unsupported")}
         </Note>
       )}
-      {offline && (
-        <Note tone="offline">
-          {t("offline")}
-        </Note>
-      )}
+      {offline && <Note tone="offline">{t("offline")}</Note>}
       {/* The header's + opens the field; with no repos yet it is the first thing to do, so it shows. */}
-      {(adding || (repos.length === 0 && !locked)) && <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono action={{ label: t("add.action"), onPress: add, disabled: !entry.trim() || locked }} />}
+      {(adding || (repos.length === 0 && !locked)) && (
+        <Field label={t("add.label")} value={entry} onChangeText={setEntry} placeholder={t("add.placeholder")} mono action={{ label: t("add.action"), onPress: add, disabled: !entry.trim() || locked }} />
+      )}
       {repos.length === 0 && <Empty icon="branch" title={t("repos.empty")} detail={t("repos.emptyDetail")} />}
       {/* One card per repo, its two actions under it (the board). */}
       <View style={{ gap: space.md }}>
@@ -98,10 +92,12 @@ function GitReposView({ agentId, agentName, machineId, stored }: { agentId: stri
                 variant="destructive"
                 size="small"
                 disabled={locked}
-                onPress={() => void save(
-                  repos.filter((other) => other !== repo),
-                  t("authenticate.remove", { repo, name: agentName }),
-                )}
+                onPress={() =>
+                  void save(
+                    repos.filter((other) => other !== repo),
+                    t("authenticate.remove", { repo, name: agentName }),
+                  )
+                }
               />
             </View>
           </Card>

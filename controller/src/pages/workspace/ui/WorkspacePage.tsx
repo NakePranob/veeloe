@@ -39,7 +39,11 @@ export function WorkspacePage() {
 
   // Today is the latest day a Machine gave us, as the Usage page reads it; the bars are the week up to it.
   const ids = new Set(agents?.map((agent) => agent.id));
-  const today = rows?.filter((row) => ids.has(row.agent_id)).map((row) => row.day).sort().at(-1);
+  const today = rows
+    ?.filter((row) => ids.has(row.agent_id))
+    .map((row) => row.day)
+    .sort()
+    .at(-1);
   const week = today && rows ? dailyTotals(rows, ids, shiftDay(today, -6), today) : [];
   const bars: Bar[] = week.map(({ day, tokens, known }) => ({ key: day, value: tokens, known, title: t("tokens.bar", { day, tokens: formatTokens(tokens, language) }) }));
 
@@ -96,4 +100,3 @@ export function WorkspacePage() {
     </Screen>
   );
 }
-

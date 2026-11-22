@@ -16,7 +16,9 @@ function ContextDetails({ usage }: { usage: ContextUsage }) {
     <View style={{ gap: space.xs }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
         <Text>{t("context.used")}</Text>
-        <Text tone="secondary" style={{ flexShrink: 1, textAlign: "right" }}>{t("context.of", { used: formatNumber(usage.tokens, language), window: formatNumber(usage.window, language) })}</Text>
+        <Text tone="secondary" style={{ flexShrink: 1, textAlign: "right" }}>
+          {t("context.of", { used: formatNumber(usage.tokens, language), window: formatNumber(usage.window, language) })}
+        </Text>
       </View>
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
         <Text>{t("context.compactAt")}</Text>

@@ -57,8 +57,7 @@ export function lookOfJson(json: string | null) {
 // Editing works on a draft: picking changes the draft only, and Done hands the whole of it over.
 export const pick = (draft: Look, slot: keyof Look, value: string): Look => lookOf({ ...draft, [slot]: value });
 
-export const sameLook = (a: Look, b: Look) =>
-  a.color.toLowerCase() === b.color.toLowerCase() && a.shell === b.shell && a.top === b.top && a.sides === b.sides && a.decal === b.decal;
+export const sameLook = (a: Look, b: Look) => a.color.toLowerCase() === b.color.toLowerCase() && a.shell === b.shell && a.top === b.top && a.sides === b.sides && a.decal === b.decal;
 
 const draw = <T>(options: readonly T[], random: () => number) => options[Math.floor(random() * options.length)]!;
 
@@ -74,6 +73,9 @@ export function shuffleLook(others: Look[], random = Math.random): Look {
 /** A colour lifted toward white: 0 is the colour, 1 is white. The Character page's stage and a picked tile. */
 export function tint(hex: string, amount: number): string {
   const n = parseInt(hex.slice(1), 16);
-  const lift = (v: number) => Math.round(v + (255 - v) * amount).toString(16).padStart(2, "0");
+  const lift = (v: number) =>
+    Math.round(v + (255 - v) * amount)
+      .toString(16)
+      .padStart(2, "0");
   return "#" + lift(n >> 16) + lift((n >> 8) & 255) + lift(n & 255);
 }

@@ -116,7 +116,30 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
   // When the item before was shown, for the time lines; events without a time draw none.
   let lastAt: number | undefined;
   for (const event of events) {
-    let body: { text?: string; content?: unknown; reason?: string; code?: string; request?: string; kind?: string; domain?: string; agent?: string; task?: string; command?: string; parts?: string[]; expiresAt?: number; member?: string; decision?: string; message?: string; summary?: string; tokensBefore?: number; tokensAfter?: number; name?: string; size?: number; hash?: string; path?: string };
+    let body: {
+      text?: string;
+      content?: unknown;
+      reason?: string;
+      code?: string;
+      request?: string;
+      kind?: string;
+      domain?: string;
+      agent?: string;
+      task?: string;
+      command?: string;
+      parts?: string[];
+      expiresAt?: number;
+      member?: string;
+      decision?: string;
+      message?: string;
+      summary?: string;
+      tokensBefore?: number;
+      tokensAfter?: number;
+      name?: string;
+      size?: number;
+      hash?: string;
+      path?: string;
+    };
     try {
       body = JSON.parse(event.body) ?? {};
     } catch {
@@ -178,12 +201,18 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
     } else if (event.kind === "file.offered" && typeof body.name === "string" && typeof body.size === "number" && typeof body.hash === "string" && typeof body.path === "string") {
       out.push({ key, kind: "file", name: body.name, size: body.size, hash: body.hash, path: body.path });
     } else if (event.kind === "context.compacted" && typeof body.summary === "string") {
-      out.push({ key, kind: "compacted", summary: body.summary, at: atOf(event), ...(typeof body.tokensBefore === "number" && { tokensBefore: body.tokensBefore }), ...(typeof body.tokensAfter === "number" && { tokensAfter: body.tokensAfter }) });
+      out.push({
+        key,
+        kind: "compacted",
+        summary: body.summary,
+        at: atOf(event),
+        ...(typeof body.tokensBefore === "number" && { tokensBefore: body.tokensBefore }),
+        ...(typeof body.tokensAfter === "number" && { tokensAfter: body.tokensAfter }),
+      });
     } else if (event.kind === "turn.started") {
       open = true;
       turnCalls = [];
-    }
-    else if (event.kind === "turn.ended") {
+    } else if (event.kind === "turn.ended") {
       open = false;
       // A command the Turn ended before it answered never will.
       for (const call of calls.values()) if (call.state === "running") call.state = "unfinished";

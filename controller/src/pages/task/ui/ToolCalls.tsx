@@ -33,7 +33,16 @@ function CallLabel({ call, tone = "label", numberOfLines, selectable }: { call: 
   return (
     <Text variant="footnote" tone={tone} numberOfLines={numberOfLines} selectable={selectable} style={{ flex: 1 }}>
       {before}
-      {after !== undefined && (call.tool === "memory" ? <Text variant="footnote" tone="body">{call.target}</Text> : <Text variant="caption" mono tone={tone}>{call.target}</Text>)}
+      {after !== undefined &&
+        (call.tool === "memory" ? (
+          <Text variant="footnote" tone="body">
+            {call.target}
+          </Text>
+        ) : (
+          <Text variant="caption" mono tone={tone}>
+            {call.target}
+          </Text>
+        ))}
       {after}
     </Text>
   );
@@ -63,7 +72,11 @@ function CallRow({ call }: { call: ToolCall }) {
 function Live({ id }: { id: string }) {
   const output = useToolOutput(id);
   if (!output.at) return null;
-  const line = output.tail.split("\n").filter((l: string) => l.trim()).at(-1) ?? "";
+  const line =
+    output.tail
+      .split("\n")
+      .filter((l: string) => l.trim())
+      .at(-1) ?? "";
   return (
     <View style={{ flexDirection: "row", gap: space.sm, paddingLeft: space.sm + icon.md + space.sm, paddingRight: space.sm, paddingBottom: space.sm }}>
       <Text variant="caption" tone="secondary" mono numberOfLines={1} style={{ flex: 1 }}>
@@ -122,13 +135,7 @@ export function ChangesRow({ files }: { files: string[] }) {
   const [open, setOpen] = useState(false);
   return (
     <View style={{ gap: space.sm }}>
-      <Pressable
-        role="button"
-        aria-expanded={open}
-        hitSlop={6}
-        onPress={() => setOpen(!open)}
-        style={({ pressed }) => ({ alignSelf: "flex-start", opacity: pressed ? 0.6 : 1 })}
-      >
+      <Pressable role="button" aria-expanded={open} hitSlop={6} onPress={() => setOpen(!open)} style={({ pressed }) => ({ alignSelf: "flex-start", opacity: pressed ? 0.6 : 1 })}>
         <Card style={{ flexDirection: "row", alignItems: "center", gap: space.sm, height: 32, paddingVertical: 0, paddingHorizontal: space.md, borderRadius: radius.pill }}>
           <Text variant="footnote">{t("changes", { count: files.length })}</Text>
           <Icon name={open ? "collapse" : "expand"} size="xs" weight="semibold" />

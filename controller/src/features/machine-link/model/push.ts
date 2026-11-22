@@ -60,9 +60,7 @@ export function usePushRegistration() {
         importance: Notifications.AndroidImportance.DEFAULT,
       });
       const current = await Notifications.getPermissionsAsync();
-      const granted =
-        current.granted ||
-        (current.canAskAgain && (await Notifications.requestPermissionsAsync()).granted);
+      const granted = current.granted || (current.canAskAgain && (await Notifications.requestPermissionsAsync()).granted);
       if (!granted) return;
       const id = projectId();
       if (!id) return;

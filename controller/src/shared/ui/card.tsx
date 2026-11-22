@@ -21,7 +21,13 @@ export function Card({ raised, tone, style, children }: Props) {
   return (
     <View
       style={[
-        { gap: space.sm, padding: space.lg, borderRadius: radius.card, borderCurve: "continuous", backgroundColor: tone === "danger" ? colors.redSoft : tone === "warning" ? colors.orangeSoft : raised || tone === "surface" ? colors.surface : colors.card },
+        {
+          gap: space.sm,
+          padding: space.lg,
+          borderRadius: radius.card,
+          borderCurve: "continuous",
+          backgroundColor: tone === "danger" ? colors.redSoft : tone === "warning" ? colors.orangeSoft : raised || tone === "surface" ? colors.surface : colors.card,
+        },
         raised && { boxShadow: shadows.raised },
         style,
       ]}

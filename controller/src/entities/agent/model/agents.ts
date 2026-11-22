@@ -110,10 +110,7 @@ export type AgentUsage = { agent: string; day: string; tokens: number };
  * `agent.usage` and `agent.listed` can arrive out of order (`daily-budget`).
  */
 function writeUsage(transaction: WriteTransaction, { agent, day, tokens }: AgentUsage) {
-  return transaction.run(
-    "UPDATE agent SET usage_day = ?, usage_tokens = ? WHERE id = ? AND (usage_day IS NULL OR ? > usage_day OR (? = usage_day AND ? >= usage_tokens))",
-    [day, tokens, agent, day, day, tokens],
-  );
+  return transaction.run("UPDATE agent SET usage_day = ?, usage_tokens = ? WHERE id = ? AND (usage_day IS NULL OR ? > usage_day OR (? = usage_day AND ? >= usage_tokens))", [day, tokens, agent, day, day, tokens]);
 }
 
 /**
@@ -138,7 +135,20 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
            approval_timeout_s = COALESCE(excluded.approval_timeout_s, agent.approval_timeout_s),
            egress = COALESCE(?, agent.egress),
            git_repos = COALESCE(excluded.git_repos, agent.git_repos)`,
-        [agent.id, machineId, agent.name, agent.provider, agent.model, agent.character ? JSON.stringify(agent.character) : null, agent.budget ?? null, agent.allowlist ? JSON.stringify(agent.allowlist) : null, agent.approvalTimeoutS ?? null, egress ?? "[]", agent.gitRepos ? JSON.stringify(agent.gitRepos) : null, egress],
+        [
+          agent.id,
+          machineId,
+          agent.name,
+          agent.provider,
+          agent.model,
+          agent.character ? JSON.stringify(agent.character) : null,
+          agent.budget ?? null,
+          agent.allowlist ? JSON.stringify(agent.allowlist) : null,
+          agent.approvalTimeoutS ?? null,
+          egress ?? "[]",
+          agent.gitRepos ? JSON.stringify(agent.gitRepos) : null,
+          egress,
+        ],
       );
       if (agent.usage) await writeUsage(transaction, { agent: agent.id, ...agent.usage });
     }

@@ -61,7 +61,10 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
 
   async function allowAlways() {
     if (!entries || !canAllowAlways(entries)) return;
-    await answer("approve", entries.map((item) => item.entry.trim()));
+    await answer(
+      "approve",
+      entries.map((item) => item.entry.trim()),
+    );
   }
 
   const target = (domain ? approval.domain : approval.command) ?? "";
@@ -126,7 +129,19 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
               <>
                 <Dot />
                 {/* The Protocol takes at most 20, so the card offers at most that many. */}
-                <TextLink role="button" strong label={t("approval.always")} disabled={!online} onPress={() => setEntries(missingParts(approval.command, allowlist).slice(0, 20).map((part) => ({ entry: part, part })))} />
+                <TextLink
+                  role="button"
+                  strong
+                  label={t("approval.always")}
+                  disabled={!online}
+                  onPress={() =>
+                    setEntries(
+                      missingParts(approval.command, allowlist)
+                        .slice(0, 20)
+                        .map((part) => ({ entry: part, part })),
+                    )
+                  }
+                />
               </>
             )}
             {!domain && more && (
@@ -176,4 +191,3 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
 }
 
 const Dot = () => <Text variant="caption">·</Text>;
-

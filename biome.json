@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "files": { "includes": ["controller/src/**", "controller/scripts/**", "controller/app/**"] },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 240 },
+  "javascript": { "formatter": { "quoteStyle": "double", "trailingCommas": "all", "semicolons": "always", "arrowParentheses": "always", "bracketSpacing": true } },
+  "json": { "formatter": { "enabled": false } },
+  "linter": { "enabled": false },
+  "assist": { "enabled": false }
+}

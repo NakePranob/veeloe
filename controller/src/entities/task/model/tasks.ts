@@ -112,7 +112,12 @@ export function previewOf(summary: Pick<TaskSummary, "last_kind" | "last_body">)
   try {
     const body = JSON.parse(summary.last_body) as { text?: unknown; content?: unknown };
     if (summary.last_kind === "member.message") return typeof body.text === "string" ? body.text.split("\n")[0]! : "";
-    const text = Array.isArray(body.content) ? body.content.filter((b) => b?.type === "text" && typeof b.text === "string").map((b) => b.text as string).join("\n") : "";
+    const text = Array.isArray(body.content)
+      ? body.content
+          .filter((b) => b?.type === "text" && typeof b.text === "string")
+          .map((b) => b.text as string)
+          .join("\n")
+      : "";
     return plainFirstLine(text);
   } catch {
     return "";

@@ -62,7 +62,19 @@ export function Ring({ ratio, tone }: { ratio: number; tone: keyof typeof RING_T
     <View style={{ width: RING, height: RING, alignItems: "center", justifyContent: "center" }}>
       <Svg width={RING} height={RING}>
         <Circle cx={RING / 2} cy={RING / 2} r={R} fill="none" stroke={colors.track} strokeWidth={STROKE} />
-        <Circle cx={RING / 2} cy={RING / 2} r={R} fill="none" stroke={color} strokeWidth={STROKE} strokeLinecap="round" strokeDasharray={`${LENGTH} ${LENGTH}`} strokeDashoffset={LENGTH * (1 - Math.min(1, Math.max(0, ratio)))} rotation={-90} origin={`${RING / 2}, ${RING / 2}`} />
+        <Circle
+          cx={RING / 2}
+          cy={RING / 2}
+          r={R}
+          fill="none"
+          stroke={color}
+          strokeWidth={STROKE}
+          strokeLinecap="round"
+          strokeDasharray={`${LENGTH} ${LENGTH}`}
+          strokeDashoffset={LENGTH * (1 - Math.min(1, Math.max(0, ratio)))}
+          rotation={-90}
+          origin={`${RING / 2}, ${RING / 2}`}
+        />
       </Svg>
       <View style={{ position: "absolute", width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
     </View>

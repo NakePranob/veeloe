@@ -6,7 +6,7 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus, useMemoryStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Empty, Note, Screen, Section, Spinner, Text, space , Icon } from "../../../shared/ui";
+import { Empty, Note, Screen, Section, Spinner, Text, space, Icon } from "../../../shared/ui";
 
 // The count is shown against the same cap `runtime-core` applies to the prompt. It is fixed in
 // v0.1 (ADR 0036), so it lives here as a constant: when `MEMORY_LIMIT` moves, this must move too.
@@ -45,21 +45,9 @@ export function MemoryPage() {
   }
 
   return (
-    <Screen
-      title={t("title")}
-      subtitle={agent?.name}
-      right={
-        machine && agent
-          ? { label: t("refresh"), icon: "refresh", onPress: () => void link?.requestMemory(machine, agent.id) }
-          : undefined
-      }
-    >
+    <Screen title={t("title")} subtitle={agent?.name} right={machine && agent ? { label: t("refresh"), icon: "refresh", onPress: () => void link?.requestMemory(machine, agent.id) } : undefined}>
       <Note tone="plain">{t("note")}</Note>
-      {online === false && (
-        <Note tone="offline">
-          {t("needsOnline")}
-        </Note>
-      )}
+      {online === false && <Note tone="offline">{t("needsOnline")}</Note>}
       {status.loading && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }}>
           <Spinner />
