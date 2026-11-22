@@ -33,7 +33,7 @@ export function NewAgentPage() {
   // Checked entries run without an Approval; the rest asks first (ADR 0030).
   const [allowlist, setAllowlist] = useState<string[]>([...READ_ONLY_ALLOWLIST]);
 
-  const ready_machine = machines.find((m) => statuses[m.id]?.online && statuses[m.id]?.providers?.length) ?? machines[0];
+  const ready_machine = machines.find((m) => statuses[m.id]?.online && statuses[m.id]?.providers?.length) ?? machines.find((m) => statuses[m.id]?.online) ?? machines[0];
   const machine = machines.find((m) => m.id === machineId) ?? ready_machine;
   const status = machine ? statuses[machine.id] : undefined;
   const providers = status?.providers ?? [];
@@ -85,8 +85,11 @@ export function NewAgentPage() {
             value={machine.id}
             options={machines.map((m) => ({
               value: m.id,
-              // ponytail: Select has no detail line, so the state rides in the value; the board's OS line has no data.
-              label: statuses[m.id]?.online === false ? t("machine.offline", { name: m.name }) : statuses[m.id]?.online ? t("machine.online", { name: m.name }) : m.name,
+              // An Agent is made by its Machine, so one that is offline can't be chosen; the dot says which are up.
+              // ponytail: the board's OS line has no data.
+              label: m.name,
+              disabled: statuses[m.id]?.online === false,
+              dot: statuses[m.id]?.online === false ? "tertiaryLabel" : statuses[m.id]?.online ? "green" : undefined,
             }))}
             onChange={(id) => {
               setMachineId(id);

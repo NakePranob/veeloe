@@ -8,9 +8,7 @@
     "footer": "An Agent stays on one Machine. The Runtime makes its Workdir at ~/.veeloe/agents/<id>/workdir (ADR 0002, 0032, 0042, 0043)."
   },
   "machine": {
-    "label": "On Machine",
-    "offline": "{{name}} · offline",
-    "online": "{{name}} · online"
+    "label": "On Machine"
   },
   "provider": {
     "label": "Provider and model",

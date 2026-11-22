@@ -8,9 +8,7 @@
     "footer": "Agent อยู่ Machine เดียวตลอด Runtime สร้าง Workdir ให้ที่ ~/.veeloe/agents/<id>/workdir (ADR 0002, 0032, 0042, 0043)"
   },
   "machine": {
-    "label": "อยู่บน Machine",
-    "offline": "{{name}} · ออฟไลน์",
-    "online": "{{name}} · ออนไลน์"
+    "label": "อยู่บน Machine"
   },
   "provider": {
     "label": "Provider และ model",
