@@ -10,5 +10,13 @@ export function formatTokens(count: number, language: string) {
   return `${count}`;
 }
 
-/** Names joined the way the language joins a list: "a, b and c", "a, b และ c". */
-export const formatList = (items: readonly string[], language: string) => new Intl.ListFormat(language, { type: "conjunction" }).format(items);
+/**
+ * Names joined the way the language joins a list: "a, b and c", "a, b และ c".
+ * Hermes on iOS has no Intl.ListFormat (Bun does, so tests pass without it): there the
+ * names are joined with the language's plain separator, a space in Thai.
+ * ponytail: no "and" before the last name without ListFormat; add it from i18n if it reads wrong.
+ */
+export function formatList(items: readonly string[], language: string) {
+  if (typeof Intl.ListFormat === "function") return new Intl.ListFormat(language, { type: "conjunction" }).format(items);
+  return items.join(language.startsWith("th") ? " " : ", ");
+}
