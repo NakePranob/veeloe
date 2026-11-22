@@ -1,5 +1,9 @@
-import { expect, test } from "bun:test";
-import { countsOf, ordered } from "./agents";
+import { expect, mock, test } from "bun:test";
+import * as tasks from "../../../entities/task/model/tasks";
+
+// The entity's public API also brings its React hooks, which Bun cannot load; CI runs each file alone.
+mock.module("../../../entities/task", () => tasks);
+const { countsOf, ordered } = await import("./agents");
 
 test("Agents that need the Owner come first, then working ones, each keeping its order", () => {
   const rows = [
