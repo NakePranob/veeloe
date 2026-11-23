@@ -17,12 +17,12 @@ export function agentOf(agentId: string, agents: readonly AgentRow[], trashed: r
 
 /**
  * A Turn is running: the Machine queues a new message until it ends. A stalled Turn (ADR 0073) is still open, and is
- * when the Owner most needs Stop.
+ * when the Owner most needs Stop; so is one waiting on an Approval, where a message also waits for the Turn to end.
  */
 export function busyOf(events: readonly Pick<TaskEventRow, "kind" | "body">[] | undefined): boolean {
   if (!events) return false;
   const status = statusOf(latestOf(events), true);
-  return status === "working" || status === "stuck";
+  return status === "working" || status === "stuck" || status === "waiting";
 }
 
 /**

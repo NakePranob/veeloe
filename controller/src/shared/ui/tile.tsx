@@ -16,7 +16,7 @@ interface Props {
   title?: string;
   // The line under it: words, a dot and words, a Meter.
   detail?: ReactNode;
-  // A fixed height pushes the figure to the bottom, so tiles side by side line up.
+  // A least height pushes the figure to the bottom, so tiles side by side line up; longer words grow the tile.
   height?: number;
   href?: Href;
   onPress?: () => void;
@@ -26,7 +26,7 @@ interface Props {
 export function Tile({ icon, top, value, unit, title, detail, height, href, onPress }: Props) {
   const colors = useColors();
   const body = (pressed: boolean) => (
-    <View style={{ height, flexGrow: 1, gap: space.xxs, padding: space.inset, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: pressed ? colors.chipPressed : colors.card }}>
+    <View style={{ minHeight: height, flexGrow: 1, gap: space.xxs, padding: space.inset, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: pressed ? colors.chipPressed : colors.card }}>
       {icon ? (
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface }}>
           <Icon name={icon} size="md" color="label" />

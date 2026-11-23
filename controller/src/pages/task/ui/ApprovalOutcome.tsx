@@ -12,7 +12,7 @@ const OUTCOME: Record<Exclude<ApprovalStatus, "open" | "closed">, { icon: IconNa
 };
 
 /** Answered, an Approval settles into the log as a small grey pill: the outcome, who, and what. */
-export function ApprovalOutcome({ approval, target }: { approval: Approval; target: string }) {
+export function ApprovalOutcome({ approval, target, me }: { approval: Approval; target: string; me: string | undefined }) {
   const t = useT("task");
   if (approval.status === "closed")
     return (
@@ -29,7 +29,15 @@ export function ApprovalOutcome({ approval, target }: { approval: Approval; targ
   const always = approval.answeredBy?.decision === "always";
   const member = approval.answeredBy?.member;
   const marks = { outcome: mark(0), target: mark(1) };
-  const line = always ? t("approval.outcomeAlways", marks) : approval.status === "expired" ? t("approval.outcomeExpired", marks) : member ? t("approval.outcomeBy", { ...marks, member }) : t("approval.outcome", marks);
+  const line = always
+    ? t("approval.outcomeAlways", marks)
+    : approval.status === "expired"
+      ? t("approval.outcomeExpired", marks)
+      : member && member === me
+        ? t("approval.outcomeByYou", marks)
+        : member
+          ? t("approval.outcomeBy", { ...marks, member })
+          : t("approval.outcome", marks);
   const parts: ReactNode[] = [
     <Text key="outcome" variant="footnote" strong>
       {always ? t("approval.always") : t(outcome.key)}

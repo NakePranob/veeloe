@@ -32,6 +32,8 @@ test("busy only while the latest Turn has not ended", () => {
   expect(busyOf([row(1, "member.message"), row(2, "turn.started"), row(3, "turn.ended")])).toBe(false);
   // A stalled Turn is still open: Stop must stay on offer.
   expect(busyOf([row(1, "member.message"), row(2, "turn.started"), row(3, "turn.stalled")])).toBe(true);
+  // So is one waiting on an Approval: a message waits for it, and Stop ends it.
+  expect(busyOf([row(1, "member.message"), row(2, "turn.started"), row(3, "approval.requested")])).toBe(true);
 });
 
 test("the brake stops saying it is stopping when the Machine refuses the Stop or the Turn ends", () => {

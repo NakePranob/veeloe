@@ -84,7 +84,8 @@
     "outcome": "{{outcome}} · {{target}}",
     "outcomeBy": "{{outcome}} by {{member}} · {{target}}",
     "outcomeExpired": "{{outcome}} counted as denied · {{target}}",
-    "outcomeAlways": "{{outcome}} · added {{target}} to Egress"
+    "outcomeAlways": "{{outcome}} · added {{target}} to Egress",
+    "outcomeByYou": "{{outcome}} by you · {{target}}"
   },
   "openAgent": "Open {{name}}",
   "stopped": "{{member}} stopped this Turn · {{when}}",
@@ -194,5 +195,6 @@
       "none": "The Agent has not sent a file in this Task"
     }
   },
-  "openDetails": "Task details"
+  "openDetails": "Task details",
+  "stoppedByYou": "You stopped this Turn · {{when}}"
 }

@@ -94,12 +94,13 @@ export function TaskPage() {
         canManage={!readOnly}
         online={status.online !== false && !!link}
         now={now}
+        me={machine?.member_id}
         // Answering takes a fresh unlock in v0.3 (ADR 0012); the Controller already asks for it when it unlocks.
         onAnswer={({ decision, allowAlways }) => (link && machine ? link.answerApproval(machine, { agent: agent.id, task, request: item.approval.request, decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) }) : null)}
         onSteer={() => input.current?.focus()}
       />
     ) : item.kind === "stopped" ? (
-      <StoppedLine member={item.member} at={item.at} now={now} />
+      <StoppedLine member={item.member} me={machine?.member_id} at={item.at} now={now} />
     ) : item.kind === "compacted" ? (
       <CompactedCard item={item} />
     ) : item.kind === "file" ? (

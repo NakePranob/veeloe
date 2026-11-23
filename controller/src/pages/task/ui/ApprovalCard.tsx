@@ -23,6 +23,8 @@ interface Props {
   canManage: boolean;
   online: boolean;
   now: number;
+  /** This device's Member, so its own answer reads "you" rather than its id. */
+  me: string | undefined;
   /** Answers it and shows "sent" until the Machine's `approval.answered` lands. */
   onAnswer: (answer: Answer) => string | null;
   /** Puts the cursor in the composer so the Member can say what to do instead. */
@@ -31,7 +33,7 @@ interface Props {
 
 // The one orange thing on the screen while it waits; once answered it settles
 // into the log like any other event.
-export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, canManage, online, now, onAnswer, onSteer }: Props) {
+export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, canManage, online, now, me, onAnswer, onSteer }: Props) {
   const t = useT("task");
   const language = useLanguage();
   const open = approval.status === "open";
@@ -68,7 +70,7 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   }
 
   const target = (domain ? approval.domain : approval.command) ?? "";
-  if (!open) return <ApprovalOutcome approval={approval} target={target} />;
+  if (!open) return <ApprovalOutcome approval={approval} target={target} me={me} />;
   const left = fromNow(approval.expiresAt, now);
   const body = (
     <>

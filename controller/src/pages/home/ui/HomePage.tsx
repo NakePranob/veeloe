@@ -38,9 +38,9 @@ export function HomePage() {
 
   // Mail with no accounts: the screen says what will be here, and how to get it there.
   if (machines.length === 0) {
+    // The header goes to Centered's own slot, so "Veeloe" lines up with the inbox's header instead of taking its padding.
     return (
-      <Centered>
-        {!split && header}
+      <Centered header={!split && header}>
         <View style={{ flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.md }}>
           <Character look={WELCOME} mood="idle" size={150} />
           <Text variant="title" role="heading" style={{ textAlign: "center" }}>

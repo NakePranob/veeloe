@@ -15,6 +15,6 @@
   "points": {
     "secret": "The secret part never leaves this device. The Hub only knows the public key.",
     "nothing": "No password to forget, leak or reset.",
-    "ask": "This device asks for Face ID, a fingerprint or a passkey each time the key is used."
+    "ask": "This device asks for Face ID or a fingerprint each time the key is used."
   }
 }

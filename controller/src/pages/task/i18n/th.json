@@ -84,7 +84,8 @@
     "outcome": "{{outcome}} · {{target}}",
     "outcomeBy": "{{outcome}} โดย {{member}} · {{target}}",
     "outcomeExpired": "{{outcome}} นับว่าปฏิเสธ · {{target}}",
-    "outcomeAlways": "{{outcome}} · เพิ่ม {{target}} เข้า Egress"
+    "outcomeAlways": "{{outcome}} · เพิ่ม {{target}} เข้า Egress",
+    "outcomeByYou": "{{outcome}} โดยคุณ · {{target}}"
   },
   "openAgent": "เปิดหน้า {{name}}",
   "stopped": "{{member}} หยุด Turn นี้ · {{when}}",
@@ -194,5 +195,6 @@
       "none": "Agent ยังไม่ได้ส่งไฟล์มาใน Task นี้"
     }
   },
-  "openDetails": "ดูรายละเอียด Task"
+  "openDetails": "ดูรายละเอียด Task",
+  "stoppedByYou": "คุณหยุด Turn นี้ · {{when}}"
 }

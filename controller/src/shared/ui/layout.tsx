@@ -15,9 +15,18 @@ export function Spinner({ size = "small" }: { size?: "small" | "large" }) {
 }
 
 /** A whole screen of one message and its action, centred, outside the navigation stack (lock, another tab). */
-export function Centered({ children }: { children: ReactNode }) {
+export function Centered({ header, children }: { header?: ReactNode; children: ReactNode }) {
   const colors = useColors();
-  return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.lg, padding: space.xl, backgroundColor: colors.background }}>{children}</View>;
+  // The column keeps a phone's width on an iPad, so the words and the button do not stretch across the screen.
+  // A header sits above it, outside the padding, so it lines up with the headers of the other screens.
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {header}
+      <View style={{ flex: 1, padding: space.xl }}>
+        <View style={[column, { flex: 1, alignItems: "center", justifyContent: "center", gap: space.lg }]}>{children}</View>
+      </View>
+    </View>
+  );
 }
 
 interface TapProps {

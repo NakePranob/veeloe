@@ -39,6 +39,6 @@
   "budgetSpent": "Today's Budget {{percent}}% · used up",
   "lineBudget": "{{line}} · Today's Budget {{percent}}%",
   "lineBudgetSpent": "{{line}} · Today's Budget {{percent}}% · used up",
-  "tokenUnit": "token",
+  "tokenUnit": "tokens",
   "machineError": "{{machine}}: {{error}}"
 }

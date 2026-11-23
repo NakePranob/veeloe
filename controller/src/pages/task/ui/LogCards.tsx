@@ -142,13 +142,14 @@ export function InterruptedCard({ machine, agentName, onContinue, readOnly }: { 
   );
 }
 
-// Who braked, in a centred line, so the log says a person did this and why it ended.
-export function StoppedLine({ member, at, now }: { member: string; at: number; now: number }) {
+// Who braked, in a centred line, so the log says a person did this and why it ended. `me` is this device's
+// Member: v0.1 has only the Owner, and Member names arrive with Invitations (ADR 0053).
+export function StoppedLine({ member, me, at, now }: { member: string; me: string | undefined; at: number; now: number }) {
   const t = useT("task");
   const language = useLanguage();
   return (
     <Card style={{ alignSelf: "center", paddingHorizontal: space.md, paddingVertical: space.smd, borderRadius: 14 }}>
-      <Label icon="stopped">{t("stopped", { member, when: when(at, language, now) })}</Label>
+      <Label icon="stopped">{member === me ? t("stoppedByYou", { when: when(at, language, now) }) : t("stopped", { member, when: when(at, language, now) })}</Label>
     </Card>
   );
 }
