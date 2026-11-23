@@ -25,4 +25,4 @@
 ## 5. ตรวจ
 
 - [x] 5.1 `bun run check`, `bun run test` และ `bun run test:e2e` ผ่าน
-- [ ] 5.2 ไม่เหลือหน้าใดที่ยังเป็นโครงเดิม; ตรวจโดยเปิดทุก route ใน `controller/app/` บน iOS Simulator และเทียบกับหน้า Agent ทีละหน้า
+- [x] 5.2 ไม่เหลือหน้าใดที่ยังเป็นโครงเดิม; ตรวจโดยเปิดทุก route ใน `controller/app/` บน iOS Simulator และเทียบกับหน้า Agent ทีละหน้า (ตรวจ 2026-11-23 บน iOS Simulator iPhone 17 Pro และ iPad Pro 11" ทั้งสองโหมดและสองภาษา; แก้ระหว่างตรวจ: "คุณ" แทนรหัส Member, Stop ระหว่างรอ Approval, Tile ยืดตามข้อความ, หัวหน้าแรกตรงแนว, คอลัมน์ของ Centered บน iPad, คำ passkey ที่ตกค้าง; ยังไม่ได้ดู: หน้าล็อกเพราะ dev ใช้กุญแจไม่ต้องยืนยันตัว, หน้าที่เก็บข้อมูลใช้ไม่ได้, Item ไฟล์แนบ compaction และ Budget หมด, หน้าที่ต้อง Link บน iPad, Android; ภาพหน้าจอไม่มี PR เพราะ v0.1 commit ตรงเข้า develop)

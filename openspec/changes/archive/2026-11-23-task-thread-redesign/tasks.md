@@ -22,4 +22,4 @@
 ## 4. ตรวจ
 
 - [x] 4.1 `bun run check`, `bun run test` และ `bun run test:e2e` ผ่าน
-- [ ] 4.2 เปิดหน้า Task บน iOS Simulator (ขนาด iPhone และ iPad; ไม่มีเว็บแล้วตาม ADR 0077) ทั้งสองโหมดและสองภาษา ครบทุกชนิด Item ใน `pages/task/model/items.ts` พร้อมภาพหน้าจอใน PR
+- [x] 4.2 เปิดหน้า Task บน iOS Simulator (ขนาด iPhone และ iPad; ไม่มีเว็บแล้วตาม ADR 0077) ทั้งสองโหมดและสองภาษา ครบทุกชนิด Item ใน `pages/task/model/items.ts` พร้อมภาพหน้าจอใน PR (ตรวจ 2026-11-23 บน iOS Simulator iPhone 17 Pro และ iPad Pro 11" ทั้งสองโหมดและสองภาษา; แก้ระหว่างตรวจ: "คุณ" แทนรหัส Member, Stop ระหว่างรอ Approval, Tile ยืดตามข้อความ, หัวหน้าแรกตรงแนว, คอลัมน์ของ Centered บน iPad, คำ passkey ที่ตกค้าง; ยังไม่ได้ดู: หน้าล็อกเพราะ dev ใช้กุญแจไม่ต้องยืนยันตัว, หน้าที่เก็บข้อมูลใช้ไม่ได้, Item ไฟล์แนบ compaction และ Budget หมด, หน้าที่ต้อง Link บน iPad, Android; ภาพหน้าจอไม่มี PR เพราะ v0.1 commit ตรงเข้า develop)
