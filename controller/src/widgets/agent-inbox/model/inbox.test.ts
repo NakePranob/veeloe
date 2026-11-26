@@ -7,7 +7,7 @@ mock.module("../../../entities/task", () => tasks);
 const { countsOf, inboxRows, rowsOf, tabOf } = await import("./inbox");
 
 const agent = (id: string, machine_id = "m1") => ({ id, machine_id });
-const ended = (reason: "done" | "error") => ({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason }) });
+const ended = (reason: "done" | "error" | "quiet") => ({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason }) });
 const running = { latest_kind: "turn.started", latest_body: "{}" };
 const task = (id: string, agent_id: string, updated_at: number, latest: { latest_kind: string | null; latest_body: string | null } = ended("done")) => ({ id, agent_id, updated_at, ...latest });
 
@@ -24,6 +24,12 @@ test("one row per Agent with its latest Task: working first, then failed and don
     ["quiet", undefined, "new"],
     ["away", "t4", "offline"],
   ]);
+});
+
+test("a scheduled round with nothing to tell stays out of the Inbox, and the Task before it shows", () => {
+  const rows = inboxRows([agent("a")], [task("t1", "a", 10), task("t2", "a", 20, ended("quiet"))], () => true);
+  expect(rows[0]!.task?.id).toBe("t1");
+  expect(tasks.statusOf(ended("quiet"), true)).toBe("done");
 });
 
 test("a Machine nobody has heard from yet is not called offline", () => {

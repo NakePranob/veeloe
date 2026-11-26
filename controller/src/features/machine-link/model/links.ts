@@ -12,6 +12,7 @@ import {
   type DeviceLink,
   type HubLinkRequest,
   type SignedPart,
+  type TriggerSetBody,
 } from "@veeloe/protocol-ts";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
@@ -22,14 +23,14 @@ import type { Database } from "../../../shared/db";
 import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
 import { MAX_ATTACHMENT_BYTES } from "./downloads";
 import { createFileCache } from "./file-cache";
-import { createStatusStore, memoryKey, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, UNKNOWN_USAGE, type MachineStatus, type MemoryStatus, type UsageStatus, NO_OUTPUT } from "./statuses";
+import { createStatusStore, memoryKey, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, UNKNOWN_TRIGGERS, UNKNOWN_USAGE, type MachineStatus, type MemoryStatus, type TriggerStatus, type UsageStatus, NO_OUTPUT } from "./statuses";
 
 export type { MachineStatus, MemoryStatus, UsageStatus };
 export { UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY };
 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "delete" | "restore" | "stop" | "hello" | "status" | "provider" | "usage" | "memory" | "download" | "other";
+type Kind = "create" | "update" | "delete" | "restore" | "stop" | "hello" | "status" | "provider" | "usage" | "memory" | "trigger" | "download" | "other";
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -63,6 +64,7 @@ export function createMachineLinks({
   const statuses = createStatusStore(UNKNOWN_MACHINE_STATUS);
   const usage = createStatusStore(UNKNOWN_USAGE);
   const memory = createStatusStore(UNKNOWN_MEMORY);
+  const triggers = createStatusStore(UNKNOWN_TRIGGERS);
   // The live end of each running command's output; tool.result carries the whole of it.
   const outputs = createStatusStore(NO_OUTPUT);
   const files = createFileCache();
@@ -74,6 +76,7 @@ export function createMachineLinks({
   const setStatus = (machine: string, change: Partial<MachineStatus>) => statuses.set(machine, change);
   const setUsage = (machine: string, change: Partial<UsageStatus>) => usage.set(machine, change);
   const setMemory = (key: string, change: Partial<MemoryStatus>) => memory.set(key, change);
+  const setTriggers = (key: string, change: Partial<TriggerStatus>) => triggers.set(key, change);
 
   /** Land an error on the ask it belongs to; a different request id leaves the page alone. */
   function failMemory(machine: string, request: string | undefined, code: string) {
@@ -162,6 +165,8 @@ export function createMachineLinks({
         memory: { exists: message.body.exists, chars: message.body.chars, text: message.body.text },
         fetchedAt: Date.now(),
       });
+    } else if (message.type === "trigger.listed") {
+      setTriggers(memoryKey(machine.id, message.body.agent), { loading: false, sending: false, error: null, triggers: message.body.triggers });
     } else if (message.type === "tool.output") {
       outputs.set(message.body.toolUseId, { tail: message.body.tail, bytes: message.body.bytes, elapsedMs: message.body.elapsedMs, at: Date.now() });
     } else if ((message.type === "task.event" || message.type === "task.events") && signed.task) {
@@ -182,6 +187,8 @@ export function createMachineLinks({
       const current = usage.get(about.machine);
       if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: code });
     } else if (about.kind === "memory") failMemory(about.machine, about.request, code);
+    // A `trigger.*` carries its Agent as the request, so its error lands on that Agent's page.
+    else if (about.kind === "trigger" && about.request) setTriggers(memoryKey(about.machine, about.request), { loading: false, sending: false, error: code });
     else if (about.kind === "download" && about.request) files.settle(about.request, new Error(code));
     else if (about.kind === "create") setStatus(about.machine, { createError: code });
     else if (about.kind === "update") setStatus(about.machine, { updateError: code });
@@ -314,6 +321,29 @@ export function createMachineLinks({
     },
 
     memory: (machine: string, agent: string) => memory.or(memoryKey(machine, agent)),
+
+    /** Asks for one Agent's Triggers (issue #56); the answer replaces what the page shows. False when nothing went. */
+    requestTriggers(machine: Machine, agent: string) {
+      const key = memoryKey(machine.id, agent);
+      setTriggers(key, { loading: true, error: null });
+      if (!sendTo(machine, "trigger", { type: "trigger.list", body: { agent } }, agent)) {
+        setTriggers(key, { loading: false, error: "hub.machine_offline" });
+        return false;
+      }
+      return true;
+    },
+
+    /** One signed change to an Agent's Triggers; the Machine answers with the whole list. The sig, or null when nothing went. */
+    changeTrigger(machine: Machine, change: { type: "trigger.set"; body: TriggerSetBody } | { type: "trigger.pause" | "trigger.resume" | "trigger.delete" | "trigger.run"; body: { agent: string; id: string } }) {
+      const key = memoryKey(machine.id, change.body.agent);
+      setTriggers(key, { sending: true, error: null });
+      const sig = sendTo(machine, "trigger", change, change.body.agent);
+      if (!sig) setTriggers(key, { sending: false, error: "hub.machine_offline" });
+      return sig;
+    },
+
+    triggers: (machine: string, agent: string) => triggers.or(memoryKey(machine, agent)),
+    subscribeTriggers: triggers.subscribe,
     output: (toolUseId: string) => outputs.or(toolUseId),
     subscribeOutput: outputs.subscribe,
     memoryStatuses: memory.all,

@@ -81,5 +81,9 @@
   "stage": {
     "withState": "{{state}} · {{machine}} · {{model}}",
     "line": "{{machine}} · {{model}}"
+  },
+  "schedule": {
+    "row": "Schedule",
+    "detail": "Task ที่ Agent เริ่มเองตามเวลา"
   }
 }

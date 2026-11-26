@@ -1,4 +1,4 @@
-import { needsYou, statusOf, type Latest, type TaskStatus } from "../../../entities/task";
+import { isQuiet, needsYou, statusOf, type Latest, type TaskStatus } from "../../../entities/task";
 
 export type InboxAgent = { id: string; machine_id: string };
 export type InboxTask = Latest & { id: string; agent_id: string; updated_at: number };
@@ -14,7 +14,8 @@ const ORDER: Record<TaskStatus, number> = { waiting: 0, interrupted: 0, stuck: 0
 export function inboxRows<A extends InboxAgent, T extends InboxTask>(agents: A[], tasks: T[], online: (machine: string) => boolean | null) {
   return agents
     .map((agent) => {
-      const task = tasks.filter((t) => t.agent_id === agent.id).sort((a, b) => b.updated_at - a.updated_at)[0];
+      // A round that had nothing to tell is not news: the row shows the Task before it.
+      const task = tasks.filter((t) => t.agent_id === agent.id && !isQuiet(t)).sort((a, b) => b.updated_at - a.updated_at)[0];
       return { agent, task, status: statusOf(task, online(agent.machine_id)) };
     })
     .sort((a, b) => ORDER[a.status] - ORDER[b.status] || (b.task?.updated_at ?? 0) - (a.task?.updated_at ?? 0));

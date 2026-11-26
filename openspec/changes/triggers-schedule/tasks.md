@@ -23,10 +23,10 @@
 
 ## 5. Controller
 
-- [ ] 5.1 `links.ts` ส่งและรับ `trigger.*` และเก็บ `trigger.listed`; ตรวจด้วย `bunx tsc --noEmit`
-- [ ] 5.2 model ของฟอร์ม Schedule (ตรวจค่า, สร้าง body) และการบอกรอบ; ตรวจด้วย `bun test` ของ model
-- [ ] 5.3 หน้า Schedule, route และแถวในหน้า Agent พร้อมคำไทย/อังกฤษ; ตรวจด้วย `bun run check:controller`
-- [ ] 5.4 Inbox ซ่อน Task ที่จบแบบ quiet; ตรวจด้วย test ของ model ของ Inbox
+- [x] 5.1 `links.ts` ส่งและรับ `trigger.*` และเก็บ `trigger.listed`; ตรวจด้วย `bunx tsc --noEmit`
+- [x] 5.2 model ของฟอร์ม Schedule (ตรวจค่า, สร้าง body) และการบอกรอบ; ตรวจด้วย `bun test` ของ model
+- [x] 5.3 หน้า Schedule, route และแถวในหน้า Agent พร้อมคำไทย/อังกฤษ; ตรวจด้วย `bun run check:controller`
+- [x] 5.4 Inbox ซ่อน Task ที่จบแบบ quiet; ตรวจด้วย test ของ model ของ Inbox
 
 ## 6. ตรวจ
 

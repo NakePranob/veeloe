@@ -4,6 +4,7 @@ import { agentMemoryI18n } from "../../pages/agent-memory";
 import { agentsI18n } from "../../pages/agents";
 import { agentAllowlistI18n } from "../../pages/agent-allowlist";
 import { agentGitI18n } from "../../pages/agent-git";
+import { agentScheduleI18n } from "../../pages/agent-schedule";
 import { agentI18n } from "../../pages/agent";
 import { agentModelI18n } from "../../pages/agent-model";
 import { newAgentI18n } from "../../pages/new-agent";
@@ -35,6 +36,7 @@ const slices = {
   agent: agentI18n,
   "agent-allowlist": agentAllowlistI18n,
   "agent-git": agentGitI18n,
+  "agent-schedule": agentScheduleI18n,
   "agent-model": agentModelI18n,
   agents: agentsI18n,
   "new-agent": newAgentI18n,

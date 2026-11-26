@@ -8,6 +8,7 @@ export {
   dismissPendingMessage,
   failPendingMessage,
   isBudgetOut,
+  isQuiet,
   latestEvents,
   latestOf,
   listTasks,

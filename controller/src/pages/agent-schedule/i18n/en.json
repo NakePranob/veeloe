@@ -1,0 +1,75 @@
+{
+  "title": "Schedule",
+  "note": "A Schedule starts a new Task on the Machine at the time you set, in your name, even with your phone off. If there is nothing to tell you, the Task stays out of your Inbox.",
+  "offline": "The Machine is offline, so Schedules can't be changed right now.",
+  "loading": "Asking the Machine…",
+  "add": "Add",
+  "missing": {
+    "title": "Agent not found",
+    "body": "This Agent is no longer on this device."
+  },
+  "empty": {
+    "title": "No Schedules yet",
+    "body": "Add one to have the Agent start work on its own, every few minutes, every day or every week."
+  },
+  "editor": {
+    "new": "New Schedule",
+    "edit": "Edit Schedule",
+    "footer": "Times are on the Machine's own clock. A round is skipped while the Agent is busy or its Budget is used up.",
+    "text": "What to do",
+    "textPlaceholder": "Check the CI and tell me what failed",
+    "when": "Runs",
+    "day": "Day",
+    "minutes": "Every (minutes)",
+    "minutesFooter": "At least 15 minutes.",
+    "at": "Time"
+  },
+  "mode": {
+    "every": "Every few minutes",
+    "daily": "Every day",
+    "weekly": "Every week"
+  },
+  "rhythm": {
+    "every": "Every {{minutes}} minutes",
+    "daily": "Every day at {{at}}",
+    "weekly": "Every {{day}} at {{at}}"
+  },
+  "state": {
+    "next": "Next round {{when}}",
+    "paused": "Paused",
+    "suspended": "Stopped for good: the key that set it was revoked"
+  },
+  "problem": {
+    "empty": {
+      "title": "Nothing to do",
+      "body": "Write what the Agent should do each round."
+    },
+    "tooOften": {
+      "title": "Too often",
+      "body": "A Schedule runs at most every 15 minutes, and at least once a week."
+    },
+    "badTime": {
+      "title": "Not a time",
+      "body": "Write the time as HH:MM, from 00:00 to 23:59."
+    }
+  },
+  "authenticate": {
+    "save": "Save this Schedule for {{name}}",
+    "pause": "Pause this Schedule of {{name}}",
+    "resume": "Resume this Schedule of {{name}}",
+    "run": "Run this Schedule of {{name}} now",
+    "delete": "Delete this Schedule of {{name}}"
+  },
+  "delete": {
+    "title": "Delete this Schedule?",
+    "message": "{{name}} stops running it. Tasks it already started stay.",
+    "action": "Delete"
+  },
+  "save": "Save",
+  "saving": "Saving…",
+  "cancel": "Cancel",
+  "run": "Run now",
+  "pause": "Pause",
+  "resume": "Resume",
+  "edit": "Edit"
+}

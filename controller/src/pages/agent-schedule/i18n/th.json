@@ -1,0 +1,75 @@
+{
+  "title": "Schedule",
+  "note": "Schedule เริ่ม Task ใหม่บน Machine ตามเวลาที่ตั้งในนามของคุณ แม้มือถือจะปิดอยู่ ถ้ารอบไหนไม่มีอะไรต้องบอก Task นั้นจะไม่ขึ้นใน Inbox",
+  "offline": "Machine ออฟไลน์อยู่ ตอนนี้จึงแก้ Schedule ไม่ได้",
+  "loading": "กำลังถาม Machine…",
+  "add": "เพิ่ม",
+  "missing": {
+    "title": "ไม่พบ Agent",
+    "body": "เครื่องนี้ไม่มี Agent นี้แล้ว"
+  },
+  "empty": {
+    "title": "ยังไม่มี Schedule",
+    "body": "เพิ่ม Schedule เพื่อให้ Agent เริ่มทำงานเองทุกกี่นาที ทุกวัน หรือทุกสัปดาห์"
+  },
+  "editor": {
+    "new": "Schedule ใหม่",
+    "edit": "แก้ Schedule",
+    "footer": "เวลาเป็นเวลาของ Machine รอบจะถูกข้ามถ้า Agent ไม่ว่างหรือ Budget หมด",
+    "text": "ให้ทำอะไร",
+    "textPlaceholder": "ดู CI แล้วบอกว่าอะไรพัง",
+    "when": "รัน",
+    "day": "วัน",
+    "minutes": "ทุกกี่นาที",
+    "minutesFooter": "อย่างน้อย 15 นาที",
+    "at": "เวลา"
+  },
+  "mode": {
+    "every": "ทุกกี่นาที",
+    "daily": "ทุกวัน",
+    "weekly": "ทุกสัปดาห์"
+  },
+  "rhythm": {
+    "every": "ทุก {{minutes}} นาที",
+    "daily": "ทุกวัน {{at}}",
+    "weekly": "ทุก{{day}} {{at}}"
+  },
+  "state": {
+    "next": "รอบถัดไป {{when}}",
+    "paused": "พักอยู่",
+    "suspended": "หยุดถาวร เพราะกุญแจที่ตั้งไว้ถูกถอน"
+  },
+  "problem": {
+    "empty": {
+      "title": "ยังไม่ได้บอกให้ทำอะไร",
+      "body": "เขียนว่าให้ Agent ทำอะไรในแต่ละรอบ"
+    },
+    "tooOften": {
+      "title": "ถี่เกินไป",
+      "body": "Schedule รันได้ถี่สุดทุก 15 นาที และอย่างน้อยสัปดาห์ละครั้ง"
+    },
+    "badTime": {
+      "title": "เวลาไม่ถูกต้อง",
+      "body": "ใส่เวลาเป็น HH:MM ตั้งแต่ 00:00 ถึง 23:59"
+    }
+  },
+  "authenticate": {
+    "save": "บันทึก Schedule นี้ของ {{name}}",
+    "pause": "พัก Schedule นี้ของ {{name}}",
+    "resume": "ทำ Schedule นี้ของ {{name}} ต่อ",
+    "run": "รัน Schedule นี้ของ {{name}} ตอนนี้",
+    "delete": "ลบ Schedule นี้ของ {{name}}"
+  },
+  "delete": {
+    "title": "ลบ Schedule นี้ไหม?",
+    "message": "{{name}} จะไม่รันอีก ส่วน Task ที่เริ่มไปแล้วยังอยู่",
+    "action": "ลบ"
+  },
+  "save": "บันทึก",
+  "saving": "กำลังบันทึก…",
+  "cancel": "ยกเลิก",
+  "run": "รันเลย",
+  "pause": "พัก",
+  "resume": "ทำต่อ",
+  "edit": "แก้"
+}

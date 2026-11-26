@@ -172,6 +172,16 @@ export function isBudgetOut(latest: Latest | undefined) {
   }
 }
 
+/** A scheduled round ended with nothing to tell (issue #56): it stays out of the Inbox. */
+export function isQuiet(latest: Latest | undefined) {
+  if (latest?.latest_kind !== TaskEventKind.TurnEnded) return false;
+  try {
+    return (JSON.parse(latest.latest_body ?? "null") as { reason?: unknown } | null)?.reason === "quiet";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Offline first; then from the latest known event: none is not started, an Approval
  * asked and not yet answered is waiting on a person, and anything else before
@@ -191,6 +201,8 @@ export function statusOf(latest: Latest | undefined, online: boolean | null): Ta
     if (reason === "done") return "done";
     // A Stop is a person ending the Turn, not a failure: the Task is finished, not broken (ADR 0017).
     if (reason === "stopped") return "done";
+    // A round with nothing to report finished as asked (issue #56).
+    if (reason === "quiet") return "done";
     return reason === "interrupted" ? "interrupted" : "failed";
   } catch {
     return "failed";

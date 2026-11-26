@@ -1,4 +1,4 @@
-import type { ProviderInfo } from "@veeloe/protocol-ts";
+import type { ListedTrigger, ProviderInfo } from "@veeloe/protocol-ts";
 
 /** What this Controller knows of a Machine right now, beside what is in the database. */
 export type MachineStatus = {
@@ -79,6 +79,18 @@ export const UNKNOWN_MEMORY: MemoryStatus = { request: null, machine: null, agen
 export type ToolOutput = { tail: string; bytes: number; elapsedMs: number; at: number };
 
 export const NO_OUTPUT: ToolOutput = { tail: "", bytes: 0, elapsedMs: 0, at: 0 };
+
+/** One Agent's Triggers as its Machine last listed them (issue #56); only in memory, asked again on every open. */
+export type TriggerStatus = {
+  loading: boolean;
+  /** A `trigger.*` change is on its way; the next `trigger.listed` ends it. */
+  sending: boolean;
+  /** A code from the Hub or the Machine, such as `trigger.forbidden`. */
+  error: string | null;
+  triggers: ListedTrigger[] | null;
+};
+
+export const UNKNOWN_TRIGGERS: TriggerStatus = { loading: false, sending: false, error: null, triggers: null };
 
 /** One Agent's Memory belongs to one Machine, so the key carries both. */
 export const memoryKey = (machine: string, agent: string) => `${machine}:${agent}`;

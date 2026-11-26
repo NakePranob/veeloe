@@ -81,5 +81,9 @@
   "stage": {
     "withState": "{{state}} · {{machine}} · {{model}}",
     "line": "{{machine}} · {{model}}"
+  },
+  "schedule": {
+    "row": "Schedule",
+    "detail": "Tasks the Agent starts on its own, on a clock"
   }
 }

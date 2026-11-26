@@ -7,6 +7,7 @@ import { deviceName } from "../../../shared/device-name";
 import { keySession, useKeyStatus } from "../../../shared/keystore";
 import { NO_OUTPUT, type ToolOutput } from "./statuses";
 import { createMachineLinks, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, type MachineLinks, type MachineStatus, type MemoryStatus, type UsageStatus } from "./links";
+import { UNKNOWN_TRIGGERS, type TriggerStatus } from "./statuses";
 
 let current: MachineLinks | null = null;
 
@@ -114,5 +115,14 @@ export function useMemoryStatus(machine: string, agent: string): MemoryStatus {
   return useSyncExternalStore(
     (listener) => links?.subscribeMemory(listener) ?? (() => {}),
     () => links?.memory(machine, agent) ?? UNKNOWN_MEMORY,
+  );
+}
+
+/** One Agent's Triggers as its Machine last listed them, for the Schedule page (issue #56). */
+export function useTriggerStatus(machine: string, agent: string): TriggerStatus {
+  const links = useCurrent();
+  return useSyncExternalStore(
+    (listener) => links?.subscribeTriggers(listener) ?? (() => {}),
+    () => links?.triggers(machine, agent) ?? UNKNOWN_TRIGGERS,
   );
 }
