@@ -106,3 +106,12 @@ export function handOff({
     const timeout = setTimeout(() => finish("expired"), Math.max(0, giveUpAt - Date.now()));
   });
 }
+
+/**
+ * The Hub a Link sends the new device to: one a Machine is online on, since the hand-off travels through it and the
+ * new device must reach it; the first Machine's when none is online. A Machine paired on an old or test Hub must not
+ * send the new device somewhere it cannot reach.
+ */
+export function linkHub(machines: readonly Pick<Machine, "id" | "hub_url">[], online: (machine: string) => boolean | null): string | undefined {
+  return (machines.find((m) => online(m.id) === true) ?? machines[0])?.hub_url;
+}

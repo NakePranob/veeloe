@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { checkLinkingProof, createSigner, linkRequestProof, parseLinkingLink, publicKeyOf, toBase64url, verifyCertificate, type HubLinkRequest, type SignedPart } from "@veeloe/protocol-ts";
 import type { Device } from "../../../entities/device";
 import type { Machine } from "../../../entities/machine";
-import { approveLink, handOff, handoffData, openLink } from "./link";
+import { approveLink, handOff, handoffData, openLink, linkHub } from "./link";
 
 // TEST-ONLY KEYS.
 const oldSeed = new Uint8Array(32).fill(0x44);
@@ -111,4 +111,12 @@ test("the handoff goes again until the new key says linked, and its proof covers
 test("with no answer, the handoff stops when the link runs out", async () => {
   const { link } = openLink({ hub, ownKey });
   expect(await handOff({ link, key: newKey, data: "{}", retryMs: 10, giveUpAt: Date.now() + 50, send: () => {}, watch: () => () => {} })).toBe("expired");
+});
+
+test("a Link takes the Hub of a Machine that is online, else the first Machine's", () => {
+  const old = { id: "old", hub_url: "ws://localhost:18090" };
+  const lan = { id: "lan", hub_url: "ws://192.168.1.10:8080" };
+  expect(linkHub([old, lan], (id) => id === "lan")).toBe("ws://192.168.1.10:8080");
+  expect(linkHub([old, lan], () => null)).toBe("ws://localhost:18090");
+  expect(linkHub([], () => true)).toBeUndefined();
 });

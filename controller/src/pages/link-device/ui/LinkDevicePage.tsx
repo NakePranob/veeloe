@@ -4,13 +4,13 @@ import { ScrollView, Share, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { listDevices, nameProblem, useDevices } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
-import { useMachineLink } from "../../../features/machine-link";
+import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { clock, useNow, when } from "../../../shared/lib";
 import { Button, Card, CenteredStep, Chip, Field, FooterBar, IconDisc, Note, QrCode, radius, Screen, Spinner, Text, column, inform, space } from "../../../shared/ui";
-import { approveLink, handOff, handoffData, openLink, type LinkAsk, type OpenLink } from "../model/link";
+import { approveLink, handOff, handoffData, linkHub, openLink, type LinkAsk, type OpenLink } from "../model/link";
 
 // The device that is already in the Workspace: show a QR
 // that carries this device's Hub, as `veeloe pair` does, then approve the request the new device
@@ -23,9 +23,10 @@ export function LinkDevicePage() {
   const machines = useMachines();
   const devices = useDevices() ?? [];
   const links = useMachineLink();
-  // ponytail: the first Machine's Hub. A Member with Machines on two Hubs links on that one, and the
-  // new device gets the Machines there; a Hub picker goes here if that ever happens.
-  const hub = machines?.[0]?.hub_url;
+  // ponytail: the Hub of a Machine that is online, else the first Machine's (linkHub). A Member with Machines on two
+  // live Hubs links on one of them, and the new device gets the Machines there; a Hub picker goes here if that matters.
+  const statuses = useMachineStatuses();
+  const hub = machines ? linkHub(machines, (id) => statuses[id]?.online ?? null) : undefined;
   const [offer, setOffer] = useState<OpenLink | null>(null);
   const [ask, setAsk] = useState<LinkAsk | null>(null);
   const [name, setName] = useState("");
@@ -41,9 +42,10 @@ export function LinkDevicePage() {
     setProblem(null);
   }
 
-  // A QR as soon as there is a connection to say it on; a new one only when asked.
+  // A QR as soon as there is a connection to say it on; a new one only when asked, or when the Hub changes before a
+  // new device asks (the Machines' online state arrives after the page opens, and may point at another Hub).
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when a connection or Hub appears; a new offer must not start another
-  useEffect(() => void (!offer && fresh()), [links, hub]);
+  useEffect(() => void ((!offer || (offer.link.hub !== hub && !ask)) && fresh()), [links, hub]);
 
   useEffect(() => {
     if (!offer || !links || ask) return;
