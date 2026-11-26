@@ -1638,6 +1638,255 @@
       "valid": true
     },
     {
+      "name": "a Schedule every 15 minutes",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "check the CI",
+          "schedule": {
+            "every": {
+              "minutes": 15
+            }
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "a daily Schedule that tells everyone with Use",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "summarise",
+          "schedule": {
+            "daily": {
+              "at": "09:00"
+            }
+          },
+          "notify": "use"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "a weekly Schedule on Monday",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "report",
+          "schedule": {
+            "weekly": {
+              "day": 1,
+              "at": "08:30"
+            }
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "a Schedule more often than every 15 minutes",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "x",
+          "schedule": {
+            "every": {
+              "minutes": 5
+            }
+          }
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "a time of day that is not one",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "x",
+          "schedule": {
+            "daily": {
+              "at": "24:00"
+            }
+          }
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "a weekday past Saturday",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "x",
+          "schedule": {
+            "weekly": {
+              "day": 7,
+              "at": "08:30"
+            }
+          }
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "two ways to run at once",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "x",
+          "schedule": {
+            "every": {
+              "minutes": 60
+            },
+            "daily": {
+              "at": "09:00"
+            }
+          }
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "a Trigger with nothing to say",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "",
+          "schedule": {
+            "daily": {
+              "at": "09:00"
+            }
+          }
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "a kind this build does not know",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "cron",
+          "text": "x",
+          "schedule": {
+            "daily": {
+              "at": "09:00"
+            }
+          }
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "pause a Trigger",
+      "type": "trigger.pause",
+      "body": {
+        "agent": "a1",
+        "id": "tr_1"
+      },
+      "valid": true
+    },
+    {
+      "name": "run a Trigger now",
+      "type": "trigger.run",
+      "body": {
+        "agent": "a1",
+        "id": "tr_1"
+      },
+      "valid": true
+    },
+    {
+      "name": "delete a Trigger with no id",
+      "type": "trigger.delete",
+      "body": {
+        "agent": "a1"
+      },
+      "valid": false
+    },
+    {
+      "name": "list an Agent's Triggers",
+      "type": "trigger.list",
+      "body": {
+        "agent": "a1"
+      },
+      "valid": true
+    },
+    {
+      "name": "the Machine's Triggers with their rounds",
+      "type": "trigger.listed",
+      "body": {
+        "agent": "a1",
+        "triggers": [
+          {
+            "id": "tr_1",
+            "kind": "schedule",
+            "text": "x",
+            "schedule": {
+              "daily": {
+                "at": "09:00"
+              }
+            },
+            "member": "m_1",
+            "paused": false,
+            "suspended": false,
+            "lastRunAt": 1,
+            "nextRunAt": 2
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a listed Trigger that does not say whether it is paused",
+      "type": "trigger.listed",
+      "body": {
+        "agent": "a1",
+        "triggers": [
+          {
+            "id": "tr_1",
+            "kind": "schedule",
+            "text": "x",
+            "schedule": {
+              "daily": {
+                "at": "09:00"
+              }
+            },
+            "member": "m_1",
+            "suspended": false
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
       "name": "unregister a push token",
       "type": "push.unregister",
       "body": {},

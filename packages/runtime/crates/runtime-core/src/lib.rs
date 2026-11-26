@@ -17,7 +17,7 @@ pub use event_store::{
 };
 pub use ipc::{
     header, ApprovalDecision, FromWorker, LlmHttpRequest, LlmHttpResponse, LogAnswer, LogQuery,
-    SupervisorLink, ToWorker,
+    SupervisorLink, ToWorker, TriggerRun,
 };
 pub use ports::{Llm, LlmError, LlmMessage, LlmReply, LlmRequest};
 pub use usage::usage_in;

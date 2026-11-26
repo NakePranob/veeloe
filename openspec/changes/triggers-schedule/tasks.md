@@ -1,17 +1,17 @@
 ## 1. ADR
 
-- [ ] 1.1 แก้ ADR 0067 ให้ชี้ไปที่ spec แม่ (#53) แทน `docs/roadmap.md`; ตรวจด้วย `grep roadmap docs/adr/0067*` ไม่เจอ
+- [x] 1.1 แก้ ADR 0067 ให้ชี้ไปที่ spec แม่ (#53) แทน `docs/roadmap.md`; ตรวจด้วย `grep roadmap docs/adr/0067*` ไม่เจอ
 
 ## 2. Protocol
 
-- [ ] 2.1 เพิ่ม `trigger.set/pause/resume/delete/run/list/listed` ใน `packages/protocol/src/messages.rs` พร้อมการตรวจ schedule; ตรวจด้วย `cargo test` ใน `packages/protocol`
-- [ ] 2.2 เพิ่ม schema เดียวกันใน `packages/protocol-ts/src/messages/trigger.ts` และ `index.ts`; ตรวจด้วย `bun test src/fixtures`
-- [ ] 2.3 เพิ่ม vectors ใน `packages/protocol/vectors/messages.json` (ผ่านและไม่ผ่าน) ให้สองฝั่งตัดสินตรงกัน; ตรวจด้วย `bun run check:protocol`
+- [x] 2.1 เพิ่ม `trigger.set/pause/resume/delete/run/list/listed` ใน `packages/protocol/src/messages.rs` พร้อมการตรวจ schedule; ตรวจด้วย `cargo test` ใน `packages/protocol`
+- [x] 2.2 เพิ่ม schema เดียวกันใน `packages/protocol-ts/src/messages/trigger.ts` และ `index.ts`; ตรวจด้วย `bun test src/fixtures`
+- [x] 2.3 เพิ่ม vectors ใน `packages/protocol/vectors/messages.json` (ผ่านและไม่ผ่าน) ให้สองฝั่งตัดสินตรงกัน; ตรวจด้วย `bun run check:protocol`
 
 ## 3. Runtime core
 
-- [ ] 3.1 `ToWorker::Run` ที่มี `trigger` เขียน `member.message` และ `turn.started` ที่มี `trigger` กับ `member`; ตรวจด้วย test ใน `runtime-core/tests/agent.rs`
-- [ ] 3.2 `nothing_to_report` มีเฉพาะ Turn ของ Trigger และจบ Turn ด้วย `quiet`; ตรวจด้วย test ใน `runtime-core/tests/agent.rs`
+- [x] 3.1 `ToWorker::Run` ที่มี `trigger` เขียน `member.message` และ `turn.started` ที่มี `trigger` กับ `member`; ตรวจด้วย test ใน `runtime-core/tests/agent.rs`
+- [x] 3.2 `nothing_to_report` มีเฉพาะ Turn ของ Trigger และจบ Turn ด้วย `quiet`; ตรวจด้วย test ใน `runtime-core/tests/agent.rs`
 
 ## 4. supervisor
 

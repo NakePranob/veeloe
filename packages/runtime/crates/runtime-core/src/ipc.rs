@@ -45,9 +45,29 @@ pub mod header_pairs {
     }
 }
 
+/// Which Trigger a round came from, and when it should have run (ADR 0067).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TriggerRun {
+    pub kind: String,
+    pub id: String,
+    /// Unix milliseconds the round was due, which is not when it started after
+    /// the Machine was off (issue #56).
+    pub at: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ToWorker {
+    /// A round of a Trigger the supervisor holds signed: a new Task in the name
+    /// of whoever set it. The worker does not check the signature again
+    /// (ADR 0067); the supervisor checked the key and Use before sending it.
+    #[serde(rename = "run")]
+    Run {
+        task: String,
+        member: String,
+        text: String,
+        trigger: TriggerRun,
+    },
     /// A Member's message, already verified by the supervisor. `ref` is its
     /// envelope's signature, for errors.
     #[serde(rename = "message")]

@@ -9,6 +9,7 @@ import { MemoryGetBodySchema, MemoryGotBodySchema } from "./memory";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
 import { ProviderAddBodySchema } from "./provider";
 import { PushRegisterBodySchema, PushRegisteredBodySchema, PushUnregisterBodySchema, PushUnregisteredBodySchema } from "./push";
+import { TriggerListBodySchema, TriggerListedBodySchema, TriggerSetBodySchema, TriggerTargetBodySchema } from "./trigger";
 import { FileChunkBodySchema, FileGetBodySchema, TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskRenameBodySchema, TaskStopBodySchema, TaskSyncBodySchema, ToolOutputBodySchema } from "./task";
 import { UsageGetBodySchema, UsageListedBodySchema } from "./usage";
 
@@ -48,6 +49,13 @@ const known = {
   "push.registered": PushRegisteredBodySchema,
   "push.unregister": PushUnregisterBodySchema,
   "push.unregistered": PushUnregisteredBodySchema,
+  "trigger.set": TriggerSetBodySchema,
+  "trigger.pause": TriggerTargetBodySchema,
+  "trigger.resume": TriggerTargetBodySchema,
+  "trigger.delete": TriggerTargetBodySchema,
+  "trigger.run": TriggerTargetBodySchema,
+  "trigger.list": TriggerListBodySchema,
+  "trigger.listed": TriggerListedBodySchema,
 };
 
 type KnownType = keyof typeof known;

@@ -41,6 +41,12 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "push.registered" => object.map(is_push_registered).unwrap_or(false),
         "push.unregister" => object.is_some(),
         "push.unregistered" => object.is_some(),
+        "trigger.set" => object.map(is_trigger_set).unwrap_or(false),
+        "trigger.pause" | "trigger.resume" | "trigger.delete" | "trigger.run" => {
+            object.map(is_trigger_target).unwrap_or(false)
+        }
+        "trigger.list" => object.map(has_agent).unwrap_or(false),
+        "trigger.listed" => object.map(is_trigger_listed).unwrap_or(false),
         _ => return None,
     };
     Some(valid)
@@ -394,6 +400,126 @@ fn is_push_register(object: &Map<String, Value>) -> bool {
 
 fn is_push_registered(object: &Map<String, Value>) -> bool {
     text(object.get("token")).is_some_and(is_push_token)
+}
+
+/// Every N minutes is at least this often, at most once a week (issue #56).
+pub const SCHEDULE_MIN_MINUTES: u64 = 15;
+pub const SCHEDULE_MAX_MINUTES: u64 = 7 * 24 * 60;
+const TRIGGER_TEXT_MAX: usize = 10_000;
+
+fn has_agent(object: &Map<String, Value>) -> bool {
+    text(object.get("agent")).is_some_and(is_agent_id)
+}
+
+fn is_trigger_id(value: &str) -> bool {
+    is_agent_id(value)
+}
+
+/// `HH:MM`, 00:00 to 23:59.
+pub fn is_clock(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 5 || bytes[2] != b':' {
+        return false;
+    }
+    let digits = |at: usize| -> Option<u32> {
+        let tens = (bytes[at] as char).to_digit(10)?;
+        let ones = (bytes[at + 1] as char).to_digit(10)?;
+        Some(tens * 10 + ones)
+    };
+    matches!((digits(0), digits(3)), (Some(hour), Some(minute)) if hour < 24 && minute < 60)
+}
+
+fn int_in(value: Option<&Value>, low: u64, high: u64) -> bool {
+    value
+        .and_then(Value::as_u64)
+        .is_some_and(|number| (low..=high).contains(&number))
+        && value
+            .and_then(Value::as_f64)
+            .is_some_and(|f| f.fract() == 0.0)
+}
+
+/// Exactly one of every N minutes, daily at a time, weekly on a day at a time.
+pub fn is_schedule(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    let parts = ["every", "daily", "weekly"]
+        .iter()
+        .filter(|name| object.get(**name).is_some_and(|part| !part.is_null()))
+        .count();
+    if parts != 1 {
+        return false;
+    }
+    if let Some(every) = object.get("every") {
+        return every.as_object().is_some_and(|every| {
+            int_in(
+                every.get("minutes"),
+                SCHEDULE_MIN_MINUTES,
+                SCHEDULE_MAX_MINUTES,
+            )
+        });
+    }
+    if let Some(daily) = object.get("daily") {
+        return daily
+            .as_object()
+            .is_some_and(|daily| text(daily.get("at")).is_some_and(is_clock));
+    }
+    object
+        .get("weekly")
+        .and_then(Value::as_object)
+        .is_some_and(|weekly| {
+            int_in(weekly.get("day"), 0, 6) && text(weekly.get("at")).is_some_and(is_clock)
+        })
+}
+
+fn is_trigger(object: &Map<String, Value>) -> bool {
+    text(object.get("id")).is_some_and(is_trigger_id)
+        && text(object.get("kind")) == Some("schedule")
+        && text(object.get("text"))
+            .is_some_and(|text| (1..=TRIGGER_TEXT_MAX).contains(&chars(text)))
+        && object.get("schedule").is_some_and(is_schedule)
+        && object
+            .get("notify")
+            .map(|notify| matches!(notify.as_str(), Some("me" | "use")))
+            .unwrap_or(true)
+}
+
+fn is_trigger_set(object: &Map<String, Value>) -> bool {
+    has_agent(object)
+        && object
+            .get("trigger")
+            .and_then(Value::as_object)
+            .is_some_and(is_trigger)
+}
+
+fn is_trigger_target(object: &Map<String, Value>) -> bool {
+    has_agent(object) && text(object.get("id")).is_some_and(is_trigger_id)
+}
+
+fn is_listed_trigger(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    let optional_ms = |name: &str| {
+        object
+            .get(name)
+            .map(|value| value.as_u64().is_some())
+            .unwrap_or(true)
+    };
+    is_trigger(object)
+        && text(object.get("member")).is_some_and(|member| (1..=64).contains(&chars(member)))
+        && object.get("paused").is_some_and(Value::is_boolean)
+        && object.get("suspended").is_some_and(Value::is_boolean)
+        && optional_ms("lastRunAt")
+        && optional_ms("nextRunAt")
+}
+
+fn is_trigger_listed(object: &Map<String, Value>) -> bool {
+    has_agent(object)
+        && object
+            .get("triggers")
+            .and_then(Value::as_array)
+            .is_some_and(|triggers| triggers.len() <= 256 && triggers.iter().all(is_listed_trigger))
 }
 
 fn is_agent_listed(object: &Map<String, Value>) -> bool {

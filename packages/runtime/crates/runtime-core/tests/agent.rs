@@ -14,7 +14,7 @@ use tokio::sync::watch;
 use veeloe_plugin_api::{Cancel, ToolDefinition, ToolError, ToolRegistry, ToolRunner};
 use veeloe_runtime_core::{
     conversation, AgentCore, ApprovalDecision, EventStore, FromWorker, Llm, LlmError, LlmReply,
-    LlmRequest, SupervisorLink, TaskEvent, ToWorker,
+    LlmRequest, SupervisorLink, TaskEvent, ToWorker, TriggerRun,
 };
 
 #[derive(Default)]
@@ -483,6 +483,79 @@ async fn a_rate_limited_turn_ends_saying_when_to_try_again() {
     assert_eq!(
         ended.body,
         json!({ "reason": "error", "code": "provider.rate_limited", "retryAfter": 30 })
+    );
+}
+
+fn scheduled(task: &str) -> ToWorker {
+    ToWorker::Run {
+        task: task.into(),
+        member: "m_owner".into(),
+        text: "check the CI".into(),
+        trigger: TriggerRun {
+            kind: "schedule".into(),
+            id: "tr_1".into(),
+            at: 1_000,
+        },
+    }
+}
+
+fn tool_names(request: &LlmRequest) -> Vec<String> {
+    request.tools.iter().map(|tool| tool.name.clone()).collect()
+}
+
+#[tokio::test]
+async fn a_trigger_round_says_where_it_came_from_and_who_set_it() {
+    let harness = setup(Setup {
+        replies: vec![Ok(text("CI is green"))],
+        ..Setup::default()
+    });
+    harness.core.receive(scheduled("t9")).expect("receive");
+    harness.core.idle().await;
+    let events = harness.core.events("t9").expect("events");
+    let started = events
+        .iter()
+        .find(|event| event.kind == "turn.started")
+        .expect("started");
+    assert_eq!(
+        started.body,
+        json!({ "member": "m_owner", "trigger": { "kind": "schedule", "id": "tr_1", "at": 1_000 } })
+    );
+    let said = events
+        .iter()
+        .find(|event| event.kind == "member.message")
+        .expect("message");
+    assert_eq!(said.body["text"], "check the CI");
+    assert_eq!(said.body["trigger"]["id"], "tr_1");
+    // Ended with words: an ordinary Task, which the Inbox shows.
+    assert_eq!(
+        events.last().expect("last").body,
+        json!({ "reason": "done" })
+    );
+    assert!(tool_names(&harness.llm.requests()[0]).contains(&"nothing_to_report".to_string()));
+}
+
+#[tokio::test]
+async fn nothing_to_report_ends_the_round_quietly_and_only_a_trigger_has_it() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use("u1", "nothing_to_report", json!({}))),
+            Ok(text("hello")),
+        ],
+        ..Setup::default()
+    });
+    harness.core.receive(scheduled("t9")).expect("receive");
+    harness.core.idle().await;
+    let events = harness.core.events("t9").expect("events");
+    assert_eq!(
+        events.last().expect("last").body,
+        json!({ "reason": "quiet" })
+    );
+
+    harness.core.receive(message("hi")).expect("receive");
+    harness.core.idle().await;
+    let requests = harness.llm.requests();
+    assert!(
+        !tool_names(requests.last().expect("request")).contains(&"nothing_to_report".to_string())
     );
 }
 

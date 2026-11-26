@@ -18,12 +18,14 @@ use std::time::{Duration, Instant};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use veeloe_plugin_api::{with_progress, Cancel, PluginError, Progress, ToolError, ToolRegistry};
+use veeloe_plugin_api::{
+    with_progress, Cancel, PluginError, Progress, ToolDefinition, ToolError, ToolRegistry,
+};
 use veeloe_protocol::{matches_allowlist, split_command};
 
 use crate::conversation::conversation;
 use crate::event_store::{Clock, EventLog, EventStore, StoreError, SystemClock, TaskEvent};
-use crate::ipc::{ApprovalDecision, FromWorker, SupervisorLink, ToWorker};
+use crate::ipc::{ApprovalDecision, FromWorker, SupervisorLink, ToWorker, TriggerRun};
 use crate::ports::{Llm, LlmError, LlmMessage, LlmRequest};
 
 /// How many times one Turn may go back to the LLM, so a tool loop cannot run all night.
@@ -336,7 +338,17 @@ impl AgentCore {
                 member,
                 text,
                 reference,
-            } => self.message(&task, &id, &member, &text, &reference, false),
+            } => self.message(&task, &id, &member, &text, &reference, false, None),
+            ToWorker::Run {
+                task,
+                member,
+                text,
+                trigger,
+            } => {
+                // One id per round, so a resend of the same round is one message.
+                let id = format!("trigger:{}:{}", trigger.id, trigger.at);
+                self.message(&task, &id, &member, &text, "", false, Some(&trigger))
+            }
         }
     }
 
@@ -382,6 +394,7 @@ impl AgentCore {
         text: &str,
         reference: &str,
         from_queue: bool,
+        trigger: Option<&TriggerRun>,
     ) -> Result<(), AgentError> {
         let starter = self.state.log().starter_of(task)?;
         if let Some(starter) = starter.as_deref() {
@@ -401,12 +414,20 @@ impl AgentCore {
                 .queued
                 .lock()
                 .expect("queued")
-                .push_back(ToWorker::Message {
-                    task: task.to_string(),
-                    id: id.to_string(),
-                    member: member.to_string(),
-                    text: text.to_string(),
-                    reference: reference.to_string(),
+                .push_back(match trigger {
+                    Some(trigger) => ToWorker::Run {
+                        task: task.to_string(),
+                        member: member.to_string(),
+                        text: text.to_string(),
+                        trigger: trigger.clone(),
+                    },
+                    None => ToWorker::Message {
+                        task: task.to_string(),
+                        id: id.to_string(),
+                        member: member.to_string(),
+                        text: text.to_string(),
+                        reference: reference.to_string(),
+                    },
                 });
             return Ok(());
         }
@@ -415,7 +436,7 @@ impl AgentCore {
             task,
             &owner,
             "member.message",
-            json!({ "member": member, "id": id, "text": text }),
+            with_trigger(json!({ "member": member, "id": id, "text": text }), trigger),
             Some(id),
         )?;
 
@@ -446,9 +467,10 @@ impl AgentCore {
             task,
             &owner,
             "turn.started",
-            json!({ "member": member }),
+            with_trigger(json!({ "member": member }), trigger),
             None,
         )?;
+        let from_trigger = trigger.is_some();
 
         let cancel = Cancel::new();
         *self.state.running.lock().expect("running") = Some(RunningTurn {
@@ -468,6 +490,7 @@ impl AgentCore {
                 owner.clone(),
                 system,
                 cancel,
+                from_trigger,
             )
             .await
             .is_err();
@@ -673,8 +696,14 @@ async fn run_turn(
     starter: String,
     system: String,
     cancel: Cancel,
+    from_trigger: bool,
 ) -> Result<(), AgentError> {
     let rounds = state.max_rounds.load(Ordering::SeqCst);
+    let mut tools = state.tools.definitions();
+    // Only a round nobody asked for may end with nothing to say (issue #56).
+    if from_trigger {
+        tools.push(nothing_to_report());
+    }
     for _ in 0..rounds {
         let mut events = state.log().events(&task, 0)?;
         if let Some(summary) = compact_if_needed(&state, &task, &starter, &events).await {
@@ -700,7 +729,7 @@ async fn run_turn(
             task: task.clone(),
             system: system.clone(),
             messages: conversation(&events),
-            tools: state.tools.definitions(),
+            tools: tools.clone(),
         };
         let window = state.context_window.load(Ordering::SeqCst);
         let _ = state.append(
@@ -766,6 +795,7 @@ async fn run_turn(
         }
 
         let mut results = Vec::new();
+        let mut quiet = false;
         for use_block in uses {
             let name = use_block
                 .get("name")
@@ -776,7 +806,10 @@ async fn run_turn(
                 .and_then(Value::as_str)
                 .unwrap_or_default();
             let input = use_block.get("input").cloned().unwrap_or(Value::Null);
-            let result = if !state.tools.has(name) {
+            let result = if from_trigger && name == NOTHING_TO_REPORT {
+                quiet = true;
+                Ok("This round ends quietly: nobody is told.".to_string())
+            } else if !state.tools.has(name) {
                 Err(ToolError::Unknown(name.to_string()))
             } else {
                 run_tool(&state, &task, &starter, id, name, &input, &cancel).await
@@ -814,6 +847,9 @@ async fn run_turn(
             json!({ "content": results }),
             None,
         )?;
+        if quiet {
+            return end(&state, &task, &starter, "quiet", None);
+        }
     }
 
     end(
@@ -852,7 +888,16 @@ fn drain_queued(state: Arc<State>) {
                 member,
                 text,
                 reference,
-            } => core.message(&task, &id, &member, &text, &reference, true),
+            } => core.message(&task, &id, &member, &text, &reference, true, None),
+            ToWorker::Run {
+                task,
+                member,
+                text,
+                trigger,
+            } => {
+                let id = format!("trigger:{}:{}", trigger.id, trigger.at);
+                core.message(&task, &id, &member, &text, "", true, Some(&trigger))
+            }
             other => core.receive(other),
         };
         if let Err(error) = result {
@@ -864,6 +909,24 @@ fn drain_queued(state: Arc<State>) {
             return;
         }
     }
+}
+
+const NOTHING_TO_REPORT: &str = "nothing_to_report";
+
+fn nothing_to_report() -> ToolDefinition {
+    ToolDefinition {
+        name: NOTHING_TO_REPORT.into(),
+        description: "Ends this scheduled round quietly when there is nothing the owner needs to hear: the Task does not show in their Inbox. Call it instead of writing that nothing changed.".into(),
+        input_schema: json!({ "type": "object", "properties": {} }),
+    }
+}
+
+/// Adds the Trigger a round came from, when it came from one.
+fn with_trigger(mut body: Value, trigger: Option<&TriggerRun>) -> Value {
+    if let Some(trigger) = trigger {
+        body["trigger"] = json!({ "kind": trigger.kind, "id": trigger.id, "at": trigger.at });
+    }
+    body
 }
 
 fn end(
