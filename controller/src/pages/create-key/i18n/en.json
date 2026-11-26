@@ -1,0 +1,20 @@
+{
+  "create": {
+    "title": "Create this device's key",
+    "body": "Veeloe signs every command you send with a key that stays on this device.",
+    "action": "Create key"
+  },
+  "lost": {
+    "title": "This device's key no longer works",
+    "body": "Its biometrics changed, so the key was locked for good. A new key needs Pairing with your Machine again.",
+    "action": "Create new key"
+  },
+  "prompt": "Unlock your Veeloe key",
+  "unsupported": "Set up Face ID or a fingerprint on this device first, so Veeloe can create a key.",
+  "failed": "The key wasn't created. Try again.",
+  "points": {
+    "secret": "The secret part never leaves this device. The Hub only knows the public key.",
+    "nothing": "No password to forget, leak or reset.",
+    "ask": "This device asks for Face ID or a fingerprint each time the key is used."
+  }
+}

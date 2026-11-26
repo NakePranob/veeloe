@@ -1,0 +1,66 @@
+[
+  {
+    "seq": 1,
+    "kind": "member.message",
+    "body": {
+      "member": "m_owner",
+      "id": "m-go",
+      "text": "go"
+    }
+  },
+  {
+    "seq": 2,
+    "kind": "turn.started",
+    "body": {
+      "member": "m_owner"
+    }
+  },
+  {
+    "seq": 3,
+    "kind": "llm.message",
+    "body": {
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "tu1",
+          "name": "echo",
+          "input": {
+            "a": 1
+          }
+        }
+      ]
+    }
+  },
+  {
+    "seq": 4,
+    "kind": "tool.result",
+    "body": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "tu1",
+          "content": "{\"a\":1}"
+        }
+      ]
+    }
+  },
+  {
+    "seq": 5,
+    "kind": "llm.message",
+    "body": {
+      "content": [
+        {
+          "type": "text",
+          "text": "done"
+        }
+      ]
+    }
+  },
+  {
+    "seq": 6,
+    "kind": "turn.ended",
+    "body": {
+      "reason": "done"
+    }
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "machine": {
+    "offline": "Machine นี้ออฟไลน์ ให้รัน veeloe ที่เครื่องนั้นก่อน"
+  },
+  "asking": "กำลังถาม Machine ว่ามี Provider อะไร",
+  "provider": {
+    "heading": "Provider",
+    "none": "Machine นี้ยังไม่มี Provider",
+    "command": "veeloe provider add --name <ชื่อ> --url <base url>"
+  },
+  "modelFilter": "ค้นหา model",
+  "noMatch": "ไม่มี model ที่ตรง",
+  "modelHeading": "model ของ {{provider}} · {{count}} ตัว",
+  "contextFooter": "ตัวเลขขวาคือ context ของแต่ละ model",
+  "pickCancel": "ยกเลิก"
+}

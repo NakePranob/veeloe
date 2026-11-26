@@ -10,7 +10,7 @@
 # by a [฀-๿] range: without a UTF-8 locale grep reads that range as bytes and
 # matches an emoji's continuation bytes, refusing every valid subject.
 if head -n 1 "$1" | LC_ALL=C grep -qF -e "$(printf '\340\270')" -e "$(printf '\340\271')"; then
-	echo "commit subject is Thai:"
+	echo "commit-subject-english: $1: the commit subject is Thai:"
 	head -n 1 "$1"
 	echo
 	echo "AGENTS.md: subjects are English, in the shape 'type(scope): <emoji> what changed'."

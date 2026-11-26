@@ -1,0 +1,40 @@
+post:
+  summary: Hand a new device's link request to the device showing the QR
+  description: >-
+    Sends `{type: "hub.link_request", id, key, name, proof}` to the live
+    connection of the Controller whose key is `to`, and keeps nothing. The Hub
+    does not know `key` yet and cannot check `proof`, an HMAC under the secret
+    in the QR, which the Hub never sees: the receiving device checks it, and
+    registers nothing until its owner approves and it posts a device.link to
+    `/links`. Open to any origin; no cookie is involved.
+  tags: [linking]
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [to, id, key, name, proof]
+          properties:
+            to: { type: string, description: "The showing device's Ed25519 public key, base64url" }
+            id: { type: string, description: "The QR's 128-bit id, base64url" }
+            key: { type: string, description: "The new device's Ed25519 public key, base64url" }
+            name: { type: string, minLength: 1, maxLength: 80 }
+            proof: { type: string, description: "HMAC-SHA256 under the QR's secret, base64url" }
+  responses:
+    "200":
+      description: Delivered
+      content:
+        application/json:
+          schema: { type: object }
+    "400":
+      description: "`hub.link_request_invalid`: not shaped like a link request"
+      content:
+        application/json:
+          schema: { $ref: '../common/schemas.yaml#/Error' }
+    "404":
+      description: "`hub.device_offline`: no Controller with key `to` is connected"
+      content:
+        application/json:
+          schema: { $ref: '../common/schemas.yaml#/Error' }

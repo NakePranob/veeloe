@@ -1,0 +1,110 @@
+{
+  "pair": "Pair Machine",
+  "none": {
+    "title": "No Machine yet",
+    "body": "Pair the first Machine with veeloe pair"
+  },
+  "footer": "Pairing starts on the Machine with veeloe pair; then scan or paste its link in this app.",
+  "agents_one": "{{count}} Agent",
+  "agents_other": "{{count}} Agents",
+  "online": "Online",
+  "offline": "Offline",
+  "budgetTotal": "Budget today, all",
+  "budgetUnknown": "Today's Budget not known yet",
+  "usedOf": "{{used}} of {{limit}}",
+  "listLine": "{{status}} · {{agents}}",
+  "missing": {
+    "title": "Machine not found",
+    "body": "It may have been unpaired."
+  },
+  "status": {
+    "checking": "Checking",
+    "disk": "Free disk",
+    "budget": "Budget today",
+    "lastError": "Last error",
+    "seeProvider": "See Providers",
+    "features": "Features this Machine supports",
+    "diskFree": "{{size}} GB"
+  },
+  "tile": {
+    "needsYou": "{{count}} need you",
+    "working": "{{count}} working",
+    "spent": "{{count}} out",
+    "budget": "{{used}} of {{limit}} today",
+    "agentUnit": "Agent",
+    "budgetUnit": "Budget",
+    "ofCount": "/ {{count}}"
+  },
+  "tabs": {
+    "info": "Machine"
+  },
+  "info": {
+    "footer": "The Runtime reports this each time it connects to the Hub."
+  },
+  "noAgent": "No Agent yet",
+  "agentsTab": {
+    "create": "Create an Agent on this Machine",
+    "search": "Search Agents on this Machine",
+    "searchPlaceholder": "Search {{count}} Agents",
+    "noMatch": "No Agent matches",
+    "group": {
+      "needsYou": "Need you",
+      "working": "Working",
+      "idle": "Idle"
+    },
+    "seeAll": "See all {{count}}",
+    "seeAllDetail": "{{count}} more: {{working}} working · {{idle}} idle",
+    "footer": "The figure on the right is each Agent's Budget today. An Agent stays on one Machine and reaches only that Machine's files and tools (ADR 0002).",
+    "footerMany": "Agents that need you always come first. The first {{count}} are shown; see the rest on the all-Agents page."
+  },
+  "provider": {
+    "footer": "The key is sealed to this Machine before it is sent and stays on it alone. You can also set it on the Machine with veeloe provider add (ADR 0042).",
+    "none": "This Machine has no Provider yet",
+    "command": "veeloe provider add --name <name> --url <base url>",
+    "models_one": "{{count}} model",
+    "models_other": "{{count}} models",
+    "ok": "Working",
+    "add": "Add Provider",
+    "custom": "Custom Provider",
+    "name": "Provider name",
+    "url": "Base URL",
+    "key": "API key (sealed to this Machine)",
+    "save": "Save Provider",
+    "cancel": "Cancel",
+    "prompt": "Add this Provider to {{machine}}",
+    "failed": "Couldn't add this Provider",
+    "failedBody": "The Machine did not accept the key or its URL.",
+    "modelsUsedBy_one": "{{count}} model · used by {{agents}}",
+    "modelsUsedBy_other": "{{count}} models · used by {{agents}}"
+  },
+  "egress": {
+    "who": "every Agent on {{machine}}",
+    "whoNamed": "every Agent on {{machine}} ({{agents}})",
+    "whoOne": "the Agent {{agent}} on {{machine}}",
+    "agent": "Agent",
+    "allAgents": "All Agents",
+    "footer": "Data can still leave to the domains listed, so add only ones you trust. While working, an Agent can ask for a new domain through an Approval (ADR 0008).",
+    "none": {
+      "title": "No domains allowed",
+      "detail": "Agents can't reach the internet at all",
+      "detailOne": "This Agent can't reach the internet at all"
+    },
+    "remove": "Remove",
+    "add": "Add domain",
+    "placeholder": "e.g. pypi.org",
+    "addPrompt": "Add {{domain}} to the Egress of {{who}}",
+    "removePrompt": "Remove {{domain}} from the Egress of {{who}}",
+    "offline": {
+      "title": "Machine offline",
+      "body": "{{machine}} has to be online first, so its Runtime can check the signature on this change."
+    },
+    "invalid": {
+      "title": "Not a valid domain",
+      "body": "Enter a domain name only, such as github.com or *.npmjs.org, without https:// or a path."
+    },
+    "duplicate": "This domain is already listed",
+    "top": "Only the domains on this list are open to {{who}}; the sandbox shuts out everything else.",
+    "topOne": "Only the domains on this list are open to {{who}}, and the other Agents are untouched. The sandbox shuts out everything else."
+  },
+  "pickCancel": "Cancel"
+}

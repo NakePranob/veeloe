@@ -1,0 +1,484 @@
+import {
+  createBackoff,
+  fromBase64url,
+  hashBytes,
+  parseMessage,
+  publicKeyOf,
+  sealFor,
+  toBase64url,
+  type AgentCreateBody,
+  type AgentUpdateBody,
+  type ApprovalAnswerBody,
+  type DeviceLink,
+  type HubLinkRequest,
+  type SignedPart,
+} from "@veeloe/protocol-ts";
+import { saveCertificates } from "../../../entities/device";
+import { saveAgents, saveUsage } from "../../../entities/agent";
+import { saveEgress, type Machine } from "../../../entities/machine";
+import { addListedTasks, addPendingMessage, failPendingMessage, listTasks, markPendingSent, saveTaskEvents } from "../../../entities/task";
+import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
+import type { Database } from "../../../shared/db";
+import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
+import { MAX_ATTACHMENT_BYTES } from "./downloads";
+import { createFileCache } from "./file-cache";
+import { createStatusStore, memoryKey, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, UNKNOWN_USAGE, type MachineStatus, type MemoryStatus, type UsageStatus, NO_OUTPUT } from "./statuses";
+
+export type { MachineStatus, MemoryStatus, UsageStatus };
+export { UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY };
+
+type Client = ReturnType<typeof startHubClient>;
+/** What an envelope was, so the error about it lands in the right place. */
+type Kind = "create" | "update" | "delete" | "restore" | "stop" | "hello" | "status" | "provider" | "usage" | "memory" | "download" | "other";
+
+/**
+ * One connection per Hub while the key is open (ADR 0021): on every connect it
+ * asks each Machine for its Agents and every Task for what came after the last
+ * event kept. What arrives is written to the database before anything shows it.
+ * Only a Machine's own key is believed, and only for that Machine.
+ */
+export function createMachineLinks({
+  database,
+  secretKey,
+  newId,
+  deviceName = "",
+  onRevoked,
+  start = startHubClient,
+}: {
+  database: Database;
+  secretKey: Uint8Array;
+  newId: () => string;
+  /** This device's own name, for the device list until a certificate names it. */
+  deviceName?: string;
+  /** The Hub closed with 4403: this key was revoked. */
+  onRevoked?: () => void;
+  start?: typeof startHubClient;
+}) {
+  const ownKey = toBase64url(publicKeyOf(secretKey));
+  const clients = new Map<string, { client: Client; machines: Machine[] }>();
+  /** Keys of this Member's other devices that a page waits to hear from, such as a new device being linked. */
+  const watchers = new Map<string, (signed: SignedPart) => void>();
+  const linkListeners = new Set<(links: DeviceLink[]) => void>();
+  const requestListeners = new Set<(hubUrl: string, request: HubLinkRequest) => void>();
+  const statuses = createStatusStore(UNKNOWN_MACHINE_STATUS);
+  const usage = createStatusStore(UNKNOWN_USAGE);
+  const memory = createStatusStore(UNKNOWN_MEMORY);
+  // The live end of each running command's output; tool.result carries the whole of it.
+  const outputs = createStatusStore(NO_OUTPUT);
+  const files = createFileCache();
+  /** Which Machine an envelope went to, by its sig, so an answer about it finds its way back. */
+  const sentTo = new Map<string, { machine: string; kind: Kind; request?: string }>();
+  // The Hub does not say when a Machine comes back, so one that was offline is asked again, later each time.
+  const retries = new Map<string, { timer?: ReturnType<typeof setTimeout>; backoff: ReturnType<typeof createBackoff> }>();
+
+  const setStatus = (machine: string, change: Partial<MachineStatus>) => statuses.set(machine, change);
+  const setUsage = (machine: string, change: Partial<UsageStatus>) => usage.set(machine, change);
+  const setMemory = (key: string, change: Partial<MemoryStatus>) => memory.set(key, change);
+
+  /** Land an error on the ask it belongs to; a different request id leaves the page alone. */
+  function failMemory(machine: string, request: string | undefined, code: string) {
+    if (!request) return;
+    for (const [key, status] of memory.entries()) {
+      if (status.machine === machine && status.request === request) setMemory(key, { loading: false, error: code });
+    }
+  }
+
+  function sendTo(machine: Machine, kind: Kind, out: { type: string; task?: string; body: unknown }, request?: string) {
+    const entry = clients.get(machine.hub_url);
+    const member = entry?.client.member();
+    if (!entry || !member) return null;
+    const sig = entry.client.send({ ...out, to: machine.id, member });
+    if (sig) sentTo.set(sig, { machine: machine.id, kind, ...(request ? { request } : {}) });
+    return sig;
+  }
+
+  /** Its Agents, and every Task's events after the last one kept. */
+  async function hello(machine: Machine) {
+    const tasks = await listTasks(database);
+    sendTo(machine, "hello", { type: "agent.list", body: {} });
+    // What this Member started there, for a device that has not seen it all (ADR 0021, 0060).
+    sendTo(machine, "other", { type: "task.list", body: {} });
+    for (const task of tasks.filter((t) => t.machine_id === machine.id)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent_id, after: task.synced_seq } });
+  }
+
+  function helloLater(machine: Machine) {
+    const retry = retries.get(machine.id) ?? { backoff: createBackoff({ baseMs: 3000, capMs: 30_000 }) };
+    clearTimeout(retry.timer);
+    retry.timer = setTimeout(() => void hello(machine), Math.max(1000, retry.backoff.next()));
+    retries.set(machine.id, retry);
+  }
+
+  async function onEnvelope(machine: Machine, signed: { type: string; task?: string; body: unknown }) {
+    const parsed = parseMessage(signed);
+    if (parsed.kind !== "message") return;
+    const { message } = parsed;
+    if (message.type === "file.chunk") {
+      files.chunk(message.body as { file?: unknown; index?: unknown; total?: unknown; data?: unknown; name?: unknown });
+      return;
+    }
+    if (message.type === "agent.listed") {
+      const retry = retries.get(machine.id);
+      if (retry) {
+        clearTimeout(retry.timer);
+        retries.delete(machine.id);
+      }
+      await saveAgents(database, machine.id, message.body.agents, message.body.trash);
+      // A Machine older than `sandboxed-commands` says nothing of it, which is not the same as an empty Egress.
+      if (message.body.egress) await saveEgress(database, machine.id, message.body.egress);
+      setStatus(machine.id, { online: true, providers: message.body.providers });
+    } else if (message.type === "machine.status") {
+      setStatus(machine.id, {
+        version: message.body.version,
+        features: message.body.features,
+        lastError: message.body.lastError,
+        diskFreeBytes: message.body.diskFreeBytes,
+        budgetToday: message.body.budgetToday ?? null,
+      });
+    } else if (message.type === "agent.usage") {
+      // The tally of an answer already given, kept before anything shows it; older news never wins (`daily-budget`).
+      await saveUsage(database, message.body);
+    } else if (message.type === "usage.listed") {
+      const current = usage.get(machine.id);
+      // An answer to an older window is dropped whole: its days would otherwise show up in the current one.
+      if (!current || current.request !== message.body.request) return;
+      await saveUsageHistory(database, machine.id, message.body);
+      await saveUsageFetchedAt(database, machine.id, Date.now());
+      setUsage(machine.id, {
+        loading: false,
+        error: null,
+        from: message.body.from,
+        to: message.body.to,
+        total: message.body.agents.reduce((sum, agent) => sum + agent.days.reduce((all, day) => all + day.tokens, 0), 0),
+        tasks: message.body.agents.flatMap((agent) => agent.tasks.map((task) => ({ agent: agent.agent, ...task }))),
+      });
+    } else if (message.type === "memory.got") {
+      const key = memoryKey(machine.id, message.body.agent);
+      const current = memory.get(key);
+      // Only the answer to this page's latest ask counts: a stale or misrouted one changes nothing.
+      if (!current || current.request !== message.body.request || current.agent !== message.body.agent) return;
+      setMemory(key, {
+        loading: false,
+        error: null,
+        memory: { exists: message.body.exists, chars: message.body.chars, text: message.body.text },
+        fetchedAt: Date.now(),
+      });
+    } else if (message.type === "tool.output") {
+      outputs.set(message.body.toolUseId, { tail: message.body.tail, bytes: message.body.bytes, elapsedMs: message.body.elapsedMs, at: Date.now() });
+    } else if ((message.type === "task.event" || message.type === "task.events") && signed.task) {
+      const events = message.type === "task.event" ? [message.body] : message.body.events;
+      await saveTaskEvents(database, { task: signed.task, agent: message.body.agent, machine: machine.id }, events);
+    } else if (message.type === "task.listed") {
+      for (const task of await addListedTasks(database, machine.id, message.body.tasks)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent, after: 0 } });
+    } else if (message.type === "error" && message.body.ref) {
+      const about = sentTo.get(message.body.ref);
+      if (about && about.kind !== "hello") await failSent(about, message.body.ref, message.body.code);
+      else await failPendingMessage(database, message.body.ref, message.body.code);
+    }
+  }
+
+  /** Land the error about one envelope on the ask it belongs to; a plain message's goes to its pending row. */
+  async function failSent(about: { machine: string; kind: Kind; request?: string }, ref: string, code: string) {
+    if (about.kind === "usage") {
+      const current = usage.get(about.machine);
+      if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: code });
+    } else if (about.kind === "memory") failMemory(about.machine, about.request, code);
+    else if (about.kind === "download" && about.request) files.settle(about.request, new Error(code));
+    else if (about.kind === "create") setStatus(about.machine, { createError: code });
+    else if (about.kind === "update") setStatus(about.machine, { updateError: code });
+    else if (about.kind === "delete") setStatus(about.machine, { deleteError: code });
+    else if (about.kind === "restore") setStatus(about.machine, { restoreError: code });
+    else if (about.kind === "stop") setStatus(about.machine, { stopError: code });
+    else if (about.kind === "provider") setStatus(about.machine, { providerError: code });
+    else await failPendingMessage(database, ref, code);
+  }
+
+  // The last envelope number from each sender lives in the database, not this process (`protocol-envelope`).
+  const { seen, ready: seenReady } = createSeenSequences(database);
+
+  function connect(hubUrl: string, machines: Machine[]) {
+    const byKey = new Map(machines.map((m) => [m.public_key, m]));
+    const client = start({
+      hubUrl,
+      secretKey,
+      seen,
+      seenReady,
+      trustedKeys: { has: (key) => byKey.has(key) || watchers.has(key) },
+      onReady: (member) => {
+        // A Hub with no certificate yet sends none, and this device is still the first one.
+        void saveCertificates(database, { member, own: ownKey, ownName: deviceName }, []);
+        machines.forEach((machine) => void hello(machine));
+      },
+      onEnvelope: ({ from, signed }) => {
+        const machine = byKey.get(from);
+        if (machine) void onEnvelope(machine, signed);
+        else watchers.get(from)?.(signed);
+      },
+      onCertificates: (certificates) => {
+        const member = client.member();
+        if (!member) return;
+        void saveCertificates(database, { member, own: ownKey, ownName: deviceName }, certificates).then((news) => {
+          if (news.length) for (const listener of [...linkListeners]) listener(news);
+        });
+      },
+      onLinkRequest: (request) => {
+        for (const listener of [...requestListeners]) listener(hubUrl, request);
+      },
+      onRevoked: () => onRevoked?.(),
+      // A Hub that cannot be reached tells nothing about its Machines: until it is back, they are as good as offline,
+      // so the screens stop showing "checking" and a head stops showing the last Task's mood.
+      onDisconnected: () => {
+        for (const machine of machines) setStatus(machine.id, { online: false });
+      },
+      onHubError: (error) => {
+        const ref = error.ref;
+        const about = ref ? sentTo.get(ref) : undefined;
+        if (!ref || !about) return;
+        if (error.code === "hub.machine_offline") {
+          setStatus(about.machine, { online: false });
+          // Whatever went out found it offline, so ask again until it is back, or the screens say offline until a restart.
+          const machine = machines.find((m) => m.id === about.machine);
+          if (machine) helloLater(machine);
+        }
+        if (about.kind === "hello") return;
+        void failSent(about, ref, error.code);
+      },
+    });
+    clients.set(hubUrl, { client, machines });
+  }
+
+  // A stopped set stays stopped: a late update (Fast Refresh renders once more with it) would
+  // open a second socket with this key, and the two would push each other off the Hub.
+  let stopped = false;
+
+  return {
+    /** Starts, restarts or stops a connection wherever the Machines on a Hub changed. */
+    update(machines: Machine[]) {
+      if (stopped) return;
+      // Not Map.groupBy: Hermes does not have it.
+      const byHub = new Map<string, Machine[]>();
+      for (const m of machines) byHub.set(m.hub_url, [...(byHub.get(m.hub_url) ?? []), m]);
+      for (const [hubUrl, entry] of clients) {
+        const now = byHub.get(hubUrl);
+        if (!now || now.map((m) => m.public_key).join() !== entry.machines.map((m) => m.public_key).join()) {
+          for (const m of entry.machines) {
+            clearTimeout(retries.get(m.id)?.timer);
+            retries.delete(m.id);
+          }
+          entry.client.stop();
+          clients.delete(hubUrl);
+        }
+      }
+      for (const [hubUrl, onHub] of byHub) if (!clients.has(hubUrl)) connect(hubUrl, onHub);
+    },
+
+    status: (machine: string) => statuses.or(machine),
+    statuses: statuses.all,
+    subscribe: statuses.subscribe,
+
+    /**
+     * Asks a Machine for how the last `days` Budget days went. The answer is cached
+     * before the page hears of it, and the request id keeps a slow answer from an
+     * older window out of the page. Null when the Hub is not connected and nothing went.
+     */
+    requestUsage(machine: Machine, days: number) {
+      const current = usage.get(machine.id);
+      if (current?.loading && current.days === days) return current.request;
+      const request = newId();
+      setUsage(machine.id, { request, days, loading: true, error: null });
+      if (!sendTo(machine, "usage", { type: "usage.list", body: { request, days } }, request)) {
+        setUsage(machine.id, { request, days, loading: false, error: "hub.machine_offline" });
+        return null;
+      }
+      return request;
+    },
+
+    usage: (machine: string) => usage.or(machine),
+    usageStatuses: usage.all,
+    subscribeUsage: usage.subscribe,
+
+    /**
+     * Asks a Machine for one Agent's Memory (`agent-memory-page`). The page keeps the answer and
+     * when it landed; an answer to an older request is dropped. Null when the Hub is not connected.
+     */
+    requestMemory(machine: Machine, agent: string) {
+      const key = memoryKey(machine.id, agent);
+      const current = memory.get(key);
+      if (current?.loading) return current.request;
+      const request = newId();
+      setMemory(key, { request, machine: machine.id, agent, loading: true, error: null });
+      if (!sendTo(machine, "memory", { type: "memory.get", body: { request, agent } }, request)) {
+        setMemory(key, { request, machine: machine.id, agent, loading: false, error: "hub.machine_offline" });
+        return null;
+      }
+      return request;
+    },
+
+    memory: (machine: string, agent: string) => memory.or(memoryKey(machine, agent)),
+    output: (toolUseId: string) => outputs.or(toolUseId),
+    subscribeOutput: outputs.subscribe,
+    memoryStatuses: memory.all,
+    subscribeMemory: memory.subscribe,
+
+    /** The new Agent's id, or null when the Machine's Hub is not connected and nothing went. The Machine keeps `character` with it. */
+    createAgent(machine: Machine, agent: Omit<AgentCreateBody, "id">) {
+      setStatus(machine.id, { createError: null });
+      const id = newId();
+      return sendTo(machine, "create", { type: "agent.create", body: { id, ...agent } }) ? id : null;
+    },
+
+    /**
+     * Only the fields that change (`agent-settings`). Nothing shows as changed until the Machine's
+     * `agent.listed` says so (ADR 0006). The sig, or null when the Hub is not connected and nothing went.
+     */
+    updateAgent(machine: Machine, body: AgentUpdateBody) {
+      setStatus(machine.id, { updateError: null });
+      return sendTo(machine, "update", { type: "agent.update", body });
+    },
+
+    /** Remove an Agent. The Machine answers with `agent.listed`; the local row goes then. */
+    deleteAgent(machine: Machine, id: string) {
+      setStatus(machine.id, { deleteError: null });
+      return sendTo(machine, "delete", { type: "agent.delete", body: { id } });
+    },
+
+    /** Bring back an Agent from the trash. The Machine answers with `agent.listed` (`agent-trash`). */
+    restoreAgent(machine: Machine, id: string) {
+      setStatus(machine.id, { restoreError: null });
+      return sendTo(machine, "restore", { type: "agent.restore", body: { id } });
+    },
+
+    /** Ask for version, features, disk and today's Budget when the Machine page opens. */
+    requestStatus(machine: Machine) {
+      return sendTo(machine, "status", { type: "machine.status", body: {} });
+    },
+
+    /** Seal a Provider key to the Machine before sending it; the Hub cannot open it. */
+    async addProvider(machine: Machine, provider: { name: string; url: string; preset?: string; key: string }) {
+      setStatus(machine.id, { providerError: null });
+      const key = await sealFor(fromBase64url(machine.public_key), new TextEncoder().encode(provider.key));
+      return sendTo(machine, "provider", { type: "provider.add", body: { ...provider, key } });
+    },
+
+    /** Send one attachment as 256 KiB chunks before its Task message (ADR 0050). */
+    async sendAttachment(machine: Machine, task: string, file: { name: string; uri: string }) {
+      const bytes = new Uint8Array(await (await fetch(file.uri)).arrayBuffer());
+      if (bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("attachment.too_large");
+      const hash = hashBytes(bytes);
+      const chunk = 256 * 1024;
+      const total = Math.max(1, Math.ceil(bytes.length / chunk));
+      for (let index = 0; index < total; index += 1) {
+        const data = toBase64url(bytes.slice(index * chunk, (index + 1) * chunk));
+        if (!sendTo(machine, "other", { type: "file.chunk", task, body: { file: hash, index, total, data } })) return null;
+      }
+      return { name: file.name, size: bytes.length, hash };
+    },
+
+    /**
+     * Opens a file the Agent offered. A cached copy opens at once; otherwise the
+     * Machine answers `file.get` with `file.chunk`, and the card waits until the
+     * file is written and handed to the OS.
+     */
+    openFile(machine: Machine, task: string, agent: string, path: string, hash: string, name: string) {
+      return files.open(hash, name, () => sendTo(machine, "download", { type: "file.get", task, body: { agent, path, hash } }, hash) !== null);
+    },
+
+    /** Give this Controller's Expo token to the Machine (ADR 0044); null when nothing went. */
+    registerPush(machine: Machine, token: string, language: "th" | "en") {
+      return sendTo(machine, "other", { type: "push.register", body: { token, language } });
+    },
+
+    /** Stop pushes to this Controller; the other devices of the Member keep theirs. */
+    unregisterPush(machine: Machine) {
+      return sendTo(machine, "other", { type: "push.unregister", body: {} });
+    },
+
+    /**
+     * A new Egress: the Machine's whole list without `agent`, or one Agent's list
+     * with it (`agent-egress-ui`). The page asks for a fresh authentication first
+     * (ADR 0012); the Machine answers with `agent.listed`, which is what changes
+     * the list shown. False when the Hub is not connected and nothing went.
+     */
+    setEgress(machine: Machine, egress: string[], agent?: string) {
+      return sendTo(machine, "other", { type: "egress.set", body: agent ? { egress, agent } : { egress } }) !== null;
+    },
+
+    /**
+     * Stops the Turn running in this Task (ADR 0017). Nothing shows as stopped until
+     * the Machine's `turn.stopped` event lands. `id` makes a resend stop nothing twice.
+     * The sig, or null when the Hub is not connected and nothing went.
+     */
+    stopTurn(machine: Machine, { agent, task, id }: { agent: string; task: string; id: string }) {
+      setStatus(machine.id, { stopError: null });
+      return sendTo(machine, "stop", { type: "task.stop", task, body: { agent, id } });
+    },
+
+    /**
+     * Names this Task (`task.rename`). The name shows once the Machine's `task.titled`
+     * lands. The sig, or null when the Hub is not connected and nothing went.
+     */
+    renameTask(machine: Machine, { agent, task, title }: { agent: string; task: string; title: string }) {
+      return sendTo(machine, "other", { type: "task.rename", task, body: { agent, title } });
+    },
+
+    /**
+     * The answer to one waiting Approval. Nothing shows as answered until the
+     * Machine's `approval.answered` event says so (ADR 0006). The sig, or null
+     * when the Hub is not connected and nothing went.
+     */
+    answerApproval(machine: Machine, { agent, task, request, decision, message, allowAlways }: Omit<ApprovalAnswerBody, "agent"> & { agent: string; task: string }) {
+      return sendTo(machine, "other", { type: "approval.answer", task, body: { agent, request, decision, ...(message !== undefined && { message }), ...(allowAlways !== undefined && { allowAlways }) } });
+    },
+
+    async sendMessage(machine: Machine, { agent, task, text, attachments }: { agent: string; task: string; text: string; attachments?: { name: string; size: number; hash: string }[] }) {
+      // A new message means the Member moved on from whatever a Stop said (ADR 0017).
+      setStatus(machine.id, { stopError: null });
+      const id = newId();
+      await addPendingMessage(database, { id, task, agent, machine: machine.id, text });
+      await markPendingSent(database, id, sendTo(machine, "other", { type: "task.message", task, body: { agent, id, text, ...(attachments?.length ? { attachments } : {}) } }));
+    },
+
+    /**
+     * To this Member's other devices on that Hub (`hub-relay` lets a Controller name only its own Member).
+     * The envelope's sig, or null when that Hub is not connected and nothing went.
+     */
+    sendToSelf(hubUrl: string, type: string, body: unknown) {
+      const client = clients.get(hubUrl)?.client;
+      const member = client?.member();
+      return client && member ? client.send({ type, recipients: [member], body }) : null;
+    },
+
+    /** Reads what `key`, another device of this Member, signs to this one, until the returned function is called. */
+    watch(key: string, handler: (signed: SignedPart) => void) {
+      watchers.set(key, handler);
+      return () => void (watchers.get(key) === handler && watchers.delete(key));
+    },
+
+    /** Hears of a device another of this Member's devices just linked (ADR 0031). */
+    onLinked(listener: (links: DeviceLink[]) => void) {
+      linkListeners.add(listener);
+      return () => void linkListeners.delete(listener);
+    },
+
+    /** Hears the link requests a Hub hands this device, unchecked: the page showing the QR checks them against its secret. */
+    onLinkRequest(listener: (hubUrl: string, request: HubLinkRequest) => void) {
+      requestListeners.add(listener);
+      return () => void requestListeners.delete(listener);
+    },
+
+    ownKey,
+
+    stop() {
+      stopped = true;
+      watchers.clear();
+      linkListeners.clear();
+      requestListeners.clear();
+      for (const { timer } of retries.values()) clearTimeout(timer);
+      retries.clear();
+      for (const { client } of clients.values()) client.stop();
+      clients.clear();
+      statuses.clear();
+    },
+  };
+}
+
+export type MachineLinks = ReturnType<typeof createMachineLinks>;

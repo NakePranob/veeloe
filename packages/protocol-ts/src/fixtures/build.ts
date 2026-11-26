@@ -1,0 +1,433 @@
+import { z } from "zod";
+import { fromBase64url, toBase64url } from "../crypto/base64url";
+import { publicKeyOf, sign, verifySignature } from "../crypto/ed25519";
+import { EnvelopeSchema, type Route } from "../envelope/schema";
+import { MemorySeenSequences, verify } from "../envelope/verify";
+import { createSigner } from "../envelope/sign";
+import { answerChallenge, handshakeBytes, normalizeHubUrl } from "../messages/hub-auth";
+import { pairingProof, pairingProofText } from "../messages/pairing-claim";
+import { buildPairingLink, buildPairingRequest, pairingLinkBytes, pairingRequestBytes, parsePairingLink } from "../messages/pairing-link";
+import { revokedWith, signCertificate, verifyCertificate } from "../messages/certificate";
+import { buildLinkingLink, linkingProof, linkingProofText, linkRequestProof, linkRequestProofText } from "../messages/linking";
+
+// The files every implementation checks itself against (Go included): the
+// header's JSON Schema and the test vectors. Rebuild them with
+// `bun run --cwd packages/protocol fixtures`.
+//
+// TEST-ONLY KEYS. Every secret below is a fixed, public seed. Never use one
+// outside a test.
+const TEST_SENDER = new Uint8Array(32).fill(0x11);
+const TEST_STRANGER = new Uint8Array(32).fill(0x22);
+const TEST_MACHINE = new Uint8Array(32).fill(0x33);
+const TEST_CONTROLLER = new Uint8Array(32).fill(0x44);
+const TEST_PAIRING_SECRET = new Uint8Array(32).fill(0x55);
+const TEST_NEW_DEVICE = new Uint8Array(32).fill(0x66);
+
+const encoder = new TextEncoder();
+const keyOf = (secret: Uint8Array) => toBase64url(publicKeyOf(secret));
+const sigOver = (text: string, secret: Uint8Array) => toBase64url(sign(encoder.encode(text), secret));
+
+/** Who the receiver in the vectors is: what it hosts, and whose Controller it is. */
+const SELF = { destinations: ["agent-1"], member: "member-1" };
+
+export function isForSelf(self: typeof SELF) {
+  return (route: Route) => ("to" in route ? self.destinations.includes(route.to) : route.recipients.includes(self.member));
+}
+
+export function headerSchema() {
+  return z.toJSONSchema(EnvelopeSchema);
+}
+
+type EnvelopeCase = { name: string; seen?: Record<string, number>; header: Record<string, unknown>; signed: string; secret?: Uint8Array };
+
+function envelopeCases(): EnvelopeCase[] {
+  const route = { type: "task.message", to: "agent-1", task: "task-1", member: "member-1" };
+  const body = { text: "สวัสดี \"ครับ\" \\ bell:\u0007 tab:\t" };
+  const plain = JSON.stringify({ ...route, seq: 8, body });
+  const members = { type: "task.event", recipients: ["member-1", "member-2"], task: "task-1" };
+  const toMembers = JSON.stringify({ ...members, seq: 8, body });
+  return [
+    { name: "valid, with Thai text and characters that need escaping", header: route, signed: plain },
+    {
+      name: "valid, with any key order, whitespace and \\u escapes in the signed bytes",
+      header: route,
+      signed: '{ "body" : { "text": "\\u0e2a\\u0e27\\u0e31\\u0e2a\\u0e14\\u0e35" },\n  "seq": 3, "member": "member-1", "task": "task-1", "to": "agent-1", "type": "task.message" }',
+    },
+    {
+      name: "valid, with fields the receiver does not know in header and signed part",
+      header: { ...route, hint: "newer sender" },
+      signed: JSON.stringify({ ...route, seq: 4, body, priority: "high" }),
+    },
+    { name: "redirected to another destination", header: { ...route, to: "agent-2" }, signed: plain },
+    { name: "swapped originating Member", header: { ...route, member: "member-2" }, signed: plain },
+    { name: "changed message type", header: { ...route, type: "approval.answer" }, signed: plain },
+    { name: "one changed byte in the signed part", header: route, signed: plain, secret: TEST_SENDER, tamper: true } as EnvelopeCase,
+    { name: "untrusted sender key", header: route, signed: plain, secret: TEST_STRANGER },
+    { name: "replayed sequence number", seen: { [keyOf(TEST_SENDER)]: 8 }, header: route, signed: plain },
+    { name: "older sequence number", seen: { [keyOf(TEST_SENDER)]: 20 }, header: route, signed: plain },
+    { name: "gap in sequence numbers", seen: { [keyOf(TEST_SENDER)]: 2 }, header: route, signed: plain },
+    { name: "valid, to a recipient list", header: members, signed: toMembers },
+    { name: "changed recipient", header: { ...members, recipients: ["member-1", "member-3"] }, signed: toMembers },
+    { name: "changed order of recipients", header: { ...members, recipients: ["member-2", "member-1"] }, signed: toMembers },
+    { name: "both a destination and recipients", header: { ...route, recipients: ["member-1"] }, signed: JSON.stringify({ ...route, recipients: ["member-1"], seq: 8, body }) },
+    { name: "no route", header: { type: "task.event" }, signed: JSON.stringify({ type: "task.event", seq: 8, body }) },
+    { name: "empty recipient list", header: { type: "task.event", recipients: [] }, signed: JSON.stringify({ type: "task.event", recipients: [], seq: 8, body }) },
+    { name: "signed part that is not the expected shape", header: route, signed: JSON.stringify({ ...route, seq: 0, body }) },
+    { name: "signed for another destination, unchanged", header: { ...route, to: "agent-2" }, signed: JSON.stringify({ ...route, to: "agent-2", seq: 8, body }) },
+    { name: "recipient list leaves out this Member", header: { ...members, recipients: ["member-2"] }, signed: JSON.stringify({ ...members, recipients: ["member-2"], seq: 8, body }) },
+  ];
+}
+
+export function envelopeVectors() {
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds. `frame` is the envelope exactly as it travels.",
+    trusted: [keyOf(TEST_SENDER)],
+    self: SELF,
+    vectors: envelopeCases().map((c) => {
+      const secret = c.secret ?? TEST_SENDER;
+      const sig = sigOver(c.signed, secret);
+      const signed = (c as { tamper?: boolean }).tamper ? c.signed.replace("ดี", "ดิ") : c.signed;
+      const frame = JSON.stringify({ v: 1, ...c.header, from: keyOf(secret), signed, sig });
+      const seen = new MemorySeenSequences();
+      for (const [key, seq] of Object.entries(c.seen ?? {})) seen.record(key, seq);
+      const result = verify(JSON.parse(frame), new Set([keyOf(TEST_SENDER)]), isForSelf(SELF), seen);
+      return {
+        name: c.name,
+        seen: c.seen ?? {},
+        frame,
+        /** Whether the header names exactly one route, which is all the Hub checks. */
+        routable: EnvelopeSchema.safeParse(JSON.parse(frame)).success,
+        /** Ed25519 over the UTF-8 of `signed` with the key in `from`, nothing else. */
+        signatureValid: verifySignature(fromBase64url(sig), encoder.encode(signed), publicKeyOf(secret)),
+        expect: result.ok ? "ok" : result.reason,
+      };
+    }),
+  };
+}
+
+export function handshakeVectors() {
+  const hubUrl = "wss://hub.example.com";
+  const nonce = toBase64url(new Uint8Array(32).map((_, i) => i));
+  const otherNonce = toBase64url(new Uint8Array(32).map((_, i) => 255 - i));
+  const auth = (url: string, n: string, secret = TEST_MACHINE) => answerChallenge(url, n, secret);
+  const good = auth(hubUrl, nonce);
+  const cases = [
+    { name: "valid", answer: good, valid: true },
+    { name: "valid when signed for the same Hub URL written differently", answer: auth("WSS://Hub.Example.com:443/", nonce), valid: true },
+    { name: "signed for another Hub", answer: auth("wss://evil.example.com", nonce), valid: false },
+    { name: "signed for another nonce", answer: auth(hubUrl, otherNonce), valid: false },
+    { name: "signature by another key", answer: { ...good, sig: auth(hubUrl, nonce, TEST_STRANGER).sig }, valid: false },
+  ];
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds. The Hub is configured with `hubUrl` and sent `nonce`.",
+    hubUrl,
+    nonce,
+    /** What the client signs, as text, for this hubUrl and nonce. */
+    signedText: new TextDecoder().decode(handshakeBytes(hubUrl, nonce)),
+    vectors: cases.map((c) => ({ name: c.name, frame: JSON.stringify(c.answer), valid: c.valid })),
+    /** The frames the Hub writes, byte for byte: `ready` for a Machine, then for a Controller. */
+    ready: [JSON.stringify({ type: "hub.ready", machine: "machine-1" }), JSON.stringify({ type: "hub.ready", member: "member-1" })],
+    error: JSON.stringify({ type: "hub.error", code: "hub.machine_offline", ref: "sig-1" }),
+  };
+}
+
+export function hubUrlVectors() {
+  const inputs = [
+    "wss://hub.example.com",
+    "WSS://Hub.Example.COM/",
+    "wss://hub.example.com:443",
+    "wss://hub.example.com:8443",
+    "ws://127.0.0.1:18080/",
+    "ws://localhost:80",
+    "ws://localhost:080",
+    "ws://localhost:08080",
+    "ws://[::1]:8080",
+    "wss://[2001:DB8:0:0:0:0:0:1]",
+    "wss://[::1]:443",
+    "wss://ไทย.example.com",
+    "wss://hub.example.com?",
+    "wss://hub.example.com#",
+    "wss://:8443",
+    "wss://[::1%25en0]",
+    "wss://hub.example.com:70000",
+    "https://hub.example.com",
+    "wss://hub.example.com/connect",
+    "wss://hub.example.com?x=1",
+    "wss://user:pass@hub.example.com",
+    "wss://hub.example.com#frag",
+  ];
+  return {
+    vectors: inputs.map((input) => {
+      try {
+        return { input, normalized: normalizeHubUrl(input) };
+      } catch {
+        return { input, error: true };
+      }
+    }),
+  };
+}
+
+export function pairingVectors() {
+  const hubUrl = "wss://hub.example.com";
+  const expires = 2_000_000_000;
+  const member = "m_vector";
+  const link = buildPairingLink({ hub: hubUrl, machineSecretKey: TEST_MACHINE, secret: TEST_PAIRING_SECRET, expires });
+  const parsed = parsePairingLink(link, 0);
+  if (!parsed.ok) throw new Error(parsed.reason);
+  const request = buildPairingRequest(parsed.link, TEST_CONTROLLER);
+  const machine = keyOf(TEST_MACHINE);
+  const controller = keyOf(TEST_CONTROLLER);
+  const secret = toBase64url(TEST_PAIRING_SECRET);
+  const proof = pairingProof({ secret, machine, controller, member });
+  const claim = createSigner(TEST_CONTROLLER, () => 1)({ type: "pairing.claim", to: "machine-1", body: { member, proof } });
+  const done = createSigner(TEST_MACHINE, () => 1)({ type: "pairing.done", recipients: [member], body: { name: "my-mac" } });
+  const stranger = (bytes: Uint8Array) => toBase64url(sign(bytes, TEST_STRANGER));
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds. The Hub is configured with `hubUrl`, and `now` is the time to check at, in Unix seconds.",
+    hubUrl,
+    now: expires - 60,
+    expires,
+    skewSeconds: 120,
+    /** The bytes each side signs, and the text the proof is the HMAC of, as text. */
+    linkSignedText: new TextDecoder().decode(pairingLinkBytes(hubUrl, machine, expires)),
+    requestSignedText: new TextDecoder().decode(pairingRequestBytes(hubUrl, machine, controller, expires)),
+    proofText: pairingProofText({ machine, controller, member }),
+    secret,
+    member,
+    proof,
+    link,
+    claim: JSON.stringify(claim),
+    done: JSON.stringify(done),
+    requests: [
+      { name: "valid", request, valid: true },
+      { name: "a Machine signature by another key", request: { ...request, machineSig: stranger(pairingLinkBytes(hubUrl, machine, expires)) }, valid: false },
+      { name: "a Machine signature for another expiry", request: { ...request, expires: expires + 1000 }, valid: false },
+      { name: "a Controller signature by another key", request: { ...request, controllerSig: stranger(pairingRequestBytes(hubUrl, machine, controller, expires)) }, valid: false },
+      {
+        name: "a Controller signature for another Hub",
+        request: { ...request, controllerSig: toBase64url(sign(pairingRequestBytes("wss://evil.example.com", machine, controller, expires), TEST_CONTROLLER)) },
+        valid: false,
+      },
+    ],
+  };
+}
+
+/** Bodies every implementation must read the same way: `valid` is whether parseMessage takes it. */
+export function messageVectors() {
+  const agent = { id: "agent-1", name: "Deployer", provider: "anthropic", model: "claude-sonnet-5-5" };
+  const character = { color: "#9DC3E6", shell: "dome", top: "antenna", sides: "ears", decal: "none" };
+  const event = { agent: "agent-1", seq: 3, kind: "llm.message", at: 1_800_000_000_000, body: { content: [{ type: "text", text: "สวัสดี" }] } };
+  const cases: { name: string; type: string; body: unknown; valid: boolean }[] = [
+    { name: "create an Agent", type: "agent.create", body: agent, valid: true },
+    { name: "create with a field this build does not know", type: "agent.create", body: { ...agent, mascot: "robot" }, valid: true },
+    { name: "create with a Character", type: "agent.create", body: { ...agent, character }, valid: true },
+    { name: "create with a Character part this build does not know", type: "agent.create", body: { ...agent, character: { ...character, shell: "orb", glow: true } }, valid: true },
+    { name: "create with a Character colour that is not #rrggbb", type: "agent.create", body: { ...agent, character: { ...character, color: "red" } }, valid: false },
+    { name: "create with a Character part too long", type: "agent.create", body: { ...agent, character: { ...character, top: "a".repeat(33) } }, valid: false },
+    { name: "create with a Character part that is not a lowercase word", type: "agent.create", body: { ...agent, character: { ...character, decal: "<b>" } }, valid: false },
+    { name: "create with a Character missing a slot", type: "agent.create", body: { ...agent, character: { color: "#9DC3E6", shell: "dome" } }, valid: false },
+    { name: "create with a blank name", type: "agent.create", body: { ...agent, name: "  " }, valid: false },
+    { name: "create with no model", type: "agent.create", body: { id: "agent-1", name: "Deployer", provider: "anthropic" }, valid: false },
+    { name: "create with an id that is not a plain folder name", type: "agent.create", body: { ...agent, id: "../trust" }, valid: false },
+    { name: "list", type: "agent.list", body: {}, valid: true },
+    { name: "the output of a running command", type: "tool.output", body: { agent: "agent-1", toolUseId: "toolu_1", tail: "test relay::timeout ... ok\n", bytes: 5120, elapsedMs: 42000 }, valid: true },
+    { name: "output with no tool id", type: "tool.output", body: { agent: "agent-1", tail: "x", bytes: 1, elapsedMs: 0 }, valid: false },
+    { name: "output with a negative byte count", type: "tool.output", body: { agent: "agent-1", toolUseId: "toolu_1", tail: "x", bytes: -1, elapsedMs: 0 }, valid: false },
+    { name: "update the name", type: "agent.update", body: { id: "agent-1", name: "Builder" }, valid: true },
+    { name: "update the Provider with its model", type: "agent.update", body: { id: "agent-1", provider: "openrouter", model: "gpt-5" }, valid: true },
+    { name: "update only the model", type: "agent.update", body: { id: "agent-1", model: "claude-opus-5-5" }, valid: true },
+    { name: "update the Character, keeping a part this build does not know", type: "agent.update", body: { id: "agent-1", character: { ...character, shell: "orb" } }, valid: true },
+    { name: "update with a field this build does not know", type: "agent.update", body: { id: "agent-1", name: "Builder", mascot: "robot" }, valid: true },
+    { name: "update only the Budget", type: "agent.update", body: { id: "agent-1", budget: 5_000_000 }, valid: true },
+    { name: "update with a Budget of zero", type: "agent.update", body: { id: "agent-1", budget: 0 }, valid: false },
+    { name: "update with a fractional Budget", type: "agent.update", body: { id: "agent-1", budget: 1.5 }, valid: false },
+    { name: "update with a Budget above the ceiling", type: "agent.update", body: { id: "agent-1", budget: 1_000_000_000_001 }, valid: false },
+    { name: "update the git repos", type: "agent.update", body: { id: "agent-1", gitRepos: ["acme/shop", "acme/api.v2"] }, valid: true },
+    { name: "update the git repos to none", type: "agent.update", body: { id: "agent-1", gitRepos: [] }, valid: true },
+    { name: "update with a git repo that is not owner/name", type: "agent.update", body: { id: "agent-1", gitRepos: ["shop"] }, valid: false },
+    { name: "update with a git repo that is a URL", type: "agent.update", body: { id: "agent-1", gitRepos: ["https://github.com/acme/shop"] }, valid: false },
+    { name: "update with a git repo in capitals", type: "agent.update", body: { id: "agent-1", gitRepos: ["Acme/Shop"] }, valid: false },
+    { name: "update with a git repo that climbs out", type: "agent.update", body: { id: "agent-1", gitRepos: ["../shop"] }, valid: false },
+    { name: "update with more git repos than the ceiling", type: "agent.update", body: { id: "agent-1", gitRepos: Array.from({ length: 21 }, (_, i) => `acme/r${i}`) }, valid: false },
+    { name: "update with nothing to change", type: "agent.update", body: { id: "agent-1" }, valid: false },
+    { name: "update with only a field this build does not know", type: "agent.update", body: { id: "agent-1", mascot: "robot" }, valid: false },
+    { name: "update the Provider without a model", type: "agent.update", body: { id: "agent-1", provider: "openrouter" }, valid: false },
+    { name: "update with a blank name", type: "agent.update", body: { id: "agent-1", name: " " }, valid: false },
+    { name: "update with a Character missing a slot", type: "agent.update", body: { id: "agent-1", character: { color: "#9DC3E6" } }, valid: false },
+    { name: "update with an id that is not a plain folder name", type: "agent.update", body: { id: "../trust", name: "Builder" }, valid: false },
+    {
+      name: "listed, with a Provider that answered and one that did not",
+      type: "agent.listed",
+      body: { agents: [agent], providers: [{ name: "anthropic", models: [{ id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5" }] }, { name: "openrouter", error: "provider.unreachable" }] },
+      valid: true,
+    },
+    { name: "listed, with an Agent that has a Character and one made before Characters", type: "agent.listed", body: { agents: [{ ...agent, character }, { ...agent, id: "agent-2" }], providers: [] }, valid: true },
+    { name: "listed, with an Agent's git repos", type: "agent.listed", body: { agents: [{ ...agent, gitRepos: ["acme/shop"] }], providers: [] }, valid: true },
+    { name: "listed with a git repo that is not owner/name", type: "agent.listed", body: { agents: [{ ...agent, gitRepos: ["acme"] }], providers: [] }, valid: false },
+    { name: "listed, with a Budget and today's usage", type: "agent.listed", body: { agents: [{ ...agent, budget: 10_000_000, usage: { day: "2026-11-06", tokens: 17_000 } }], providers: [] }, valid: true },
+    {
+      name: "listed with a usage day that is not a date",
+      type: "agent.listed",
+      body: { agents: [{ ...agent, usage: { day: "6 November", tokens: 1 } }], providers: [] },
+      valid: false,
+    },
+    { name: "listed with a Character colour that is not #rrggbb", type: "agent.listed", body: { agents: [{ ...agent, character: { ...character, color: "#12345" } }], providers: [] }, valid: false },
+    { name: "listed with no providers field", type: "agent.listed", body: { agents: [] }, valid: false },
+    { name: "how today's tokens stand", type: "agent.usage", body: { agent: "agent-1", day: "2026-11-06", tokens: 1_700, budget: 10_000_000 }, valid: true },
+    { name: "a tally with a negative number of tokens", type: "agent.usage", body: { agent: "agent-1", day: "2026-11-06", tokens: -1, budget: 10_000_000 }, valid: false },
+    { name: "a message in a Task", type: "task.message", body: { agent: "agent-1", id: "msg-1", text: "deploy ให้หน่อย" }, valid: true },
+    { name: "an empty message", type: "task.message", body: { agent: "agent-1", id: "msg-1", text: "" }, valid: false },
+    { name: "name a Task", type: "task.rename", body: { agent: "agent-1", title: "ทบทวน git rebase" }, valid: true },
+    { name: "a Task's name of 60 characters, emoji counted once", type: "task.rename", body: { agent: "agent-1", title: `${"ก".repeat(59)}🚀` }, valid: true },
+    { name: "a Task's name over 60 characters", type: "task.rename", body: { agent: "agent-1", title: "ก".repeat(61) }, valid: false },
+    { name: "a Task's name of only spaces", type: "task.rename", body: { agent: "agent-1", title: "   " }, valid: false },
+    { name: "a Task's name over two lines", type: "task.rename", body: { agent: "agent-1", title: "CI\nแดง" }, valid: false },
+    { name: "a Task's name with no Agent", type: "task.rename", body: { title: "CI" }, valid: false },
+    { name: "an event", type: "task.event", body: event, valid: true },
+    { name: "an event of a kind this build does not know", type: "task.event", body: { ...event, kind: "future.thing" }, valid: true },
+    { name: "an event numbered from zero", type: "task.event", body: { ...event, seq: 0 }, valid: false },
+    { name: "approve a command", type: "approval.answer", body: { agent: "agent-1", request: "ap_1", decision: "approve" }, valid: true },
+    { name: "deny a request", type: "approval.answer", body: { agent: "agent-1", request: "ap_1", decision: "deny" }, valid: true },
+    { name: "allow a domain for good", type: "approval.answer", body: { agent: "agent-1", request: "ap_1", decision: "always" }, valid: true },
+    { name: "an Approval answer with a decision this build does not know", type: "approval.answer", body: { agent: "agent-1", request: "ap_1", decision: "maybe" }, valid: false },
+    { name: "an Approval answer with no request", type: "approval.answer", body: { agent: "agent-1", decision: "approve" }, valid: false },
+    { name: "sync from the start", type: "task.sync", body: { agent: "agent-1", after: 0 }, valid: true },
+    { name: "sync from a negative number", type: "task.sync", body: { agent: "agent-1", after: -1 }, valid: false },
+    { name: "a page of events", type: "task.events", body: { agent: "agent-1", events: [{ seq: 1, kind: "member.message", at: 1, body: {} }] }, valid: true },
+    { name: "an error about an envelope", type: "error", body: { code: "agent.busy", ref: "sig-1" }, valid: true },
+    { name: "listed with the Machine's Egress", type: "agent.listed", body: { agents: [agent], providers: [], egress: ["github.com", "*.npmjs.org"] }, valid: true },
+    { name: "listed with each Agent's own Egress", type: "agent.listed", body: { agents: [{ ...agent, egress: ["github.com"] }, { ...agent, id: "agent-2", egress: ["*.npmjs.org"] }], providers: [], egress: ["github.com", "*.npmjs.org"] }, valid: true },
+    { name: "listed with an Agent Egress entry that is not a domain", type: "agent.listed", body: { agents: [{ ...agent, egress: ["10.0.0.1"] }], providers: [] }, valid: false },
+    { name: "listed with an Egress entry that is not a domain", type: "agent.listed", body: { agents: [], providers: [], egress: ["10.0.0.1"] }, valid: false },
+    { name: "listed with an Agent the Machine deleted and has not purged", type: "agent.listed", body: { agents: [], trash: [{ ...agent, deletedAt: 1_794_000_000_000, restoreUntil: 1_796_592_000_000 }], providers: [] }, valid: true },
+    { name: "listed with a deleted Agent that does not say when it goes", type: "agent.listed", body: { agents: [], trash: [{ ...agent, deletedAt: 1_794_000_000_000 }], providers: [] }, valid: false },
+    { name: "listed from a Machine older than the trash", type: "agent.listed", body: { agents: [agent], providers: [] }, valid: true },
+    { name: "restore an Agent", type: "agent.restore", body: { id: "agent-1" }, valid: true },
+    { name: "restore with no id", type: "agent.restore", body: {}, valid: false },
+    { name: "set the Egress", type: "egress.set", body: { egress: ["github.com", "*.npmjs.org"] }, valid: true },
+    { name: "set one Agent's Egress", type: "egress.set", body: { agent: "agent-1", egress: ["github.com"] }, valid: true },
+    { name: "set the Egress of an Agent id that is not a folder name", type: "egress.set", body: { agent: "../trust", egress: [] }, valid: false },
+    { name: "set the Egress to nothing", type: "egress.set", body: { egress: [] }, valid: true },
+    { name: "set the Egress with a URL", type: "egress.set", body: { egress: ["https://pypi.org/simple"] }, valid: false },
+    { name: "set the Egress with localhost", type: "egress.set", body: { egress: ["localhost"] }, valid: false },
+    { name: "a claim that names the Member's other keys", type: "pairing.claim", body: { member: "m_1", proof: "p", keys: ["k1", "k2"] }, valid: true },
+    { name: "a claim from before other keys", type: "pairing.claim", body: { member: "m_1", proof: "p" }, valid: true },
+    { name: "list Tasks", type: "task.list", body: {}, valid: true },
+    { name: "listed Tasks", type: "task.listed", body: { tasks: [{ id: "task-1", agent: "agent-1", updated: 1_800_000_000_000 }] }, valid: true },
+    { name: "listed Tasks with an Agent id that is not a folder name", type: "task.listed", body: { tasks: [{ id: "task-1", agent: "../x", updated: 1 }] }, valid: false },
+    { name: "a handoff", type: "device.handoff", body: { data: "{}", proof: "p" }, valid: true },
+    { name: "a handoff with no proof", type: "device.handoff", body: { data: "{}" }, valid: false },
+    { name: "linked", type: "device.linked", body: {}, valid: true },
+    { name: "ask for 7 days of usage", type: "usage.list", body: { request: "req-1", days: 7 }, valid: true },
+    { name: "ask for usage of one Agent", type: "usage.list", body: { request: "req-2", days: 30, agent: "agent-1" }, valid: true },
+    { name: "ask for usage with no request id", type: "usage.list", body: { days: 7 }, valid: false },
+    { name: "ask for usage with a fractional number of days", type: "usage.list", body: { request: "req-3", days: 7.5 }, valid: false },
+    {
+      name: "usage for two Agents in a range",
+      type: "usage.listed",
+      body: {
+        request: "req-1",
+        from: "2026-10-31",
+        to: "2026-11-06",
+        agents: [
+          { agent: "agent-1", days: [{ day: "2026-11-05", tokens: 1_700 }, { day: "2026-11-06", tokens: 400 }], tasks: [{ task: "task-1", tokens: 1_100 }], sources: [{ source: "task", tokens: 2_100 }] },
+          { agent: "agent-2", days: [], tasks: [], sources: [] },
+        ],
+      },
+      valid: true,
+    },
+    { name: "usage with a day that is not a date", type: "usage.listed", body: { request: "req-1", from: "2026-10-31", to: "2026-11-06", agents: [{ agent: "agent-1", days: [{ day: "6 November", tokens: 1 }], tasks: [], sources: [] }] }, valid: false },
+    { name: "usage with a range that ends before it starts", type: "usage.listed", body: { request: "req-1", from: "2026-11-06", to: "2026-10-31", agents: [] }, valid: false },
+    { name: "usage with a negative number of tokens", type: "usage.listed", body: { request: "req-1", from: "2026-10-31", to: "2026-11-06", agents: [{ agent: "agent-1", days: [{ day: "2026-11-06", tokens: -1 }], tasks: [], sources: [] }] }, valid: false },
+    { name: "usage with more than 20 Tasks", type: "usage.listed", body: { request: "req-1", from: "2026-11-06", to: "2026-11-06", agents: [{ agent: "agent-1", days: [], tasks: Array.from({ length: 21 }, (_, i) => ({ task: `task-${i}`, tokens: 1 })), sources: [] }] }, valid: false },
+    { name: "ask for an Agent's Memory", type: "memory.get", body: { request: "req-1", agent: "agent-1" }, valid: true },
+    { name: "ask for Memory with no request id", type: "memory.get", body: { agent: "agent-1" }, valid: false },
+    { name: "ask for Memory of an id that is not a plain folder name", type: "memory.get", body: { request: "req-1", agent: "../trust" }, valid: false },
+    { name: "Memory of an Agent, with its whole-file count", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: true, chars: 12, text: "จดไว้แล้ว" }, valid: true },
+    { name: "Memory empty but present", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: true, chars: 0, text: "" }, valid: true },
+    { name: "Memory of an Agent with no file", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: false, chars: 0, text: "" }, valid: true },
+    { name: "no file but with text", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: false, chars: 0, text: "x" }, valid: false },
+    { name: "Memory text at the bound", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: true, chars: 9_000, text: "a".repeat(4_200) }, valid: true },
+    { name: "Memory text over the bound", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: true, chars: 9_000, text: "a".repeat(4_201) }, valid: false },
+    { name: "Memory with a negative count", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: true, chars: -1, text: "x" }, valid: false },
+    { name: "set the Egress with more than 100 domains", type: "egress.set", body: { egress: Array.from({ length: 101 }, (_, i) => `d${i}.example.com`) }, valid: false },
+  ];
+  cases.push(
+    { name: "register a push token", type: "push.register", body: { token: "ExponentPushToken[abc123]", language: "th" }, valid: true },
+    { name: "register a token with an unknown language", type: "push.register", body: { token: "ExponentPushToken[abc123]", language: "fr" }, valid: false },
+    { name: "a push token that is not from Expo", type: "push.register", body: { token: "abc123" }, valid: false },
+    { name: "the Machine keeps a push token", type: "push.registered", body: { token: "ExponentPushToken[abc123]" }, valid: true },
+    { name: "unregister a push token", type: "push.unregister", body: {}, valid: true },
+    { name: "the Machine removed a push token", type: "push.unregistered", body: {}, valid: true },
+  );
+  return { note: "`valid` is whether a receiver accepts the body of an envelope of `type` that verify already accepted.", vectors: cases };
+}
+
+/**
+ * Certificates every implementation must judge the same way: `valid` is whether
+ * the key in `by` really signed exactly this, before asking whether it is trusted.
+ */
+export function certificateVectors() {
+  const common = { workspace: "w_vector", member: "m_vector", at: 1_800_000_000_000 };
+  const link = signCertificate({ ...common, type: "device.link", key: keyOf(TEST_NEW_DEVICE), name: "Chrome บน Mac" }, TEST_CONTROLLER);
+  const revoke = signCertificate({ ...common, type: "device.revoke", key: keyOf(TEST_CONTROLLER), keep: [keyOf(TEST_NEW_DEVICE)] }, TEST_NEW_DEVICE);
+  const resigned = (signed: string, secret: Uint8Array) => ({ signed, sig: sigOver(signed, secret) });
+  const cases = [
+    { name: "a link", certificate: link },
+    { name: "a revocation that keeps one key", certificate: revoke },
+    { name: "a link with a field this build does not know", certificate: resigned(link.signed.replace('"v":1,', '"v":1,"hint":"newer",'), TEST_CONTROLLER) },
+    { name: "a link to another key, after signing", certificate: { ...link, signed: link.signed.replace(keyOf(TEST_NEW_DEVICE), keyOf(TEST_STRANGER)) } },
+    { name: "a link to another Member, after signing", certificate: { ...link, signed: link.signed.replace("m_vector", "m_other") } },
+    { name: "a link signed by a key other than its by", certificate: { ...link, sig: sigOver(link.signed, TEST_STRANGER) } },
+    { name: "a link with no name", certificate: resigned(link.signed.replace(/"name":"[^"]*",?/, ""), TEST_CONTROLLER) },
+    { name: "a revocation with no keep list", certificate: resigned(revoke.signed.replace(/,?"keep":\[[^\]]*\]/, ""), TEST_NEW_DEVICE) },
+    { name: "a type this build does not know", certificate: resigned(link.signed.replace("device.link", "device.rename"), TEST_CONTROLLER) },
+  ];
+  // A tree: A linked B and C, B linked D. Revoking A and keeping C drops A, B and D.
+  const links = [
+    { key: "B", by: "A" },
+    { key: "C", by: "A" },
+    { key: "D", by: "B" },
+  ];
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds. `sig` is Ed25519 over the UTF-8 of `signed`, by the key in its `by`.",
+    vectors: cases.map((c) => ({ name: c.name, certificate: c.certificate, valid: verifyCertificate(c.certificate) !== null })),
+    fallout: { revoked: "A", links, keep: ["C"], drops: revokedWith("A", links, ["C"]) },
+  };
+}
+
+/** The QR the device already in the Workspace shows, the new device's request back, and the proof on the handoff it waits for. */
+export function linkingVectors() {
+  const key = keyOf(TEST_NEW_DEVICE);
+  const to = keyOf(TEST_CONTROLLER);
+  const id = toBase64url(new Uint8Array(16).fill(0x11));
+  const name = "Chrome บน Mac";
+  const secret = toBase64url(TEST_PAIRING_SECRET);
+  const data = JSON.stringify({ workspace: "w_vector", member: "m_vector", machines: [{ id: "machine-1", key: keyOf(TEST_MACHINE), name: "my-mac", hub: "wss://hub.example.com" }], keys: [{ key: to, name: "iPhone" }] });
+  return {
+    note: "TEST-ONLY KEYS from fixed public seeds.",
+    link: buildLinkingLink({ hub: "wss://hub.example.com", to, id, secret: TEST_PAIRING_SECRET, expires: 2_000_000_000 }),
+    to,
+    id,
+    secret,
+    request: { to, id, key, name, proof: linkRequestProof({ secret, id, key, name }) },
+    requestProofText: linkRequestProofText(id, key, name),
+    key,
+    data,
+    proofText: linkingProofText(key, data),
+    proof: linkingProof({ secret, key, data }),
+  };
+}
+
+export const FIXTURES = {
+  "schema/envelope-header.schema.json": headerSchema,
+  "vectors/envelopes.json": envelopeVectors,
+  "vectors/handshakes.json": handshakeVectors,
+  "vectors/hub-urls.json": hubUrlVectors,
+  "vectors/pairings.json": pairingVectors,
+  "vectors/messages.json": messageVectors,
+  "vectors/certificates.json": certificateVectors,
+  "vectors/linkings.json": linkingVectors,
+};
+
+export const render = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;

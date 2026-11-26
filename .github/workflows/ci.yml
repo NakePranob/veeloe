@@ -1,0 +1,209 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ADR 0022: every part has its structure checked, each by its own tool.
+  structure:
+    name: Types and structure
+    runs-on: ubuntu-latest
+    # A hung test used to hold this job for GitHub's six-hour ceiling. Fail and
+    # say which package, rather than look busy all afternoon.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: Sandbox for the Runtime's workers (ADR 0008)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap socat ripgrep
+          # Ubuntu 24.04 stops unprivileged user namespaces through AppArmor, and bubblewrap needs them.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: bun run typecheck
+      - name: Biome (Controller format + lint)
+        run: bun run lint
+      - name: Dead files, exports and dependencies (knip)
+        run: bun run check:dead
+      - name: Unit tests (Protocol, Controller)
+        # `bun run test` is the same two commands; split here so a hang names
+        # the package it is in and a timeout turns it into a failure.
+        run: |
+          set -x
+          (cd packages/protocol-ts && timeout 120 bun test --timeout 15000)
+          # One process per file: `mock.module` is process-global, and an async
+          # factory for a module another file already mocked hangs Bun 1.3.14
+          # on the runner (links.test.ts after inbox.test.ts). Each file stays
+          # self-contained and a hang names its file.
+          (cd controller && files=$(find src scripts -name '*.test.ts' -o -name '*.test.tsx' | sort); \
+            if [ -z "$files" ]; then echo "no controller test files found"; exit 1; fi; \
+            for file in $files; do \
+              echo "== $file"; \
+              timeout 60 bun test --timeout 15000 "$file" || exit 1; \
+            done)
+      - name: i18n keys (Controller)
+        run: bun run check:controller
+      - name: Structure (keel, ADR 0070)
+        run: bun run check:structure
+      - name: keel rules still match their proven coverage
+        run: |
+          for half in controller hub packages .; do
+            python3 .conventions/prove.py --root "$half" --verify || exit 1
+          done
+
+  hub:
+    name: Hub
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hub_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    # Without these the repository tests skip, and a broken one stays green.
+    env:
+      TEST_DB_DSN: postgres://postgres:postgres@localhost:5432/hub_test?sslmode=disable
+      REQUIRE_TEST_DB: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: hub/go.mod
+          cache-dependency-path: hub/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - name: gofmt
+        run: test -z "$(gofmt -l . | tee /dev/stderr)"
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          # keep in step with GOLANGCI_LINT_VERSION in hub/Makefile
+          version: v2.12.2
+          working-directory: hub
+      - name: Apply migrations
+        run: |
+          # keep in step with MIGRATE_VERSION in hub/Makefile
+          go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+          "$(go env GOPATH)/bin/migrate" -path migrations -database "$TEST_DB_DSN" up
+      - run: go test -race ./...
+
+  runtime:
+    name: Runtime and Protocol (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: hub/go.mod
+          cache-dependency-path: hub/go.sum
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Sandbox for the Runtime's workers (ADR 0008)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap socat ripgrep
+          # Ubuntu 24.04 stops unprivileged user namespaces through AppArmor, and bubblewrap needs them.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: bun install --frozen-lockfile
+      - name: Runtime tests (Rust)
+        run: bun run check:runtime
+      - name: Protocol tests (Rust, TypeScript fixtures, Hub)
+        run: bun run check:protocol
+
+  # The Runtime is checked on Linux above, but the profile that only macOS
+  # enforces is `sandbox-exec`, and a path the OS moves breaks Agent work with
+  # no build to catch it. This job runs only what needs that profile, one test
+  # at a time because they start real workers (ADR 0022, 0069).
+  runtime-macos:
+    name: Runtime sandbox (macOS)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: packages/runtime
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      # A Turn under the narrowed mach-lookup list runs `git` and `bun`, so the
+      # runner has both. `git` ships with the macOS image; `bun` does not.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      # The sandbox reads only the paths its allow-list names, and the runner
+      # keeps bun under its tool cache, outside them. Put the binary where the
+      # profile already reads, so the runner tests the rules and not its layout.
+      - name: Put bun where the sandbox can read it
+        run: |
+          sudo mkdir -p /usr/local/veeloe-ci
+          sudo cp "$(command -v bun)" /usr/local/veeloe-ci/bun
+          # Ahead of the tool cache setup-bun added, so the tests run this one.
+          echo "PATH=/usr/local/veeloe-ci:$PATH" >> "$GITHUB_ENV"
+      - name: Commands under sandbox-exec
+        run: cargo test -p veeloe-runtime-supervisor --test sandbox -- --test-threads=1
+      - name: A real worker under sandbox-exec
+        run: cargo test -p veeloe-runtime-supervisor --test workers -- --test-threads=1
+      - name: A refused system service in the Runtime log
+        run: cargo test -p veeloe-runtime-supervisor --test denials -- --test-threads=1
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hub_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    # Without these the Pairing test skips, and a broken one stays green.
+    env:
+      TEST_DB_DSN: postgres://postgres:postgres@localhost:5432/hub_test?sslmode=disable
+      REQUIRE_TEST_DB: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: hub/go.mod
+          cache-dependency-path: hub/go.sum
+      - uses: dtolnay/rust-toolchain@stable
+      - run: bun install --frozen-lockfile
+      - name: Sandbox for the Runtime's workers (ADR 0008)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap socat ripgrep
+          # Ubuntu 24.04 stops unprivileged user namespaces through AppArmor, and bubblewrap needs them.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Apply migrations
+        working-directory: hub
+        run: |
+          # keep in step with MIGRATE_VERSION in hub/Makefile
+          go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+          "$(go env GOPATH)/bin/migrate" -path migrations -database "$TEST_DB_DSN" up
+      - run: bun run test:e2e

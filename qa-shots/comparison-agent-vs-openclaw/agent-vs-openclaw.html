@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<title>Veeloe Agent vs OpenClaw</title>
+<style>
+  :root { --bg:#0b1016; --panel:#141c25; --panel2:#18222d; --line:#2a3745; --text:#e8eef5; --muted:#9fb0c2; --accent:#7cc4ff; --green:#8ee6b0; --amber:#f0b37e; --red:#ff8f8f; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,"SF Pro Text","Noto Sans Thai","Helvetica Neue",sans-serif; }
+  #canvas { position:relative; width:1400px; height:1080px; }
+  h1 { margin:28px 40px 0; font-size:25px; }
+  .sub { margin:6px 40px 0; color:var(--muted); font-size:13px; }
+  .cols { position:absolute; top:100px; left:40px; display:flex; gap:24px; }
+  .panel { width:648px; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 20px; }
+  .panel h2 { margin:0 0 4px; font-size:18px; color:var(--accent); }
+  .panel .kind { color:var(--muted); font-size:12px; margin-bottom:14px; }
+  .step { display:flex; gap:10px; padding:9px 0; border-top:1px solid var(--line); }
+  .step:first-of-type { border-top:0; }
+  .num { flex:0 0 24px; height:24px; border-radius:50%; background:#21303f; color:var(--accent); font-size:12px; display:grid; place-items:center; font-weight:600; }
+  .step b { font-size:13.5px; }
+  .step p { margin:2px 0 0; font-size:12px; line-height:1.55; color:var(--muted); }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; border:1px solid var(--line); color:var(--muted); margin:2px 4px 2px 0; }
+  .ok { color:var(--green); border-color:rgba(142,230,176,.35); }
+  .warn { color:var(--amber); border-color:rgba(240,179,126,.35); }
+  .deny { color:var(--red); border-color:rgba(255,143,143,.35); }
+  .table { position:absolute; left:40px; top:660px; width:1320px; background:var(--panel2); border:1px solid var(--line); border-radius:16px; padding:16px 20px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { text-align:left; padding:9px 10px; border-top:1px solid var(--line); vertical-align:top; }
+  thead th { border-top:0; color:var(--muted); font-weight:600; font-size:11.5px; letter-spacing:.3px; }
+  th:first-child { width:200px; color:var(--muted); }
+  td:nth-child(2) { color:var(--text); }
+  td:nth-child(3) { color:var(--text); }
+  .note { position:absolute; left:40px; top:1024px; width:1320px; color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<div id="canvas">
+  <h1>ทำงานยังไง: Veeloe Agent vs OpenClaw</h1>
+  <div class="sub">Veeloe = Agent เป็นโปรเซสบน Machine ของเรา · OpenClaw = Gateway บน host + tool execution ย้ายเข้า container เมื่อเปิด sandbox</div>
+
+  <div class="cols">
+    <!-- Veeloe -->
+    <div class="panel">
+      <h2>Veeloe — Agent บน Machine ของ Owner</h2>
+      <div class="kind">1 Agent = 1 worker (Rust) · 1 คิว · 1 Workdir · รันบนเครื่องจริง ไม่ต้องมี Docker</div>
+      <div class="step"><div class="num">1</div><div><b>Controller (แอป) → Hub</b><p>Member ส่งข้อความ/คำสั่งที่เซ็นแล้ว; Hub เป็นแค่ตัวส่งต่อ ไม่เก็บเนื้อหา</p></div></div>
+      <div class="step"><div class="num">2</div><div><b>Supervisor บน Machine</b><p>ตรวจลายเซ็น, ถือ Provider key, เป็น proxy ของ LLM, คุม Budget/usage, เปิด–ปิด worker</p></div></div>
+      <div class="step"><div class="num">3</div><div><b>Worker = Agent</b><p>Harness ประกอบ prompt (คำสั่ง + MEMORY.md + Skills + tools) → เรียก LLM ผ่าน proxy → เรียก tool → บันทึก event ลง tasks.db</p></div></div>
+      <div class="step"><div class="num">4</div><div><b>Tools</b><p>bash, read/write/edit/glob/grep, memory, send_file — ทุก tool ใช้ path resolver ชุดเดียวกับ sandbox</p></div></div>
+      <div class="step"><div class="num">5</div><div><b>Sandbox ระดับ OS</b><p>Seatbelt (macOS) / bwrap (Linux): อ่าน–เขียนเฉพาะ Workdir + Project ที่ได้งาน; อ่าน Library/system; deny home/secrets<br/><span class="pill ok">Workdir</span><span class="pill ok">Project</span><span class="pill warn">Library ตามสิทธิ์</span><span class="pill deny">home/secrets</span></p></div></div>
+      <div class="step"><div class="num">6</div><div><b>Memory</b><p><code>MEMORY.md</code> ที่ Workdir (≤4,000) + <code>memory/YYYY-MM-DD.md</code>; tool memory เขียน, flush ก่อน compaction</p></div></div>
+    </div>
+
+    <!-- OpenClaw -->
+    <div class="panel">
+      <h2>OpenClaw — Gateway บน host + sandbox container</h2>
+      <div class="kind">Gateway อยู่บน host เสมอ · sandbox ปิดเป็นค่าเริ่มต้น · เปิดเมื่อต้องการ</div>
+      <div class="step"><div class="num">1</div><div><b>ช่องทาง (Telegram/Web/ฯลฯ)</b><p>ข้อความเข้าหา agent session ใน Gateway — ไม่มี Hub แยกแบบ Veeloe</p></div></div>
+      <div class="step"><div class="num">2</div><div><b>Gateway + agent session</b><p>ประกอบ context จาก workspace (AGENTS.md, MEMORY.md, USER.md, memory/*.md) และเรียกโมเดล</p></div></div>
+      <div class="step"><div class="num">3</div><div><b>Tool execution</b><p>ถ้าไม่เปิด sandbox: shell/file tools รันบน host ตาม permission mode + approval</p></div></div>
+      <div class="step"><div class="num">4</div><div><b>Sandbox (ถ้าเปิด)</b><p>ย้าย shell/file read-write เข้า container: Docker (ค่าเริ่มต้น), Podman, SSH, OpenShell, Crabbox; workspace mount ที่ <code>/workspace</code>; จำกัด network/resources ได้</p></div></div>
+      <div class="step"><div class="num">5</div><div><b>นโยบายแยกจาก sandbox</b><p>tool allow/deny + permission mode (<code>deny/allowlist/ask/auto/full</code>); <code>tools.elevated</code> เป็นทางออกไปรันนอก sandbox</p></div></div>
+      <div class="step"><div class="num">6</div><div><b>Memory</b><p>ไฟล์ใน workspace: <code>MEMORY.md</code>, <code>memory/YYYY-MM-DD.md</code>, <code>USER.md</code>; index + <code>memory_search</code>/<code>memory_get</code> + dreaming/flush</p></div></div>
+    </div>
+  </div>
+
+  <div class="table">
+    <table>
+      <thead><tr><th>เรื่อง</th><th>Veeloe</th><th>OpenClaw</th></tr></thead>
+      <tbody>
+        <tr><th>ที่รัน Agent</th><td>worker บน Machine ของ Owner (Rust)</td><td>Gateway บน host; session อยู่ใน Gateway</td></tr>
+        <tr><th>Sandbox</th><td>OS-native (Seatbelt/bwrap) ครอบคำสั่ง/เป้าหมายทั้ง worker</td><td>Container backend (Docker/Podman/SSH/OpenShell) เมื่อเปิด; ปิดเป็นค่าเริ่มต้น</td></tr>
+        <tr><th>ขอบเขตไฟล์</th><td>Workdir + Project ที่ได้งาน + Library ตามสิทธิ์; deny home/secrets</td><td>workspace ที่ mount เข้า container (กำหนด workspaceAccess ได้) + tool policy</td></tr>
+        <tr><th>Approval</th><td>Allowlist/Approval เป็นนโยบาย; sandbox เป็นด่านจริง</td><td>permission mode + exec approvals; sandbox เป็นอีกชั้น</td></tr>
+        <tr><th>Memory</th><td>MEMORY.md + daily notes + memory tool/flush (ยังไม่มี index/search)</td><td>MEMORY.md/USER.md/daily notes + index, memory_search/get, dreaming</td></tr>
+        <tr><th>หลาย Agent</th><td>หลาย worker บน Machine เดียว; Project/Team ภายหลัง</td><td>multi-agent ใน Gateway; sandbox scope per-session/agent/shared</td></tr>
+        <tr><th>ข้อจำกัดวันนี้</th><td>macOS 27: allow-list subpath ทำให้ sandbox-exec abort (ต้องแก้/hybrid)</td><td>sandbox ต้องมี Docker/Podman; เอกสารยอมรับว่าไม่ใช่ boundary สมบูรณ์</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">สรุป: Veeloe เน้นเบาและอยู่ในเครื่อง (OS sandbox) · OpenClaw เน้นแยกงานหนักออกเป็น container — ทั้งคู่ถือว่า “sandbox ≠ approval” และ approval ไม่ได้ให้สิทธิ์ไฟล์</div>
+</div>
+</body>
+</html>

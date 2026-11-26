@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "595394010239",
+    "project_id": "veeloe-push",
+    "storage_bucket": "veeloe-push.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:595394010239:android:e222605aa392663e13b34a",
+        "android_client_info": {
+          "package_name": "dev.veeloe.controller"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1uPim5M2CoVtJhS0rfkQBE0rskS_YNMw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

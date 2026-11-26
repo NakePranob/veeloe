@@ -1,0 +1,76 @@
+name: Runtime release
+
+# GitHub Releases are the Runtime's only (ADR 0009, 0025): pushing a `v*` tag
+# builds `veeloe` for each platform and publishes them with SHA256SUMS and
+# install.sh, which the Controller's Add Machine page tells the Owner to run.
+#
+# ponytail: checksums only. The Ed25519-signed manifest, its key in an
+# environment that needs approval, comes with the updater in v0.3 (ADR 0009).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: veeloe-${{ matrix.asset }}
+    strategy:
+      matrix:
+        include:
+          # 22.04 for an older glibc, so the binary also runs on older distros.
+          - { asset: linux-x86_64, runner: ubuntu-22.04 }
+          - { asset: linux-aarch64, runner: ubuntu-22.04-arm }
+          - { asset: darwin-arm64, runner: macos-15 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Stamp the tag's version into the Runtime
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # The workspace's one version line (the first in the file); every crate inherits it.
+          perl -0pi -e "s/^version = \".*?\"/version = \"$version\"/m" packages/runtime/Cargo.toml
+          grep -m1 '^version' packages/runtime/Cargo.toml
+      - name: Build
+        working-directory: packages/runtime
+        # Not --locked: the stamped version changes the workspace crates' lines in Cargo.lock.
+        run: cargo build --release -p veeloe-runtime-supervisor
+      - name: Name the binary for its platform
+        run: |
+          mkdir -p dist
+          cp packages/runtime/target/release/veeloe "dist/veeloe-${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: veeloe-${{ matrix.asset }}
+          path: dist/veeloe-${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    name: Publish the release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and installer
+        run: |
+          cp packaging/install.sh dist/install.sh
+          cd dist
+          sha256sum veeloe-* install.sh > SHA256SUMS
+          cat SHA256SUMS
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true
+          # v0.1.0-rc.1 is a pre-release, so `releases/latest` (and install.sh) never picks it.
+          prerelease: ${{ contains(github.ref_name, '-') }}

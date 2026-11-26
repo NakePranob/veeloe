@@ -1,0 +1,200 @@
+{
+  "title": "Task",
+  "agent": "Agent settings",
+  "deletedAgent": "Deleted Agent",
+  "readOnly": "This Agent was deleted. Its Task history stays readable, but nothing new can be sent.",
+  "empty": "Send a message to start this Task. {{name}} can read files only in its own Workdir.",
+  "working": "Working…",
+  "sending": "Sending…",
+  "dismiss": "Remove",
+  "placeholder": "Talk to {{name}}",
+  "send": "Send",
+  "offline": "The Machine is offline. Send once it's back.",
+  "tools": {
+    "verbs": {
+      "bash": "{{target}}",
+      "read": "Read {{target}}",
+      "glob": "Found files {{target}}",
+      "grep": "Searched {{target}}",
+      "edit": "Edited {{target}}",
+      "write": "Created {{target}}",
+      "memory": "Remembered: {{target}}",
+      "send_file": "Sent {{target}}"
+    },
+    "other": "Used {{tool}}",
+    "more": "+{{count}}",
+    "unfinished": "Not finished"
+  },
+  "queued": "You can send; it waits until this Turn ends",
+  "queuedPosition": "Queued #{{position}} for the running Turn",
+  "attach": "Attach a file",
+  "attachedOnly": "Attached file",
+  "removeAttachment": "Remove {{name}}",
+  "file": {
+    "offered": "File from the Agent",
+    "size": "{{size}} KB",
+    "open": "Open",
+    "opening": "Opening…"
+  },
+  "compacted": {
+    "title": "Context compacted · {{when}}",
+    "show": "Show summary",
+    "hide": "Hide summary"
+  },
+  "context": {
+    "title": "Context window",
+    "used": "Used",
+    "of": "{{used}} / {{window}} tokens",
+    "compactAt": "Compacts at",
+    "threshold": "{{tokens}} tokens",
+    "a11y": "{{percent}}% of the context window used"
+  },
+  "budget": {
+    "out": "Today's Budget is used up",
+    "body": "New work starts at 04:00 in {{machine}}'s time, or when you add Budget. Files it changed are still there.",
+    "add": "Add Budget",
+    "used": "{{used}} of {{budget}} tokens used"
+  },
+  "approval": {
+    "title": "Can I run this?",
+    "domainTitle": "Can I go out to this?",
+    "domainBody": "This domain is not in {{name}}'s Egress.",
+    "expiresIn_one": "{{count}} min left",
+    "expiresIn_other": "{{count}} min left",
+    "expiresInHours_one": "{{count}} hr left",
+    "expiresInHours_other": "{{count}} hr left",
+    "approved": "Approved",
+    "denied": "Denied",
+    "expired": "Timed out",
+    "closed": "Its Turn ended before anyone answered",
+    "waitingForApprover": "Waiting for someone with Approve",
+    "sent": "Answer sent",
+    "approve": "Approve",
+    "allowOnce": "Allow once",
+    "allowAlways": "Always allow",
+    "deny": "Deny",
+    "always": "Always allow",
+    "steer": "Tell it what to do instead",
+    "addToAllowlist": "Add to the Allowlist",
+    "covers": "Trim the end to leave the prefix you mean. This entry covers every command that starts that way.",
+    "doesNotCover": "This does not cover the command, so it still asks.",
+    "signAndApprove": "Sign and approve",
+    "cancel": "Cancel",
+    "more": "Other options",
+    "outcome": "{{outcome}} · {{target}}",
+    "outcomeBy": "{{outcome}} by {{member}} · {{target}}",
+    "outcomeExpired": "{{outcome}} counted as denied · {{target}}",
+    "outcomeAlways": "{{outcome}} · added {{target}} to Egress",
+    "outcomeByYou": "{{outcome}} by you · {{target}}"
+  },
+  "openAgent": "Open {{name}}",
+  "stopped": "{{member}} stopped this Turn · {{when}}",
+  "interrupted": {
+    "title": "{{machine}} started again mid-Turn",
+    "body": "The files it changed are still there, and {{name}} won't carry on by itself, because it could run the same command twice",
+    "continue": "Carry on",
+    "continueMessage": "Carry on"
+  },
+  "stop": {
+    "title": "Stop this Turn?",
+    "message": "Stopping:\n• {{agent}}\n\nFiles it already changed stay, and you can carry on talking",
+    "action": "Stop",
+    "cancel": "Cancel",
+    "button": "Stop",
+    "stopping": "Stopping…"
+  },
+  "authenticate": {
+    "approve": "Approve this command for {{name}}",
+    "always": "Add {{entries}} to the Allowlist and approve",
+    "domain": "Allow this domain for {{name}}: {{domain}}",
+    "domainAlways": "Add {{domain}} to {{name}}'s Egress"
+  },
+  "changes_one": "Changed {{count}} file",
+  "changes_other": "Changed {{count}} files",
+  "changesNote": "Counts only files the Agent changed with its edit and write tools",
+  "failedTitle": "Turn failed",
+  "emptyTitle": "What should {{name}} help with?",
+  "waitingHeader": "Waiting for your answer",
+  "budgetHeader": "Today's Budget is used up",
+  "newTitle": "New Task",
+  "newSubtitle": "{{name}} · {{machine}}",
+  "deletedSubtitle": "Read only",
+  "failedBody": "Files it already changed are still there. Send a message and {{name}} can carry on.",
+  "runningCommand": "Running {{target}}",
+  "separator": {
+    "today": "Today {{time}}",
+    "yesterday": "Yesterday {{time}}",
+    "date": "{{date}} {{time}}"
+  },
+  "details": {
+    "title": "Task details",
+    "untitled": "No messages yet",
+    "titleLabel": "Task name: {{title}}, tap to rename",
+    "hintOffline": "You can rename it once the Machine is online",
+    "hintFirst": "This is the first message for now. The Agent names the Task when its first Turn ends, or tap to name it yourself.",
+    "offline": "The Machine is offline. You can rename the Task and stop a Turn once it is back. What is below is the latest this device has.",
+    "stop": "Stop this Turn",
+    "open": "Open Task",
+    "agent": "Go to Agent",
+    "context": {
+      "heading": "Context",
+      "of": "of {{window}} tokens · {{percent}}",
+      "bar": "{{used}} of {{window}} tokens used ({{percent}})",
+      "threshold": "The line at 70% is where the Runtime compacts the context on its own",
+      "thresholdCompacted": "The line at 70% is where the Runtime compacts the context on its own. This Task was compacted {{count}} times",
+      "free": "Free",
+      "freeHint": "Left for the next Turn",
+      "none": "No breakdown yet. It shows once the next Turn talks to the model",
+      "footer": "A rough count from the latest Turn, about 3 characters a token. The Provider's own count may differ a little (ADR 0041)"
+    },
+    "parts": {
+      "system": {
+        "label": "System prompt",
+        "hint": "How the Runtime tells the Agent to work"
+      },
+      "memory": {
+        "label": "Memory",
+        "hint": "MEMORY.md, pinned into every Turn"
+      },
+      "tools": {
+        "label": "Tools",
+        "hint": "The tool descriptions sent every time"
+      },
+      "summary": {
+        "label": "Compacted summary",
+        "hint": "Stands in for the earlier conversation"
+      },
+      "you": {
+        "label": "Your messages",
+        "hint": "What you sent in this Task"
+      },
+      "agent": {
+        "label": "The Agent's answers",
+        "hint": "Its words and the commands it called"
+      },
+      "results": {
+        "label": "Tool results",
+        "hint": "Files it read and what commands printed"
+      }
+    },
+    "facts": {
+      "heading": "Details",
+      "agent": "Agent",
+      "machine": "Machine",
+      "started": "Started",
+      "last": "Last activity",
+      "turns": "Turns"
+    },
+    "changed": {
+      "heading": "Files the Agent changed",
+      "none": "No files changed in this Task yet",
+      "footer": "Only files changed with edit and write. What a bash command changed cannot be told from the log."
+    },
+    "sent": {
+      "heading": "Files sent",
+      "none": "The Agent has not sent a file in this Task"
+    }
+  },
+  "openDetails": "Task details",
+  "stoppedByYou": "You stopped this Turn · {{when}}"
+}

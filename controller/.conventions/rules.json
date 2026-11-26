@@ -1,0 +1,335 @@
+{
+  "version": 1,
+  "shared": "../docs/adr/0070-keel-holds-the-structure.md",
+  "check": [
+    "bun",
+    "scripts/check-structure.ts"
+  ],
+  "units": {
+    "kind": "slice",
+    "at": "src/{layer}/{name}",
+    "layers": [
+      "pages",
+      "widgets",
+      "features",
+      "entities"
+    ],
+    "shared": [
+      "src/shared/"
+    ],
+    "wiring": [
+      "src/app/",
+      "app/"
+    ]
+  },
+  "templates": [
+    {
+      "name": "page",
+      "dir": ".conventions/templates/page",
+      "placeholder": "usage",
+      "like": "src/pages/usage"
+    },
+    {
+      "name": "entity",
+      "dir": ".conventions/templates/entity",
+      "placeholder": "task",
+      "like": "src/entities/task"
+    }
+  ],
+  "rules": [
+    {
+      "id": "fsd-layer-direction",
+      "statement": "A file imports only from layers below its own: app > pages > widgets > features > entities > shared. Re-exports and require() count.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "import \"../../../pages/task\";\n"
+        },
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "export { x } from \"../../../features/machine-link\";\n"
+        },
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "const page = require(\"../../../pages/task\");\nexport default page;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/task/model/zz_probe.ts",
+          "content": "import \"../../../entities/task\";\n"
+        }
+      ]
+    },
+    {
+      "id": "fsd-no-cross-slice",
+      "statement": "A slice never imports a sibling slice of the same layer, tests included.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "import \"../../agent\";\n"
+        },
+        {
+          "path": "src/entities/task/model/zz_probe.test.ts",
+          "content": "import \"../../agent\";\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/entities/task/model/zz_probe.ts",
+          "content": "import \"../../../shared/db\";\n"
+        }
+      ]
+    },
+    {
+      "id": "fsd-public-api",
+      "statement": "Another slice is imported through its index.ts, never a deep path; tests are exempt.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/pages/home/model/zz_probe.ts",
+          "content": "import \"../../../entities/task/model/tasks\";\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/model/zz_probe.ts",
+          "content": "import \"../../../entities/task\";\n"
+        },
+        {
+          "path": "src/pages/home/model/zz_probe.test.ts",
+          "content": "import \"../../../entities/task/model/tasks\";\n"
+        }
+      ]
+    },
+    {
+      "id": "routes-import-pages",
+      "statement": "A route file in app/ imports only a page from src/pages/<name> or src/app.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "app/zz_probe.tsx",
+          "content": "import \"../src/entities/task\";\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "app/zz_probe.tsx",
+          "content": "import \"../src/pages/usage\";\n"
+        }
+      ]
+    },
+    {
+      "id": "known-places",
+      "statement": "Every file lives in a slice, src/shared/<segment>, src/app, app/, scripts/, assets/ or at the root.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/helpers/zz_probe.ts",
+          "content": "export const x = 1;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "export const x = 1;\n"
+        }
+      ]
+    },
+    {
+      "id": "unit-shape",
+      "statement": "A slice has only the folders its templates have (ui, model, i18n).",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "violation": [
+        {
+          "path": "src/pages/home/helpers/zz_probe.ts",
+          "content": "export const x = 1;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/model/zz_probe.ts",
+          "content": "export const x = 1;\n"
+        }
+      ]
+    },
+    {
+      "id": "colour-from-shared-ui",
+      "statement": "A file in src/pages or src/widgets does not import useColors or useShadows and has no hex colour: colour comes from shared/ui; View lays things out. Entities may use colour.",
+      "adr": "docs/adr/0072-controller-colour-comes-from-shared-ui.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [],
+      "violation": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { useColors } from \"../../../shared/ui\";\nexport const a = useColors;\n"
+        },
+        {
+          "path": "src/widgets/agent-inbox/ui/zz_probe.tsx",
+          "content": "export const tint = { backgroundColor: \"#ff7a2f\" };\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/entities/character/ui/zz_probe.tsx",
+          "content": "export const screen = \"#151b25\";\n"
+        },
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { View } from \"react-native\";\nimport { space } from \"../../../shared/ui\";\nexport const Row = () => <View style={{ flexDirection: \"row\", gap: space.md }} />;\n"
+        }
+      ]
+    },
+    {
+      "id": "type-from-shared-ui",
+      "statement": "A file in src/pages or src/widgets sets no fontSize, fontFamily, fontWeight, letterSpacing or lineHeight: size and weight come from Text's variant and the type tokens in shared/ui/theme.ts.",
+      "adr": "docs/adr/0074-controller-type-links-and-words-are-checked.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [],
+      "violation": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text } from \"../../../shared/ui\";\nexport const Big = () => <Text style={{ fontSize: 28 }}>x</Text>;\n"
+        },
+        {
+          "path": "src/widgets/agent-inbox/ui/zz_probe.tsx",
+          "content": "export const name = { fontFamily: \"Anuphan_700Bold\", lineHeight: 26 };\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text } from \"../../../shared/ui\";\n// fontSize: comes from the variant.\nexport const Big = () => <Text variant=\"title\" style={{ flex: 1 }}>x</Text>;\n"
+        },
+        {
+          "path": "src/shared/ui/zz_probe.ts",
+          "content": "export const prose = { fontSize: 16, lineHeight: 26 };\n"
+        }
+      ]
+    },
+    {
+      "id": "links-are-pressables",
+      "statement": "A file in src/pages or src/widgets puts no onPress on <Text>: a link or an action is TextLink, Button or Row, which keep a pressed state and a 44pt target.",
+      "adr": "docs/adr/0074-controller-type-links-and-words-are-checked.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [
+        {
+          "path": "src/pages/task/ui/AgentText.tsx",
+          "reason": "A link inside an Agent's Markdown sits mid-sentence, and only a nested Text keeps the line flowing; a Pressable would break the paragraph (ADR 0074)."
+        }
+      ],
+      "violation": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text } from \"../../../shared/ui\";\nexport const More = ({ go }: { go: () => void }) => (\n  <Text tone=\"link\"\n    onPress={go}>more</Text>\n);\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text, TextLink } from \"../../../shared/ui\";\nexport const More = ({ go }: { go: () => void }) => (\n  <>\n    <Text>Read</Text>\n    <TextLink label=\"more\" onPress={go} />\n  </>\n);\n"
+        }
+      ]
+    },
+    {
+      "id": "no-blind-casts",
+      "statement": "No file in src, tests aside, casts with `as never` or `as unknown as`: those hide a wrong key or shape the types would catch.",
+      "adr": "docs/adr/0074-controller-type-links-and-words-are-checked.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [
+        {
+          "path": "src/shared/i18n/errors/describe-error.ts",
+          "reason": "The one door for a code from a Runtime or the Hub, a string whose vocabulary only grows (ADR 0023); i18n.exists checks the key on the line before, so the cast is where it is checked (ADR 0074)."
+        }
+      ],
+      "violation": [
+        {
+          "path": "src/pages/home/model/zz_probe.ts",
+          "content": "export const key = (k: string) => k as never;\n"
+        },
+        {
+          "path": "src/shared/lib/zz_probe.ts",
+          "content": "export const scope = globalThis as unknown as { x?: number };\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/shared/lib/zz_probe.ts",
+          "content": "export const scope: { crypto?: unknown } = globalThis;\n"
+        },
+        {
+          "path": "src/shared/lib/zz_probe.test.ts",
+          "content": "export const fake = {} as never;\n"
+        }
+      ]
+    },
+    {
+      "id": "words-from-i18n",
+      "statement": "No .ts or .tsx file in src, tests aside, has Thai outside a comment: words come from the slice's i18n json (ADR 0065). English words cannot be told from code, so they are not checked.",
+      "adr": "docs/adr/0074-controller-type-links-and-words-are-checked.md",
+      "enforcer": {
+        "tool": "short check (bun)",
+        "at": "controller/scripts/check-structure.ts"
+      },
+      "exceptions": [],
+      "violation": [
+        {
+          "path": "src/pages/home/ui/zz_probe.tsx",
+          "content": "import { Text } from \"../../../shared/ui\";\nexport const Hi = () => <Text>สวัสดี</Text>;\n"
+        },
+        {
+          "path": "src/shared/lib/zz_probe.ts",
+          "content": "export const and = \" และ \";\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "src/shared/lib/zz_probe.ts",
+          "content": "// The board's \"และ\" comes from i18n.\nexport const and = (word: string) => ` ${word} `;\n"
+        },
+        {
+          "path": "src/shared/lib/zz_probe.test.ts",
+          "content": "export const sample = \"สวัสดี\";\n"
+        }
+      ]
+    }
+  ]
+}

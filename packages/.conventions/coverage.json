@@ -1,0 +1,16 @@
+{
+  "clean": "pass",
+  "rules": {
+    "known-places": "caught",
+    "messages-independent": "caught",
+    "plugin-api-leaf": "caught",
+    "protocol-leaf": "caught",
+    "protocol-ts-self-contained": "caught",
+    "rustfmt": "caught",
+    "supervisor-layout": "caught",
+    "supervisor-uses-worker-entry-only": "caught",
+    "unit-shape": "caught",
+    "worker-core-hexagonal": "prose only: ADR 0022's pure worker core behind ports is a design rule inside runtime-worker/runtime-core with no module boundary a test can see yet, ADR 0070",
+    "worker-never-supervisor": "caught"
+  }
+}

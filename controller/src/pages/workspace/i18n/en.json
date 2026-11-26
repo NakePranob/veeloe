@@ -1,0 +1,24 @@
+{
+  "machines": {
+    "online": "{{online}} of {{count}} online"
+  },
+  "agents": {
+    "line": "{{waiting}} need you · {{working}} working"
+  },
+  "tokens": {
+    "title": "tokens today",
+    "detail": "Every Machine",
+    "chart": "Tokens over the last 7 days, every Machine",
+    "bar": "{{day}}: {{tokens}} tokens"
+  },
+  "devices": {
+    "title": "My devices",
+    "linkSecond": "Link a second device"
+  },
+  "thisDevice": "This device",
+  "push": {
+    "title": "Push notifications",
+    "detail": "Approvals and finished Turns, without Task text"
+  },
+  "note": "This applies to this device only; your other devices keep their own. Change the language with the button at the top right."
+}

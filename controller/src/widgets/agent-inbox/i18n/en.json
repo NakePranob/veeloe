@@ -1,0 +1,22 @@
+{
+  "title": "Veeloe",
+  "start": "Start talking with {{name}}",
+  "noAgents": {
+    "title": "No Agent yet",
+    "body": "Create the first Agent on a paired Machine",
+    "action": "Create Agent"
+  },
+  "tabs": {
+    "all": "All",
+    "needsYou": "Needs you",
+    "working": "Working",
+    "done": "Done"
+  },
+  "emptyTab": {
+    "needsYou": "No Agent is waiting on you",
+    "working": "No Agent is working",
+    "done": "No Agent has finished yet"
+  },
+  "answer": "Answer",
+  "addBudget": "Add Budget"
+}

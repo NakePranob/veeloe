@@ -1,0 +1,34 @@
+{
+  "title": "Link new device",
+  "noHub": "Pair a Machine first. The new device links through the Hub your Machines are on.",
+  "show": {
+    "heading": "On the new device, open Veeloe, choose Use with a device I already have, and scan this",
+    "footer": "Expires {{when}}. It works once. Linking is only for your own devices.",
+    "label": "QR code to link a new device",
+    "link": "No camera on the new device? Open or paste this link there",
+    "share": "Share link",
+    "waiting": "Waiting for the new device…",
+    "secret": "This QR code and link hold a secret. Only give them to your own new device, and don't keep a photo of them.",
+    "expiresIn": "Expires in {{left}}"
+  },
+  "expired": "This QR code expired before a new device used it.",
+  "again": "Make a new QR code",
+  "ask": {
+    "heading": "A device asks to be linked",
+    "label": "Name of the new device",
+    "footer": "Approve only if this is the device in front of you. This device will vouch for its key, and it will be able to command all your Machines. If you don't recognize the name, cancel."
+  },
+  "name": {
+    "empty": "Name the new device first",
+    "taken": "You already have a device called {{name}}"
+  },
+  "cannot": "Can't link",
+  "approve": "Approve",
+  "cancel": "Cancel",
+  "prompt": "Link {{name}}. This device will vouch for its key",
+  "sending": {
+    "heading": "Sending your Machines to the new device…",
+    "body": "Keep the app open on the new device until this finishes."
+  },
+  "expiredBody": "A QR code works once and only for a short time. Make a new one and scan it from the new device again."
+}

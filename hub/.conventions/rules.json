@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "shared": "../docs/adr/0070-keel-holds-the-structure.md",
+  "check": [
+    "go",
+    "test",
+    "-count=1",
+    "./internal/archtest/"
+  ],
+  "units": {
+    "kind": "module",
+    "at": "internal/app/{name}",
+    "shared": [
+      "internal/shared/",
+      "internal/platform/"
+    ],
+    "wiring": [
+      "cmd/api/wiring.go",
+      "internal/composition/"
+    ],
+    "migrations": [
+      "migrations/"
+    ]
+  },
+  "templates": [
+    {
+      "name": "table-module",
+      "dir": ".conventions/templates/table-module",
+      "placeholder": "machine",
+      "like": "internal/app/machine"
+    },
+    {
+      "name": "no-table-module",
+      "dir": ".conventions/templates/no-table-module",
+      "placeholder": "relay",
+      "like": "internal/app/relay"
+    }
+  ],
+  "rules": [
+    {
+      "id": "module-isolation",
+      "statement": "A module never imports another module; only internal/composition imports a module, and only its root package.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Go test (go/parser)",
+        "at": "hub/internal/archtest/arch_test.go"
+      },
+      "violation": [
+        {
+          "path": "internal/app/machine/application/zz_probe.go",
+          "content": "package application\n\nimport _ \"hub/internal/app/controller/application\"\n"
+        },
+        {
+          "path": "internal/app/machine/application/zz_probe.go",
+          "content": "package application\n\nimport ctl \"hub/internal/app/controller/domain\"\n\nvar _ = ctl.ErrNotFound\n"
+        },
+        {
+          "path": "internal/composition/zz_probe.go",
+          "content": "package composition\n\nimport _ \"hub/internal/app/machine/adapters/outbound/postgres\"\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "internal/app/machine/application/zz_probe.go",
+          "content": "package application\n\nimport _ \"hub/internal/shared/apperror\"\n"
+        }
+      ]
+    },
+    {
+      "id": "layer-direction",
+      "statement": "Inside a module: domain imports no gin, gorm, adapters, application or ports; application and ports import no gin, gorm or adapters; inbound imports no gorm or outbound; outbound imports no gin or inbound.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Go test (go/parser)",
+        "at": "hub/internal/archtest/arch_test.go"
+      },
+      "violation": [
+        {
+          "path": "internal/app/machine/domain/zz_probe.go",
+          "content": "package domain\n\nimport _ \"gorm.io/gorm\"\n"
+        },
+        {
+          "path": "internal/app/machine/application/zz_probe.go",
+          "content": "package application\n\nimport _ \"hub/internal/app/machine/adapters/outbound/postgres\"\n"
+        },
+        {
+          "path": "internal/app/machine/adapters/inbound/http/zz_probe.go",
+          "content": "package http\n\nimport _ \"gorm.io/gorm\"\n"
+        },
+        {
+          "path": "internal/app/machine/adapters/outbound/postgres/zz_probe.go",
+          "content": "package postgres\n\nimport _ \"github.com/gin-gonic/gin\"\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "internal/app/machine/application/zz_probe.go",
+          "content": "package application\n\nimport _ \"hub/internal/app/machine/ports\"\n"
+        }
+      ]
+    },
+    {
+      "id": "no-cmd-import",
+      "statement": "Nothing under internal/ imports hub/cmd: wiring flows inward.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Go test (go/parser)",
+        "at": "hub/internal/archtest/arch_test.go"
+      },
+      "violation": [
+        {
+          "path": "internal/app/machine/domain/zz_probe.go",
+          "content": "package domain\n\nimport _ \"hub/cmd/api\"\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "internal/app/machine/domain/zz_probe.go",
+          "content": "package domain\n\nimport _ \"errors\"\n"
+        }
+      ]
+    },
+    {
+      "id": "migration-pairs",
+      "statement": "Every migrations/*.up.sql has a matching .down.sql, so every change can be rolled back.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Go test",
+        "at": "hub/internal/archtest/arch_test.go"
+      },
+      "violation": [
+        {
+          "path": "migrations/20991231000000_zz_probe.up.sql",
+          "content": "SELECT 1;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "migrations/20991231000000_zz_probe.down.sql",
+          "content": "SELECT 1;\n"
+        }
+      ]
+    },
+    {
+      "id": "known-places",
+      "statement": "Every file lives in a module, internal/shared/<pkg>, internal/platform/<pkg>, internal/composition, internal/archtest, cmd/, migrations/, docs/ or at the root.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Go test",
+        "at": "hub/internal/archtest/arch_test.go"
+      },
+      "violation": [
+        {
+          "path": "internal/helpers/zz_probe.go",
+          "content": "package helpers\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "internal/app/machine/domain/zz_probe.go",
+          "content": "package domain\n"
+        }
+      ]
+    },
+    {
+      "id": "unit-shape",
+      "statement": "A module has only the folders its templates (machine, relay) have.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Go test",
+        "at": "hub/internal/archtest/arch_test.go"
+      },
+      "violation": [
+        {
+          "path": "internal/app/machine/utils/zz_probe.go",
+          "content": "package utils\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "internal/app/machine/domain/zz_probe.go",
+          "content": "package domain\n"
+        }
+      ]
+    }
+  ]
+}

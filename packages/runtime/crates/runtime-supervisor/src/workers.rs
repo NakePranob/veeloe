@@ -1,0 +1,1121 @@
+//! One worker process per Agent (ADR 0020), ported from
+//! `packages/runtime-legacy/src/supervisor/workers/workers.ts`.
+//!
+//! A worker that ends without being told is started again, later each time.
+//! Messages wait for a worker that is starting, and come back as
+//! `agent.unavailable` if it dies before it reads them. Its LLM requests come
+//! over its own IPC, so which Agent sent one is never in question (ADR 0042).
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use async_trait::async_trait;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin, Command};
+use tokio::sync::{mpsc, watch};
+use veeloe_protocol::backoff::Backoff;
+use veeloe_runtime_core::sandbox::{self, Policy, Sandbox};
+use veeloe_runtime_core::{FromWorker, LlmHttpRequest, LlmHttpResponse, TaskEvent, ToWorker};
+
+use crate::agents::{agent_dir, Agent};
+use crate::cgroup;
+use crate::hub_link::random;
+use crate::limits::{Limits, ResidentMemory};
+use crate::task_log::TaskLogs;
+use crate::toolchain::{Report, Reported};
+
+/// A worker that lived this long counts as having started fine, so its next
+/// crash waits the shortest time again.
+const HEALTHY: Duration = Duration::from_secs(60);
+
+/// A scoped worker that ends this soon after its scope opened, before it said
+/// Ready, did not start: the scope itself failed. Retrying the scope on every
+/// restart would fail the same way, so the scope is not used again on this
+/// Machine and the restart path opens the worker plainly (issue #48).
+const SCOPE_GRACE: Duration = Duration::from_secs(5);
+
+/// How often a worker's memory is read (issue #47). Two seconds is enough to
+/// catch a runaway before the Mac swaps itself to a stop, and cheap enough for
+/// every Agent to have one.
+const MEMORY_POLL: Duration = Duration::from_secs(2);
+
+/// The supervisor's answer to one LLM request. The key stays here (ADR 0042).
+#[async_trait]
+pub trait SupervisorLlm: Send + Sync {
+    async fn answer(&self, agent: &str, request: LlmHttpRequest) -> LlmHttpResponse;
+}
+
+pub type OnMessage = Arc<dyn Fn(&str, FromWorker) + Send + Sync>;
+/// Wraps the worker's own argv in the rules it must run under. An empty argv
+/// means it may not run, and its session ends before it starts.
+pub type Wrap = Arc<dyn Fn(&Agent, Vec<String>) -> Vec<String> + Send + Sync>;
+/// Reports the toolchains this Agent's worker cannot run, as it opens. `None`
+/// when the Runtime has no check to make for it. What comes back is written at
+/// Runtime log level; nothing waits for it and nothing fails because of it
+/// (issue #35).
+pub type Toolchains = Arc<dyn Fn(&Agent, &Path) -> Option<Vec<Report>> + Send + Sync>;
+/// Answers whether this Machine can put a worker in a cgroup scope. A test
+/// replaces the real probe so the fallback is checked on any system (issue
+/// #48).
+pub type CgroupProbe = Arc<dyn Fn() -> bool + Send + Sync>;
+/// Builds the argv that opens a worker's scope. The real one is `cgroup::argv`;
+/// a test replaces it so a scope that fails after it spawns can be checked on
+/// any system (issue #48).
+pub type ScopeArgv = Arc<dyn Fn(crate::cgroup::Scope, &[String]) -> Vec<String> + Send + Sync>;
+
+/// The Wrap a Runtime uses: each worker inside its own Agent's sandbox, which
+/// every command it starts inherits, reaching the network only through that
+/// Agent's own Egress proxy (ADR 0008, 0029, 0069). On a system with no
+/// sandbox, or an Agent whose folder or proxy cannot be made, no worker runs.
+pub fn sandboxed(home: PathBuf, proxies: Arc<crate::proxy::Proxies>) -> Wrap {
+    Arc::new(move |agent, mut command| {
+        // The folder of the program the worker runs, which must be readable to
+        // start it: the `veeloe` binary itself in a release.
+        let Some(bin) = program_dir(&command) else {
+            return Vec::new();
+        };
+        // No listener means no way out, so there is no worker to start: another
+        // Agent's proxy is never a fallback (ADR 0029, issue #43).
+        let Some(proxy) = proxies.get(&agent.id) else {
+            return Vec::new();
+        };
+        let Some(policy) = rules(&home, agent, &bin, &proxy, &proxies.ports()) else {
+            return Vec::new();
+        };
+        // How the worker finds its own proxy. macOS reaches it over loopback,
+        // on the one port the profile allows out. Linux has no route to the
+        // supervisor, only this Agent's socket bound into its namespace, and
+        // the worker runs a bridge from its own loopback to that socket so
+        // every command can keep using an ordinary `http://127.0.0.1:<port>`
+        // proxy URL (ADR 0069).
+        if cfg!(target_os = "linux") {
+            command.push("--proxy-unix".to_string());
+            command.push(sandbox::PROXY_SOCKET.to_string());
+        } else {
+            command.push("--proxy".to_string());
+            command.push(proxy.url);
+        }
+        Sandbox::new(policy).wrap(&command)
+    })
+}
+
+/// The rules one Agent's worker runs under, started from `bin` (ADR 0008,
+/// 0069): its own folder to write in, the program's folder to read, and the one
+/// way out, which is its own proxy. `proxy_ports` are every proxy on the
+/// Machine, so the range this Agent may bind never covers one. `None` when this
+/// system has no sandbox, or the Agent has no folder it can be given: then
+/// nothing of that Agent runs.
+pub fn rules(
+    home: &Path,
+    agent: &Agent,
+    bin: &Path,
+    proxy: &crate::proxy::ProxyView,
+    proxy_ports: &[u16],
+) -> Option<Policy> {
+    if !sandbox::AVAILABLE {
+        return None;
+    }
+    let dir = agent_dir(home, &agent.id).ok()?;
+    let mut policy = Policy::new(&dir.join("workdir"), &dir.join("tmp"), bin);
+    // The one way out on macOS: this Agent's own TCP listener, and no other.
+    policy.proxy = Some(proxy.port);
+    // The one way out on Linux: this Agent's socket, bound into its namespace
+    // at a fixed path (ADR 0069). A system without one never reads it.
+    policy.proxy_socket = proxy
+        .socket
+        .as_ref()
+        .map(|path| path.to_string_lossy().to_string());
+    // The Agent's own localhost, from the range the supervisor reserved for it
+    // and kept outside its folder (ADR 0069). The toolchain check runs under
+    // these rules too, so it sees what the worker sees. A range that cannot be
+    // read leaves the Agent without ports, never without a worker.
+    policy.ports = crate::ports::Ports::open(home)
+        .and_then(|ports| ports.range_avoiding(&agent.id, &|port| proxy_ports.contains(&port)))
+        .map(|range| range.ports())
+        .unwrap_or_default();
+    Some(policy)
+}
+
+/// The folder the program in `command` lives in, which must be readable for it
+/// to start at all.
+fn program_dir(command: &[String]) -> Option<PathBuf> {
+    command
+        .first()
+        .and_then(|program| Path::new(program).parent())
+        .map(Path::to_path_buf)
+}
+
+/// The Agent's own home, `<agent>/.home`: where `$HOME`, caches and its git
+/// identity live, so nothing reads or writes the owner's (ADR 0069). The git
+/// config is written once; the Agent may change it after.
+fn agent_home(dir: &Path, agent: &Agent) -> std::io::Result<PathBuf> {
+    let home = dir.join(".home");
+    std::fs::create_dir_all(home.join(".cache"))?;
+    let gitconfig = home.join(".gitconfig");
+    if !gitconfig.exists() {
+        std::fs::write(
+            &gitconfig,
+            format!(
+                "[user]\n\tname = {}\n\temail = {}@agents.veeloe.invalid\n",
+                agent.name.replace(['\n', '\\', '"'], " "),
+                agent.id
+            ),
+        )?;
+    }
+    Ok(home)
+}
+pub type Log = Arc<dyn Fn(&str) + Send + Sync>;
+/// Told when one Agent's worker session ends, before it is started again. The
+/// Turn context it held is gone with it (ADR 0033, issue #44).
+pub type SessionEnded = Arc<dyn Fn(&str) + Send + Sync>;
+/// One event the supervisor just wrote, before the worker's live copy of it.
+/// The proxy learns the running Turn from this, so no command can reach it
+/// before its Turn does (issue #44).
+pub type TurnEvent = Arc<dyn Fn(&str, &str, &TaskEvent) + Send + Sync>;
+
+struct Entry {
+    frames: mpsc::UnboundedSender<ToWorker>,
+    ready: watch::Receiver<bool>,
+}
+
+struct Inner {
+    home: PathBuf,
+    /// How to run the worker: `[veeloe-worker]`, or a source path in tests.
+    command: Vec<String>,
+    llm: Arc<dyn SupervisorLlm>,
+    on_message: OnMessage,
+    log: Log,
+    wrap: Wrap,
+    toolchains: Mutex<Option<Toolchains>>,
+    session_ended: Mutex<Option<SessionEnded>>,
+    turn_events: Mutex<Option<TurnEvent>>,
+    /// The process id of each Agent's running worker, so a sandbox refusal in
+    /// the system log can be tied back to the work that caused it (issue #37).
+    pids: Mutex<HashMap<String, u32>>,
+    reported: Reported,
+    /// What one worker may use (issue #47). The default is what a Machine
+    /// without a `limits` in its config gets.
+    limits: Mutex<Limits>,
+    /// Whether a worker can be put in a cgroup scope, answered once and kept
+    /// for the supervisor's lifetime (issue #48). `None` until the first worker
+    /// asks.
+    cgroup: Mutex<Option<bool>>,
+    /// How that answer is found; the real systemd probe unless a test says.
+    cgroup_probe: Mutex<Option<CgroupProbe>>,
+    /// How a worker's scope argv is built; `cgroup::argv` unless a test says.
+    cgroup_argv: Mutex<Option<ScopeArgv>>,
+    /// The fallback is said once in the Runtime log, not once per worker.
+    cgroup_logged: AtomicBool,
+    /// How this Runtime reads a process's memory. Real `proc_pidinfo` on macOS;
+    /// a test replaces it so a limit can be crossed without a memory hog.
+    memory: Mutex<Option<ResidentMemory>>,
+    running: Mutex<HashMap<String, Entry>>,
+    stopping: AtomicBool,
+    /// The Task logs, which only this process writes (ADR 0069).
+    logs: Arc<TaskLogs>,
+}
+
+pub struct Workers {
+    inner: Arc<Inner>,
+}
+
+impl Workers {
+    pub fn new(
+        home: PathBuf,
+        command: Vec<String>,
+        llm: Arc<dyn SupervisorLlm>,
+        on_message: OnMessage,
+        log: Log,
+        wrap: Wrap,
+    ) -> Self {
+        let logs = Arc::new(TaskLogs::new(home.clone()));
+        Self::with_logs(home, command, llm, on_message, log, wrap, logs)
+    }
+
+    /// The same workers, writing through a Task log the supervisor also hands
+    /// to the domain Approvals: one writer per file, and a proxy approval is in
+    /// the same log as the Turn that caused it (issue #44).
+    pub fn with_logs(
+        home: PathBuf,
+        command: Vec<String>,
+        llm: Arc<dyn SupervisorLlm>,
+        on_message: OnMessage,
+        log: Log,
+        wrap: Wrap,
+        logs: Arc<TaskLogs>,
+    ) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                home,
+                command,
+                llm,
+                on_message,
+                log,
+                wrap,
+                toolchains: Mutex::new(None),
+                session_ended: Mutex::new(None),
+                turn_events: Mutex::new(None),
+                pids: Mutex::new(HashMap::new()),
+                reported: Reported::default(),
+                limits: Mutex::new(Limits::default()),
+                cgroup: Mutex::new(None),
+                cgroup_probe: Mutex::new(None),
+                cgroup_argv: Mutex::new(None),
+                cgroup_logged: AtomicBool::new(false),
+                memory: Mutex::new(system_memory()),
+                running: Mutex::new(HashMap::new()),
+                stopping: AtomicBool::new(false),
+                logs,
+            }),
+        }
+    }
+
+    /// Report the toolchains a worker cannot run as it opens, at Runtime log
+    /// level (issue #35). Without it a worker still starts; nothing is reported.
+    pub fn checking_toolchains(&self, check: Toolchains) {
+        *self.inner.toolchains.lock().expect("toolchains") = Some(check);
+    }
+
+    /// Cap what one worker may use: CPU time in the OS, and resident memory in
+    /// this supervisor's own watch (issue #47). A worker over its memory limit
+    /// is ended and started again like any other crash.
+    pub fn limiting(&self, limits: Limits) {
+        *self.inner.limits.lock().expect("limits") = limits;
+    }
+
+    /// Answer whether this Machine can put a worker in a cgroup scope, instead
+    /// of asking systemd (issue #48). A test uses it so the fallback path is
+    /// checked without a Linux user session.
+    pub fn probing_cgroup(&self, probe: CgroupProbe) {
+        *self.inner.cgroup_probe.lock().expect("cgroup probe") = Some(probe);
+    }
+
+    /// Build a worker's scope argv instead of `cgroup::argv`, so a scope that
+    /// fails after it spawns is checked without a real systemd (issue #48).
+    pub fn scoping_cgroup(&self, argv: ScopeArgv) {
+        *self.inner.cgroup_argv.lock().expect("cgroup argv") = Some(argv);
+    }
+
+    /// Read a process's memory instead of asking the OS, so a test decides when
+    /// the limit is crossed (issue #47).
+    pub fn reading_memory(&self, reader: ResidentMemory) {
+        *self.inner.memory.lock().expect("memory") = Some(reader);
+    }
+
+    /// Follow a worker session's end, so an Approval its Turn was waiting on is
+    /// refused instead of waiting for a Turn that is gone (issue #44).
+    pub fn watching_session_end(&self, ended: SessionEnded) {
+        *self.inner.session_ended.lock().expect("session ended") = Some(ended);
+    }
+
+    /// Follow every event the supervisor writes, so the Turn a command runs in
+    /// is known before the command runs (issue #44).
+    pub fn watching_turns(&self, event: TurnEvent) {
+        *self.inner.turn_events.lock().expect("turn events") = Some(event);
+    }
+
+    /// The one Task log, shared with the domain Approvals (issue #44).
+    pub fn logs(&self) -> Arc<TaskLogs> {
+        Arc::clone(&self.inner.logs)
+    }
+
+    /// Follow the macOS sandbox's own record, so a service the profile does not
+    /// name shows up as a Runtime log line instead of a silent failure (issue
+    /// #37). The handle must stay alive with the Runtime; dropping it stops the
+    /// reader. `None` on a system whose sandbox keeps no such log.
+    pub fn watching_denials(&self) -> Option<crate::denials::Denials> {
+        let inner = Arc::clone(&self.inner);
+        let running: crate::denials::Running = Arc::new(move || {
+            inner
+                .pids
+                .lock()
+                .expect("pids")
+                .iter()
+                .map(|(agent, pid)| (*pid, agent.clone()))
+                .collect()
+        });
+        crate::denials::Denials::start(self.inner.home.clone(), running)
+    }
+
+    /// Starts this Agent's worker unless it is already running. An Agent in the
+    /// trash gets none, even when boot asks for every Agent (`agent-trash`).
+    pub fn start(&self, agent: &Agent) {
+        if agent.deleted() {
+            return;
+        }
+        let mut running = self.inner.running.lock().expect("running");
+        if running.contains_key(&agent.id) {
+            return;
+        }
+        let (frames, queue) = mpsc::unbounded_channel();
+        let (ready, watching) = watch::channel(false);
+        running.insert(
+            agent.id.clone(),
+            Entry {
+                frames,
+                ready: watching,
+            },
+        );
+        drop(running);
+        let inner = Arc::clone(&self.inner);
+        let agent = agent.clone();
+        tokio::spawn(async move { run(inner, agent, queue, ready).await });
+    }
+
+    /// False when this Agent has no worker: the frame is not kept.
+    pub fn send(&self, agent: &str, message: ToWorker) -> bool {
+        let running = self.inner.running.lock().expect("running");
+        match running.get(agent) {
+            Some(entry) => entry.frames.send(message).is_ok(),
+            None => false,
+        }
+    }
+
+    pub fn is_ready(&self, agent: &str) -> bool {
+        let running = self.inner.running.lock().expect("running");
+        running
+            .get(agent)
+            .map(|entry| *entry.ready.borrow())
+            .unwrap_or(false)
+    }
+
+    /// The name, Allowlist and Approval timeout now in force reach the worker
+    /// that is running (ADR 0023).
+    pub fn rename(&self, agent: &Agent) {
+        self.send(
+            &agent.id,
+            ToWorker::Agent {
+                name: agent.name.clone(),
+                allowlist: Some(agent.allowlist.clone()),
+                approval_timeout_s: Some(agent.approval_timeout_s),
+            },
+        );
+    }
+
+    /// Drop one Agent's worker. The worker ends when its channel closes; a
+    /// Turn that was running is interrupted, as a stopped process is.
+    pub fn stop(&self, id: &str) {
+        self.inner.running.lock().expect("running").remove(id);
+    }
+
+    /// Stops every worker, for good: the supervisor is ending.
+    pub fn stop_all(&self) {
+        self.inner.stopping.store(true, Ordering::SeqCst);
+        self.inner.running.lock().expect("running").clear();
+    }
+}
+
+struct Ending {
+    stopped: bool,
+    why: String,
+}
+
+async fn run(
+    inner: Arc<Inner>,
+    agent: Agent,
+    mut queue: mpsc::UnboundedReceiver<ToWorker>,
+    ready: watch::Sender<bool>,
+) {
+    let mut backoff = Backoff::new(1_000, 30_000);
+    let mut waiting: Vec<ToWorker> = Vec::new();
+    loop {
+        let started = Instant::now();
+        let ending = session(&inner, &agent, &mut queue, &mut waiting, &ready).await;
+        if let Some(ended) = inner
+            .session_ended
+            .lock()
+            .expect("session ended")
+            .as_ref()
+            .map(Arc::clone)
+        {
+            ended(&agent.id);
+        }
+        if ending.stopped || inner.stopping.load(Ordering::SeqCst) {
+            return;
+        }
+        if started.elapsed() > HEALTHY {
+            backoff.reset();
+        }
+        let delay = backoff.next_with(random());
+        (inner.log)(&format!(
+            "worker of agent {} ended ({}); starting it again in {delay} ms",
+            agent.id, ending.why
+        ));
+        tokio::time::sleep(Duration::from_millis(delay)).await;
+        if inner.stopping.load(Ordering::SeqCst) {
+            return;
+        }
+    }
+}
+
+async fn session(
+    inner: &Arc<Inner>,
+    agent: &Agent,
+    queue: &mut mpsc::UnboundedReceiver<ToWorker>,
+    waiting: &mut Vec<ToWorker>,
+    ready: &watch::Sender<bool>,
+) -> Ending {
+    let dir = match agent_dir(&inner.home, &agent.id) {
+        Ok(dir) => dir,
+        Err(error) => {
+            return Ending {
+                stopped: false,
+                why: error.to_string(),
+            }
+        }
+    };
+    let agent_home = match agent_home(&dir, agent) {
+        Ok(home) => home,
+        Err(error) => {
+            return Ending {
+                stopped: false,
+                why: format!("could not make the Agent's home: {error}"),
+            }
+        }
+    };
+    // The log moves out of the Agent's writable folder the first time, and is
+    // open here before the worker starts: the worker never opens it itself
+    // (ADR 0069), so a missing log is a failure to start, not an empty history.
+    if let Err(why) = inner.logs.prepare(&agent.id, &dir) {
+        return Ending {
+            stopped: false,
+            why: format!("could not open the Task log: {why}"),
+        };
+    }
+    let worker_argv = (inner.wrap)(agent, inner.command.clone());
+    if worker_argv.is_empty() {
+        return Ending {
+            stopped: false,
+            why: "no sandbox to run it in".into(),
+        };
+    }
+    // The port range the wrap just reserved for this Agent, read back from the
+    // file so a restart hands out the same one (ADR 0069). Every command sees
+    // `PORT` and the whole list, so a dev server started by a Task keeps its
+    // address across Turns and finds the database beside it. This reads only:
+    // `rules()` is the one place that allocates, with every proxy's port
+    // excluded, so a second allocation here could only reserve a worse range.
+    let ports = match crate::ports::Ports::open(&inner.home) {
+        Ok(ports) => ports.existing(&agent.id),
+        Err(error) => {
+            (inner.log)(&format!(
+                "agent {} runs without localhost ports: {error}",
+                agent.id
+            ));
+            None
+        }
+    };
+    if ports.is_none() {
+        (inner.log)(&format!(
+            "agent {} runs without localhost ports: no range is reserved",
+            agent.id
+        ));
+    }
+    // What one worker may use (issue #47), and where it runs on Linux: inside a
+    // cgroup scope when the Machine has a user manager to put it in (issue #48).
+    let limits = *inner.limits.lock().expect("limits");
+    let scope = match scope_for(inner, &limits).await {
+        Some(scope) => Some(scope),
+        None => {
+            // Said once per supervisor, never per worker, and never about an
+            // Agent: this is a fact about the Machine. macOS has no cgroups at
+            // all, so there is nothing to say there.
+            if cfg!(target_os = "linux") {
+                say_cgroup_unavailable(inner, cgroup::NO_SYSTEMD);
+            }
+            None
+        }
+    };
+    // The same command either way, so the fallback differs only in its argv.
+    let prepared = |argv: &[String], scoped: bool| -> std::io::Result<Child> {
+        let (program, rest) = argv.split_first().expect("a worker argv has a program");
+        let mut command = Command::new(program);
+        command.args(rest);
+        command
+            .env_clear()
+            // Only what a worker needs. Never a Provider's key: the supervisor
+            // holds that (ADR 0042).
+            .env("PATH", std::env::var("PATH").unwrap_or_default())
+            .env("HOME", &agent_home)
+            .env("XDG_CACHE_HOME", agent_home.join(".cache"))
+            .env("GIT_CONFIG_GLOBAL", agent_home.join(".gitconfig"))
+            // `git` reaches GitHub only through the broker (issue #32).
+            .envs(crate::git_broker::worker_env())
+            .env("TMPDIR", dir.join("tmp"))
+            .env("VEELOE_AGENT_DIR", &dir)
+            .env("VEELOE_AGENT_NAME", &agent.name)
+            .env(
+                "VEELOE_AGENT_ALLOWLIST",
+                serde_json::to_string(&agent.allowlist).unwrap_or_else(|_| "[]".into()),
+            )
+            .env(
+                "VEELOE_AGENT_APPROVAL_TIMEOUT_S",
+                agent.approval_timeout_s.to_string(),
+            );
+        // `systemd-run` finds the owner's user manager through these. They are
+        // passed only when a scope is used, so the plain path never widens what
+        // the worker can see (issue #48).
+        if scoped {
+            for name in ["XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] {
+                if let Ok(value) = std::env::var(name) {
+                    command.env(name, value);
+                }
+            }
+        }
+        if let Some(ports) = &ports {
+            command
+                .env("PORT", ports.start().to_string())
+                .env("VEELOE_PORTS", ports.listed());
+        }
+        command
+            .current_dir(dir.join("workdir"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+        // A worker that burns CPU for longer than the Owner allows is cut by the
+        // OS itself, with no code of ours in the way (issue #47). Kept on Linux
+        // beside the scope, as the backstop for the CPUQuota rate (issue #48).
+        #[cfg(unix)]
+        crate::limits::capping_cpu_time(&mut command, limits.cpu_seconds);
+        command.spawn()
+    };
+    let started: std::io::Result<Child> = match scope {
+        None => prepared(&worker_argv, false),
+        Some(scope) => {
+            let argv = match inner.cgroup_argv.lock().expect("cgroup argv").clone() {
+                Some(build) => build(scope, &worker_argv),
+                None => cgroup::argv(scope, &worker_argv),
+            };
+            match prepared(&argv, true) {
+                Ok(child) => Ok(child),
+                // `systemd-run` is there but would not start this worker — its
+                // user manager went away, or it refused a property. The worker
+                // is started the plain way rather than not at all, and no scope
+                // is tried again on this Machine (issue #48).
+                Err(_) => {
+                    *inner.cgroup.lock().expect("cgroup") = Some(false);
+                    say_cgroup_unavailable(inner, cgroup::SCOPE_FAILED);
+                    prepared(&worker_argv, false)
+                }
+            }
+        }
+    };
+    let mut child: Child = match started {
+        Ok(child) => child,
+        Err(error) => {
+            return Ending {
+                stopped: false,
+                why: format!("could not start: {error}"),
+            }
+        }
+    };
+    // When this session's process started, so a scope that fails before the
+    // worker is ready can be told from a worker that ran and then died.
+    let spawned = Instant::now();
+    let pid = child.id().unwrap_or_default();
+    inner
+        .pids
+        .lock()
+        .expect("pids")
+        .insert(agent.id.clone(), pid);
+    // The memory the worker and its commands hold is watched beside it, and a
+    // reading over the limit ends it the way a crash would: the restart path
+    // opens a new worker, which closes the Turn that was running as
+    // interrupted (ADR 0033). A test's reader stands in for the OS.
+    let killed_for_memory = Arc::new(AtomicBool::new(false));
+    // What the watch last saw of the worker's CPU time, in nanoseconds, so a
+    // `SIGKILL` can be told apart from the CPU limit (issue #47). Zero means
+    // the OS never said.
+    let burned_cpu = Arc::new(AtomicU64::new(0));
+    let memory = inner.memory.lock().expect("memory").clone();
+    let memory_watch = match (memory, pid) {
+        (Some(read), pid) if pid != 0 => Some(watching_memory(
+            Arc::clone(inner),
+            agent.id.clone(),
+            pid,
+            limits,
+            read,
+            Arc::clone(&killed_for_memory),
+            Arc::clone(&burned_cpu),
+        )),
+        _ => None,
+    };
+    // The toolchains are checked beside the worker, not before it: a machine
+    // whose `bun` is broken must still open a worker and end a Turn (issue #35).
+    report_toolchains(inner, agent);
+    let mut writing = child.stdin.take().expect("stdin is piped");
+    let mut lines = BufReader::new(child.stdout.take().expect("stdout is piped")).lines();
+    let mut is_ready = false;
+
+    let ending = loop {
+        tokio::select! {
+            frame = queue.recv() => match frame {
+                Some(frame) => {
+                    if is_ready {
+                        write(&mut writing, &frame).await;
+                    } else {
+                        waiting.push(frame);
+                    }
+                }
+                None => {
+                    let _ = child.start_kill();
+                    // On Linux the process this Runtime holds may be the
+                    // `systemd-run` that opened the scope, with the worker
+                    // below it: killing only the wrapper would leave the worker
+                    // running (issue #48).
+                    crate::limits::kill_tree(pid);
+                    let _ = child.wait().await;
+                    break Ending { stopped: true, why: "stopped".into() };
+                }
+            },
+            line = lines.next_line() => match line {
+                Ok(Some(line)) => {
+                    let Ok(message) = serde_json::from_str::<FromWorker>(&line) else {
+                        continue;
+                    };
+                    match message {
+                        FromWorker::Ready => {
+                            is_ready = true;
+                            let _ = ready.send(true);
+                            for queued in waiting.drain(..) {
+                                write(&mut writing, &queued).await;
+                            }
+                        }
+                        FromWorker::LlmRequest { id, method, path, headers, body } => {
+                            let answer = inner
+                                .llm
+                                .answer(&agent.id, LlmHttpRequest { method, path, headers, body })
+                                .await;
+                            write(
+                                &mut writing,
+                                &ToWorker::LlmResponse {
+                                    id,
+                                    status: answer.status,
+                                    headers: answer.headers,
+                                    body: answer.body,
+                                },
+                            )
+                            .await;
+                        }
+                        FromWorker::LogAppend { id, task, starter, kind, body, message_id } => {
+                            match inner.logs.record(
+                                &agent.id,
+                                &task,
+                                &starter,
+                                &kind,
+                                &body,
+                                message_id.as_deref(),
+                            ) {
+                                Ok(event) => {
+                                    if let Some(watching) = inner
+                                        .turn_events
+                                        .lock()
+                                        .expect("turn events")
+                                        .as_ref()
+                                        .map(Arc::clone)
+                                    {
+                                        watching(&agent.id, &task, &event);
+                                    }
+                                    write(&mut writing, &ToWorker::LogAppended { id, event })
+                                        .await;
+                                }
+                                Err(code) => {
+                                    (inner.log)(&format!(
+                                        "could not write the Task log of agent {}: {code}",
+                                        agent.id
+                                    ));
+                                    write(&mut writing, &ToWorker::LogFailed { id, code }).await;
+                                }
+                            }
+                        }
+                        FromWorker::LogRead { id, query } => {
+                            match inner.logs.answer(&agent.id, &query) {
+                                Ok(answer) => {
+                                    write(&mut writing, &ToWorker::LogAnswer { id, answer }).await;
+                                }
+                                Err(code) => {
+                                    write(&mut writing, &ToWorker::LogFailed { id, code }).await;
+                                }
+                            }
+                        }
+                        other => (inner.on_message)(&agent.id, other),
+                    }
+                }
+                Ok(None) | Err(_) => {
+                    let status = child.wait().await.ok();
+                    let killed_for_memory = killed_for_memory.load(Ordering::SeqCst);
+                    // A scoped worker that ends this soon, before Ready, never
+                    // started: `systemd-run` opened a scope and the scope
+                    // failed. Trying the scope again on every restart would
+                    // fail the same way, so this Machine is done with scopes
+                    // and the restart path opens the worker plainly (issue #48).
+                    if scope.is_some()
+                        && !is_ready
+                        && !killed_for_memory
+                        && spawned.elapsed() < SCOPE_GRACE
+                    {
+                        *inner.cgroup.lock().expect("cgroup") = Some(false);
+                        say_cgroup_unavailable(inner, cgroup::SCOPE_FAILED);
+                        break Ending {
+                            stopped: false,
+                            why: "its cgroup scope failed".into(),
+                        };
+                    }
+                    let burned = burned_cpu.load(Ordering::SeqCst);
+                    // The OS cut it, or this Runtime did for memory. Either way
+                    // the Owner is told which limit, with codes only (ADR 0052).
+                    // A signal that is not provably ours names no limit.
+                    let cut = status
+                        .as_ref()
+                        .and_then(|status| {
+                            crate::limits::breach(
+                                status,
+                                killed_for_memory,
+                                (burned > 0).then_some(burned),
+                                limits.cpu_seconds,
+                            )
+                        });
+                    let why = match cut {
+                        Some(crate::limits::Cut::Limit { limit, signal }) => {
+                            let _ = crate::logs::record(
+                                &inner.home,
+                                "warn",
+                                "worker.limit",
+                                serde_json::json!({
+                                    "agent": &agent.id,
+                                    "limit": limit,
+                                    "signal": signal,
+                                }),
+                            );
+                            format!("its {limit} limit ({signal})")
+                        }
+                        Some(crate::limits::Cut::Signal { signal }) => {
+                            let _ = crate::logs::record(
+                                &inner.home,
+                                "warn",
+                                "worker.limit",
+                                serde_json::json!({ "agent": &agent.id, "signal": signal }),
+                            );
+                            format!("the signal {signal}")
+                        }
+                        None if killed_for_memory => "its memory limit".to_string(),
+                        // No signal and no limit of ours: a clean end, or an
+                        // exit code. Under a scope `systemd-run` may report a
+                        // cgroup kill this way, so the code is said rather
+                        // than calling it a limit nobody proved (issue #48).
+                        None => match status.as_ref().and_then(|status| status.code()) {
+                            Some(code) if code != 0 => {
+                                format!("it ended with exit code {code}")
+                            }
+                            _ => "it ended".to_string(),
+                        },
+                    };
+                    break Ending { stopped: false, why };
+                }
+            },
+        }
+    };
+
+    let _ = ready.send(false);
+    drop(memory_watch);
+    inner.pids.lock().expect("pids").remove(&agent.id);
+    // A message that never reached the worker is reported, not lost quietly.
+    for lost in waiting.drain(..) {
+        if let Some((member, reference, task)) = failed(&lost) {
+            (inner.on_message)(
+                &agent.id,
+                FromWorker::Error {
+                    member,
+                    reference,
+                    code: "agent.unavailable".into(),
+                    task,
+                },
+            );
+        }
+    }
+    ending
+}
+
+/// Who asked for this message, so a worker that never read it can be answered.
+fn failed(message: &ToWorker) -> Option<(String, String, Option<String>)> {
+    match message {
+        ToWorker::Message {
+            task,
+            member,
+            reference,
+            ..
+        }
+        | ToWorker::Sync {
+            task,
+            member,
+            reference,
+            ..
+        } => Some((member.clone(), reference.clone(), Some(task.clone()))),
+        ToWorker::Stop {
+            task,
+            member,
+            reference,
+            ..
+        }
+        | ToWorker::Retitle {
+            task,
+            member,
+            reference,
+            ..
+        } => Some((member.clone(), reference.clone(), Some(task.clone()))),
+        ToWorker::Approval {
+            member, reference, ..
+        } => Some((member.clone(), reference.clone(), None)),
+        _ => None,
+    }
+}
+
+async fn write(stdin: &mut ChildStdin, message: &ToWorker) {
+    let Ok(text) = serde_json::to_string(message) else {
+        return;
+    };
+    let _ = stdin.write_all(format!("{text}\n").as_bytes()).await;
+    let _ = stdin.flush().await;
+}
+
+/// The reader the Runtime uses in real life: `proc_pidinfo` on macOS, which has
+/// no cgroups, and `/proc/<pid>/statm` on Linux, where the watch is the backstop
+/// for a Machine with no user systemd to make a scope with (ADR 0069).
+fn system_memory() -> Option<ResidentMemory> {
+    #[cfg(unix)]
+    {
+        Some(Arc::new(crate::limits::resident_bytes))
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
+/// The worker's process and every one below it, which is what its limits are
+/// counted over. The worker's own reading is not the whole story: a build
+/// started by a Task is its child, and that is usually what fills the memory.
+/// On Linux the process this Runtime holds is the `systemd-run` that opened the
+/// worker's scope, so one walk covers wrapper and worker alike (issue #48).
+fn process_tree(pid: u32) -> Vec<u32> {
+    let mut pids = vec![pid];
+    #[cfg(unix)]
+    pids.extend(crate::limits::descendants(pid));
+    pids
+}
+
+/// One reading summed over `pids`: what the OS said for each, or `None` when it
+/// could say for none of them.
+fn tree_total(pids: &[u32], read: &dyn Fn(u32) -> Option<u64>) -> Option<u64> {
+    let mut total = None;
+    for pid in pids {
+        if let Some(value) = read(*pid) {
+            total = Some(total.unwrap_or(0u64).saturating_add(value));
+        }
+    }
+    total
+}
+
+/// The scope one worker should run in, or `None` when this Machine has no user
+/// systemd to make one with. Asked once per supervisor and kept: the answer is
+/// a fact about the Machine, not about a worker (issue #48).
+async fn scope_for(inner: &Arc<Inner>, limits: &Limits) -> Option<crate::cgroup::Scope> {
+    let known = *inner.cgroup.lock().expect("cgroup");
+    let usable = match known {
+        Some(usable) => usable,
+        None => {
+            let probe = inner.cgroup_probe.lock().expect("cgroup probe").clone();
+            let usable = tokio::task::spawn_blocking(move || match probe {
+                Some(probe) => probe(),
+                None => crate::cgroup::detect(),
+            })
+            .await
+            .unwrap_or(false);
+            *inner.cgroup.lock().expect("cgroup") = Some(usable);
+            usable
+        }
+    };
+    usable.then(|| crate::cgroup::Scope::of(limits))
+}
+
+/// Says once, at Runtime log level and without an Agent, that workers run
+/// without a cgroup, so the older caps are all there is, and why: no user
+/// systemd on this Machine, or a scope that failed (issue #48). macOS never
+/// calls it: there are no cgroups to fall back from.
+fn say_cgroup_unavailable(inner: &Inner, reason: &'static str) {
+    if inner.cgroup_logged.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let _ = crate::logs::record(
+        &inner.home,
+        "warn",
+        cgroup::UNAVAILABLE,
+        serde_json::json!({ "reason": reason }),
+    );
+    let why = if reason == cgroup::SCOPE_FAILED {
+        "the cgroup scope failed; workers run with the CPU limit and the memory watch"
+    } else {
+        "no cgroups on this Machine; workers run with the CPU limit and the memory watch"
+    };
+    (inner.log)(why);
+}
+
+/// Watch one worker's memory until it ends. Over the limit, the Runtime records
+/// which Agent crossed which limit, ends the worker and its commands, and lets
+/// the usual restart path start a new one (issue #47). Nothing of the worker's
+/// own content reaches the log through here.
+fn watching_memory(
+    inner: Arc<Inner>,
+    agent: String,
+    pid: u32,
+    limits: Limits,
+    read: ResidentMemory,
+    killed_for_memory: Arc<AtomicBool>,
+    burned_cpu: Arc<AtomicU64>,
+) -> MemoryWatch {
+    let limit = limits.memory_mb.saturating_mul(1024 * 1024);
+    let watching = tokio::spawn(async move {
+        let mut every = tokio::time::interval(MEMORY_POLL);
+        every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            every.tick().await;
+            // One look at the tree serves both readings. CPU is summed over it
+            // because under a scope the pid is the `systemd-run` wrapper and
+            // the worker burns time below it (issue #48). The last look before
+            // the worker dies is within one poll of what it really burned.
+            let pids = process_tree(pid);
+            if let Some(nanos) = tree_total(&pids, &|pid| crate::limits::cpu_nanos(pid)) {
+                burned_cpu.store(nanos, Ordering::SeqCst);
+            }
+            let Some(bytes) = tree_total(&pids, &|pid| read(pid)) else {
+                continue;
+            };
+            if bytes <= limit {
+                continue;
+            }
+            // The flag first, so the session's own end does not name the CPU
+            // for a kill this watch made.
+            killed_for_memory.store(true, Ordering::SeqCst);
+            let _ = crate::logs::record(
+                &inner.home,
+                "warn",
+                "worker.limit",
+                serde_json::json!({ "agent": &agent, "limit": crate::limits::MEMORY }),
+            );
+            (inner.log)(&format!(
+                "worker of agent {agent} passed {} MB of memory; stopping it",
+                limits.memory_mb
+            ));
+            crate::limits::kill_tree(pid);
+            return;
+        }
+    });
+    MemoryWatch(watching)
+}
+
+/// One session's memory watch, ended when the session is, even when the session
+/// future is dropped instead of returned (the supervisor is stopping).
+struct MemoryWatch(tokio::task::JoinHandle<()>);
+
+impl Drop for MemoryWatch {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+/// Start the check in the background and write what it finds, or nothing when
+/// this Runtime has no check or no rules to check under. Its own thread, because
+/// a tool that hangs is bounded by a timeout, not by the worker's readiness.
+fn report_toolchains(inner: &Arc<Inner>, agent: &Agent) {
+    let check = inner.toolchains.lock().expect("toolchains").clone();
+    let (Some(check), Some(bin)) = (check, program_dir(&inner.command)) else {
+        return;
+    };
+    let inner = Arc::clone(inner);
+    let agent = agent.clone();
+    tokio::task::spawn_blocking(move || {
+        if let Some(reports) = check(&agent, &bin) {
+            inner.reported.record(&inner.home, &agent.id, &reports);
+        }
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    /// Issue #48: the memory watch must exist on Linux too, where it is the
+    /// backstop for a Machine with no user systemd to make a scope with.
+    /// Gated to unix because the reader itself is: a non-unix CI must not fail
+    /// on a watch this Runtime never has there (review follow-up).
+    #[cfg(unix)]
+    #[test]
+    fn the_memory_watch_has_a_reader_on_this_system() {
+        assert!(
+            super::system_memory().is_some(),
+            "no resident-memory reader on this system"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_linux_reader_reads_this_process_from_proc() {
+        let read = super::system_memory().expect("a reader");
+        let bytes = read(std::process::id()).expect("this process is in /proc");
+        assert!(bytes > 0, "a running process holds some memory");
+    }
+
+    /// Issue #48 (review): the two readings a limit is counted over are summed
+    /// over the same tree, so a process below the worker counts. Here the tree
+    /// and its readings are injected: no process is started to check the sum.
+    #[test]
+    fn a_tree_total_adds_every_process_below_the_worker() {
+        let read = |pid: u32| match pid {
+            10 => Some(2_000_000_000),
+            11 => Some(1_000_000_000),
+            12 => Some(0),
+            _ => None,
+        };
+        assert_eq!(super::tree_total(&[10, 11, 12], &read), Some(3_000_000_000));
+        assert_eq!(
+            super::tree_total(&[99], &read),
+            None,
+            "a reading nobody could give is not zero"
+        );
+    }
+
+    /// Issue #48 (review): under a scope the pid this Runtime holds is
+    /// `systemd-run`, and the worker's CPU time is below it. A fake `/proc`
+    /// stands in for the real one, so the sum is checked on any Linux kernel.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_scoped_workers_cpu_counts_the_process_below_the_wrapper() {
+        let root = tempfile::tempdir().expect("proc");
+        let write = |pid: u32, ppid: u32, ticks: u64| {
+            let dir = root.path().join(pid.to_string());
+            std::fs::create_dir_all(&dir).expect("process dir");
+            std::fs::write(
+                dir.join("stat"),
+                format!("{pid} (systemd-run) S {ppid} 0 0 0 0 0 0 0 0 0 {ticks} 0 0 0"),
+            )
+            .expect("stat");
+        };
+        write(100, 1, 1); // the wrapper this Runtime holds
+        write(101, 100, 3); // the worker below it
+
+        let mut pids = vec![100];
+        pids.extend(crate::limits::descendants_with(100, |pid| {
+            crate::limits::children_in(root.path(), pid)
+        }));
+        assert_eq!(pids, vec![100, 101]);
+        let wrapper = crate::limits::cpu_nanos_in(root.path(), 100).expect("wrapper time");
+        let worker = crate::limits::cpu_nanos_in(root.path(), 101).expect("worker time");
+        assert_eq!(
+            super::tree_total(&pids, &|pid| crate::limits::cpu_nanos_in(root.path(), pid)),
+            Some(wrapper + worker),
+            "the worker's time was not added to the wrapper's"
+        );
+    }
+}

@@ -1,0 +1,32 @@
+post:
+  summary: Remove a Controller of a Member with a device.revoke certificate
+  description: >-
+    Removes `key`, and every key it linked down the line except those in `keep`,
+    when `by` and `key` are both Controllers of that Member. Their live
+    connections close with 4403, and the certificate goes to every live
+    connection left in the Workspace. The same certificate again answers the
+    same. Open to any origin: the signature authenticates it, and no cookie is
+    involved.
+  tags: [linking]
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './certificate.yaml#/Certificate' }
+  responses:
+    "200":
+      description: Removed
+      content:
+        application/json:
+          schema: { type: object }
+    "400":
+      description: "`hub.revocation_invalid`: not a device.revoke, the signature is wrong, or `by` or `key` is not a Controller of that Member"
+      content:
+        application/json:
+          schema: { $ref: '../common/schemas.yaml#/Error' }
+    "409":
+      description: "`hub.last_device`: the Member would have no Controller left"
+      content:
+        application/json:
+          schema: { $ref: '../common/schemas.yaml#/Error' }

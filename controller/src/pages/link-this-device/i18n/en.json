@@ -1,0 +1,28 @@
+{
+  "title": "Use with a device I already have",
+  "enter": {
+    "heading": "On a device you already use, go to Workspace, then My devices, and tap Link new device",
+    "footer": "Scan the QR code it shows, or open or paste its link here. The link says which Hub to use. This device then sees your Machines, Agents and Tasks, and can command them the same way.",
+    "scan": "Scan QR code",
+    "stopScan": "Stop scanning",
+    "paste": "Paste the link",
+    "continue": "Continue",
+    "noCamera": "Veeloe can't use the camera here. Paste the link instead.",
+    "scanHint": "Fit the QR code inside the frame"
+  },
+  "name": {
+    "heading": "This device",
+    "label": "Name of this device",
+    "footer": "Your other device shows this name when it asks you to approve, and can change it.",
+    "empty": "Name this device first"
+  },
+  "hub": "Hub",
+  "send": "Ask to link",
+  "back": "Back",
+  "cannot": "Can't link",
+  "waiting": {
+    "heading": "Approve on your other device",
+    "body": "It asks you to approve {{name}}. Keep this open until it's done.",
+    "footer": "The request expires {{when}}."
+  }
+}

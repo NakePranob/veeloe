@@ -1,0 +1,14 @@
+{
+  "missing": {
+    "title": "Agent not found",
+    "body": "Its Machine may not have listed its Agents yet, or the Agent is gone."
+  },
+  "provider": {
+    "heading": "Provider and model",
+    "nextTask": "A change takes effect from the next Task. A Task already going keeps its model to the end, since changing it midway restarts the prompt cache. The list comes from the Providers set on this Machine (ADR 0042)."
+  },
+  "save": "Save",
+  "saving": "Saving on the Machine",
+  "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",
+  "subtitle": "{{agent}} · {{machine}}"
+}

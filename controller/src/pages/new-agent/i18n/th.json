@@ -1,0 +1,26 @@
+{
+  "new": "Agent ใหม่",
+  "shuffle": "สุ่ม Character ใหม่",
+  "name": "ชื่อ",
+  "namePlaceholder": "เช่น Deployer",
+  "where": {
+    "heading": "ทำงานที่ไหน และด้วย model อะไร",
+    "footer": "Agent อยู่ Machine เดียวตลอด Runtime สร้าง Workdir ให้ที่ ~/.veeloe/agents/<id>/workdir (ADR 0002, 0032, 0042, 0043)"
+  },
+  "machine": {
+    "label": "อยู่บน Machine"
+  },
+  "provider": {
+    "label": "Provider และ model",
+    "footer": "รายชื่อ model มาจาก Provider ที่ตั้งบน Machine นี้ คนที่มี Manage เปลี่ยนทีหลังได้ และมีผลตั้งแต่ Task ถัดไป (ADR 0042)"
+  },
+  "allowlist": {
+    "heading": "คำสั่งที่รันได้เลย",
+    "footer": "ไม่มี find, sed หรือ git กับ npm ทั้งตัว เพราะแก้ไฟล์หรือลบได้ เอาออกได้ก่อนสร้าง (ADR 0030)",
+    "row_one": "ชุดอ่านอย่างเดียว · {{count}} รายการ",
+    "row_other": "ชุดอ่านอย่างเดียว · {{count}} รายการ"
+  },
+  "creating": "กำลังสร้างบน Machine",
+  "create": "สร้าง Agent",
+  "pickCancel": "ยกเลิก"
+}

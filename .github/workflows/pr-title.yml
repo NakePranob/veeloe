@@ -9,9 +9,9 @@ name: PR title
 # inside Claude Code. This is the backstop for every other tool — Codex, the
 # gh CLI by hand, and a title edited in the browser after the fact.
 #
-# The develop ruleset requires this check on the PR's head commit, so it runs
-# on every push too (synchronize) — otherwise a PR pushed to after it was
-# opened waits forever on a check that never reports.
+# It runs on every push to the PR too (synchronize), so the check always
+# reports on the PR's head commit. During v0.1 the develop ruleset does not
+# require it (AGENTS.md); check it is green before merging an outside PR.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]

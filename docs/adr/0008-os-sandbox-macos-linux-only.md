@@ -1,0 +1,26 @@
+# คำสั่งของ Agent รันใน sandbox ระดับ OS และ v0.1 รองรับแค่ macOS กับ Linux
+
+> **ADR 0069 แก้บางส่วน** Runtime ไม่ใช้ `@anthropic-ai/sandbox-runtime` แล้ว แต่ครอบ worker ทั้งโปรเซสด้วย `sandbox-exec` หรือ `bwrap` เอง Agent มี localhost ของตัวเอง (บน Linux เป็น network namespace ส่วน macOS เป็นช่วง port ต่อ Agent) และ Egress แยกต่อ Agent ตั้งแต่ v0.1 ผ่าน proxy ต่อ Turn ข้อจำกัดเรื่องรายชื่อโดเมนร่วมทั้ง Machine ด้านล่างจึงไม่ใช้แล้ว
+
+> **ADR 0068 แก้บางส่วน** การอ่านไฟล์เป็น allow list: Workdir, Project ที่ได้งาน และ Library ตามสิทธิ์; home ของผู้ใช้และ secret ถูกปฏิเสธเสมอ แม้ใน Turn ของ Owner. ใน Rust runtime worker ยังไม่ถูก wrap ทั้งโปรเซส (sandbox-exec abort) จึงบังคับที่ทุกคำสั่งและให้ tool ใช้ root ชุดเดียวกันแทน จนกว่าจะแก้ข้อจำกัดนั้นได้
+
+> **ADR 0064 แก้บางส่วน** คำว่าพนักงานร่วม Project ในเรื่องการอ่าน Workdir หมายถึงพนักงานร่วม Team ระหว่างทำ Task ของ Team นั้น
+
+Allowlist ดูแค่ว่า Agent เรียกคำสั่งอะไร แต่ไม่รู้ว่าข้างในคำสั่งทำอะไร เช่น `npm test` ที่ script แอบอ่าน `~/.ssh` แล้วส่งออกไปทางเน็ต Runtime จึงครอบทุกคำสั่งที่ Agent รันด้วย `@anthropic-ai/sandbox-runtime` ซึ่งบน macOS ใช้ Seatbelt และบน Linux ใช้ bubblewrap ภายใต้ sandbox นี้ Agent เขียนไฟล์ได้แค่ใน Workdir ของตัวเอง อ่าน Workdir ของ Agent อื่นไม่ได้ ยกเว้นพนักงานร่วม Project ระหว่างทำ Task ของ Project นั้น (ADR 0026) อ่านไฟล์ลับไม่ได้ และออกเน็ตได้เฉพาะโดเมนที่อนุญาต ไฟล์อื่นบนเครื่องอ่านได้ ยกเว้น Turn ของคนที่ไม่มี Manage ที่ Agent นั้น (ADR 0059), Agent ที่มี Channel (ADR 0028) หรือตั้ง Egress เป็นทั้งเน็ตสาธารณะ (ADR 0029) ซึ่งอ่านได้แค่ใน Workdir ของตัวเองกับ Library ที่ได้สิทธิ์ (ADR 0037) Library เขียนได้เฉพาะ Agent ที่ได้สิทธิ์เขียน และโฟลเดอร์ Skill ของ Agent อ่านได้อย่างเดียว (ADR 0038) ระหว่าง Turn ที่อยู่ใน Worktree ของ Project Agent เขียนได้แค่ worktree นั้น และ Workdir อ่านได้อย่างเดียว (ADR 0047) ส่วน Turn แบบ Ask อ่านไม่ได้ใน path ที่ Project ห้าม (ADR 0046) ทั้งหมดนี้ไม่ต้องใช้ Docker ส่วน Windows ยังไม่มีรุ่น native เพราะการทำ sandbox บน Windows ยังไม่ชัดเจน คนใช้ Windows ให้ติดตั้ง Runtime รุ่น Linux ใน WSL2 ซึ่งใช้ bubblewrap ได้ตามปกติ ข้อจำกัดคือ Agent จะทำงานอยู่ฝั่ง Linux และแตะ tool ที่เป็นของ Windows โดยตรงไม่ได้ ส่วนรุ่น native จะทำเมื่อ sandbox-runtime รองรับ Windows ชัดเจนแล้ว เราจะไม่เขียน sandbox บน Windows เอง เพราะเป็นงานด้านความปลอดภัยที่พลาดง่าย
+
+sandbox ครอบทั้งโปรเซส worker ของ Agent (ADR 0020) ไม่ได้ครอบแค่คำสั่ง shell เหตุผลคือถ้า tool อ่านหรือเขียนไฟล์รันอยู่นอก sandbox Agent ก็สร้าง symlink ใน Workdir ชี้ไปที่ `~/.ssh` แล้วสั่ง tool read ให้อ่านผ่าน symlink นั้นได้โดยที่ sandbox ไม่รู้เรื่องเลย เมื่อครอบทั้ง worker แล้ว tool ทุกตัวและ shell ทุกคำสั่งจะอยู่ใต้กฎชุดเดียวกันที่ OS เป็นคนบังคับ worker แตะอะไรในโฟลเดอร์ของ Runtime ไม่ได้เลยนอกจากโฟลเดอร์ของ Agent ตัวเอง (ADR 0032) สิ่งที่ต้องเปิดให้ worker ได้แก่ ไฟล์ SQLite ของตัวเอง, ช่องทางคุยกับ supervisor ซึ่งเป็นทางที่คำขอไป LLM วิ่งผ่านด้วย (ADR 0042) และ Egress (v0.1 ใช้รายชื่อเดียวทั้ง Machine ดูข้อจำกัดด้านล่าง ต่อไปแยกต่อ Agent ตาม ADR 0029)
+
+supervisor เรียก `SandboxManager.initialize()` ครั้งเดียว เพราะ proxy ของเน็ตอยู่ใน supervisor จากนั้นเปิด worker ของแต่ละ Agent ด้วย `wrapWithSandbox()` แล้วตามด้วย `Bun.spawn` ห้ามใช้ CLI `srt` เพราะช่อง ipc จะหายไปเงียบๆ และเปลือง RAM ราว 73 MB ต่อ worker แต่ละ worker ต้องมี TMPDIR ของตัวเอง (`CLAUDE_CODE_TMPDIR`) เพราะค่าเริ่มต้นคือ `/tmp/claude` ซึ่งทุก Agent ใช้ร่วมกัน และกลายเป็นช่องที่ Agent ส่งข้อมูลหากันได้
+
+## Considered Options
+
+- **Docker container ต่อ Agent**: แยกขาดที่สุดและใช้ได้ทุก OS แต่ลูกค้าต้องมี Docker และ Agent จะแตะไฟล์กับ tool จริงบนเครื่องได้ยาก
+- **Allowlist + Approval อย่างเดียว**: กันเคส `npm test` ข้างบนไม่ได้
+
+## Consequences
+
+- sandbox-runtime ยังเป็น research preview API อาจเปลี่ยนได้ ต้อง pin เวอร์ชันไว้
+- spike ยืนยันแล้วว่า sandbox-runtime 0.0.80 ครอบ worker ที่รันนานได้ ทดสอบบน macOS 200 วินาที ผลคือ อ่านไฟล์ลับไม่ได้ทั้งแบบตรงและผ่าน symlink, hard link ไฟล์ลับไม่ได้, เขียนนอก Workdir ไม่ได้, คำสั่งลูกโดนกฎชุดเดียวกัน, ออกเน็ตได้เฉพาะโดเมนที่อนุญาต และ bun:sqlite ในโหมด WAL ใช้ได้ ส่วนการครอบเพิ่มเวลาเริ่มราว 16 ms และ RAM ของ worker ไม่เพิ่ม บน Linux (bubblewrap ใน Docker) การอ่าน การเขียน และคำสั่งลูกก็ผ่านเหมือนกัน
+- **v0.1 ใช้รายชื่อโดเมนที่อนุญาตร่วมกันทั้ง Machine** sandbox-runtime แยกรายชื่อต่อ Agent ไว้แค่เพื่อบันทึกว่าใครเรียก ไม่ได้แยกจริง เราจึงให้ Egress เป็นค่าที่ตั้งต่อ Machine ไม่ใช่ต่อ Agent และแอปต้องเขียนบอกให้ชัดว่า Agent ทุกตัวบนเครื่องนั้นออกไปโดเมนเหล่านี้ได้ ความเสี่ยงที่เหลือมีจำกัด เพราะ token ของแต่ละ Agent ยังอยู่ใน Workdir ที่ sandbox กันไว้ Agent ที่ได้ออกไปโดเมนของอีกตัวจึงไม่มี token ไปใช้ ยกเว้นพนักงานร่วม Project ระหว่างทำ Task ของ Project (ADR 0026) ส่วนที่เหลือคือข้อมูลยังส่งออกไปยังโดเมนที่อยู่ในรายชื่อได้ ข้อนี้รับได้แค่ใน v0.1 ที่มี Owner คนเดียวและไม่มี Channel เมื่อมี Member คนที่สองหรือ Channel ให้แยกเป็น Egress ต่อ Agent ด้วย proxy ต่อ Agent (ADR 0029)
+- ถ้ารัน Runtime อยู่ใน Docker ต้องผ่อนการป้องกันของ container (`seccomp=unconfined` ร่วมกับ `systempaths=unconfined` หรือโหมด `enableWeakerNestedSandbox`) ไม่ต้องใช้ `--privileged` ถ้ารันเป็น root ต้องให้ root เป็นเจ้าของ Workdir ด้วย ส่วน Linux ที่ไม่ได้อยู่ใน container ยังไม่ได้ทดสอบ
+- ยังไม่ได้ทดสอบการรันที่นานกว่า 200 วินาที และการใช้ `bun install` หรือ cache ของ package ใน sandbox

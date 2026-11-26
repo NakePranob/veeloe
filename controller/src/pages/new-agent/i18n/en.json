@@ -1,0 +1,26 @@
+{
+  "new": "New Agent",
+  "shuffle": "Shuffle Character",
+  "name": "Name",
+  "namePlaceholder": "e.g. Deployer",
+  "where": {
+    "heading": "Where it works, and with which model",
+    "footer": "An Agent stays on one Machine. The Runtime makes its Workdir at ~/.veeloe/agents/<id>/workdir (ADR 0002, 0032, 0042, 0043)."
+  },
+  "machine": {
+    "label": "On Machine"
+  },
+  "provider": {
+    "label": "Provider and model",
+    "footer": "The models come from the Providers set on this Machine. Someone with Manage can change them later, from the next Task on (ADR 0042)."
+  },
+  "allowlist": {
+    "heading": "Commands that run right away",
+    "footer": "There is no find, sed, or git and npm on their own, since they can change or delete files. Untick what you don't want before creating (ADR 0030).",
+    "row_one": "Read-only set · {{count}} entry",
+    "row_other": "Read-only set · {{count}} entries"
+  },
+  "creating": "Creating on the Machine",
+  "create": "Create Agent",
+  "pickCancel": "Cancel"
+}

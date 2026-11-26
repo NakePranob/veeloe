@@ -1,0 +1,85 @@
+{
+  "missing": {
+    "title": "Agent not found",
+    "body": "Its Machine may not have listed its Agents yet, or the Agent is gone."
+  },
+  "name": "Name",
+  "provider": {
+    "heading": "Provider and model"
+  },
+  "budget": {
+    "label": "Today's Budget",
+    "perDay": "{{budget}} a day",
+    "used": "tokens · {{percent}}%",
+    "field": "Budget per day (million tokens)",
+    "footer": "Every token the Provider reports counts. The day turns at 04:00 in the Machine's own time. When it runs out, the Turn going finishes as if stopped, and no new work starts until the next day or someone adds Budget (ADR 0043).",
+    "asOf": "As of {{when}}",
+    "usedSpent": "tokens · {{percent}}% · used up"
+  },
+  "tasks": {
+    "heading": "Latest Tasks",
+    "new": "New Task",
+    "footer": "Only the Tasks you started are here (ADR 0060).",
+    "untitled": "No message yet",
+    "detail": "{{status}} · {{when}}"
+  },
+  "approval": {
+    "waiting": "Approval waits",
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days"
+  },
+  "identity": "Identity",
+  "work": {
+    "heading": "How it works",
+    "footer": "A new model takes effect from the next Task. An Approval nobody answers before it expires counts as denied (ADR 0042, 0003)."
+  },
+  "allowlist": {
+    "row": "Allowlist",
+    "count_one": "{{count}} entry",
+    "count_other": "{{count}} entries"
+  },
+  "save": "Save",
+  "saving": "Saving on the Machine",
+  "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",
+  "character": {
+    "detail": "How it looks and moves in the Inbox"
+  },
+  "problem": {
+    "provider": "Provider {{provider}} is no longer on the Machine, so this Agent can't answer. Pick a new Provider below.",
+    "model": "Provider {{provider}} no longer lists model {{model}}. Pick a new model below.",
+    "choose": "Pick a new Provider"
+  },
+  "delete": {
+    "action": "Delete this Agent",
+    "title": "Delete {{name}}?",
+    "body": "The Agent stops and moves to Deleted Agents. Its Workdir and Task history stay on the Machine, and you can restore it for 30 days.",
+    "cancel": "Cancel",
+    "prompt": "Delete {{name}}",
+    "failed": "Couldn't delete this Agent"
+  },
+  "memory": {
+    "detail": "The MEMORY.md this Agent keeps"
+  },
+  "online": "Online",
+  "offline": "Offline",
+  "git": {
+    "row": "Git repos",
+    "unsupported": "Not supported",
+    "count_one": "{{count}} repo",
+    "count_other": "{{count}} repos"
+  },
+  "away": {
+    "title": "{{machine}} is offline.",
+    "body": "{{name}} isn't working right now. Settings can change once the Machine is back. Messages to a Task can still be sent, and go out when it returns.",
+    "workFooter": "These values live on {{machine}}, so they can change once it is back online (ADR 0006).",
+    "deleteFooter": "Deleting needs the Machine to stop the Agent, so it can be deleted once {{machine}} is back online."
+  },
+  "stage": {
+    "withState": "{{state}} · {{machine}} · {{model}}",
+    "line": "{{machine}} · {{model}}"
+  }
+}

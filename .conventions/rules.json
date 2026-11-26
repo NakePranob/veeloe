@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "check": [
+    "bun",
+    "run",
+    "check:structure"
+  ],
+  "rules": [
+    {
+      "id": "commit-subject-english",
+      "statement": "A commit subject is English; the body may be Thai.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "git commit-msg hook",
+        "at": ".githooks/commit-msg"
+      },
+      "check": [
+        "sh",
+        ".githooks/commit-msg",
+        "zz_probe_msg"
+      ],
+      "runs": ".githooks/commit-msg",
+      "violation": [
+        {
+          "path": "zz_probe_msg",
+          "content": "feat: ✨ เพิ่มฟอร์มล็อกอิน\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "zz_probe_msg",
+          "content": "feat: ✨ add login form\n\nเพิ่มฟอร์มล็อกอิน\n"
+        }
+      ]
+    },
+    {
+      "id": "pr-title-english",
+      "proseOnly": "the PR title is checked on GitHub by .github/workflows/pr-title.yml and in Claude Code by .claude/hooks/pr-title-english.py; neither runs on a file in the tree, AGENTS.md"
+    },
+    {
+      "id": "known-places",
+      "notApplicable": "the root holds independently built halves (controller, hub, packages/runtime) that each keep their own .conventions; the rest (docs, e2e, scripts, packaging, openspec) is not unit code, ADR 0070"
+    },
+    {
+      "id": "unit-shape",
+      "notApplicable": "the root has no units of its own, ADR 0070"
+    }
+  ]
+}

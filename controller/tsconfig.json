@@ -1,0 +1,13 @@
+{
+  // A path, not "expo/tsconfig.base": a tool that resolves "extends" through
+  // expo's exports map does not find it, since SDK 58 leaves tsconfig.base out. Works because bunfig.toml hoists node_modules.
+  "extends": "../node_modules/expo/tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  // Tests and scripts run on Bun and are type-checked with Bun's types from the root tsconfig.
+  "exclude": ["node_modules", "scripts", "**/*.test.ts"]
+}

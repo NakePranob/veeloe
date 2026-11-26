@@ -1,0 +1,54 @@
+{
+  "title": "Allowlist",
+  "subtitle_one": "{{name}} · {{count}} entry",
+  "subtitle_other": "{{name}} · {{count}} entries",
+  "remove": "Remove",
+  "offline": "The Machine is offline. The Allowlist can be changed once it is back online.",
+  "notAWall": "The Allowlist is not a wall. An Agent that is talked into it can edit files without asking, for example the test script in package.json, and then run the npm test that is on the list. The real wall is the sandbox and Egress (ADR 0030, 0008).",
+  "missing": {
+    "title": "Agent not found",
+    "body": "Its Machine may not have listed its Agents yet, or the Agent is gone."
+  },
+  "runs": {
+    "heading": "Runs without asking for an Approval",
+    "footer": "Each entry is compared word by word from the start of the command: npm test covers npm test -- --watch. Commands joined with && ; | or & must pass on every part, and $( ), backticks and eval always ask. An entry like git push covers git push --force too, so keep it as narrow as you mean.",
+    "empty": "Nothing yet",
+    "emptyDetail": "Every command of this Agent asks for an Approval"
+  },
+  "add": {
+    "label": "Add",
+    "placeholder": "e.g. npm test",
+    "action": "Add"
+  },
+  "invalid": {
+    "title": "Cannot add it",
+    "body": "Enter one command only, with no && ; or |, and no $( ), backtick or eval."
+  },
+  "duplicate": {
+    "title": "It is on the list already"
+  },
+  "wide": {
+    "title": "{{entry}} is very wide",
+    "message": "The entry {{entry}} covers every command that starts with {{entry}}, whatever follows. Keep it as narrow as you mean, such as {{entry}} test.",
+    "action": "Add it"
+  },
+  "try": {
+    "heading": "Try a command",
+    "label": "Sample command",
+    "invalidDraft": "The entry typed above cannot be added yet, so it does not count below.",
+    "sampleDefault": "npm test -- --watch",
+    "coveredBy": "Covered by {{entry}}",
+    "wouldCover": "Adding {{entry}} would cover it",
+    "notCovered": "Not in the Allowlist",
+    "runs": "Runs without asking for an Approval",
+    "wouldRun": "Would run right away if you add {{entry}}",
+    "asks": "Asks for an Approval",
+    "asksAlways": "Asks every time: the parts cannot be told apart reliably ($( ), backtick or eval)",
+    "builtIn": "Needs no entry: it only prints or reads (ADR 0075)"
+  },
+  "cancel": "Cancel",
+  "authenticate": {
+    "add": "Add {{entry}} to the Allowlist of {{name}}",
+    "remove": "Remove {{entry}} from the Allowlist of {{name}}"
+  }
+}

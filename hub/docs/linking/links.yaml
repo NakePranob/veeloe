@@ -1,0 +1,31 @@
+post:
+  summary: Register a new Controller of a Member with a device.link certificate
+  description: >-
+    Registers `key` as a Controller of `member` when `by` is already one of that
+    Member's Controllers in that Workspace, keeps the certificate, and sends it
+    to every live connection in the Workspace. The same certificate again
+    answers the same. Open to any origin: the signature authenticates it, and
+    no cookie is involved.
+  tags: [linking]
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './certificate.yaml#/Certificate' }
+  responses:
+    "200":
+      description: Registered
+      content:
+        application/json:
+          schema: { type: object }
+    "400":
+      description: "`hub.link_invalid`: not a device.link, the signature is wrong, or `by` is not a Controller of that Member in that Workspace"
+      content:
+        application/json:
+          schema: { $ref: '../common/schemas.yaml#/Error' }
+    "409":
+      description: "`hub.key_taken`: `key` is already a Controller, or was revoked"
+      content:
+        application/json:
+          schema: { $ref: '../common/schemas.yaml#/Error' }

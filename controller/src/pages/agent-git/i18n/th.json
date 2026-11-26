@@ -1,0 +1,39 @@
+{
+  "title": "git repo",
+  "subtitle_one": "{{name}} · {{count}} repo",
+  "subtitle_other": "{{name}} · {{count}} repo",
+  "remove": "เอาออก",
+  "offline": "Machine ออฟไลน์อยู่ แก้ repo ได้เมื่อเครื่องกลับมาออนไลน์",
+  "unsupported": "Runtime บน Machine นี้ยังไม่มี git broker อัปเดต Runtime ก่อนจึงจะตั้ง repo ได้",
+  "missing": {
+    "title": "ไม่พบ Agent นี้",
+    "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
+  },
+  "repos": {
+    "empty": "ยังไม่มี repo",
+    "emptyDetail": "Agent นี้ใช้ git กับ GitHub ไม่ได้",
+    "access": "clone · fetch · push ได้แค่ veeloe/{{id}}/*"
+  },
+  "add": {
+    "label": "repo บน GitHub",
+    "placeholder": "เช่น acme/shop",
+    "action": "เพิ่ม repo"
+  },
+  "invalid": {
+    "title": "เพิ่มไม่ได้",
+    "body": "ใส่ repo บน GitHub ตัวเดียว เป็น owner/name หรือลิงก์ของ repo"
+  },
+  "duplicate": {
+    "title": "มี repo นี้แล้ว"
+  },
+  "full": {
+    "title": "เพิ่มไม่ได้แล้ว",
+    "body": "Agent หนึ่งตัวใช้ได้ไม่เกิน {{count}} repo"
+  },
+  "authenticate": {
+    "add": "ให้ {{name}} ใช้ {{repo}}",
+    "remove": "เอา {{repo}} ออกจาก {{name}}"
+  },
+  "open": "เปิดบน GitHub",
+  "footer": "Agent clone, fetch และ push ได้เฉพาะ repo เหล่านี้ ผ่าน broker บน Machine ซึ่งถือ token ไว้เอง Agent จึงไม่เห็น token Machine ต้องมี token ที่ตั้งด้วยคำสั่ง veeloe git token บนเครื่อง ลบ branch, push tag หรือแตะ main ไม่ได้"
+}

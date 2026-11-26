@@ -1,0 +1,24 @@
+{
+  "create": "Create Agent",
+  "none": {
+    "title": "No Agent yet",
+    "body": "Create the first Agent on a paired Machine"
+  },
+  "needsOnline": "The Machine is offline. The Agent's settings can be changed once it is back online (ADR 0006).",
+  "count_one": "{{count}} Agent",
+  "count_other": "{{count}} Agents",
+  "cancel": "Cancel",
+  "trash": {
+    "title": "Deleted Agents",
+    "footer": "A deleted Agent can be restored for 30 days. After that the Machine drops it from this list, but its Workdir and Task history stay on the disk (ADR 0032).",
+    "days_one": "{{count}} day left",
+    "days_other": "{{count}} days left",
+    "restore": "Restore",
+    "restoring": "Restoring",
+    "confirmTitle": "Restore {{name}}?",
+    "confirmBody": "The Agent goes back to work with its settings, and its old Tasks can carry on.",
+    "failed": "Couldn't restore this Agent"
+  },
+  "subtitle_one": "{{count}} Agent on {{machines}} Machine",
+  "subtitle_other": "{{count}} Agents on {{machines}} Machine"
+}

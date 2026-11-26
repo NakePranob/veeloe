@@ -1,0 +1,14 @@
+{
+  "missing": {
+    "title": "ไม่พบ Agent นี้",
+    "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
+  },
+  "provider": {
+    "heading": "Provider และ model",
+    "nextTask": "เปลี่ยนแล้วมีผลตั้งแต่ Task ถัดไป Task ที่กำลังทำอยู่ใช้ model เดิมจนจบ เพราะเปลี่ยนกลาง Task ทำให้ prompt cache เริ่มใหม่ รายชื่อมาจาก Provider ที่ตั้งบน Machine นี้ (ADR 0042)"
+  },
+  "save": "บันทึก",
+  "saving": "กำลังบันทึกบน Machine",
+  "needsOnline": "Machine ออฟไลน์ ค่าของ Agent แก้ได้เมื่อเครื่องกลับมาออนไลน์ (ADR 0006)",
+  "subtitle": "{{agent}} · {{machine}}"
+}

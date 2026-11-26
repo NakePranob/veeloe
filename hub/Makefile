@@ -1,0 +1,213 @@
+# Pinned dev-tool versions — one place, used by `make tools` and by CI, so a
+# lint rule or migration runner never behaves differently on someone's laptop
+# than it does on a pull request.
+#
+# ponytail: installed with `go install`, not tracked as a go.mod `tool`
+# directive — golang-migrate's CLI pulls a driver for every database it
+# supports and golangci-lint pulls its whole linter tree, which between them
+# turned this project's go.sum from 117 lines into 2,700. Tool pinning is not
+# worth that in a scaffold whose point is a clean starting project.
+MIGRATE_VERSION       ?= v4.19.1
+GOLANGCI_LINT_VERSION ?= v2.12.2
+
+DB_HOST ?= localhost
+DB_PORT ?= 5432
+DB_USER ?= postgres
+DB_NAME ?= hub
+PGPASSWORD ?= postgres
+POSTGRES_CONTAINER ?=
+
+# which env file to load — defaults to .env (your local override, gitignored).
+# override to run against another file, e.g. copy .env.example to .env.production,
+# fill it in, then `make run ENV_FILE=.env.production`.
+#
+# Every target that needs config loads it the same way: `set -a` marks whatever
+# follows for export, the file is sourced, `set +a` stops.
+#
+# Sourcing rather than piping through xargs, which is what this used to do. The
+# shell already understands the format: `PORT=8080 # prod: 80` keeps 8080,
+# blank lines are nothing, and — the reason it changed — a quoted value with a
+# space in it survives. xargs word-split `SMTP_PASSWORD="two words"` into two
+# arguments and exported the wrong thing, silently.
+#
+# It does mean .env is executed, so `$(...)` in a value runs. That file is your
+# own gitignored config, and the alternative could not read half of it.
+#
+# (Can't factor this into a make variable: a `#` in a variable value starts a
+# make comment; in a recipe line it is passed to the shell untouched.)
+ENV_FILE ?= .env
+
+.PHONY: tools run build test fmt vet lint tidy db-create db-drop migrations-ready migrate-up migrate-up-test migrate-down migrate-verify openapi-bundle docker-up docker-down
+
+# A command started here acts on whatever database DB_DSN names. Pointed at a
+# deployed one — which .env is a single edit away from — a laptop stops being a
+# development machine and becomes a participant in that system: `make dev`
+# joins its job queue and starts taking its work, `make migrate-up` changes its
+# schema. Neither logs anything unusual, so the result reads as an intermittent
+# bug in whatever the jobs do rather than as a second consumer.
+#
+# Targets that write to, or consume from, DB_DSN carry this guard. Point one at
+# a real database on purpose with ALLOW_REMOTE_DB=1.
+define refuse_remote_db
+@set -a; [ -f $(ENV_FILE) ] && . ./$(ENV_FILE); set +a; \
+host=$$(printf '%s' "$$DB_DSN" | sed -E 's|^[^@]*@||; s|[/?].*$$||'); \
+case "$$host" in \
+  localhost:*|127.0.0.1:*|\[::1\]:*|localhost|127.0.0.1) ;; \
+  *) [ "$$ALLOW_REMOTE_DB" = "1" ] || { \
+       echo "make $@: DB_DSN points at $$host, not this machine."; \
+       echo "Targets here act on it: migrations change its schema, a worker takes its jobs."; \
+       echo "Use the local database (see .env.example), or ALLOW_REMOTE_DB=1 make $@."; \
+       exit 1; }; \
+     echo "warning: running against $$host — this machine is now part of that system." ;; \
+esac
+endef
+
+# A comment-only migration is still marked applied by migrate. Refuse the
+# explicit TODO files emitted by `generate migration` until both directions
+# are replaced, so an accidental migrate-up cannot silently consume them.
+define require_completed_migrations
+@for migration in migrations/*.up.sql migrations/*.down.sql; do \
+  [ -f "$$migration" ] || continue; \
+  if grep -Eq '^-- TODO: write the (up|down) migration' "$$migration"; then \
+    echo "$$migration still contains generated TODO SQL — complete it before migrating" >&2; \
+    exit 1; \
+  fi; \
+done
+endef
+
+# migrate-up first, because cmd/api refuses to boot against a database that is
+# behind the migrations it embeds. The schema is the migrations' in every
+# environment — this is the step that would otherwise be a db.AutoMigrate
+# bootstrap, except it applies the same SQL production gets, constraints and
+# seeded rows and all.
+run: migrate-up
+	$(refuse_remote_db)
+	@set -a; [ -f $(ENV_FILE) ] && . ./$(ENV_FILE); set +a; go run ./cmd/api
+
+build:
+	go build -o bin/api ./cmd/api
+
+# loads ENV_FILE like every other target, so TEST_DB_DSN set there reaches the
+# integration tests. A bare `go test ./...` still works, but falls back to
+# whatever defaults the test files carry.
+test:
+	@set -a; [ -f $(ENV_FILE) ] && . ./$(ENV_FILE); set +a; go test ./...
+
+fmt:
+	gofmt -w .
+
+vet:
+	go vet ./...
+
+lint:
+	golangci-lint run
+
+# install the pinned dev tools into $(go env GOPATH)/bin
+tools:
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+tidy:
+	go mod tidy
+
+# creates the database itself (not the schema — the app's development path or
+# migrate-up does that).
+# connects to the always-present "postgres" maintenance DB to run CREATE DATABASE,
+# since the target DB may not exist yet. Safe to re-run — skips if it already exists.
+# \gexec only works read from stdin, not through -c, hence the pipe.
+# `POSTGRES_CONTAINER` selects an exact Docker container when no host psql is
+# installed; otherwise the fallback discovers a container publishing DB_PORT.
+# override DB_HOST/DB_PORT/DB_USER/DB_NAME/PGPASSWORD to point at a different server.
+db-create:
+	@if command -v psql >/dev/null 2>&1; then \
+		echo "SELECT 'CREATE DATABASE $(DB_NAME)' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$(DB_NAME)')\gexec" | \
+			PGPASSWORD=$(PGPASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d postgres && echo "SUCCESS! database $(DB_NAME) is ready"; \
+	elif [ -n "$(POSTGRES_CONTAINER)" ]; then \
+		echo "no local psql — using docker exec into $(POSTGRES_CONTAINER)"; \
+		echo "SELECT 'CREATE DATABASE $(DB_NAME)' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$(DB_NAME)')\gexec" | \
+			docker exec -i -e PGPASSWORD=$(PGPASSWORD) $(POSTGRES_CONTAINER) psql -U $(DB_USER) -d postgres && echo "SUCCESS! database $(DB_NAME) is ready"; \
+	elif [ "$(DB_HOST)" = "localhost" ] || [ "$(DB_HOST)" = "127.0.0.1" ]; then \
+		container=$$(docker ps -q --filter "publish=$(DB_PORT)" | head -1); \
+		if [ -z "$$container" ]; then \
+			echo "psql not found and no container is publishing port $(DB_PORT) — install the PostgreSQL client (brew install libpq && brew link --force libpq), or start Postgres any way you like and re-run" >&2; \
+			exit 1; \
+		fi; \
+		echo "no local psql — using docker exec into $$container"; \
+		echo "SELECT 'CREATE DATABASE $(DB_NAME)' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$(DB_NAME)')\gexec" | \
+			docker exec -i -e PGPASSWORD=$(PGPASSWORD) $$container psql -U $(DB_USER) -d postgres && echo "SUCCESS! database $(DB_NAME) is ready"; \
+	else \
+		echo "psql not found — install the PostgreSQL client (brew install libpq && brew link --force libpq) to connect to $(DB_HOST):$(DB_PORT)" >&2; \
+		exit 1; \
+	fi
+
+db-drop:
+	@if command -v psql >/dev/null 2>&1; then \
+		PGPASSWORD=$(PGPASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d postgres -c "DROP DATABASE IF EXISTS $(DB_NAME);" && echo "SUCCESS! database $(DB_NAME) dropped"; \
+	elif [ -n "$(POSTGRES_CONTAINER)" ]; then \
+		docker exec -i -e PGPASSWORD=$(PGPASSWORD) $(POSTGRES_CONTAINER) psql -U $(DB_USER) -d postgres -c "DROP DATABASE IF EXISTS $(DB_NAME);" && echo "SUCCESS! database $(DB_NAME) dropped"; \
+	elif [ "$(DB_HOST)" = "localhost" ] || [ "$(DB_HOST)" = "127.0.0.1" ]; then \
+		container=$$(docker ps -q --filter "publish=$(DB_PORT)" | head -1); \
+		if [ -z "$$container" ]; then \
+			echo "psql not found and no container is publishing port $(DB_PORT) — install the PostgreSQL client (brew install libpq && brew link --force libpq), or start Postgres any way you like and re-run" >&2; \
+			exit 1; \
+		fi; \
+		docker exec -i -e PGPASSWORD=$(PGPASSWORD) $$container psql -U $(DB_USER) -d postgres -c "DROP DATABASE IF EXISTS $(DB_NAME);" && echo "SUCCESS! database $(DB_NAME) dropped"; \
+	else \
+		echo "psql not found — install the PostgreSQL client (brew install libpq && brew link --force libpq) to connect to $(DB_HOST):$(DB_PORT)" >&2; \
+		exit 1; \
+	fi
+
+# A project has no migrations until its first `generate module` or `add auth`,
+# and `migrate up` treats an empty directory as an error rather than as nothing
+# to do. `run` depends on this target, so without the guard the very first
+# `make run` of a fresh scaffold fails on a database that is already correct.
+migrations-ready:
+	$(require_completed_migrations)
+
+migrate-up: migrations-ready
+	$(refuse_remote_db)
+	@set -a; [ -f $(ENV_FILE) ] && . ./$(ENV_FILE); set +a; \
+	if ! ls migrations/*.up.sql >/dev/null 2>&1; then echo "no migrations yet — nothing to apply"; exit 0; fi; \
+	migrate -path migrations -database "$$DB_DSN" up
+
+# same migration files, applied to TEST_DB_DSN instead of DB_DSN — run this
+# once after `make db-create DB_NAME=..._test` so repository_test.go files
+# see real tables instead of skipping (or failing, if REQUIRE_TEST_DB=true).
+migrate-up-test: migrations-ready
+	@set -a; [ -f $(ENV_FILE) ] && . ./$(ENV_FILE); set +a; \
+	if ! ls migrations/*.up.sql >/dev/null 2>&1; then echo "no migrations yet — nothing to apply"; exit 0; fi; \
+	migrate -path migrations -database "$$TEST_DB_DSN" up
+
+migrate-down:
+	$(refuse_remote_db)
+	@set -a; [ -f $(ENV_FILE) ] && . ./$(ENV_FILE); set +a; migrate -path migrations -database "$$DB_DSN" down 1
+
+# runs up -> down-to-zero -> up to catch a bit-rotted down.sql (one that no
+# longer reverses cleanly) before you actually need a rollback.
+#
+# TEST_DB_DSN, not DB_DSN: this drops every table, and it used to say "point
+# DB_DSN at a throwaway database first" — advice its own recipe made impossible
+# to follow, because the .env sourced on the line below overwrites whatever
+# DB_DSN the caller set on the way in. The test database is the one that is
+# meant to be destroyed, so it is the one named here.
+migrate-verify: migrations-ready
+	@set -a; [ -f $(ENV_FILE) ] && . ./$(ENV_FILE); set +a; \
+	if ! ls migrations/*.up.sql >/dev/null 2>&1; then echo "no migrations yet — nothing to apply"; exit 0; fi; \
+	: "$${TEST_DB_DSN:?TEST_DB_DSN is required — migrate-verify drops every table and will not guess a database}"; \
+	migrate -path migrations -database "$$TEST_DB_DSN" up && \
+	migrate -path migrations -database "$$TEST_DB_DSN" down -all && \
+	migrate -path migrations -database "$$TEST_DB_DSN" up
+
+# docs/openapi.yaml is hand-written and split across sibling files via relative
+# $ref (common/, health/, per-domain folders) — fine for tools that resolve
+# $ref over HTTP (Scalar, Swagger UI, Redoc), but importers that read a local
+# file as-is (Bruno, some Postman flows) never follow $ref and see zero routes.
+# This bundles everything into one fully-resolved file for those tools.
+openapi-bundle:
+	npx --yes @redocly/cli bundle docs/openapi.yaml -o docs/openapi.bundled.yaml
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Only the Controller and the root scripts; the other halves have their own tooling.
+  "ignoreWorkspaces": ["packages/*", "e2e"],
+  // `check:protocol` runs `go test` in hub/.
+  "ignoreBinaries": ["go"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts"],
+      "project": ["scripts/**/*.ts"]
+    },
+    "controller": {
+      "entry": ["app/**/*.tsx", "src/**/*.test.ts", "scripts/*.ts"],
+      "project": ["app/**/*.tsx", "src/**/*.{ts,tsx}", "scripts/**/*.ts"],
+      "ignore": [
+        // keel templates: copied and renamed by /keel:add-unit, their imports resolve only in place.
+        ".conventions/**",
+        // Push registration, dormant until PUSH_READY (ADR 0044); unhooked on purpose, not dead.
+        "src/features/machine-link/model/push.ts"
+      ],
+      // Knip's Expo plugin expects expo-updates whenever EAS is configured; this build does not ship OTA updates.
+      "ignoreDependencies": ["expo-updates"]
+    }
+  }
+}

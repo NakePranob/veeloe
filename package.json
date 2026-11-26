@@ -1,0 +1,39 @@
+{
+  "name": "veeloe",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "workspaces": [
+    "packages/*",
+    "controller",
+    "e2e"
+  ],
+  "scripts": {
+    "dev": "bun scripts/dev.ts up",
+    "dev:down": "bun scripts/dev.ts down",
+    "dev:status": "bun scripts/dev.ts status",
+    "dev:pair": "bun scripts/dev.ts pair",
+    "dev:link": "bun scripts/dev.ts link",
+    "dev:unpair": "bun scripts/dev.ts unpair",
+    "dev:reset-sim": "bun scripts/dev.ts reset-sim",
+    "dev:restart": "bun scripts/dev.ts restart",
+    "dev:seed": "bun scripts/dev.ts seed",
+    "dev:ios": "bun e2e/ios-flow-harness.ts serve",
+    "test": "cd packages/protocol-ts && bun test && cd ../../controller && bun test ./src ./scripts",
+    "test:e2e": "cd e2e && bun test",
+    "check": "bun scripts/check-all.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p controller",
+    "check:runtime": "cd packages/runtime && cargo test --workspace -- --test-threads=1",
+    "check:controller": "cd controller && bun scripts/check-i18n.ts",
+    "build:runtime": "bun scripts/build-runtime.ts",
+    "check:protocol": "cd packages/protocol && cargo test && cd ../protocol-ts && bun test src/fixtures && cd ../../hub && go test ./internal/shared/protocol/...",
+    "check:structure": "bun scripts/check-structure.ts",
+    "lint": "biome check",
+    "check:dead": "knip"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@types/bun": "^1.3.14",
+    "knip": "6.47.0",
+    "typescript": "~6.0.3"
+  }
+}

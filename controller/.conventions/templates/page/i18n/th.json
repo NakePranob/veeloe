@@ -1,0 +1,33 @@
+{
+  "title": "การใช้ token",
+  "retry": "ลองใหม่",
+  "window": {
+    "1": "1 วัน",
+    "3": "3 วัน",
+    "7": "7 วัน",
+    "30": "30 วัน"
+  },
+  "note": "นับทุก token ที่ Provider รายงาน วันใหม่เริ่มตอน 04:00 ตามเวลาของ Machine และไม่มีตัวเลขเงิน (ADR 0043)",
+  "loading": "กำลังขอข้อมูลจาก Machine",
+  "machine": {
+    "total": "ใช้ไป {{tokens}} token",
+    "fetched": "ข้อมูลเมื่อ {{when}}",
+    "online": "ออนไลน์",
+    "offline": "ออฟไลน์",
+    "none": "ยังไม่มีข้อมูลของเครื่องนี้"
+  },
+  "chart": {
+    "label": "การใช้ token ต่อวันของ {{machine}}",
+    "bar": "{{day}}: {{tokens}} token",
+    "none": "{{day}}: ไม่มีข้อมูล"
+  },
+  "tasks": {
+    "heading": "งานที่ใช้ token มากที่สุด",
+    "other": "อื่น ๆ",
+    "unknown": "Task {{id}}"
+  },
+  "empty": {
+    "title": "ยังไม่มีข้อมูล",
+    "body": "เปิด Machine แล้วกดลองใหม่อีกครั้ง"
+  }
+}

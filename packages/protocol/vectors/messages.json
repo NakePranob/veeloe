@@ -1,0 +1,1653 @@
+{
+  "note": "`valid` is whether a receiver accepts the body of an envelope of `type` that verify already accepted.",
+  "vectors": [
+    {
+      "name": "create an Agent",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "valid": true
+    },
+    {
+      "name": "create with a field this build does not know",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "mascot": "robot"
+      },
+      "valid": true
+    },
+    {
+      "name": "create with a Character",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "dome",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "none"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "create with a Character part this build does not know",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "orb",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "none",
+          "glow": true
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "create with a Character colour that is not #rrggbb",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "red",
+          "shell": "dome",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "none"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "create with a Character part too long",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "dome",
+          "top": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sides": "ears",
+          "decal": "none"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "create with a Character part that is not a lowercase word",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "dome",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "<b>"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "create with a Character missing a slot",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "dome"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "create with a blank name",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "  ",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "valid": false
+    },
+    {
+      "name": "create with no model",
+      "type": "agent.create",
+      "body": {
+        "id": "agent-1",
+        "name": "Deployer",
+        "provider": "anthropic"
+      },
+      "valid": false
+    },
+    {
+      "name": "create with an id that is not a plain folder name",
+      "type": "agent.create",
+      "body": {
+        "id": "../trust",
+        "name": "Deployer",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "valid": false
+    },
+    {
+      "name": "list",
+      "type": "agent.list",
+      "body": {},
+      "valid": true
+    },
+    {
+      "name": "the output of a running command",
+      "type": "tool.output",
+      "body": {
+        "agent": "agent-1",
+        "toolUseId": "toolu_1",
+        "tail": "test relay::timeout ... ok\n",
+        "bytes": 5120,
+        "elapsedMs": 42000
+      },
+      "valid": true
+    },
+    {
+      "name": "output with no tool id",
+      "type": "tool.output",
+      "body": {
+        "agent": "agent-1",
+        "tail": "x",
+        "bytes": 1,
+        "elapsedMs": 0
+      },
+      "valid": false
+    },
+    {
+      "name": "output with a negative byte count",
+      "type": "tool.output",
+      "body": {
+        "agent": "agent-1",
+        "toolUseId": "toolu_1",
+        "tail": "x",
+        "bytes": -1,
+        "elapsedMs": 0
+      },
+      "valid": false
+    },
+    {
+      "name": "update the name",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "name": "Builder"
+      },
+      "valid": true
+    },
+    {
+      "name": "update the Provider with its model",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "provider": "openrouter",
+        "model": "gpt-5"
+      },
+      "valid": true
+    },
+    {
+      "name": "update only the model",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "model": "claude-opus-5-5"
+      },
+      "valid": true
+    },
+    {
+      "name": "update the Character, keeping a part this build does not know",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "character": {
+          "color": "#9DC3E6",
+          "shell": "orb",
+          "top": "antenna",
+          "sides": "ears",
+          "decal": "none"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "update with a field this build does not know",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "name": "Builder",
+        "mascot": "robot"
+      },
+      "valid": true
+    },
+    {
+      "name": "update only the Budget",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 5000000
+      },
+      "valid": true
+    },
+    {
+      "name": "update with a Budget of zero",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 0
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a fractional Budget",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 1.5
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a Budget above the ceiling",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "budget": 1000000000001
+      },
+      "valid": false
+    },
+    {
+      "name": "update the git repos",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "acme/shop",
+          "acme/api.v2"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "update the git repos to none",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": []
+      },
+      "valid": true
+    },
+    {
+      "name": "update with a git repo that is not owner/name",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "shop"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a git repo that is a URL",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "https://github.com/acme/shop"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a git repo in capitals",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "Acme/Shop"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a git repo that climbs out",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "../shop"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with more git repos than the ceiling",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "gitRepos": [
+          "acme/r0",
+          "acme/r1",
+          "acme/r2",
+          "acme/r3",
+          "acme/r4",
+          "acme/r5",
+          "acme/r6",
+          "acme/r7",
+          "acme/r8",
+          "acme/r9",
+          "acme/r10",
+          "acme/r11",
+          "acme/r12",
+          "acme/r13",
+          "acme/r14",
+          "acme/r15",
+          "acme/r16",
+          "acme/r17",
+          "acme/r18",
+          "acme/r19",
+          "acme/r20"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "update with nothing to change",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1"
+      },
+      "valid": false
+    },
+    {
+      "name": "update with only a field this build does not know",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "mascot": "robot"
+      },
+      "valid": false
+    },
+    {
+      "name": "update the Provider without a model",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "provider": "openrouter"
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a blank name",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "name": " "
+      },
+      "valid": false
+    },
+    {
+      "name": "update with a Character missing a slot",
+      "type": "agent.update",
+      "body": {
+        "id": "agent-1",
+        "character": {
+          "color": "#9DC3E6"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "update with an id that is not a plain folder name",
+      "type": "agent.update",
+      "body": {
+        "id": "../trust",
+        "name": "Builder"
+      },
+      "valid": false
+    },
+    {
+      "name": "listed, with a Provider that answered and one that did not",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5"
+          }
+        ],
+        "providers": [
+          {
+            "name": "anthropic",
+            "models": [
+              {
+                "id": "claude-sonnet-5-5",
+                "name": "Claude Sonnet 5.5"
+              }
+            ]
+          },
+          {
+            "name": "openrouter",
+            "error": "provider.unreachable"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "listed, with an Agent that has a Character and one made before Characters",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "character": {
+              "color": "#9DC3E6",
+              "shell": "dome",
+              "top": "antenna",
+              "sides": "ears",
+              "decal": "none"
+            }
+          },
+          {
+            "id": "agent-2",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5"
+          }
+        ],
+        "providers": []
+      },
+      "valid": true
+    },
+    {
+      "name": "listed, with an Agent's git repos",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "gitRepos": [
+              "acme/shop"
+            ]
+          }
+        ],
+        "providers": []
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with a git repo that is not owner/name",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "gitRepos": [
+              "acme"
+            ]
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
+    },
+    {
+      "name": "listed, with a Budget and today's usage",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "budget": 10000000,
+            "usage": {
+              "day": "2026-11-06",
+              "tokens": 17000
+            }
+          }
+        ],
+        "providers": []
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with a usage day that is not a date",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "usage": {
+              "day": "6 November",
+              "tokens": 1
+            }
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
+    },
+    {
+      "name": "listed with a Character colour that is not #rrggbb",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "character": {
+              "color": "#12345",
+              "shell": "dome",
+              "top": "antenna",
+              "sides": "ears",
+              "decal": "none"
+            }
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
+    },
+    {
+      "name": "listed with no providers field",
+      "type": "agent.listed",
+      "body": {
+        "agents": []
+      },
+      "valid": false
+    },
+    {
+      "name": "how today's tokens stand",
+      "type": "agent.usage",
+      "body": {
+        "agent": "agent-1",
+        "day": "2026-11-06",
+        "tokens": 1700,
+        "budget": 10000000
+      },
+      "valid": true
+    },
+    {
+      "name": "a tally with a negative number of tokens",
+      "type": "agent.usage",
+      "body": {
+        "agent": "agent-1",
+        "day": "2026-11-06",
+        "tokens": -1,
+        "budget": 10000000
+      },
+      "valid": false
+    },
+    {
+      "name": "a message in a Task",
+      "type": "task.message",
+      "body": {
+        "agent": "agent-1",
+        "id": "msg-1",
+        "text": "deploy ให้หน่อย"
+      },
+      "valid": true
+    },
+    {
+      "name": "an empty message",
+      "type": "task.message",
+      "body": {
+        "agent": "agent-1",
+        "id": "msg-1",
+        "text": ""
+      },
+      "valid": false
+    },
+    {
+      "name": "name a Task",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "ทบทวน git rebase"
+      },
+      "valid": true
+    },
+    {
+      "name": "a Task's name of 60 characters, emoji counted once",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "กกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกก🚀"
+      },
+      "valid": true
+    },
+    {
+      "name": "a Task's name over 60 characters",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "กกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกก"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Task's name of only spaces",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "   "
+      },
+      "valid": false
+    },
+    {
+      "name": "a Task's name over two lines",
+      "type": "task.rename",
+      "body": {
+        "agent": "agent-1",
+        "title": "CI\nแดง"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Task's name with no Agent",
+      "type": "task.rename",
+      "body": {
+        "title": "CI"
+      },
+      "valid": false
+    },
+    {
+      "name": "an event",
+      "type": "task.event",
+      "body": {
+        "agent": "agent-1",
+        "seq": 3,
+        "kind": "llm.message",
+        "at": 1800000000000,
+        "body": {
+          "content": [
+            {
+              "type": "text",
+              "text": "สวัสดี"
+            }
+          ]
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "an event of a kind this build does not know",
+      "type": "task.event",
+      "body": {
+        "agent": "agent-1",
+        "seq": 3,
+        "kind": "future.thing",
+        "at": 1800000000000,
+        "body": {
+          "content": [
+            {
+              "type": "text",
+              "text": "สวัสดี"
+            }
+          ]
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "an event numbered from zero",
+      "type": "task.event",
+      "body": {
+        "agent": "agent-1",
+        "seq": 0,
+        "kind": "llm.message",
+        "at": 1800000000000,
+        "body": {
+          "content": [
+            {
+              "type": "text",
+              "text": "สวัสดี"
+            }
+          ]
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "approve a command",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "approve"
+      },
+      "valid": true
+    },
+    {
+      "name": "deny a request",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "deny"
+      },
+      "valid": true
+    },
+    {
+      "name": "allow a domain for good",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "always"
+      },
+      "valid": true
+    },
+    {
+      "name": "an Approval answer with a decision this build does not know",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "maybe"
+      },
+      "valid": false
+    },
+    {
+      "name": "an Approval answer with no request",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "decision": "approve"
+      },
+      "valid": false
+    },
+    {
+      "name": "sync from the start",
+      "type": "task.sync",
+      "body": {
+        "agent": "agent-1",
+        "after": 0
+      },
+      "valid": true
+    },
+    {
+      "name": "sync from a negative number",
+      "type": "task.sync",
+      "body": {
+        "agent": "agent-1",
+        "after": -1
+      },
+      "valid": false
+    },
+    {
+      "name": "a page of events",
+      "type": "task.events",
+      "body": {
+        "agent": "agent-1",
+        "events": [
+          {
+            "seq": 1,
+            "kind": "member.message",
+            "at": 1,
+            "body": {}
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "an error about an envelope",
+      "type": "error",
+      "body": {
+        "code": "agent.busy",
+        "ref": "sig-1"
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with the Machine's Egress",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5"
+          }
+        ],
+        "providers": [],
+        "egress": [
+          "github.com",
+          "*.npmjs.org"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with each Agent's own Egress",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "egress": [
+              "github.com"
+            ]
+          },
+          {
+            "id": "agent-2",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "egress": [
+              "*.npmjs.org"
+            ]
+          }
+        ],
+        "providers": [],
+        "egress": [
+          "github.com",
+          "*.npmjs.org"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with an Agent Egress entry that is not a domain",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "egress": [
+              "10.0.0.1"
+            ]
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
+    },
+    {
+      "name": "listed with an Egress entry that is not a domain",
+      "type": "agent.listed",
+      "body": {
+        "agents": [],
+        "providers": [],
+        "egress": [
+          "10.0.0.1"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "listed with an Agent the Machine deleted and has not purged",
+      "type": "agent.listed",
+      "body": {
+        "agents": [],
+        "trash": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "deletedAt": 1794000000000,
+            "restoreUntil": 1796592000000
+          }
+        ],
+        "providers": []
+      },
+      "valid": true
+    },
+    {
+      "name": "listed with a deleted Agent that does not say when it goes",
+      "type": "agent.listed",
+      "body": {
+        "agents": [],
+        "trash": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "deletedAt": 1794000000000
+          }
+        ],
+        "providers": []
+      },
+      "valid": false
+    },
+    {
+      "name": "listed from a Machine older than the trash",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5"
+          }
+        ],
+        "providers": []
+      },
+      "valid": true
+    },
+    {
+      "name": "restore an Agent",
+      "type": "agent.restore",
+      "body": {
+        "id": "agent-1"
+      },
+      "valid": true
+    },
+    {
+      "name": "restore with no id",
+      "type": "agent.restore",
+      "body": {},
+      "valid": false
+    },
+    {
+      "name": "set the Egress",
+      "type": "egress.set",
+      "body": {
+        "egress": [
+          "github.com",
+          "*.npmjs.org"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "set one Agent's Egress",
+      "type": "egress.set",
+      "body": {
+        "agent": "agent-1",
+        "egress": [
+          "github.com"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "set the Egress of an Agent id that is not a folder name",
+      "type": "egress.set",
+      "body": {
+        "agent": "../trust",
+        "egress": []
+      },
+      "valid": false
+    },
+    {
+      "name": "set the Egress to nothing",
+      "type": "egress.set",
+      "body": {
+        "egress": []
+      },
+      "valid": true
+    },
+    {
+      "name": "set the Egress with a URL",
+      "type": "egress.set",
+      "body": {
+        "egress": [
+          "https://pypi.org/simple"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "set the Egress with localhost",
+      "type": "egress.set",
+      "body": {
+        "egress": [
+          "localhost"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a claim that names the Member's other keys",
+      "type": "pairing.claim",
+      "body": {
+        "member": "m_1",
+        "proof": "p",
+        "keys": [
+          "k1",
+          "k2"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a claim from before other keys",
+      "type": "pairing.claim",
+      "body": {
+        "member": "m_1",
+        "proof": "p"
+      },
+      "valid": true
+    },
+    {
+      "name": "list Tasks",
+      "type": "task.list",
+      "body": {},
+      "valid": true
+    },
+    {
+      "name": "listed Tasks",
+      "type": "task.listed",
+      "body": {
+        "tasks": [
+          {
+            "id": "task-1",
+            "agent": "agent-1",
+            "updated": 1800000000000
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "listed Tasks with an Agent id that is not a folder name",
+      "type": "task.listed",
+      "body": {
+        "tasks": [
+          {
+            "id": "task-1",
+            "agent": "../x",
+            "updated": 1
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a handoff",
+      "type": "device.handoff",
+      "body": {
+        "data": "{}",
+        "proof": "p"
+      },
+      "valid": true
+    },
+    {
+      "name": "a handoff with no proof",
+      "type": "device.handoff",
+      "body": {
+        "data": "{}"
+      },
+      "valid": false
+    },
+    {
+      "name": "linked",
+      "type": "device.linked",
+      "body": {},
+      "valid": true
+    },
+    {
+      "name": "ask for 7 days of usage",
+      "type": "usage.list",
+      "body": {
+        "request": "req-1",
+        "days": 7
+      },
+      "valid": true
+    },
+    {
+      "name": "ask for usage of one Agent",
+      "type": "usage.list",
+      "body": {
+        "request": "req-2",
+        "days": 30,
+        "agent": "agent-1"
+      },
+      "valid": true
+    },
+    {
+      "name": "ask for usage with no request id",
+      "type": "usage.list",
+      "body": {
+        "days": 7
+      },
+      "valid": false
+    },
+    {
+      "name": "ask for usage with a fractional number of days",
+      "type": "usage.list",
+      "body": {
+        "request": "req-3",
+        "days": 7.5
+      },
+      "valid": false
+    },
+    {
+      "name": "usage for two Agents in a range",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-10-31",
+        "to": "2026-11-06",
+        "agents": [
+          {
+            "agent": "agent-1",
+            "days": [
+              {
+                "day": "2026-11-05",
+                "tokens": 1700
+              },
+              {
+                "day": "2026-11-06",
+                "tokens": 400
+              }
+            ],
+            "tasks": [
+              {
+                "task": "task-1",
+                "tokens": 1100
+              }
+            ],
+            "sources": [
+              {
+                "source": "task",
+                "tokens": 2100
+              }
+            ]
+          },
+          {
+            "agent": "agent-2",
+            "days": [],
+            "tasks": [],
+            "sources": []
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "usage with a day that is not a date",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-10-31",
+        "to": "2026-11-06",
+        "agents": [
+          {
+            "agent": "agent-1",
+            "days": [
+              {
+                "day": "6 November",
+                "tokens": 1
+              }
+            ],
+            "tasks": [],
+            "sources": []
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "usage with a range that ends before it starts",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-11-06",
+        "to": "2026-10-31",
+        "agents": []
+      },
+      "valid": false
+    },
+    {
+      "name": "usage with a negative number of tokens",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-10-31",
+        "to": "2026-11-06",
+        "agents": [
+          {
+            "agent": "agent-1",
+            "days": [
+              {
+                "day": "2026-11-06",
+                "tokens": -1
+              }
+            ],
+            "tasks": [],
+            "sources": []
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "usage with more than 20 Tasks",
+      "type": "usage.listed",
+      "body": {
+        "request": "req-1",
+        "from": "2026-11-06",
+        "to": "2026-11-06",
+        "agents": [
+          {
+            "agent": "agent-1",
+            "days": [],
+            "tasks": [
+              {
+                "task": "task-0",
+                "tokens": 1
+              },
+              {
+                "task": "task-1",
+                "tokens": 1
+              },
+              {
+                "task": "task-2",
+                "tokens": 1
+              },
+              {
+                "task": "task-3",
+                "tokens": 1
+              },
+              {
+                "task": "task-4",
+                "tokens": 1
+              },
+              {
+                "task": "task-5",
+                "tokens": 1
+              },
+              {
+                "task": "task-6",
+                "tokens": 1
+              },
+              {
+                "task": "task-7",
+                "tokens": 1
+              },
+              {
+                "task": "task-8",
+                "tokens": 1
+              },
+              {
+                "task": "task-9",
+                "tokens": 1
+              },
+              {
+                "task": "task-10",
+                "tokens": 1
+              },
+              {
+                "task": "task-11",
+                "tokens": 1
+              },
+              {
+                "task": "task-12",
+                "tokens": 1
+              },
+              {
+                "task": "task-13",
+                "tokens": 1
+              },
+              {
+                "task": "task-14",
+                "tokens": 1
+              },
+              {
+                "task": "task-15",
+                "tokens": 1
+              },
+              {
+                "task": "task-16",
+                "tokens": 1
+              },
+              {
+                "task": "task-17",
+                "tokens": 1
+              },
+              {
+                "task": "task-18",
+                "tokens": 1
+              },
+              {
+                "task": "task-19",
+                "tokens": 1
+              },
+              {
+                "task": "task-20",
+                "tokens": 1
+              }
+            ],
+            "sources": []
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "ask for an Agent's Memory",
+      "type": "memory.get",
+      "body": {
+        "request": "req-1",
+        "agent": "agent-1"
+      },
+      "valid": true
+    },
+    {
+      "name": "ask for Memory with no request id",
+      "type": "memory.get",
+      "body": {
+        "agent": "agent-1"
+      },
+      "valid": false
+    },
+    {
+      "name": "ask for Memory of an id that is not a plain folder name",
+      "type": "memory.get",
+      "body": {
+        "request": "req-1",
+        "agent": "../trust"
+      },
+      "valid": false
+    },
+    {
+      "name": "Memory of an Agent, with its whole-file count",
+      "type": "memory.got",
+      "body": {
+        "request": "req-1",
+        "agent": "agent-1",
+        "exists": true,
+        "chars": 12,
+        "text": "จดไว้แล้ว"
+      },
+      "valid": true
+    },
+    {
+      "name": "Memory empty but present",
+      "type": "memory.got",
+      "body": {
+        "request": "req-1",
+        "agent": "agent-1",
+        "exists": true,
+        "chars": 0,
+        "text": ""
+      },
+      "valid": true
+    },
+    {
+      "name": "Memory of an Agent with no file",
+      "type": "memory.got",
+      "body": {
+        "request": "req-1",
+        "agent": "agent-1",
+        "exists": false,
+        "chars": 0,
+        "text": ""
+      },
+      "valid": true
+    },
+    {
+      "name": "no file but with text",
+      "type": "memory.got",
+      "body": {
+        "request": "req-1",
+        "agent": "agent-1",
+        "exists": false,
+        "chars": 0,
+        "text": "x"
+      },
+      "valid": false
+    },
+    {
+      "name": "Memory text at the bound",
+      "type": "memory.got",
+      "body": {
+        "request": "req-1",
+        "agent": "agent-1",
+        "exists": true,
+        "chars": 9000,
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "valid": true
+    },
+    {
+      "name": "Memory text over the bound",
+      "type": "memory.got",
+      "body": {
+        "request": "req-1",
+        "agent": "agent-1",
+        "exists": true,
+        "chars": 9000,
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "valid": false
+    },
+    {
+      "name": "Memory with a negative count",
+      "type": "memory.got",
+      "body": {
+        "request": "req-1",
+        "agent": "agent-1",
+        "exists": true,
+        "chars": -1,
+        "text": "x"
+      },
+      "valid": false
+    },
+    {
+      "name": "set the Egress with more than 100 domains",
+      "type": "egress.set",
+      "body": {
+        "egress": [
+          "d0.example.com",
+          "d1.example.com",
+          "d2.example.com",
+          "d3.example.com",
+          "d4.example.com",
+          "d5.example.com",
+          "d6.example.com",
+          "d7.example.com",
+          "d8.example.com",
+          "d9.example.com",
+          "d10.example.com",
+          "d11.example.com",
+          "d12.example.com",
+          "d13.example.com",
+          "d14.example.com",
+          "d15.example.com",
+          "d16.example.com",
+          "d17.example.com",
+          "d18.example.com",
+          "d19.example.com",
+          "d20.example.com",
+          "d21.example.com",
+          "d22.example.com",
+          "d23.example.com",
+          "d24.example.com",
+          "d25.example.com",
+          "d26.example.com",
+          "d27.example.com",
+          "d28.example.com",
+          "d29.example.com",
+          "d30.example.com",
+          "d31.example.com",
+          "d32.example.com",
+          "d33.example.com",
+          "d34.example.com",
+          "d35.example.com",
+          "d36.example.com",
+          "d37.example.com",
+          "d38.example.com",
+          "d39.example.com",
+          "d40.example.com",
+          "d41.example.com",
+          "d42.example.com",
+          "d43.example.com",
+          "d44.example.com",
+          "d45.example.com",
+          "d46.example.com",
+          "d47.example.com",
+          "d48.example.com",
+          "d49.example.com",
+          "d50.example.com",
+          "d51.example.com",
+          "d52.example.com",
+          "d53.example.com",
+          "d54.example.com",
+          "d55.example.com",
+          "d56.example.com",
+          "d57.example.com",
+          "d58.example.com",
+          "d59.example.com",
+          "d60.example.com",
+          "d61.example.com",
+          "d62.example.com",
+          "d63.example.com",
+          "d64.example.com",
+          "d65.example.com",
+          "d66.example.com",
+          "d67.example.com",
+          "d68.example.com",
+          "d69.example.com",
+          "d70.example.com",
+          "d71.example.com",
+          "d72.example.com",
+          "d73.example.com",
+          "d74.example.com",
+          "d75.example.com",
+          "d76.example.com",
+          "d77.example.com",
+          "d78.example.com",
+          "d79.example.com",
+          "d80.example.com",
+          "d81.example.com",
+          "d82.example.com",
+          "d83.example.com",
+          "d84.example.com",
+          "d85.example.com",
+          "d86.example.com",
+          "d87.example.com",
+          "d88.example.com",
+          "d89.example.com",
+          "d90.example.com",
+          "d91.example.com",
+          "d92.example.com",
+          "d93.example.com",
+          "d94.example.com",
+          "d95.example.com",
+          "d96.example.com",
+          "d97.example.com",
+          "d98.example.com",
+          "d99.example.com",
+          "d100.example.com"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "register a push token",
+      "type": "push.register",
+      "body": {
+        "token": "ExponentPushToken[abc123]",
+        "language": "th"
+      },
+      "valid": true
+    },
+    {
+      "name": "register a token with an unknown language",
+      "type": "push.register",
+      "body": {
+        "token": "ExponentPushToken[abc123]",
+        "language": "fr"
+      },
+      "valid": false
+    },
+    {
+      "name": "a push token that is not from Expo",
+      "type": "push.register",
+      "body": {
+        "token": "abc123"
+      },
+      "valid": false
+    },
+    {
+      "name": "the Machine keeps a push token",
+      "type": "push.registered",
+      "body": {
+        "token": "ExponentPushToken[abc123]"
+      },
+      "valid": true
+    },
+    {
+      "name": "unregister a push token",
+      "type": "push.unregister",
+      "body": {},
+      "valid": true
+    },
+    {
+      "name": "the Machine removed a push token",
+      "type": "push.unregistered",
+      "body": {},
+      "valid": true
+    }
+  ]
+}

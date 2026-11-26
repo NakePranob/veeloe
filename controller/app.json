@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Veeloe",
+    "slug": "veeloe",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "veeloe",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.veeloe.controller"
+    },
+    "android": {
+      "package": "dev.veeloe.controller",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9d2e2d71-7141-4290-9ad9-19d1adb06be4"
+      }
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "./app"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Veeloe uses the camera to scan the QR code your Machine shows.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-localization",
+      "expo-notifications",
+      "expo-sqlite",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Veeloe uses Face ID to unlock the key that signs your commands.",
+          "configureAndroidBackup": true
+        }
+      ],
+      "expo-font"
+    ]
+  }
+}

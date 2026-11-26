@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<title>Veeloe — องค์ประกอบของ Agent</title>
+<style>
+  :root {
+    --bg: #0b1016;
+    --panel: #141c25;
+    --panel2: #18222d;
+    --line: #2a3745;
+    --text: #e8eef5;
+    --muted: #9fb0c2;
+    --accent: #7cc4ff;
+    --accent2: #8ee6b0;
+    --warn: #f0b37e;
+    --deny: #ff8f8f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "SF Pro Text", "Noto Sans Thai", "Helvetica Neue", sans-serif; }
+  #canvas { position: relative; width: 1500px; height: 1140px; padding: 0; }
+  h1 { position: absolute; left: 44px; top: 26px; margin: 0; font-size: 26px; letter-spacing: .2px; }
+  .sub { position: absolute; left: 44px; top: 64px; color: var(--muted); font-size: 14px; }
+  .card { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 8px; font-size: 15px; color: var(--accent); font-weight: 600; }
+  .card p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+  .card ul { margin: 0; padding-left: 16px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+  .agent { position: absolute; left: 404px; top: 104px; width: 772px; height: 906px;
+    border: 1.5px dashed var(--accent); border-radius: 20px; background: rgba(124,196,255,.04); }
+  .agent .tag { position: absolute; left: 20px; top: -14px; background: var(--bg); padding: 0 8px;
+    color: var(--accent); font-size: 13px; letter-spacing: .3px; }
+  .agent .hint { position: absolute; left: 20px; top: 14px; color: var(--muted); font-size: 12px; }
+  .step { display: flex; gap: 10px; margin: 0 0 9px; }
+  .num { flex: 0 0 22px; height: 22px; border-radius: 50%; background: #21303f; color: var(--accent);
+    font-size: 12px; display: grid; place-items: center; font-weight: 600; }
+  .step p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text); }
+  .step small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+    border: 1px solid var(--line); color: var(--muted); margin: 2px 4px 2px 0; }
+  .ok { color: var(--accent2); border-color: rgba(142,230,176,.35); }
+  .warn { color: var(--warn); border-color: rgba(240,179,126,.35); }
+  .deny { color: var(--deny); border-color: rgba(255,143,143,.35); }
+  .legend { position: absolute; left: 44px; top: 1080px; display: flex; gap: 22px; font-size: 12px; color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 7px; }
+  .swatch { width: 26px; height: 0; border-top: 2px solid var(--accent); }
+  .swatch.dash { border-top-style: dashed; }
+  .swatch.red { border-top: 2px dashed var(--deny); }
+  svg { position: absolute; inset: 0; width: 1500px; height: 1140px; pointer-events: none; }
+  .flow { position: absolute; left: 44px; top: 92px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="canvas">
+  <h1>Veeloe — องค์ประกอบของ Agent และการทำงาน</h1>
+  <div class="sub">Agent หนึ่งตัว = worker หนึ่งโปรเซส · หนึ่งคิว · หนึ่ง Workdir · sandbox = ขอบเขตที่ OS บังคับ ไม่ใช่ prompt หรือ approval</div>
+
+  <!-- Supervisor -->
+  <div class="card" style="left:44px; top:140px; width:320px; height:240px;">
+    <h3>Supervisor (Runtime บน Machine)</h3>
+    <ul>
+      <li>hub-link และตรวจลายเซ็นทุกซอง</li>
+      <li>ทะเบียน Agent + กุญแจเครื่อง</li>
+      <li>ถือ Provider key และเป็น proxy ของ LLM</li>
+      <li>Budget / usage / log</li>
+      <li>เริ่ม–หยุด–restart worker, service</li>
+    </ul>
+  </div>
+
+  <!-- Hub -->
+  <div class="card" style="left:44px; top:400px; width:320px; height:120px;">
+    <h3>Hub</h3>
+    <p>ส่งต่อซองที่เซ็นแล้วระหว่างแอปกับ Machine — ไม่เก็บเนื้อหา Task</p>
+  </div>
+
+  <!-- Controller -->
+  <div class="card" style="left:44px; top:540px; width:320px; height:130px;">
+    <h3>Controller (แอปของ Member)</h3>
+    <p>สร้าง/แก้ Agent, ส่งข้อความ, ตอบ Approval, Stop, ตั้ง Schedule / Idle Work / Watch</p>
+  </div>
+
+  <!-- Triggers -->
+  <div class="card" style="left:44px; top:690px; width:320px; height:190px;">
+    <h3>Trigger ที่ Member เซ็นไว้</h3>
+    <p><b>ข้อความใน Task</b> · <b>Schedule</b> · <b>Idle Work</b> · <b>Watch</b></p>
+    <p style="margin-top:8px;">ทุกอย่างเข้าลูปเดียวกันผ่าน trigger ภายในของ supervisor (ADR 0067) — รอบที่ Agent ไม่ว่างจะถูกข้าม ไม่ต่อคิว</p>
+  </div>
+
+  <!-- Sandbox definition -->
+  <div class="card" style="left:44px; top:886px; width:320px; height:178px; border-color: rgba(124,196,255,.5);">
+    <h3>Sandbox คืออะไร</h3>
+    <p>ขอบเขตที่ <b>OS บังคับ</b> (macOS Seatbelt / Linux bwrap) ว่า Agent แตะไฟล์หรือเน็ตอะไรได้ — ไม่ใช่ prompt และไม่ใช่ Approval</p>
+    <p style="margin-top:6px;">ปัจจุบันบังคับกับทุกคำสั่งที่ worker เปิด; tool ใช้ resolver ชุดเดียวกัน. เป้าหมาย ADR 0008 คือครอบทั้ง worker</p>
+  </div>
+
+  <!-- Agent boundary -->
+  <div class="agent">
+    <div class="tag">AGENT (worker process)</div>
+    <div class="hint">sandbox และสิทธิ์ไฟล์ถูกกำหนดต่อ Turn</div>
+
+    <!-- Identity -->
+    <div class="card" style="left:18px; top:38px; width:352px; height:172px;">
+      <h3>Identity &amp; settings</h3>
+      <ul>
+        <li>ชื่อ · Character · Provider / model</li>
+        <li>Allowlist · Approval timeout</li>
+        <li>Budget ต่อวัน</li>
+        <li>git name/email · cache ในบ้านจำลอง</li>
+      </ul>
+    </div>
+
+    <!-- Tools -->
+    <div class="card" style="left:388px; top:38px; width:352px; height:172px;">
+      <h3>Tools</h3>
+      <p>bash · read · write · edit · glob · grep · memory · send_file</p>
+      <p style="margin-top:8px;">คำสั่งนอก Allowlist → ขอ Approval จากคนที่มี Approve; Approval ไม่ได้ให้สิทธิ์นอก sandbox</p>
+    </div>
+
+    <!-- Harness -->
+    <div class="card" style="left:18px; top:228px; width:722px; height:336px;">
+      <h3>Harness — ลูปของ Turn</h3>
+      <div class="step"><div class="num">1</div><p>รับ trigger<small>ข้อความ Member หรือ trigger ภายใน (Schedule / Idle / Watch) พร้อมเจ้าของและเวลาที่ควรเริ่ม</small></p></div>
+      <div class="step"><div class="num">2</div><p>ประกอบ prompt<small>คำสั่ง Agent + MEMORY.md (pin ไว้ทั้ง Turn) + รายชื่อ Skill + tools ที่มี</small></p></div>
+      <div class="step"><div class="num">3</div><p>เรียก LLM ผ่าน proxy ของ Supervisor<small>Agent ไม่เคยเห็น Provider key; ทุก token ถูกนับเข้า Budget</small></p></div>
+      <div class="step"><div class="num">4</div><p>เรียก tool → Allowlist / Approval → Sandbox<small>shell รันใน Seatbelt; ไฟล์อยู่ใน roots ที่กำหนด; เน็ตตาม Egress</small></p></div>
+      <div class="step"><div class="num">5</div><p>บันทึก event ลง tasks.db<small>append-only: ข้อความ, LLM, tool call/ผล, Approval, Stop, Turn เริ่ม/จบ</small></p></div>
+      <div class="step"><div class="num">6</div><p>จบ Turn<small>ตอบหรือจบเงียบ · ใกล้เต็ม context → flush Memory + compaction · push ถ้ามีเรื่องต้องบอก</small></p></div>
+    </div>
+
+    <!-- Workdir -->
+    <div class="card" style="left:18px; top:584px; width:352px; height:156px;">
+      <h3>Workdir</h3>
+      <ul>
+        <li>ไฟล์งานของ Agent</li>
+        <li><b>MEMORY.md</b> ≤ 4,000 ตัวอักษร</li>
+        <li><b>memory/YYYY-MM-DD.md</b> โน้ตรายวัน</li>
+        <li>.home / tmp (cache ของ toolchain)</li>
+      </ul>
+    </div>
+
+    <!-- Memory + skills -->
+    <div class="card" style="left:388px; top:584px; width:352px; height:156px;">
+      <h3>Memory &amp; Skills</h3>
+      <p><b>memory tool</b> เขียน MEMORY.md / โน้ตรายวัน (โค้ดคุมที่อยู่และเพดาน); flush ก่อน compaction เขียนให้เอง</p>
+      <p style="margin-top:6px;">Skill: อ่าน SKILL.md ได้อย่างเดียว; ติดตั้ง/แก้โดย Member ที่มี Manage</p>
+    </div>
+
+    <!-- Sandbox bar -->
+    <div class="card" style="left:18px; top:760px; width:722px; height:122px; border-color: rgba(124,196,255,.5);">
+      <h3>Sandbox boundary (Seatbelt / OS)</h3>
+      <p><span class="pill ok">อ่าน+เขียน Workdir</span><span class="pill ok">อ่าน+เขียน Project ตอนได้งาน</span><span class="pill warn">Library: อ่านตามสิทธิ์ · เขียนเฉพาะ writer</span><span class="pill warn">อ่าน system/SDK</span><span class="pill deny">deny home จริง / secrets / docker socket</span></p>
+      <p style="margin-top:8px;">path นอก roots ล้มเหลวแม้ Owner กดอนุมัติ — <b>Approval ไม่ใช่ sandbox</b>; เขียนนอก Workdir/Project/Library ที่เป็น writer ไม่มี</p>
+    </div>
+  </div>
+
+  <!-- Project -->
+  <div class="card" style="left:1204px; top:120px; width:252px; height:190px;">
+    <h3>Project (แยกจาก Agent)</h3>
+    <p>repos/&lt;name&gt; + worktree + wiki<br/>เห็นเฉพาะ Task ที่ Agent ได้รับมอบหมาย</p>
+    <p style="margin-top:6px;">ระหว่างงาน Project: Workdir เป็น read-only</p>
+  </div>
+
+  <!-- Library -->
+  <div class="card" style="left:1204px; top:330px; width:252px; height:150px;">
+    <h3>Library</h3>
+    <p>ความรู้ร่วมบน Machine + wiki ของ Project</p>
+    <p style="margin-top:6px;"><span class="pill ok">อ่าน (ตามสิทธิ์)</span><span class="pill ok">เขียน (writer คนเดียว)</span></p>
+    <p style="margin-top:6px;">สิทธิ์เป็นราย Agent ต่อ Library; Project wiki ตั้ง Entry เป็น writer</p>
+  </div>
+
+  <!-- System -->
+  <div class="card" style="left:1204px; top:500px; width:252px; height:130px;">
+    <h3>ระบบ / toolchain</h3>
+    <p>/usr /bin /System /SDK — อ่านและรันได้ แต่เขียนไม่ได้</p>
+  </div>
+
+  <!-- Secrets -->
+  <div class="card" style="left:1204px; top:650px; width:252px; height:130px; border-color: rgba(255,143,143,.45);">
+    <h3 style="color: var(--deny);">ห้ามตลอด</h3>
+    <p>~/.ssh · ~/.aws · ~/.config/gh · ~/.veeloe · docker socket · home จริง</p>
+  </div>
+
+  <!-- Network -->
+  <div class="card" style="left:1204px; top:800px; width:252px; height:100px;">
+    <h3>Network</h3>
+    <p>ออกได้เฉพาะโดเมนใน Egress ผ่าน proxy ของ supervisor</p>
+  </div>
+
+  <!-- arrows -->
+  <svg>
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#7cc4ff" />
+      </marker>
+      <marker id="arrowDash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#f0b37e" />
+      </marker>
+      <marker id="arrowDeny" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff8f8f" />
+      </marker>
+    </defs>
+
+    <!-- triggers into agent harness -->
+    <path d="M 364 760 C 384 760, 384 600, 422 520" fill="none" stroke="#7cc4ff" stroke-width="2" marker-end="url(#arrow)" />
+    <!-- supervisor to harness (LLM proxy) -->
+    <path d="M 364 200 C 386 200, 386 360, 422 380" fill="none" stroke="#7cc4ff" stroke-width="2" marker-end="url(#arrow)" />
+    <!-- agent to hub/controller -->
+    <path d="M 404 470 C 390 470, 380 470, 366 470" fill="none" stroke="#7cc4ff" stroke-width="2" marker-end="url(#arrow)" />
+    <!-- agent to project -->
+    <path d="M 1176 300 C 1190 300, 1196 220, 1202 215" fill="none" stroke="#f0b37e" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowDash)" />
+    <!-- agent to library -->
+    <path d="M 1176 620 C 1192 620, 1196 420, 1202 405" fill="none" stroke="#f0b37e" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowDash)" />
+    <!-- agent to system -->
+    <path d="M 1176 700 C 1190 700, 1196 570, 1202 565" fill="none" stroke="#f0b37e" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowDash)" />
+    <text x="1180" y="418" fill="#f0b37e" font-size="11" text-anchor="end">อ่าน / เขียนตามสิทธิ์</text>
+    <!-- deny secrets -->
+    <path d="M 1176 820 C 1192 820, 1196 720, 1202 715" fill="none" stroke="#ff8f8f" stroke-width="2" stroke-dasharray="4 5" marker-end="url(#arrowDeny)" />
+  </svg>
+
+  <div class="legend">
+    <span><i class="swatch"></i> เรียก / ไหลของงาน</span>
+    <span><i class="swatch dash"></i> เข้าถึงตามสิทธิ์ (อ่าน · เขียนเฉพาะ writer)</span>
+    <span><i class="swatch red"></i> deny</span>
+    <span style="color: var(--muted);">Agent ไม่เห็น Provider key · ทุก tool call อยู่ใน Task log</span>
+  </div>
+</div>
+</body>
+</html>

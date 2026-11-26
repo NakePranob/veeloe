@@ -1,0 +1,314 @@
+{
+  "version": 1,
+  "shared": "../docs/adr/0070-keel-holds-the-structure.md",
+  "check": [
+    "sh",
+    "-c",
+    "cd runtime && s=0; cargo test -q -p veeloe-runtime-core --test structure || s=1; for d in . ../protocol; do out=$(cd $d && cargo fmt --all -- --check -l 2>&1) || { echo \"$out\" | sed 's/^/rustfmt: /'; s=1; }; done; exit $s"
+  ],
+  "units": {
+    "kind": "crate",
+    "at": "runtime/crates/{name}",
+    "shared": [],
+    "wiring": [
+      "runtime/Cargo.toml"
+    ],
+    "note": "covers packages/runtime, packages/protocol and packages/protocol-ts (ADR 0071); it sits in packages/ because the Runtime workspace builds against packages/protocol"
+  },
+  "templates": [
+    {
+      "name": "crate",
+      "dir": ".conventions/templates/crate",
+      "placeholder": "sample",
+      "templateFrom": "proposal: a new crate is rare; the skeleton holds only the shape"
+    }
+  ],
+  "rules": [
+    {
+      "id": "worker-never-supervisor",
+      "statement": "runtime-worker and runtime-core never use the supervisor crate, and runtime-core never uses the worker crate: they talk to the supervisor over ipc only.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-worker/src/zz_probe.rs",
+          "content": "use veeloe_runtime_supervisor as _;\n"
+        },
+        {
+          "path": "runtime/crates/runtime-core/src/zz_probe.rs",
+          "content": "use veeloe_runtime_worker as _;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-worker/src/zz_probe.rs",
+          "content": "use veeloe_runtime_core as _;\n"
+        }
+      ]
+    },
+    {
+      "id": "supervisor-uses-worker-entry-only",
+      "statement": "The supervisor uses the worker crate only through veeloe_runtime_worker::entry, which runs `veeloe worker` in the same binary.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-supervisor/src/zz_probe.rs",
+          "content": "use veeloe_runtime_worker::tools as _;\n"
+        },
+        {
+          "path": "runtime/crates/runtime-supervisor/src/zz_probe.rs",
+          "content": "use veeloe_runtime_worker::{entry, worker};\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-supervisor/src/zz_probe.rs",
+          "content": "use veeloe_runtime_worker::entry as _;\n"
+        }
+      ]
+    },
+    {
+      "id": "known-places",
+      "statement": "Every Runtime file lives in a crate's src/ or tests/, is a crate's Cargo.toml, or sits at the workspace root; protocol keeps src/, tests/, schema/, vectors/ and its root files; protocol-ts keeps src/ and package.json.",
+      "adr": "docs/adr/0071-runtime-and-protocol-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-worker/zz_probe.rs",
+          "content": "\n"
+        },
+        {
+          "path": "protocol/helpers/zz_probe.rs",
+          "content": "\n"
+        },
+        {
+          "path": "protocol-ts/lib/zz_probe.ts",
+          "content": "\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-worker/tests/zz_probe.rs",
+          "content": "\n"
+        },
+        {
+          "path": "protocol/vectors/zz_probe.json",
+          "content": "{}\n"
+        },
+        {
+          "path": "protocol-ts/src/zz_probe.ts",
+          "content": "\n"
+        }
+      ]
+    },
+    {
+      "id": "unit-shape",
+      "statement": "A crate has only the top-level folders its template (runtime-core) has: src/ and tests/.",
+      "adr": "docs/adr/0070-keel-holds-the-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-worker/helpers/zz_probe.rs",
+          "content": "\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-worker/src/zz_probe.rs",
+          "content": "\n"
+        }
+      ]
+    },
+    {
+      "id": "worker-core-hexagonal",
+      "proseOnly": "ADR 0022's pure worker core behind ports is a design rule inside runtime-worker/runtime-core with no module boundary a test can see yet, ADR 0070"
+    },
+    {
+      "id": "plugin-api-leaf",
+      "statement": "plugin-api names no other veeloe crate: a plugin builds against it alone.",
+      "adr": "docs/adr/0071-runtime-and-protocol-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/plugin-api/src/zz_probe.rs",
+          "content": "use veeloe_runtime_core as _;\n"
+        },
+        {
+          "path": "runtime/crates/plugin-api/src/zz_probe.rs",
+          "content": "use veeloe_protocol::envelope as _;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/plugin-api/src/zz_probe.rs",
+          "content": "use serde as _;\n"
+        }
+      ]
+    },
+    {
+      "id": "supervisor-layout",
+      "statement": "runtime-supervisor/src holds services as flat files, one module per Hub message in messages/ and CLI commands in cli/; no other folder, and messages/ and cli/ have no folders of their own.",
+      "adr": "docs/adr/0071-runtime-and-protocol-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-supervisor/src/handlers/zz_probe.rs",
+          "content": "\n"
+        },
+        {
+          "path": "runtime/crates/runtime-supervisor/src/messages/deep/zz_probe.rs",
+          "content": "\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-supervisor/src/messages/zz_probe.rs",
+          "content": "\n"
+        },
+        {
+          "path": "runtime/crates/runtime-supervisor/src/cli/zz_probe.rs",
+          "content": "\n"
+        },
+        {
+          "path": "runtime/crates/runtime-supervisor/src/zz_probe.rs",
+          "content": "\n"
+        }
+      ]
+    },
+    {
+      "id": "messages-independent",
+      "statement": "A message module never uses another message module, nor super::; what two handlers share is a service at src/ or a helper in messages/mod.rs reached through crate::messages::shared.",
+      "adr": "docs/adr/0071-runtime-and-protocol-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-supervisor/src/messages/zz_probe.rs",
+          "content": "use crate::messages::egress_set as _;\n"
+        },
+        {
+          "path": "runtime/crates/runtime-supervisor/src/messages/zz_probe.rs",
+          "content": "use super::memory_get;\n"
+        },
+        {
+          "path": "runtime/crates/runtime-supervisor/src/messages/zz_probe.rs",
+          "content": "use crate::messages::{egress_set, memory_get};\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-supervisor/src/messages/zz_probe.rs",
+          "content": "use crate::egress::Egress as _;\n"
+        },
+        {
+          "path": "runtime/crates/runtime-supervisor/src/messages/zz_probe.rs",
+          "content": "use crate::messages::shared::Machine as _;\n"
+        }
+      ]
+    },
+    {
+      "id": "protocol-leaf",
+      "statement": "packages/protocol names no other veeloe crate: the Runtime, the Controller's wasm and the Hub's copy all build from it.",
+      "adr": "docs/adr/0071-runtime-and-protocol-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "protocol/src/zz_probe.rs",
+          "content": "use veeloe_runtime_core as _;\n"
+        },
+        {
+          "path": "protocol/tests/zz_probe.rs",
+          "content": "extern crate veeloe_plugin_api;\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "protocol/src/zz_probe.rs",
+          "content": "use serde as _;\n"
+        }
+      ]
+    },
+    {
+      "id": "protocol-ts-self-contained",
+      "statement": "packages/protocol-ts imports only its own files, the dependencies its package.json declares, bun: and node:.",
+      "adr": "docs/adr/0071-runtime-and-protocol-structure.md",
+      "enforcer": {
+        "tool": "Rust test",
+        "at": "packages/runtime/crates/runtime-core/tests/structure.rs"
+      },
+      "violation": [
+        {
+          "path": "protocol-ts/src/zz_probe.ts",
+          "content": "import { shiftDay } from \"../../../controller/src/shared/lib\";\n"
+        },
+        {
+          "path": "protocol-ts/src/zz_probe.ts",
+          "content": "export * from \"@veeloe/controller\";\n"
+        },
+        {
+          "path": "protocol-ts/src/zz_probe.ts",
+          "content": "const late = await import(\"../../runtime/x\");\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "protocol-ts/src/zz_probe.ts",
+          "content": "import { z } from \"zod\";\nimport { frame } from \"./frame\";\n"
+        },
+        {
+          "path": "protocol-ts/src/messages/zz_probe.ts",
+          "content": "import { describe } from \"bun:test\";\nimport { sha256 } from \"@noble/hashes/sha2.js\";\nimport { b } from \"../crypto/base64url\";\n"
+        }
+      ]
+    },
+    {
+      "id": "rustfmt",
+      "statement": "The Runtime and protocol are formatted with rustfmt's defaults; cargo fmt --check passes.",
+      "adr": "docs/adr/0071-runtime-and-protocol-structure.md",
+      "enforcer": {
+        "tool": "cargo fmt --check",
+        "at": "packages/.conventions/rules.json check"
+      },
+      "violation": [
+        {
+          "path": "runtime/crates/runtime-worker/tests/zz_probe.rs",
+          "content": "fn  zz( ) {}\n"
+        },
+        {
+          "path": "protocol/tests/zz_probe.rs",
+          "content": "fn  zz( ) {}\n"
+        }
+      ],
+      "legal": [
+        {
+          "path": "runtime/crates/runtime-worker/tests/zz_probe.rs",
+          "content": "fn zz() {}\n"
+        }
+      ]
+    }
+  ]
+}

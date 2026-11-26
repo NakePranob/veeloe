@@ -1,0 +1,200 @@
+{
+  "title": "Task",
+  "agent": "ตั้งค่า Agent",
+  "deletedAgent": "Agent ที่ถูกลบแล้ว",
+  "readOnly": "Agent นี้ถูกลบแล้ว ประวัติ Task ยังอ่านได้ แต่ส่งข้อความใหม่ไม่ได้",
+  "empty": "ส่งข้อความเพื่อเริ่ม Task นี้ {{name}} อ่านไฟล์ได้เฉพาะใน Workdir ของตัวเอง",
+  "working": "กำลังทำงาน…",
+  "sending": "กำลังส่ง…",
+  "dismiss": "ลบ",
+  "placeholder": "คุยกับ {{name}}",
+  "send": "ส่ง",
+  "offline": "Machine ออฟไลน์อยู่ ส่งได้เมื่อกลับมา",
+  "tools": {
+    "verbs": {
+      "bash": "{{target}}",
+      "read": "อ่าน {{target}}",
+      "glob": "หาไฟล์ {{target}}",
+      "grep": "ค้นหา {{target}}",
+      "edit": "แก้ {{target}}",
+      "write": "สร้าง {{target}}",
+      "memory": "จำไว้: {{target}}",
+      "send_file": "ส่งไฟล์ {{target}}"
+    },
+    "other": "ใช้ {{tool}}",
+    "more": "+{{count}}",
+    "unfinished": "ไม่เสร็จ"
+  },
+  "queued": "ส่งได้ จะรอจน Turn นี้จบ",
+  "queuedPosition": "คิว #{{position}} รอ Turn ที่กำลังทำงาน",
+  "attach": "แนบไฟล์",
+  "attachedOnly": "ไฟล์แนบ",
+  "removeAttachment": "นำ {{name}} ออก",
+  "file": {
+    "offered": "ไฟล์จาก Agent",
+    "size": "{{size}} KB",
+    "open": "เปิด",
+    "opening": "กำลังเปิด…"
+  },
+  "compacted": {
+    "title": "ย่อ context แล้ว · {{when}}",
+    "show": "ดูสรุป",
+    "hide": "ซ่อนสรุป"
+  },
+  "context": {
+    "title": "Context window",
+    "used": "ใช้ไป",
+    "of": "{{used}} / {{window}} tokens",
+    "compactAt": "ย่อเมื่อถึง",
+    "threshold": "{{tokens}} tokens",
+    "a11y": "ใช้ context window ไป {{percent}}%"
+  },
+  "budget": {
+    "out": "Budget ของวันนี้หมดแล้ว",
+    "body": "งานใหม่จะเริ่มตอน 04:00 ตามเวลาของ {{machine}} หรือเมื่อเพิ่ม Budget ไฟล์ที่แก้ไว้ยังอยู่",
+    "add": "เพิ่ม Budget",
+    "used": "ใช้ไป {{used}} จาก {{budget}} tokens"
+  },
+  "approval": {
+    "title": "ขอรันอันนี้ได้ไหม?",
+    "domainTitle": "ขอออกไปที่นี่ได้ไหม?",
+    "domainBody": "โดเมนนี้ไม่อยู่ใน Egress ของ {{name}}",
+    "expiresIn_one": "เหลือ {{count}} นาที",
+    "expiresIn_other": "เหลือ {{count}} นาที",
+    "expiresInHours_one": "เหลือ {{count}} ชม.",
+    "expiresInHours_other": "เหลือ {{count}} ชม.",
+    "approved": "อนุมัติแล้ว",
+    "denied": "ปฏิเสธแล้ว",
+    "expired": "หมดเวลา",
+    "closed": "Turn จบก่อนมีคนตอบ",
+    "waitingForApprover": "รอคนที่มี Approve ตอบ",
+    "sent": "ส่งคำตอบแล้ว",
+    "approve": "อนุมัติ",
+    "allowOnce": "อนุญาตครั้งนี้",
+    "allowAlways": "อนุญาตถาวร",
+    "deny": "ปฏิเสธ",
+    "always": "อนุญาตตลอด",
+    "steer": "บอกให้ทำอย่างอื่น",
+    "addToAllowlist": "เพิ่มเข้า Allowlist",
+    "covers": "ตัดท้ายให้เหลือคำนำหน้าที่ต้องการ รายการนี้ครอบทุกคำสั่งที่ขึ้นต้นแบบนี้",
+    "doesNotCover": "ไม่ครอบคำสั่งนี้ ยังต้องขออนุมัติ",
+    "signAndApprove": "เซ็นและอนุมัติ",
+    "cancel": "ยกเลิก",
+    "more": "ตัวเลือกอื่น",
+    "outcome": "{{outcome}} · {{target}}",
+    "outcomeBy": "{{outcome}} โดย {{member}} · {{target}}",
+    "outcomeExpired": "{{outcome}} นับว่าปฏิเสธ · {{target}}",
+    "outcomeAlways": "{{outcome}} · เพิ่ม {{target}} เข้า Egress",
+    "outcomeByYou": "{{outcome}} โดยคุณ · {{target}}"
+  },
+  "openAgent": "เปิดหน้า {{name}}",
+  "stopped": "{{member}} หยุด Turn นี้ · {{when}}",
+  "interrupted": {
+    "title": "{{machine}} เริ่มใหม่กลาง Turn",
+    "body": "ไฟล์ที่แก้ไว้ยังอยู่ และ {{name}} จะไม่ทำต่อเอง เพราะอาจรันคำสั่งเดิมซ้ำ",
+    "continue": "ทำต่อ",
+    "continueMessage": "ทำต่อ"
+  },
+  "stop": {
+    "title": "หยุด Turn นี้?",
+    "message": "จะหยุด:\n• {{agent}}\n\nไฟล์ที่แก้ไปแล้วยังอยู่ และคุยต่อได้",
+    "action": "หยุด",
+    "cancel": "ยกเลิก",
+    "button": "หยุด",
+    "stopping": "กำลังหยุด…"
+  },
+  "authenticate": {
+    "approve": "อนุมัติให้ {{name}} รันคำสั่งนี้",
+    "always": "เพิ่ม {{entries}} เข้า Allowlist และอนุมัติ",
+    "domain": "อนุญาตโดเมนนี้ให้ {{name}}: {{domain}}",
+    "domainAlways": "เพิ่ม {{domain}} เข้า Egress ของ {{name}}"
+  },
+  "changes_one": "แก้ {{count}} ไฟล์",
+  "changes_other": "แก้ {{count}} ไฟล์",
+  "changesNote": "นับเฉพาะไฟล์ที่ Agent แก้ด้วย tool แก้ไฟล์และเขียนไฟล์",
+  "failedTitle": "Turn ล้มเหลว",
+  "emptyTitle": "ให้ {{name}} ช่วยอะไรดี?",
+  "waitingHeader": "รอคุณตอบ",
+  "budgetHeader": "Budget วันนี้หมด",
+  "newTitle": "Task ใหม่",
+  "newSubtitle": "{{name}} · {{machine}}",
+  "deletedSubtitle": "อ่านได้อย่างเดียว",
+  "failedBody": "ไฟล์ที่แก้ไปแล้วยังอยู่ ส่งข้อความเพื่อให้ {{name}} ทำต่อได้",
+  "runningCommand": "กำลังรัน {{target}}",
+  "separator": {
+    "today": "วันนี้ {{time}}",
+    "yesterday": "เมื่อวาน {{time}}",
+    "date": "{{date}} {{time}}"
+  },
+  "details": {
+    "title": "รายละเอียด Task",
+    "untitled": "ยังไม่มีข้อความ",
+    "titleLabel": "ชื่อ Task: {{title}} แตะเพื่อแก้",
+    "hintOffline": "แก้ชื่อได้เมื่อ Machine ออนไลน์",
+    "hintFirst": "ใช้ข้อความแรกไปก่อน Agent จะตั้งชื่อให้เมื่อ Turn แรกจบ แตะชื่อเพื่อตั้งเองก็ได้",
+    "offline": "Machine ออฟไลน์ แก้ชื่อและหยุด Turn ได้เมื่อเครื่องกลับมาออนไลน์ ข้อมูลด้านล่างเป็นของล่าสุดที่เครื่องนี้มี",
+    "stop": "หยุด Turn นี้",
+    "open": "เปิด Task",
+    "agent": "ไปหน้า Agent",
+    "context": {
+      "heading": "Context",
+      "of": "จาก {{window}} token · {{percent}}",
+      "bar": "ใช้ไป {{used}} จาก {{window}} token ({{percent}})",
+      "threshold": "เส้นที่ 70% คือจุดที่ Runtime ย่อ context ให้เอง",
+      "thresholdCompacted": "เส้นที่ 70% คือจุดที่ Runtime ย่อ context ให้เอง Task นี้ย่อไปแล้ว {{count}} ครั้ง",
+      "free": "ยังว่าง",
+      "freeHint": "เหลือให้ Turn ต่อไป",
+      "none": "ยังไม่มีตัวเลขแยกส่วน จะขึ้นเมื่อ Turn ถัดไปคุยกับ model",
+      "footer": "นับคร่าว ๆ จาก Turn ล่าสุด ราว 3 ตัวอักษรต่อ token ตัวเลขจริงของ Provider อาจต่างไปเล็กน้อย (ADR 0041)"
+    },
+    "parts": {
+      "system": {
+        "label": "คำสั่งของระบบ",
+        "hint": "วิธีทำงานและกติกาที่ Runtime ให้ Agent"
+      },
+      "memory": {
+        "label": "Memory",
+        "hint": "MEMORY.md ที่ติดไปทุก Turn"
+      },
+      "tools": {
+        "label": "เครื่องมือ",
+        "hint": "คำอธิบาย tool ที่ส่งไปทุกครั้ง"
+      },
+      "summary": {
+        "label": "สรุปจากการย่อ",
+        "hint": "แทนบทสนทนาช่วงก่อนหน้า"
+      },
+      "you": {
+        "label": "ข้อความของคุณ",
+        "hint": "ข้อความที่ส่งใน Task นี้"
+      },
+      "agent": {
+        "label": "คำตอบของ Agent",
+        "hint": "ข้อความและคำสั่งที่ Agent เรียก"
+      },
+      "results": {
+        "label": "ผลจากเครื่องมือ",
+        "hint": "ไฟล์ที่อ่านและผลของคำสั่ง"
+      }
+    },
+    "facts": {
+      "heading": "รายละเอียด",
+      "agent": "Agent",
+      "machine": "Machine",
+      "started": "เริ่ม",
+      "last": "เคลื่อนไหวล่าสุด",
+      "turns": "Turn"
+    },
+    "changed": {
+      "heading": "ไฟล์ที่ Agent แก้",
+      "none": "ยังไม่มีไฟล์ที่แก้ใน Task นี้",
+      "footer": "นับเฉพาะไฟล์ที่ Agent แก้ด้วย edit และ write ไฟล์ที่คำสั่ง bash แก้ดูจาก log ไม่ได้"
+    },
+    "sent": {
+      "heading": "ไฟล์ที่ส่งมา",
+      "none": "Agent ยังไม่ได้ส่งไฟล์มาใน Task นี้"
+    }
+  },
+  "openDetails": "ดูรายละเอียด Task",
+  "stoppedByYou": "คุณหยุด Turn นี้ · {{when}}"
+}

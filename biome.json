@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "files": { "includes": ["controller/src/**", "controller/scripts/**", "controller/app/**"] },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 240 },
+  "javascript": { "formatter": { "quoteStyle": "double", "trailingCommas": "all", "semicolons": "always", "arrowParentheses": "always", "bracketSpacing": true } },
+  "json": { "formatter": { "enabled": false } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "useExhaustiveDependencies": "error",
+        "useHookAtTopLevel": "error",
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "linter": {
+        "rules": {
+          "style": { "noNonNullAssertion": "off" },
+          "complexity": { "noCommaOperator": "off" },
+          "suspicious": { "noAssignInExpressions": "off", "useIterableCallbackReturn": "off" }
+        }
+      }
+    }
+  ],
+  "assist": { "enabled": false }
+}

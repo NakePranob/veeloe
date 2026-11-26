@@ -1,0 +1,24 @@
+[package]
+name = "veeloe-runtime-worker"
+description = "The per-Agent worker process of the Veeloe Runtime."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autobins = false
+
+[dependencies]
+async-trait.workspace = true
+veeloe-plugin-api = { path = "../plugin-api" }
+veeloe-runtime-core = { path = "../runtime-core" }
+veeloe-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+globset.workspace = true
+walkdir.workspace = true
+regex.workspace = true
+sha2 = "0.10"
+libc.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

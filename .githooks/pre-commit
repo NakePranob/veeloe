@@ -1,0 +1,7 @@
+#!/bin/sh
+# Biome (format + lint) on the staged files only, so a commit stays quick. `bun run check` covers the rest.
+bunx biome check --staged --no-errors-on-unmatched || {
+  echo >&2
+  echo "pre-commit: Biome found problems. Run \`bunx biome check --write\`, then stage the fixes." >&2
+  exit 1
+}

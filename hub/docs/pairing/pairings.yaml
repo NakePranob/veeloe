@@ -1,0 +1,43 @@
+post:
+  summary: Register a Machine with both sides' signatures
+  description: >-
+    Creates a Workspace and a Member when the Hub does not know the Controller.
+    The same request again answers the same. Open to any origin: the signatures
+    authenticate it, and no cookie is involved.
+  tags: [pairing]
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [machine, controller, expires, machineSig, controllerSig]
+          properties:
+            machine: { type: string, description: The Machine's public key, base64url }
+            controller: { type: string, description: The Controller's public key, base64url }
+            expires: { type: integer, format: int64, description: When the Machine's consent runs out, Unix seconds }
+            machineSig: { type: string, description: The Machine's signature from the Pairing link }
+            controllerSig: { type: string, description: The Controller's signature, bound to this Hub's URL }
+  responses:
+    "200":
+      description: Registered
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [workspace, member, machine]
+            properties:
+              workspace: { type: string, format: uuid }
+              member: { type: string }
+              machine: { type: string, format: uuid }
+    "400":
+      description: "`hub.pairing_invalid`: a signature is wrong, or the consent has run out"
+      content:
+        application/json:
+          schema: { $ref: '../common/schemas.yaml#/Error' }
+    "409":
+      description: "`hub.machine_taken`: this Machine belongs to another Workspace"
+      content:
+        application/json:
+          schema: { $ref: '../common/schemas.yaml#/Error' }

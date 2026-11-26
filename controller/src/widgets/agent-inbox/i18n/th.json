@@ -1,0 +1,22 @@
+{
+  "title": "Veeloe",
+  "start": "เริ่มคุยกับ {{name}}",
+  "noAgents": {
+    "title": "ยังไม่มี Agent",
+    "body": "สร้าง Agent ตัวแรกบน Machine ที่ผูกไว้",
+    "action": "สร้าง Agent"
+  },
+  "tabs": {
+    "all": "ทั้งหมด",
+    "needsYou": "รอคุณ",
+    "working": "ทำงาน",
+    "done": "เสร็จ"
+  },
+  "emptyTab": {
+    "needsYou": "ไม่มี Agent ที่รอคุณ",
+    "working": "ไม่มี Agent ที่กำลังทำงาน",
+    "done": "ยังไม่มี Agent ที่ทำเสร็จ"
+  },
+  "answer": "ตอบ",
+  "addBudget": "เพิ่ม Budget"
+}

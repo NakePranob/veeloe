@@ -1,0 +1,11 @@
+{
+  "waiting": "Needs you",
+  "working": "Working",
+  "failed": "Turn failed",
+  "done": "Done",
+  "offline": "Offline",
+  "new": "Not started",
+  "interrupted": "Turn interrupted",
+  "stuck": "Turn stalled",
+  "spent": "Budget used up"
+}

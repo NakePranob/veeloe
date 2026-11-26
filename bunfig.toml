@@ -1,0 +1,4 @@
+[install]
+# Metro resolves through a flat node_modules; Bun's isolated layout is not
+# something Expo supports in a workspace yet.
+linker = "hoisted"

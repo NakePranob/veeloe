@@ -1,0 +1,127 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"hub/internal/shared/protocol"
+)
+
+// Config loads from env (with dev-friendly defaults).
+type Config struct {
+	AppEnv            string // "development" | "production" — the one source of truth for env-gated behavior; see IsProd (validated in Load)
+	Port              string
+	DBDSN             string
+	LogLevel          string
+	DBMaxOpenConns    int
+	DBMaxIdleConns    int
+	DBConnMaxLifetime time.Duration
+
+	CORSAllowedOrigins []string
+	// TrustedProxies is which peers may set X-Forwarded-For — empty means
+	// "nobody", so ClientIP() is the address that actually connected.
+	TrustedProxies []string
+
+	// HubPublicURL is the URL Runtimes and Controllers dial, normalized. It is
+	// bound into every handshake signature, so it must be what clients really
+	// use (ADR 0013, 0016).
+	HubPublicURL      string
+	HandshakeTimeout  time.Duration
+	HeartbeatInterval time.Duration
+	// HubMaxQueueBytes is how much unsent data one connection may hold before
+	// its receiver is cut off.
+	HubMaxQueueBytes int
+	// go-scaffold:config-fields
+}
+
+// IsProd reports whether env-gated production behavior should be active
+// (e.g. hiding internal error details from responses). Everything that
+// isn't APP_ENV=production is treated the same way.
+func (c Config) IsProd() bool { return c.AppEnv == "production" }
+
+func Load() Config {
+	cfg := Config{
+		AppEnv:            env("APP_ENV", "development"),
+		Port:              env("PORT", "8080"),
+		DBDSN:             env("DB_DSN", "postgres://postgres:postgres@localhost:5432/hub?sslmode=disable"),
+		LogLevel:          env("LOG_LEVEL", "info"),
+		DBMaxOpenConns:    envInt("DB_MAX_OPEN_CONNS", 10),
+		DBMaxIdleConns:    envInt("DB_MAX_IDLE_CONNS", 10),
+		DBConnMaxLifetime: time.Duration(envInt("DB_CONN_MAX_LIFETIME_MIN", 5)) * time.Minute,
+
+		CORSAllowedOrigins: envList("CORS_ALLOWED_ORIGINS", "http://localhost:3000"),
+		// empty on purpose: trust nothing until you know which hop in front of
+		// this app is yours. See main.go's SetTrustedProxies call.
+		TrustedProxies: envList("TRUSTED_PROXIES", ""),
+
+		HandshakeTimeout:  envDuration("HUB_HANDSHAKE_TIMEOUT", 10*time.Second),
+		HeartbeatInterval: envDuration("HUB_HEARTBEAT_INTERVAL", 15*time.Second),
+		HubMaxQueueBytes:  envInt("HUB_MAX_QUEUE_BYTES", 4<<20),
+		// go-scaffold:config-load
+	}
+
+	// Fail closed on an unknown APP_ENV: an unrecognized value (typo, stale var)
+	// would otherwise be treated as non-prod and silently disable the prod guard
+	// (leaking error details). Panics here — the one place the binary loads
+	// config — so a bad value is caught at boot, not discovered in prod later.
+	if cfg.AppEnv != "development" && cfg.AppEnv != "production" {
+		panic(fmt.Sprintf("invalid APP_ENV %q — must be development or production", cfg.AppEnv))
+	}
+
+	// A wrong public URL fails every handshake, so it fails the boot instead.
+	// Production must say it; development defaults to this machine.
+	publicURL := env("HUB_PUBLIC_URL", "")
+	if publicURL == "" {
+		if cfg.IsProd() {
+			panic("HUB_PUBLIC_URL is required in production — the URL Runtimes and Controllers dial, e.g. wss://hub.example.com")
+		}
+		publicURL = "ws://localhost:" + cfg.Port
+	}
+	normalized, err := protocol.NormalizeHubURL(publicURL)
+	if err != nil {
+		panic(fmt.Sprintf("invalid HUB_PUBLIC_URL %q: %v", publicURL, err))
+	}
+	cfg.HubPublicURL = normalized
+
+	return cfg
+}
+
+func env(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
+
+func envList(k, def string) []string {
+	raw := strings.Split(env(k, def), ",")
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func envDuration(k string, def time.Duration) time.Duration {
+	if v := os.Getenv(k); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			return d
+		}
+		panic(fmt.Sprintf("invalid %s %q — want a positive duration such as 15s", k, v))
+	}
+	return def
+}
+
+func envInt(k string, def int) int {
+	if v := os.Getenv(k); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}

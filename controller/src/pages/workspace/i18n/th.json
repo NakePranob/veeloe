@@ -1,0 +1,24 @@
+{
+  "machines": {
+    "online": "ออนไลน์ {{online}} จาก {{count}}"
+  },
+  "agents": {
+    "line": "รอคุณ {{waiting}} · ทำงาน {{working}}"
+  },
+  "tokens": {
+    "title": "token วันนี้",
+    "detail": "ทุก Machine",
+    "chart": "token 7 วันล่าสุด ทุก Machine",
+    "bar": "{{day}}: {{tokens}} token"
+  },
+  "devices": {
+    "title": "เครื่องของฉัน",
+    "linkSecond": "Link เครื่องที่สองไว้"
+  },
+  "thisDevice": "ตั้งค่าเครื่องนี้",
+  "push": {
+    "title": "แจ้งเตือนแบบ push",
+    "detail": "Approval และ Turn ที่จบ ไม่มีข้อความ Task"
+  },
+  "note": "มีผลเฉพาะเครื่องนี้ เครื่องอื่นของคุณตั้งแยกกัน ภาษาเปลี่ยนได้ที่ปุ่มขวาบน"
+}

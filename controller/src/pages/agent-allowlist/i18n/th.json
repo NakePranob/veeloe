@@ -1,0 +1,54 @@
+{
+  "title": "Allowlist",
+  "subtitle_one": "{{name}} · {{count}} รายการ",
+  "subtitle_other": "{{name}} · {{count}} รายการ",
+  "remove": "เอาออก",
+  "offline": "Machine ออฟไลน์อยู่ แก้ Allowlist ได้เมื่อเครื่องกลับมาออนไลน์",
+  "notAWall": "Allowlist ไม่ใช่กำแพง Agent ที่โดนหลอกแก้ไฟล์ได้โดยไม่ต้องขอ เช่นแก้ script test ใน package.json แล้วรัน npm test ที่อยู่ในรายการ กำแพงจริงคือ sandbox กับ Egress (ADR 0030, 0008)",
+  "missing": {
+    "title": "ไม่พบ Agent นี้",
+    "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
+  },
+  "runs": {
+    "heading": "รันได้เลยไม่ต้องขอ Approval",
+    "footer": "เทียบทีละคำจากต้นคำสั่ง npm test ครอบ npm test -- --watch คำสั่งที่ต่อด้วย && ; | หรือ & ต้องผ่านทุกท่อน และ $( ), backtick กับ eval ขอ Approval ทุกครั้ง รายการอย่าง git push ครอบ git push --force ด้วย ตั้งให้แคบเท่าที่ตั้งใจ",
+    "empty": "ยังไม่มีรายการ",
+    "emptyDetail": "ทุกคำสั่งของ Agent นี้ต้องขอ Approval"
+  },
+  "add": {
+    "label": "เพิ่ม",
+    "placeholder": "เช่น npm test",
+    "action": "เพิ่ม"
+  },
+  "invalid": {
+    "title": "เพิ่มไม่ได้",
+    "body": "ใส่คำสั่งเดียวเท่านั้น ห้ามต่อด้วย && ; หรือ | และห้ามมี $( ), backtick หรือ eval"
+  },
+  "duplicate": {
+    "title": "มีรายการนี้แล้ว"
+  },
+  "wide": {
+    "title": "{{entry}} กว้างมาก",
+    "message": "รายการ {{entry}} ครอบทุกคำสั่งที่ขึ้นต้นด้วย {{entry}} ไม่ว่าจะตามด้วยอะไร ตั้งให้แคบเท่าที่ตั้งใจ เช่น {{entry}} test",
+    "action": "เพิ่มต่อ"
+  },
+  "try": {
+    "heading": "ลองคำสั่ง",
+    "label": "คำสั่งตัวอย่าง",
+    "invalidDraft": "รายการที่พิมพ์ยังเพิ่มไม่ได้ จึงยังไม่นับในผลข้างล่าง",
+    "sampleDefault": "npm test -- --watch",
+    "coveredBy": "ครอบโดย {{entry}}",
+    "wouldCover": "ถ้าเพิ่ม {{entry}} จะครอบ",
+    "notCovered": "ไม่อยู่ใน Allowlist",
+    "runs": "รันได้เลยไม่ต้องขอ Approval",
+    "wouldRun": "รันได้เลยถ้าเพิ่ม {{entry}}",
+    "asks": "ต้องขอ Approval",
+    "asksAlways": "ต้องขอ Approval ทุกครั้ง: แยกท่อนให้แน่ใจไม่ได้ ($( ), backtick หรือ eval)",
+    "builtIn": "ไม่ต้องอยู่ใน Allowlist: แค่แสดงผลหรืออ่าน (ADR 0075)"
+  },
+  "cancel": "ยกเลิก",
+  "authenticate": {
+    "add": "เพิ่ม {{entry}} เข้า Allowlist ของ {{name}}",
+    "remove": "ลบ {{entry}} ออกจาก Allowlist ของ {{name}}"
+  }
+}

@@ -1,0 +1,17 @@
+# Veeloe's AppArmor profile for bubblewrap (ADR 0069, issue #49).
+#
+# Ubuntu 24.04 and later set kernel.apparmor_restrict_unprivileged_userns=1:
+# only a program with a profile that allows userns may create an unprivileged
+# user namespace. The OS sandbox wraps every worker with bwrap (ADR 0008), so
+# bwrap needs it and nothing else does.
+#
+# Installed as /etc/apparmor.d/veeloe-bwrap by `sudo veeloe doctor
+# --fix-apparmor`, which also loads it with `apparmor_parser -r`. The same text
+# is embedded in the binary, so a release needs no repository beside it.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile veeloe-bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}

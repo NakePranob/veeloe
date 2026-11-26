@@ -1,0 +1,204 @@
+{
+  "description": "Allowlist decisions shared by the Rust Runtime and protocol-ts (ADR 0030, 0075): allowed is whether the command runs without an Approval.",
+  "vectors": [
+    {
+      "command": "ls -la; echo \"---\"; cat MEMORY.md 2>/dev/null; echo \"---\"; ls memory 2>/dev/null",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "grep -rn TODO src | sort | uniq -c",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "find . -name '*.ts' -type f",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "rg -n foo src",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "git status && git log --oneline -5",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "git show HEAD~1",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "git branch -a",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "git rev-parse --show-toplevel",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "date +%Y-%m-%d",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "which node",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "make >/dev/null 2>&1",
+      "allowlist": [
+        "make"
+      ],
+      "allowed": true
+    },
+    {
+      "command": "npm test 2>&1",
+      "allowlist": [
+        "npm test"
+      ],
+      "allowed": true
+    },
+    {
+      "command": "cat x >>/dev/null",
+      "allowlist": [],
+      "allowed": true
+    },
+    {
+      "command": "find . -exec rm {} ;",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "find . -e\\xec rm {} +",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "find . '-delete'",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "rg --pre ./evil foo",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "sort --compress-program=sh x",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "date -s 2020-01-01",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "date -us 2020",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "git branch -D main",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "git branch --set-upstream-to=origin/x",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "git -c diff.external=sh diff",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "git commit -m x",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "git push",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "echo x | sh",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "rm -rf dist",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "npm test",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "echo hi > notes.txt",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "cat x >/dev/nullx",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "cat x >/dev/null/../../etc/passwd",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "cat x >\"/dev/null\"",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "cat x >&3",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "cat x >| /dev/null",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "cat x 2>/dev/null </etc/shadow",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "echo $(rm -rf dist)",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "eval echo hi",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "FOO=bar ls",
+      "allowlist": [],
+      "allowed": false
+    },
+    {
+      "command": "",
+      "allowlist": [],
+      "allowed": false
+    }
+  ]
+}

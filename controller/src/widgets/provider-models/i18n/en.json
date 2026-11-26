@@ -1,0 +1,16 @@
+{
+  "machine": {
+    "offline": "This Machine is offline. Start veeloe on it first."
+  },
+  "asking": "Asking the Machine which Providers it has",
+  "provider": {
+    "heading": "Provider",
+    "none": "This Machine has no Provider yet",
+    "command": "veeloe provider add --name <name> --url <base url>"
+  },
+  "modelFilter": "Search models",
+  "noMatch": "No model matches",
+  "modelHeading": "{{provider}} models · {{count}}",
+  "contextFooter": "The figure on the right is each model's context",
+  "pickCancel": "Cancel"
+}
