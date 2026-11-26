@@ -336,3 +336,22 @@ test("a Stop from the Controller ends the Turn and kills the command it was runn
   expect((next.body as { body: unknown }).body).toEqual({ reason: "done" });
   owner.client.stop();
 }, 90_000);
+
+test("a signed Schedule is kept by the Machine and a run-now round starts a Task that says which Trigger it came from", async () => {
+  const owner = controller();
+  await owner.ready;
+  owner.send("agent.create", { id: "agent-schedule", name: "Scheduler", provider: "main", model: "model-a" });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-schedule"));
+
+  owner.send("trigger.set", { agent: "agent-schedule", trigger: { id: "tr_e2e", kind: "schedule", text: "check the CI", schedule: { daily: { at: "09:00" } } } });
+  const listed = await owner.waitFor((m) => m.type === "trigger.listed" && m.body.triggers.length === 1);
+  expect(listed.type === "trigger.listed" && listed.body.triggers[0]).toMatchObject({ id: "tr_e2e", member: "member-1", paused: false, suspended: false });
+  expect(listed.type === "trigger.listed" && typeof listed.body.triggers[0]?.nextRunAt).toBe("number");
+
+  owner.send("trigger.run", { agent: "agent-schedule", id: "tr_e2e" });
+  const started = await owner.waitFor((m) => m.type === "task.event" && m.body.kind === "turn.started" && (m.body.body as { trigger?: { id?: string } }).trigger?.id === "tr_e2e");
+  expect(started.type === "task.event" && started.body.body).toMatchObject({ member: "member-1", trigger: { kind: "schedule", id: "tr_e2e" } });
+  // The round's Task ends like any other, in the name of whoever set the Schedule.
+  await owner.waitFor((m) => m.type === "task.event" && m.task === started.task && m.body.kind === "turn.ended");
+  owner.client.stop();
+}, 60_000);
