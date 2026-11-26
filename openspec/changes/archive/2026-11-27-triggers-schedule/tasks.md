@@ -30,6 +30,6 @@
 
 ## 6. ตรวจ
 
-- [ ] 6.1 `bun run check` และ `bun run test` ผ่าน
+- [x] 6.1 `bun run check` และ `bun run test` ผ่าน
 - [x] 6.2 test:e2e ผ่าน relay: `trigger.set` แล้ว `trigger.run` ได้ Task ใหม่ที่ `turn.started` มี `trigger`; ตรวจด้วย `bun run test:e2e`
-- [ ] 6.3 ลองบน Simulator: สร้าง Schedule รันทันที แล้วเห็น Task ใหม่
+- [x] 6.3 ลองบน Simulator: สร้าง Schedule รันทันที แล้วเห็น Task ใหม่
