@@ -19,7 +19,7 @@ bunx eas-cli build --profile preview --platform ios      # an internal build to 
 bunx eas-cli build --profile production --platform ios   # the App Store build (bumps the build number itself)
 ```
 
-The Controller ships through EAS (ADR 0025), built by hand from the maintainer's machine during v0.1: the profiles are in `eas.json`, and the Expo and Apple credentials stay in the maintainer's EAS account, never in git. A workflow that builds it in CI, with `EXPO_TOKEN` in a GitHub environment, comes after v0.1.
+The Controller ships through EAS (ADR 0025), built by hand from the maintainer's machine: the profiles are in `eas.json`, and the Expo and Apple credentials stay in the maintainer's EAS account, never in git. A workflow that builds it in CI, with `EXPO_TOKEN` in a GitHub environment, comes later.
 
 Native modules are in this build, so it does not run in Expo Go. `ios/` and `android/` are generated (Continuous Native Generation), so never edit them by hand: configure native behaviour in `app.json`.
 

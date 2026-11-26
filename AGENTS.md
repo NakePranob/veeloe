@@ -11,16 +11,18 @@ GitHub environments or the host, never in git.
 architecture decisions: do not contradict one; if a change has to, say so and
 change the ADR in the same commit. `openspec/` holds the specs and changes,
 versioned with the code; it starts empty until the build restarts.
-GitHub Issues track the work of each version (ADR 0048 sets what each version
-holds): open the next change from an issue, and close the issue in the commit
-that archives it.
+GitHub Issues hold the work still to do, with no version attached (ADR 0078:
+there are no phases, everything is `develop`): open the next change from an
+issue, and close the issue in the commit that archives it. Before anyone but the
+Owner uses Veeloe, the conditions in ADR 0078 must all hold (E2E, a signed
+updater, Linux checked on a real machine).
 
 GitHub Releases are for the Runtime only — its updater takes the latest
 release as its own (ADR 0009, 0025). The Hub ships as an image on GHCR, the
 Controller through EAS.
 
-To ship: bump nothing by hand, and push a version tag from `develop` (`git tag v0.1.0`,
-`git push origin v0.1.0`; `v0.1.0-rc.1` for a pre-release that `releases/latest` skips).
+To ship: bump nothing by hand, and push a version tag from `develop` (`git tag v0.2.0`,
+`git push origin v0.2.0`; `v0.2.0-rc.1` for a pre-release that `releases/latest` skips).
 `runtime-release.yml` builds `veeloe` for macOS arm64 and Linux x86_64 and arm64,
 stamps the tag's version into it, and publishes them with `SHA256SUMS` and
 `packaging/install.sh`; `hub-image.yml` pushes `ghcr.io/<owner>/veeloe-hub` with the
@@ -174,19 +176,22 @@ Thai, and to quote the Thai copy the change is about. A body usually goes:
 A commit that finishes an issue ends its body with `Closes #12` (one line per
 issue), so merging it into `develop`, the default branch, closes the issue.
 
-## Branches and pull requests on develop
+## Commits on develop
 
-Since v0.1 shipped, every change goes to `develop` through a branch and a pull
-request: the `develop` ruleset refuses a direct push, a force-push and deleting
-the branch, and requires the `english` check (`.github/workflows/pr-title.yml`).
-Run `bun run check` before opening the PR; CI runs on it too.
+The maintainer commits straight to `develop`, whatever the work is for (ADR
+0078): no branch, no PR. Run `bun run check` before pushing, because nothing on
+GitHub gates the push — CI runs after it lands, and a red run is fixed with the
+next commit. The `develop` ruleset only refuses force-pushes and deleting the
+branch.
 
 ## Pull requests
 
 Outside contributors still open a PR into `develop`, and `main` is promoted
 from `develop` through a PR, so nothing targets `main` directly — dependabot
-included (`target-branch: develop`). `develop` merges by squash only, and the
-ruleset requires the `english` check (`.github/workflows/pr-title.yml`). `main` is
+included (`target-branch: develop`). `develop` merges a PR by squash only; check
+that the `english` check (`.github/workflows/pr-title.yml`) is green before
+merging, because the ruleset does not require it (it would refuse the
+maintainer's own direct commits). `main` is
 guarded by a ruleset (no direct push, no force-push, no deletion) and merges by
 merge commit only, so promoting `develop` never forks the two histories. No
 approval is required.
