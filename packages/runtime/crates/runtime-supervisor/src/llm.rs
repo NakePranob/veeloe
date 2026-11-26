@@ -41,6 +41,9 @@ pub struct Target {
     pub url: String,
     pub model: String,
     pub headers: Vec<(String, String)>,
+    /// The Provider runs `web_search` on its own servers, so the Agent can
+    /// search without any Egress (ADR 0040). Only Anthropic's API has it.
+    pub web_search: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -158,6 +161,15 @@ impl LlmProxy {
             set_header(&mut headers, name, value);
         }
         body["model"] = json!(target.model);
+        // ponytail: a Turn the Provider pauses mid-search (`pause_turn`) ends
+        // there; resume it when Agents search enough for that to matter.
+        if target.web_search {
+            if let Some(tools) = body.get_mut("tools").and_then(Value::as_array_mut) {
+                tools.push(
+                    json!({ "type": "web_search_20250305", "name": "web_search", "max_uses": 5 }),
+                );
+            }
+        }
 
         let url = format!("{}{}{}", target.url, pathname, search);
         let answer = match self.client.post(&url, headers, body.to_string()).await {

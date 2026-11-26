@@ -65,6 +65,7 @@ fn target() -> Target {
         url: "https://api.anthropic.test".into(),
         model: "claude-test".into(),
         headers: vec![("x-api-key".into(), "sk-the-key".into())],
+        web_search: false,
     }
 }
 
@@ -183,6 +184,36 @@ fn a_429_from_the_provider_is_rate_limited_and_keeps_its_retry_after() {
         veeloe_runtime_core::header(&response.headers, "retry-after"),
         Some("30")
     );
+}
+
+#[test]
+fn only_an_anthropic_provider_gets_its_web_search_tool_added() {
+    let ok = HttpAnswer {
+        status: 200,
+        headers: Vec::new(),
+        body: json!({ "usage": { "input_tokens": 1, "output_tokens": 1 } }).to_string(),
+    };
+    let mut with_tools = request();
+    with_tools.body =
+        json!({ "model": "agent", "messages": [], "tools": [{ "name": "bash" }] }).to_string();
+    for (web_search, expected) in [(true, 2), (false, 1)] {
+        let client = FakeClient::answering(ok.clone());
+        let proxy = LlmProxy::new(Arc::clone(&client) as Arc<dyn HttpClient>).route(
+            move |_agent, _task| {
+                Some(Route::Ready(Target {
+                    web_search,
+                    ..target()
+                }))
+            },
+        );
+        block().block_on(proxy.handle("a1", &with_tools));
+        let sent: Value = serde_json::from_str(&client.calls()[0].2).expect("json");
+        let tools = sent["tools"].as_array().expect("tools");
+        assert_eq!(tools.len(), expected, "web_search {web_search}");
+        if web_search {
+            assert_eq!(tools[1]["name"], "web_search");
+        }
+    }
 }
 
 #[test]

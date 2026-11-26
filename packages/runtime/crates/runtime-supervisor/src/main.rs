@@ -662,6 +662,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
                             url: provider.url.clone(),
                             model,
                             headers: upstream_headers(&provider, task),
+                            web_search: provider.preset.as_deref() == Some("anthropic"),
                         },
                     ),
                     None => veeloe_runtime_supervisor::llm::Route::Missing,

@@ -345,6 +345,9 @@ impl Worker {
         )))?;
         tools.register(Arc::new(FileTools::new(&workdir, false)))?;
         tools.register(Arc::new(MemoryTool::new(&workdir)))?;
+        tools.register(Arc::new(crate::tools::web_fetch::WebFetchTool::new(
+            config.proxy.clone(),
+        )))?;
 
         let transport = Arc::new(IpcTransport::new(Arc::clone(&link)));
         let llm = Arc::new(AnthropicLlm::new(
