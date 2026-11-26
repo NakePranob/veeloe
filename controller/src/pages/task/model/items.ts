@@ -65,7 +65,7 @@ export type Approval = {
 export type Item =
   | { key: string; kind: "member"; text: string }
   | { key: string; kind: "agent"; text: string }
-  | { key: string; kind: "error"; code: string }
+  | { key: string; kind: "error"; code: string; retryAt?: number }
   /** Commands run back to back, with no words of the Agent between them. */
   | { key: string; kind: "tools"; calls: ToolCall[] }
   | { key: string; kind: "approval"; approval: Approval }
@@ -122,6 +122,7 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       content?: unknown;
       reason?: string;
       code?: string;
+      retryAfter?: unknown;
       request?: string;
       kind?: string;
       domain?: string;
@@ -219,7 +220,8 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       for (const call of calls.values()) if (call.state === "running") call.state = "unfinished";
       // An Approval its Turn ended before anyone answered is closed, as the prototype's `approvals` does.
       for (const { item } of approvals.values()) if (item.approval.status === "open") item.approval.status = "closed";
-      if (body.reason === "error") out.push({ key, kind: "error", code: body.code ?? "provider.failed" });
+      // The Provider's `Retry-After`, in seconds from when the Turn ended (issue #55).
+      if (body.reason === "error") out.push({ key, kind: "error", code: body.code ?? "provider.failed", ...(typeof body.retryAfter === "number" && event.at !== undefined && { retryAt: event.at + body.retryAfter * 1000 }) });
       // Only edit and write count: a file bash changed cannot be told from the log, and the row says so.
       const files = [...new Set(turnCalls.filter((c) => (c.tool === "edit" || c.tool === "write") && c.state === "ok" && c.target).map((c) => c.target))];
       if (files.length) out.push({ key: `${key}-changes`, kind: "changes", files });

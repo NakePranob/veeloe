@@ -3,7 +3,7 @@ import { View, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { formatNumber } from "../../../shared/lib";
-import { Button, Card, Chip, column, Input, Label, space, Text } from "../../../shared/ui";
+import { Button, Card, Chip, column, Input, Label, space, Text, TextLink } from "../../../shared/ui";
 import type { ContextUsage } from "../model/items";
 import type { ComposerState } from "../model/use-composer";
 import { ContextMeter } from "./ContextMeter";
@@ -45,7 +45,7 @@ export function Composer({ composer, agentName, readOnly, online, canSend, conte
   const t = useT("task");
   const insets = useSafeAreaInsets();
   const [contextOpen, setContextOpen] = useState(false);
-  const { message, attachments, busy, stopping } = composer;
+  const { message, attachments, busy, stopping, steering } = composer;
   if (readOnly)
     return (
       <View style={[column, { paddingHorizontal: space.xl, paddingTop: space.xs, paddingBottom: space.lg + insets.bottom }]}>
@@ -79,15 +79,24 @@ export function Composer({ composer, agentName, readOnly, online, canSend, conte
             {t("offline")}
           </Label>
         )}
+        {/* Send answers the Approval while this shows; Cancel goes back to the card's own choices. */}
+        {steering && (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm, paddingHorizontal: space.sm, paddingBottom: space.sm }}>
+            <Label icon="info" style={{ flexShrink: 1 }}>
+              {t("steering.title")}
+            </Label>
+            <TextLink role="button" strong label={t("steering.cancel")} onPress={() => composer.steer(null)} />
+          </View>
+        )}
         {/* The boards' composer: a grey pill track with attach on the left, the field, and one round ink action. */}
         <Card style={{ flexDirection: "row", alignItems: "center", gap: space.xs, padding: space.xs, borderRadius: 26 }}>
           <View style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
-            <Button label={t("attach")} icon="add" variant="ghost" size="large" disabled={online === false} onPress={() => void composer.attach()} />
+            <Button label={t("attach")} icon="add" variant="ghost" size="large" disabled={online === false || !!steering} onPress={() => void composer.attach()} />
           </View>
           <Input
             ref={inputRef}
             aria-label={t("placeholder", { name: agentName })}
-            placeholder={busy ? t("queued") : t("placeholder", { name: agentName })}
+            placeholder={steering ? t("steering.placeholder", { name: agentName }) : busy ? t("queued") : t("placeholder", { name: agentName })}
             value={composer.text}
             onChangeText={composer.setText}
             multiline
@@ -96,10 +105,10 @@ export function Composer({ composer, agentName, readOnly, online, canSend, conte
           <ContextMeter usage={contextUsage} onPress={() => setContextOpen(!contextOpen)} />
           <View style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
             {/* A working Agent with nothing typed offers the brake instead of send. */}
-            {busy && !message ? (
+            {busy && !message && !steering ? (
               <Button label={stopping ? t("stop.stopping") : t("stop.button")} icon="stopped" variant="primary" size="large" disabled={online === false || !canSend || stopping} onPress={() => void composer.stop()} />
             ) : (
-              <Button label={t("send")} icon="send" variant="primary" size="large" disabled={(!message && attachments.length === 0) || !canSend || composer.sending || online === false} onPress={() => void composer.send()} />
+              <Button label={t("send")} icon="send" variant="primary" size="large" disabled={(!message && (attachments.length === 0 || !!steering)) || !canSend || composer.sending || online === false} onPress={() => void composer.send()} />
             )}
           </View>
         </Card>

@@ -111,6 +111,12 @@ impl Llm for AnthropicLlm {
 
         if answer.status != 200 {
             let code = header(&answer.headers, PROXY_ERROR_HEADER).unwrap_or("provider.failed");
+            if code == "provider.rate_limited" {
+                // ponytail: seconds only; an HTTP-date Retry-After is dropped.
+                let seconds = header(&answer.headers, "retry-after")
+                    .and_then(|value| value.trim().parse().ok());
+                return Err(LlmError::RateLimited(seconds));
+            }
             return Err(LlmError::Failed(code.to_string()));
         }
         final_message(&answer.body)

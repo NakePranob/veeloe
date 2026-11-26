@@ -1,4 +1,5 @@
 import { formatList } from "../../../shared/lib";
+import type { Item } from "./items";
 
 export type Decision = "approve" | "deny" | "always";
 export type Answer = { decision: Decision; allowAlways?: string[] };
@@ -48,4 +49,19 @@ export async function respond({
   if (prompt === null) return !!onAnswer({ decision });
   const answer = { decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) };
   return (await sign(prompt, () => onAnswer(answer))).status === "sent";
+}
+
+/**
+ * The Approval the composer answers while it steers: kept only while that Approval is still open. Answered
+ * on another device or timed out, it is gone, and what was typed stays in the field as an ordinary message.
+ */
+export function steeringOf(log: readonly Item[], request: string | null): string | null {
+  if (request === null) return null;
+  return log.some((item) => item.kind === "approval" && item.approval.request === request && item.approval.status === "open") ? request : null;
+}
+
+/** "Tell it what to do instead": a refusal that carries the typed words to the Agent in the same Turn. */
+export function redirectOf(text: string): { decision: "redirect"; message: string } | null {
+  const message = text.trim();
+  return message ? { decision: "redirect", message } : null;
 }

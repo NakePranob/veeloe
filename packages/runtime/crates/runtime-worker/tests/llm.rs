@@ -174,6 +174,23 @@ fn a_refusal_from_the_supervisor_carries_its_own_code() {
 }
 
 #[test]
+fn a_rate_limited_provider_says_when_to_try_again() {
+    let transport = Arc::new(FakeTransport::with(vec![Ok(LlmHttpResponse {
+        status: 429,
+        headers: vec![
+            ("x-veeloe-error".into(), "provider.rate_limited".into()),
+            ("retry-after".into(), "30".into()),
+        ],
+        body: "{}".into(),
+    })]));
+    let llm = AnthropicLlm::new(Arc::clone(&transport) as Arc<dyn LlmTransport>);
+    assert_eq!(
+        send(&llm, request()).unwrap_err(),
+        LlmError::RateLimited(Some(30))
+    );
+}
+
+#[test]
 fn an_unreachable_supervisor_is_provider_unreachable() {
     let transport = Arc::new(FakeTransport::with(vec![Err(LlmError::Failed(
         "provider.unreachable".into(),

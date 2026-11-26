@@ -12,7 +12,8 @@ const COMMANDS: [(&str, &str); 10] = [
   Start the Runtime: it connects to the Hub and runs every Agent on this Machine.
   The first time, at a terminal, it pairs this Machine and adds a Provider first.
 
-  veeloe                               start (or set up, the first time)",
+  veeloe                               start (or set up, the first time)
+  veeloe --version                     print this Runtime's version",
     ),
     (
         "pair",

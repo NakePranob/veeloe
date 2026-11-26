@@ -735,7 +735,12 @@ async fn run_turn(
                 } else {
                     error.code()
                 };
-                return end(&state, &task, &starter, "error", Some(code));
+                let mut body = json!({ "reason": "error", "code": code });
+                if let LlmError::RateLimited(Some(seconds)) = error {
+                    body["retryAfter"] = json!(seconds);
+                }
+                state.append(&task, &starter, "turn.ended", body, None)?;
+                return Ok(());
             }
         };
         // An answer that arrived after the Stop is not the Turn's answer: it is

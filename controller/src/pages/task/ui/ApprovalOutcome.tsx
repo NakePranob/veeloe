@@ -27,6 +27,8 @@ export function ApprovalOutcome({ approval, target, me }: { approval: Approval; 
   // A permanent yes says so and what it added. Only a domain answer carries "always": a command's allow-always
   // goes out as an approve with entries, and the log does not say which entries (ponytail: show it when it does).
   const always = approval.answeredBy?.decision === "always";
+  // A no that told the Agent what to do instead says so, not just "denied" (issue #55).
+  const redirected = approval.answeredBy?.decision === "redirect";
   const member = approval.answeredBy?.member;
   const marks = { outcome: mark(0), target: mark(1) };
   const line = always
@@ -40,7 +42,7 @@ export function ApprovalOutcome({ approval, target, me }: { approval: Approval; 
           : t("approval.outcome", marks);
   const parts: ReactNode[] = [
     <Text key="outcome" variant="footnote" strong>
-      {always ? t("approval.always") : t(outcome.key)}
+      {always ? t("approval.always") : redirected ? t("approval.redirected") : t(outcome.key)}
     </Text>,
     <Text key="target" variant="caption" mono>
       {target}

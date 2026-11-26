@@ -85,7 +85,8 @@
     "outcomeBy": "{{outcome}} by {{member}} · {{target}}",
     "outcomeExpired": "{{outcome}} counted as denied · {{target}}",
     "outcomeAlways": "{{outcome}} · added {{target}} to Egress",
-    "outcomeByYou": "{{outcome}} by you · {{target}}"
+    "outcomeByYou": "{{outcome}} by you · {{target}}",
+    "redirected": "Told to do something else"
   },
   "openAgent": "Open {{name}}",
   "stopped": "{{member}} stopped this Turn · {{when}}",
@@ -113,6 +114,7 @@
   "changes_other": "Changed {{count}} files",
   "changesNote": "Counts only files the Agent changed with its edit and write tools",
   "failedTitle": "Turn failed",
+  "retryAt": "You can try again at {{time}}.",
   "emptyTitle": "What should {{name}} help with?",
   "waitingHeader": "Waiting for your answer",
   "budgetHeader": "Today's Budget is used up",
@@ -196,5 +198,10 @@
     }
   },
   "openDetails": "Task details",
-  "stoppedByYou": "You stopped this Turn · {{when}}"
+  "stoppedByYou": "You stopped this Turn · {{when}}",
+  "steering": {
+    "title": "Answering the Approval: telling it what to do instead",
+    "cancel": "Cancel",
+    "placeholder": "Tell {{name}} what to do instead"
+  }
 }

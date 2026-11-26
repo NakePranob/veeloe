@@ -85,7 +85,8 @@
     "outcomeBy": "{{outcome}} โดย {{member}} · {{target}}",
     "outcomeExpired": "{{outcome}} นับว่าปฏิเสธ · {{target}}",
     "outcomeAlways": "{{outcome}} · เพิ่ม {{target}} เข้า Egress",
-    "outcomeByYou": "{{outcome}} โดยคุณ · {{target}}"
+    "outcomeByYou": "{{outcome}} โดยคุณ · {{target}}",
+    "redirected": "บอกให้ทำอย่างอื่นแทน"
   },
   "openAgent": "เปิดหน้า {{name}}",
   "stopped": "{{member}} หยุด Turn นี้ · {{when}}",
@@ -113,6 +114,7 @@
   "changes_other": "แก้ {{count}} ไฟล์",
   "changesNote": "นับเฉพาะไฟล์ที่ Agent แก้ด้วย tool แก้ไฟล์และเขียนไฟล์",
   "failedTitle": "Turn ล้มเหลว",
+  "retryAt": "ลองได้อีกตอน {{time}}",
   "emptyTitle": "ให้ {{name}} ช่วยอะไรดี?",
   "waitingHeader": "รอคุณตอบ",
   "budgetHeader": "Budget วันนี้หมด",
@@ -196,5 +198,10 @@
     }
   },
   "openDetails": "ดูรายละเอียด Task",
-  "stoppedByYou": "คุณหยุด Turn นี้ · {{when}}"
+  "stoppedByYou": "คุณหยุด Turn นี้ · {{when}}",
+  "steering": {
+    "title": "ตอบ Approval: บอกให้ทำอย่างอื่นแทน",
+    "cancel": "ยกเลิก",
+    "placeholder": "บอก {{name}} ว่าให้ทำอะไรแทน"
+  }
 }

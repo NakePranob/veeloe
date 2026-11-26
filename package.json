@@ -17,6 +17,7 @@
     "dev:reset-sim": "bun scripts/dev.ts reset-sim",
     "dev:restart": "bun scripts/dev.ts restart",
     "dev:seed": "bun scripts/dev.ts seed",
+    "dev:reload": "bun scripts/dev.ts reload",
     "dev:ios": "bun e2e/ios-flow-harness.ts serve",
     "test": "cd packages/protocol-ts && bun test && cd ../../controller && bun test ./src ./scripts",
     "test:e2e": "cd e2e && bun test",

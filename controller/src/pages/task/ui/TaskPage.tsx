@@ -55,12 +55,12 @@ export function TaskPage() {
     atEnd.current = true;
     toEnd(true);
   };
-  const composer = useComposer({ task, screen, link, events: events ?? undefined, onSend: followEnd });
   // The log only changes with its events; the clock matters only while an Approval is open and can still time out.
   const settled = useMemo(() => (events ? items(events, Date.now()) : null), [events]);
   const ticking = !!settled?.items.some((item) => item.kind === "approval" && item.approval.status === "open");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `ticking && now` makes the clock a dependency only while it can change the log
   const log = useMemo(() => (events && ticking ? items(events, now) : settled), [events, ticking, ticking && now, settled]);
+  const composer = useComposer({ task, screen, link, events: events ?? undefined, log: log?.items, onSend: followEnd });
 
   // A Machine no longer paired (or a deleted Agent's unknown one) still shows the log, read from the device.
   if (!screen || !events || !pending || !log) return <Stack.Screen options={{ title: t("title") }} />;
@@ -97,7 +97,10 @@ export function TaskPage() {
         me={machine?.member_id}
         // Answering takes a fresh unlock in v0.3 (ADR 0012); the Controller already asks for it when it unlocks.
         onAnswer={({ decision, allowAlways }) => (link && machine ? link.answerApproval(machine, { agent: agent.id, task, request: item.approval.request, decision, ...(allowAlways && allowAlways.length > 0 && { allowAlways }) }) : null)}
-        onSteer={() => input.current?.focus()}
+        onSteer={() => {
+          composer.steer(item.approval.request);
+          input.current?.focus();
+        }}
       />
     ) : item.kind === "stopped" ? (
       <StoppedLine member={item.member} me={machine?.member_id} at={item.at} now={now} />
@@ -112,7 +115,7 @@ export function TaskPage() {
     ) : item.code === "budget.exhausted" ? (
       <BudgetCard machine={machineName} agent={agent} readOnly={readOnly} />
     ) : (
-      <FailedCard code={item.code} agentName={agent.name} />
+      <FailedCard code={item.code} retryAt={item.retryAt} agentName={agent.name} />
     );
 
   const tail = pending.length > 0 || working;

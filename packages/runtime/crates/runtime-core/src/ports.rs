@@ -28,6 +28,10 @@ pub struct LlmReply {
 pub enum LlmError {
     #[error("{0}")]
     Failed(String),
+    /// The Provider answered 429: its quota, not the Budget. The seconds its
+    /// `Retry-After` gave, when it gave a number (issue #55).
+    #[error("provider.rate_limited")]
+    RateLimited(Option<u64>),
 }
 
 impl LlmError {
@@ -35,6 +39,7 @@ impl LlmError {
     pub fn code(&self) -> &str {
         match self {
             Self::Failed(code) => code,
+            Self::RateLimited(_) => "provider.rate_limited",
         }
     }
 }

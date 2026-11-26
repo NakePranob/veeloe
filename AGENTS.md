@@ -114,6 +114,7 @@ bun run dev:unpair     # `veeloe unpair`, to pair this Machine from scratch agai
 bun run dev:reset-sim  # wipe the simulator app's database (backup in .dev/backup/), then re-pair
 bun run dev:restart    # restart the Runtime (e.g. after pairing rotated the Machine key)
 bun run dev:seed       # one Agent (qa-memory / Pang) with a MEMORY.md to look at
+bun run dev:reload     # reload every app on Metro in full, not Fast Refresh (needs bun run dev)
 bun run dev:down       # stop the three processes and Postgres
 bun run dev:ios        # e2e/ios-flow-harness.ts serve: temp home + fake Provider
 ```

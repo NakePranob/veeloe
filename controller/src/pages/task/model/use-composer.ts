@@ -6,6 +6,8 @@ import type { TaskEventRow } from "../../../entities/task";
 import { MAX_ATTACHMENT_BYTES, type useMachineLink } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
 import { confirm } from "../../../shared/ui";
+import { redirectOf, steeringOf } from "./approval";
+import type { Item } from "./items";
 import { busyOf, stopStateOf } from "./screen";
 import type { useTaskScreen } from "./use-task-screen";
 
@@ -16,12 +18,14 @@ type Options = {
   link: ReturnType<typeof useMachineLink>;
   /** Undefined while the log loads. */
   events: readonly TaskEventRow[] | undefined;
+  /** The log as drawn, so steering ends the moment its Approval is answered or times out. */
+  log?: readonly Item[];
   /** Called as a message goes out, so the log can jump to its end to show it. */
   onSend?: () => void;
 };
 
 /** What the composer holds and does: the words and files to send, Send, Attach and the Stop brake. */
-export function useComposer({ task, screen, link, events, onSend }: Options) {
+export function useComposer({ task, screen, link, events, log, onSend }: Options) {
   const t = useT("task");
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<{ name: string; uri: string }[]>([]);
@@ -30,6 +34,9 @@ export function useComposer({ task, screen, link, events, onSend }: Options) {
   const [sending, setSending] = useState(false);
   // Set when the Stop went out, so the brake can say it is working on it until the Turn ends.
   const [stopAsked, setStopAsked] = useState(false);
+  // "Tell it what to do instead": the Approval Send answers in place of sending a message (issue #55).
+  const [steer, setSteer] = useState<string | null>(null);
+  const steering = steeringOf(log ?? [], steer);
   const message = text.trim();
   const agent = screen?.agent;
   const machine = screen?.machine;
@@ -40,6 +47,7 @@ export function useComposer({ task, screen, link, events, onSend }: Options) {
   const stopping = brake.stopping;
 
   async function send(words = message) {
+    if (steering) return redirect(steering, words);
     if ((!words && attachments.length === 0) || !link || !machine || !agent || readOnly || sending) return;
     const files = attachments;
     Keyboard.dismiss();
@@ -69,6 +77,20 @@ export function useComposer({ task, screen, link, events, onSend }: Options) {
     }
   }
 
+  function redirect(request: string, words: string) {
+    const answer = redirectOf(words);
+    if (!answer || !link || !machine || !agent || readOnly) return;
+    setProblem(null);
+    if (!link.answerApproval(machine, { agent: agent.id, task, request, ...answer })) {
+      setProblem("hub.machine_offline");
+      return;
+    }
+    Keyboard.dismiss();
+    onSend?.();
+    setText("");
+    setSteer(null);
+  }
+
   async function attach() {
     const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true, multiple: false });
     const asset = result.assets?.[0];
@@ -91,7 +113,7 @@ export function useComposer({ task, screen, link, events, onSend }: Options) {
   }
 
   const remove = (uri: string) => setAttachments((current) => current.filter((item) => item.uri !== uri));
-  return { text, setText, message, attachments, remove, problem, sending, busy, stopping, send, attach, stop };
+  return { text, setText, message, attachments, remove, problem, sending, busy, stopping, steering, steer: setSteer, send, attach, stop };
 }
 
 export type ComposerState = ReturnType<typeof useComposer>;

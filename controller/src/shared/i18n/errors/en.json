@@ -11,6 +11,7 @@
   "attachment.too_large": "The file is over 20 MB, so the app cannot send it. Use git or a Connector instead",
   "attachment.unavailable": "This Machine can't send files yet",
   "budget.exhausted": "Today's Budget is used up. You can add Budget on the Agent's page",
+  "provider.rate_limited": "The Provider's quota is used up; the Provider isn't down. Wait for it to come back, or top up with the Provider",
   "egress.forbidden": "Only the Owner can change an Agent's Egress right now",
   "egress.invalid_domain": "The Machine kept its Egress: one entry isn't a plain domain name",
   "egress.unavailable": "The Machine couldn't save the Egress. Try again",

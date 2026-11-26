@@ -167,6 +167,25 @@ fn a_spent_budget_refuses_the_answer_before_the_provider_is_asked_but_count_toke
 }
 
 #[test]
+fn a_429_from_the_provider_is_rate_limited_and_keeps_its_retry_after() {
+    let client = FakeClient::answering(HttpAnswer {
+        status: 429,
+        headers: vec![("retry-after".into(), "30".into())],
+        body: json!({ "type": "error" }).to_string(),
+    });
+    let response = block().block_on(proxy(client).handle("a1", &request()));
+    assert_eq!(response.status, 429);
+    assert_eq!(
+        veeloe_runtime_core::header(&response.headers, PROXY_ERROR_HEADER),
+        Some("provider.rate_limited")
+    );
+    assert_eq!(
+        veeloe_runtime_core::header(&response.headers, "retry-after"),
+        Some("30")
+    );
+}
+
+#[test]
 fn a_body_that_is_not_json_is_refused_as_bad_request() {
     let client = Arc::new(FakeClient::default());
     let mut broken = request();

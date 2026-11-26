@@ -467,6 +467,25 @@ async fn a_named_task_is_not_named_again_and_a_failed_first_turn_waits_for_a_don
     assert_eq!(harness.llm.titles.lock().expect("titles").len(), 1);
 }
 
+#[tokio::test]
+async fn a_rate_limited_turn_ends_saying_when_to_try_again() {
+    let harness = setup(Setup {
+        replies: vec![Err(LlmError::RateLimited(Some(30)))],
+        ..Setup::default()
+    });
+    harness.core.receive(message("one")).expect("receive");
+    harness.core.idle().await;
+    let events = harness.core.events("t1").expect("events");
+    let ended = events
+        .iter()
+        .find(|event| event.kind == "turn.ended")
+        .expect("ended");
+    assert_eq!(
+        ended.body,
+        json!({ "reason": "error", "code": "provider.rate_limited", "retryAfter": 30 })
+    );
+}
+
 fn retitle(title: &str, member: &str) -> ToWorker {
     ToWorker::Retitle {
         task: "t1".into(),

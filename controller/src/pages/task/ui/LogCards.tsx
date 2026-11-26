@@ -15,8 +15,9 @@ export function Problem({ code }: { code: string }) {
   );
 }
 
-export function FailedCard({ code, agentName }: { code: string; agentName: string }) {
+export function FailedCard({ code, retryAt, agentName }: { code: string; retryAt?: number; agentName: string }) {
   const t = useT("task");
+  const language = useLanguage();
   return (
     <Card tone="danger" style={{ padding: space.inset, gap: space.smd }}>
       <Label icon="failed" iconColor="red" variant="subheadline" tone="label" strong>
@@ -25,7 +26,8 @@ export function FailedCard({ code, agentName }: { code: string; agentName: strin
         </Text>
       </Label>
       <Text variant="callout" tone="body">
-        {describeError({ code })} {t("failedBody", { name: agentName })}
+        {describeError({ code })} {retryAt !== undefined && `${t("retryAt", { time: new Date(retryAt).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) })} `}
+        {t("failedBody", { name: agentName })}
       </Text>
     </Card>
   );

@@ -183,6 +183,12 @@ impl LlmProxy {
                 lower != "content-encoding" && lower != "content-length"
             })
             .collect();
+        // A 429 here is the Provider's quota; the Budget's own 429 is refused
+        // above as `budget.exhausted`. `Retry-After` passes through as it came.
+        let mut headers = headers;
+        if answer.status == 429 {
+            set_header(&mut headers, PROXY_ERROR_HEADER, "provider.rate_limited");
+        }
         LlmHttpResponse {
             status: answer.status,
             headers,

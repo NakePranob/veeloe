@@ -150,6 +150,21 @@ fn an_unknown_command_is_refused() {
 /// `unpair` asks a person first, as the legacy CLI did: with no terminal to
 /// answer, nothing is removed.
 #[test]
+fn version_prints_the_stamped_version_and_an_unknown_flag_starts_nothing() {
+    let home = tempdir().expect("home");
+    for flag in ["--version", "-V"] {
+        let (code, out) = veeloe(home.path(), &[flag]);
+        assert_eq!(code, 0, "{flag}");
+        assert_eq!(out.trim(), format!("veeloe {}", env!("CARGO_PKG_VERSION")));
+    }
+    // Without the refusal this would start a second supervisor and hang.
+    let (code, err) = stderr_of(home.path(), &["--verbose"]);
+    assert_eq!(code, 2);
+    assert!(err.contains("--verbose"), "{err}");
+    assert!(!home.path().join("runtime").exists());
+}
+
+#[test]
 fn unpair_without_a_terminal_changes_nothing() {
     let home = tempdir().expect("home");
     fs::create_dir_all(home.path().join("runtime")).expect("runtime");

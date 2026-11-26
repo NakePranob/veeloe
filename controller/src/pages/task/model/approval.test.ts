@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { promptFor, respond } from "./approval";
+import { promptFor, redirectOf, respond, steeringOf } from "./approval";
+import type { Item } from "./items";
 
 test("the unlock names what it approves: the domain, the Allowlist entries, or the command", () => {
   expect(promptFor({ decision: "deny", agentName: "Pang", language: "en" })).toBeNull();
@@ -23,4 +24,21 @@ test("a yes goes out only behind the unlock, and a denial never asks for one", a
   expect(sent).toEqual([{ decision: "deny" }, { decision: "approve", allowAlways: ["ls"] }]);
   expect(await respond({ decision: "approve", prompt: "p", onAnswer, sign: cancel })).toBe(false);
   expect(sent).toHaveLength(2);
+});
+
+const approval = (request: string, status: "open" | "denied" | "expired"): Item => ({ key: request, kind: "approval", approval: { request, status } }) as unknown as Item;
+
+test("steering holds only while its Approval is still open", () => {
+  const log = [approval("ap_1", "open"), approval("ap_2", "denied"), approval("ap_3", "expired")];
+  expect(steeringOf(log, "ap_1")).toBe("ap_1");
+  // Answered elsewhere or timed out: the mode goes, and the words stay in the field.
+  expect(steeringOf(log, "ap_2")).toBeNull();
+  expect(steeringOf(log, "ap_3")).toBeNull();
+  expect(steeringOf(log, "ap_gone")).toBeNull();
+  expect(steeringOf(log, null)).toBeNull();
+});
+
+test("a redirect is the typed words, and empty words send nothing", () => {
+  expect(redirectOf("  run the tests first  ")).toEqual({ decision: "redirect", message: "run the tests first" });
+  expect(redirectOf("   ")).toBeNull();
 });

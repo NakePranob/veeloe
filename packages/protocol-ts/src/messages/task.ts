@@ -112,7 +112,7 @@ export const TaskEventKind = {
   LlmMessage: "llm.message",
   /** `{ content }`: the tool_result blocks that answer the LLM's tool_use. */
   ToolResult: "tool.result",
-  /** `{ reason: "done" } | { reason: "error", code } | { reason: "stopped" } | { reason: "interrupted" }` */
+  /** `{ reason: "done" } | { reason: "error", code, retryAfter? } | { reason: "stopped" } | { reason: "interrupted" }`; `retryAfter` is the seconds a Provider's 429 gave (`provider.rate_limited`). */
   TurnEnded: "turn.ended",
   /** `{ member }`: who stopped the Turn that was running (`stop-and-restart`). */
   TurnStopped: "turn.stopped",

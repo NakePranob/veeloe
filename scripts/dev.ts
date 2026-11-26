@@ -152,8 +152,8 @@ async function up() {
   }
 
   if (!(await portOpen(METRO_PORT))) {
-    say(`Metro: expo start --dev-client on :${METRO_PORT}`);
-    const metro = spawnService("metro", ["bunx", "expo", "start", "--dev-client", "--port", String(METRO_PORT)], controllerDir, {});
+    say(`Metro: expo start on :${METRO_PORT}`);
+    const metro = spawnService("metro", ["bunx", "expo", "start", "--port", String(METRO_PORT)], controllerDir, {});
     next.metro = metro.proc.pid;
     started = true;
     writeStack(next);
@@ -359,6 +359,21 @@ function seed() {
   say("Open the Agent in the Controller, then its Memory row; no restart of the Runtime is needed.");
 }
 
+// A full reload of every app on Metro, the same broadcast its `r` key sends; Fast Refresh keeps state, this does not.
+async function reload() {
+  if (!(await portOpen(METRO_PORT))) fail(`Metro is not running on :${METRO_PORT}. Start it with bun run dev first`);
+  const socket = new WebSocket(`ws://127.0.0.1:${METRO_PORT}/message`);
+  await new Promise<void>((resolve, reject) => {
+    socket.onopen = () => resolve();
+    socket.onerror = () => reject(new Error("could not reach Metro's message socket"));
+  });
+  socket.send(JSON.stringify({ version: 2, method: "reload" }));
+  // ponytail: the broadcast has no ack; a short wait lets it leave before the socket closes.
+  await Bun.sleep(200);
+  socket.close();
+  say("Reloaded every app connected to Metro");
+}
+
 const command = process.argv[2] ?? "up";
 if (command === "up") await up();
 else if (command === "down") await down();
@@ -369,4 +384,5 @@ else if (command === "reset-sim") await resetSim();
 else if (command === "restart") await restartRuntime();
 else if (command === "link") await link();
 else if (command === "seed") seed();
-else fail(`unknown command: ${command} (up | down | status | pair | seed)`);
+else if (command === "reload") await reload();
+else fail(`unknown command: ${command} (up | down | status | pair | seed | reload)`);

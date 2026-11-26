@@ -27,6 +27,12 @@ test("the Owner's words, the Agent's text without its thinking, and a failed Tur
   });
 });
 
+test("a Provider out of quota says when to try again, when it said", () => {
+  const ended = (body: unknown) => ({ ...row(2, "turn.ended", body), at: 1_000 });
+  expect(items([ended({ reason: "error", code: "provider.rate_limited", retryAfter: 30 })]).items.find((i) => i.kind === "error")).toMatchObject({ kind: "error", code: "provider.rate_limited", retryAt: 31_000 });
+  expect(items([ended({ reason: "error", code: "provider.rate_limited" })]).items.find((i) => i.kind === "error")).not.toHaveProperty("retryAt");
+});
+
 test("a Turn that has started and not ended shows the Agent working", () => {
   expect(items([row(1, "member.message", { text: "x" }), row(2, "turn.started", {})]).working).toBe(true);
   expect(items([row(1, "turn.started", {}), row(2, "turn.ended", { reason: "done" })]).working).toBe(false);

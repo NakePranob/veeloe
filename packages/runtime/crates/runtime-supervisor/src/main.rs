@@ -420,6 +420,18 @@ async fn run() -> Result<(), CliError> {
         println!("{text}");
         return Ok(());
     }
+    // The version the release stamped into Cargo.toml (runtime-release.yml).
+    if command.is_none() && args.iter().any(|arg| arg == "--version" || arg == "-V") {
+        println!("veeloe {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    // Only a bare `veeloe` starts the supervisor: a stray flag must not start
+    // a second one (issue #55).
+    if command.is_none() {
+        if let Some(flag) = args.first() {
+            return Err(CliError::usage(format!("unknown flag: {flag}")));
+        }
+    }
     // A worker runs inside the Agent's sandbox, where `VEELOE_HOME` cannot be
     // read: it must not touch it before it knows it is a worker (ADR 0069).
     if command == Some("worker") {
