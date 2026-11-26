@@ -280,15 +280,23 @@ impl Supervisor {
                     let _ = logs::record(&self.home, "info", "trigger.skipped", skipped);
                 }
                 Round::Run { at } => {
-                    // No worker yet: the round stays due for the next tick.
-                    if veeloe_runtime_supervisor::triggers::start_round(
-                        workers,
-                        &self.triggers,
-                        &record,
-                        at,
-                    )
-                    .is_some()
-                    {
+                    let start = || {
+                        veeloe_runtime_supervisor::triggers::start_round(
+                            workers,
+                            &self.triggers,
+                            &record,
+                            at,
+                        )
+                    };
+                    // Workers start when the Hub connects; with no Hub there may be
+                    // none yet, and a round must not wait for the Hub (issue #56).
+                    let started = start().or_else(|| {
+                        if let Some(agent) = &agent {
+                            workers.start(agent);
+                        }
+                        start()
+                    });
+                    if started.is_some() {
                         let _ = self
                             .triggers
                             .update(agent_id, id, |held| held.last_run_at = Some(at));
