@@ -115,6 +115,7 @@ impl HubLinkSink for Slice {
                 .unwrap_or_default()
                 .to_string(),
             task: verified.signed.task.clone(),
+            envelope: None,
         };
         let Some(me) = self.me.upgrade() else { return };
         let type_ = verified.signed.type_.clone();
@@ -128,6 +129,7 @@ impl HubLinkSink for Slice {
                 secret_key: None,
                 uploads: None,
                 push_tokens: None,
+                triggers: None,
                 providers: &[],
                 egress: None,
                 trust: None,

@@ -71,6 +71,7 @@ fn from() -> Inbound {
         key: None,
         reference: "sig".into(),
         task: None,
+        envelope: None,
     }
 }
 
@@ -102,6 +103,7 @@ fn machine<'a>(
         secret_key: None,
         uploads: None,
         push_tokens: None,
+        triggers: None,
         providers: &[],
         egress: None,
         trust: None,

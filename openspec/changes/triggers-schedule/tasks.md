@@ -15,11 +15,11 @@
 
 ## 4. supervisor
 
-- [ ] 4.1 ที่เก็บ Trigger (`triggers.rs`) โหลดใหม่ได้ แทนที่ตาม `id` และระงับตามกุญแจ; ตรวจด้วย unit test ใน `triggers.rs`
-- [ ] 4.2 คำนวณรอบของ every/daily/weekly และรอบที่พลาด; ตรวจด้วย unit test ที่ใส่เวลาเอง
-- [ ] 4.3 `Trust::uses` และข้อความ `trigger.*` ใน `messages/trigger.rs` + `dispatch`; ตรวจด้วย binary test ใน `tests/triggers.rs`
-- [ ] 4.4 ตัวนับรอบใน `main.rs`: ข้ามเมื่อไม่ว่างหรือ Budget หมด ถังขยะ ระงับเมื่อถอนกุญแจ; ตรวจด้วย unit test ของฟังก์ชันตัดสินรอบ
-- [ ] 4.5 usage source `schedule`; ตรวจด้วย test ของ `Budgets`
+- [x] 4.1 ที่เก็บ Trigger (`triggers.rs`) โหลดใหม่ได้ แทนที่ตาม `id` และระงับตามกุญแจ; ตรวจด้วย unit test ใน `triggers.rs`
+- [x] 4.2 คำนวณรอบของ every/daily/weekly และรอบที่พลาด; ตรวจด้วย unit test ที่ใส่เวลาเอง
+- [x] 4.3 `Trust::uses` และข้อความ `trigger.*` ใน `messages/trigger.rs` + `dispatch`; ตรวจด้วย binary test ใน `tests/triggers.rs`
+- [x] 4.4 ตัวนับรอบใน `main.rs`: ข้ามเมื่อไม่ว่างหรือ Budget หมด ถังขยะ ระงับเมื่อถอนกุญแจ; ตรวจด้วย unit test ของฟังก์ชันตัดสินรอบ
+- [x] 4.5 usage source `schedule`; ตรวจด้วย test ของ `Budgets`
 
 ## 5. Controller
 

@@ -172,6 +172,13 @@ impl Trust {
         self.manages(member, key)
     }
 
+    /// Whether this Member may give this Agent work, a Trigger included
+    /// (ADR 0010, issue #56). v0.1's only Member is the Owner, who has every
+    /// Grant, so this is [`Trust::manages`]; per-Agent Grants narrow only this.
+    pub fn uses(&self, member: &str, key: Option<&str>) -> bool {
+        self.manages(member, key)
+    }
+
     /// The keys revoked here that `before` still had, so what they registered
     /// (a push token) goes with them (ADR 0044).
     pub fn revoked_since(&self, before: &Trust) -> Vec<String> {

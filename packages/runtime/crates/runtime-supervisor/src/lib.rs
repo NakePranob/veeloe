@@ -30,6 +30,7 @@ pub mod task_log;
 pub mod task_routes;
 pub mod tasks;
 pub mod toolchain;
+pub mod triggers;
 pub mod trust;
 pub mod uploads;
 pub mod usage;

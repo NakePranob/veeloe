@@ -38,6 +38,7 @@ use veeloe_runtime_supervisor::status::{remove_pid_file, run_status, write_pid_f
 use veeloe_runtime_supervisor::task_log::turn_log;
 use veeloe_runtime_supervisor::task_routes::TaskRoutes;
 use veeloe_runtime_supervisor::tasks::{dispatch, forward, Inbound, Machine, MachineOutbox};
+use veeloe_runtime_supervisor::triggers::{MachineTime, Round, Triggers};
 use veeloe_runtime_supervisor::trust::{
     load_hub_url, load_or_create_machine_key, load_trust, supervisor_dir, Trust,
 };
@@ -147,6 +148,8 @@ struct Supervisor {
     uploads: Uploads,
     push_tokens: Arc<veeloe_runtime_supervisor::push_tokens::PushTokens>,
     push: Arc<veeloe_runtime_supervisor::push::ExpoPush>,
+    /// The signed Triggers and the rounds they start (issue #56).
+    triggers: Arc<Triggers>,
     /// The id the Hub gave this connection (`hub.ready`). Envelopes are addressed
     /// to it, not to the key, so nothing can be verified before it is known.
     machine: Mutex<Option<String>>,
@@ -237,6 +240,66 @@ impl Supervisor {
     }
 }
 
+impl Supervisor {
+    /// One pass over every Trigger: run, skip or suspend what is due (issue #56).
+    fn tick_triggers(&self) {
+        let Some(workers) = self.workers.get() else {
+            return;
+        };
+        let trust = self.trust.lock().expect("trust").clone();
+        let now_ms = veeloe_runtime_supervisor::usage::now_ms();
+        for record in self.triggers.all() {
+            let agent = self.registry.get(&record.agent).ok().flatten();
+            let now = veeloe_runtime_supervisor::triggers::Now {
+                ms: now_ms as u64,
+                // An Agent purged from the trash waits too: it has no rounds left.
+                in_trash: agent.as_ref().is_none_or(|agent| agent.deleted()),
+                allowed: trust.uses(&record.member, Some(&record.key)),
+                busy: self.approvals.current_turn(&record.agent).is_some(),
+                budget_spent: agent
+                    .as_ref()
+                    .is_some_and(|agent| self.budgets.exhausted(agent, now_ms).unwrap_or(true)),
+            };
+            let round = veeloe_runtime_supervisor::triggers::decide(&record, &now, &MachineTime);
+            let (agent_id, id) = (record.agent.as_str(), record.id.as_str());
+            let fields = |at: u64| json!({ "agent": agent_id, "trigger": id, "at": at });
+            match round {
+                Round::Wait => {}
+                Round::Suspend => {
+                    let _ = self
+                        .triggers
+                        .update(agent_id, id, |held| held.suspended = true);
+                    let _ = logs::record(&self.home, "warn", "trigger.suspended", fields(now.ms));
+                }
+                Round::Skip { at, why } => {
+                    let _ = self
+                        .triggers
+                        .update(agent_id, id, |held| held.last_run_at = Some(at));
+                    let mut skipped = fields(at);
+                    skipped["why"] = json!(why);
+                    let _ = logs::record(&self.home, "info", "trigger.skipped", skipped);
+                }
+                Round::Run { at } => {
+                    // No worker yet: the round stays due for the next tick.
+                    if veeloe_runtime_supervisor::triggers::start_round(
+                        workers,
+                        &self.triggers,
+                        &record,
+                        at,
+                    )
+                    .is_some()
+                    {
+                        let _ = self
+                            .triggers
+                            .update(agent_id, id, |held| held.last_run_at = Some(at));
+                        let _ = logs::record(&self.home, "info", "trigger.run", fields(at));
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl HubLinkSink for Supervisor {
     fn log(&self, line: &str) {
         println!("{line}");
@@ -309,6 +372,9 @@ impl HubLinkSink for Supervisor {
                 .unwrap_or_default()
                 .to_string(),
             task: verified.signed.task.clone(),
+            // Only what is kept to run later needs its envelope; a file chunk
+            // is not copied for nothing.
+            envelope: (verified.signed.type_ == "trigger.set").then(|| value.clone()),
         };
         let Some(me) = self.me.upgrade() else { return };
         let trust = me.trust.lock().expect("trust").clone();
@@ -330,6 +396,7 @@ impl HubLinkSink for Supervisor {
                 secret_key: Some(&me.secret_key),
                 uploads: Some(&me.uploads),
                 push_tokens: Some(me.push_tokens.as_ref()),
+                triggers: Some(me.triggers.as_ref()),
                 providers: &providers,
                 egress: Some(me.egress.as_ref()),
                 trust: Some(&trust),
@@ -362,6 +429,10 @@ impl HubLinkSink for Supervisor {
         if !revoked.is_empty() {
             if let Err(error) = self.push_tokens.remove_devices(&revoked) {
                 println!("could not remove push tokens: {error}");
+            }
+            // A lost phone must not keep giving work (ADR 0031).
+            if let Err(error) = self.triggers.suspend_keys(&revoked) {
+                println!("could not suspend triggers: {error}");
             }
         }
         *held = next;
@@ -584,6 +655,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let push = Arc::new(veeloe_runtime_supervisor::push::ExpoPush::new(Arc::clone(
         &http,
     )));
+    let triggers = Arc::new(Triggers::open(&home)?);
     let supervisor = Arc::new_cyclic(|me| Supervisor {
         home: home.clone(),
         registry,
@@ -600,6 +672,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         uploads: Uploads::default(),
         push_tokens,
         push,
+        triggers: Arc::clone(&triggers),
         machine: Mutex::new(None),
         outbox: Mutex::new(None),
         workers: OnceLock::new(),
@@ -626,10 +699,12 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
             let Ok(Some(agent)) = usage_routing.registry.get(agent) else {
                 return;
             };
-            let Ok(usage) = usage_budgets.add(
+            let task = task.unwrap_or("");
+            let Ok(usage) = usage_budgets.add_from(
                 &agent,
                 veeloe_runtime_supervisor::usage::now_ms(),
-                task.unwrap_or(""),
+                &usage_routing.triggers.source_of(task),
+                task,
                 tokens,
             ) else {
                 return;
@@ -739,6 +814,18 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         }));
     }
     let _ = supervisor.workers.set(workers);
+    // Rounds are counted on this Machine, with or without a Hub (issue #56).
+    // ponytail: a 30-second tick, so a round starts up to 30 s late.
+    {
+        let rounds = Arc::clone(&supervisor);
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(30));
+            loop {
+                tick.tick().await;
+                rounds.tick_triggers();
+            }
+        });
+    }
     // The sandbox keeps no log of its own that a process can read: a refusal
     // goes to the system log, and this reader turns one into a Runtime log line
     // naming the service, so a missing name is added from evidence (issue #37).

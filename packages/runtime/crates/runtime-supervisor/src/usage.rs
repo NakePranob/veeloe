@@ -346,9 +346,22 @@ impl Budgets {
         task: &str,
         tokens: u64,
     ) -> Result<Usage, UsageError> {
+        self.add_from(agent, now_ms, "task", task, tokens)
+    }
+
+    /// The same, for tokens that came from somewhere other than a Member's
+    /// message: a Trigger's kind, such as `schedule` (ADR 0043, issue #56).
+    pub fn add_from(
+        &self,
+        agent: &Agent,
+        now_ms: i64,
+        source: &str,
+        task: &str,
+        tokens: u64,
+    ) -> Result<Usage, UsageError> {
         let usage = self.usage_of(agent, now_ms)?;
         self.store
-            .add(&agent.id, &usage.day, "task", task, tokens)?;
+            .add(&agent.id, &usage.day, source, task, tokens)?;
         // The oldest day leaves when a new one is written (ADR 0043).
         self.store.prune(&shift_day(&usage.day, -29))?;
         self.usage_of(agent, now_ms)

@@ -19,7 +19,7 @@ use crate::hub_link::HubSender;
 use crate::llm::HttpClient;
 use crate::messages::{
     agent_config, egress_set, file_transfer, machine_status, memory_get, provider_add,
-    push_register, task_message, usage_list,
+    push_register, task_message, trigger, usage_list,
 };
 use crate::providers::Provider;
 use crate::proxy::Proxies;
@@ -42,6 +42,9 @@ pub struct Inbound {
     pub key: Option<String>,
     pub reference: String,
     pub task: Option<String>,
+    /// The signed envelope as it arrived, for what is kept to run later
+    /// (a Trigger, ADR 0067). Absent in slices' tests.
+    pub envelope: Option<Value>,
 }
 
 /// How a slice answers. Every envelope out is signed by the Machine and goes to
@@ -194,6 +197,8 @@ pub struct Machine<'a> {
     pub secret_key: Option<&'a [u8; 32]>,
     pub uploads: Option<&'a crate::uploads::Uploads>,
     pub push_tokens: Option<&'a crate::push_tokens::PushTokens>,
+    /// The signed Triggers (issue #56). Absent in slices that do not test them.
+    pub triggers: Option<&'a crate::triggers::Triggers>,
     pub providers: &'a [Provider],
     /// Every Agent's Egress, written through `egress.set` (ADR 0029, #43).
     /// Absent in slices that do not test it; a real supervisor always has one.
@@ -223,6 +228,12 @@ pub async fn dispatch(
         "egress.set" => egress_set::set(machine, outbox, from, body).await,
         "push.register" => push_register::register(machine, outbox, from, body),
         "push.unregister" => push_register::unregister(machine, outbox, from, body),
+        "trigger.set" => trigger::set(machine, outbox, from, body),
+        "trigger.pause" => trigger::pause(machine, outbox, from, body, true),
+        "trigger.resume" => trigger::pause(machine, outbox, from, body, false),
+        "trigger.delete" => trigger::delete(machine, outbox, from, body),
+        "trigger.run" => trigger::run(machine, outbox, from, body),
+        "trigger.list" => trigger::list(machine, outbox, from, body),
         "provider.add" => provider_add::add(machine, outbox, from, body).await,
         "file.chunk" => file_transfer::chunk(machine, outbox, from, body),
         "file.get" => file_transfer::get(machine, outbox, from, body),

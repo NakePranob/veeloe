@@ -153,3 +153,31 @@ fn a_legacy_usage_json_is_imported_once_and_renamed() {
     let again = UsageStore::open(&dir.join("usage.db")).expect("reopen");
     assert_eq!(again.total("a1", "2026-11-06").expect("total"), 2_000);
 }
+
+/// Issue #56: a Schedule's rounds are their own source, in the same Budget.
+#[test]
+fn a_schedules_tokens_are_their_own_source_in_the_same_budget() {
+    let home = tempdir().expect("home");
+    let store = UsageStore::open(&home.path().join("usage.db")).expect("store");
+    let budgets = Budgets::new(store);
+    let a1 = agent(None);
+    budgets.add(&a1, MORNING, "t1", 10).expect("task");
+    let after = budgets
+        .add_from(&a1, MORNING, "schedule", "t2", 4)
+        .expect("schedule");
+    assert_eq!(after.tokens, 14);
+    let day = after.day.clone();
+    let range = budgets
+        .range(&["a1".to_string()], &day, &day)
+        .expect("range");
+    let mut sources: Vec<(String, u64)> = range[0]
+        .sources
+        .iter()
+        .map(|source| (source.source.clone(), source.tokens))
+        .collect();
+    sources.sort();
+    assert_eq!(
+        sources,
+        vec![("schedule".to_string(), 4), ("task".to_string(), 10)]
+    );
+}

@@ -10,4 +10,5 @@ pub(crate) mod provider_add;
 pub(crate) mod push_register;
 pub(crate) mod shared;
 pub(crate) mod task_message;
+pub(crate) mod trigger;
 pub(crate) mod usage_list;

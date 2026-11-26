@@ -528,6 +528,7 @@ mod tests {
             key: Some("k_1".into()),
             reference: "sig".into(),
             task: task.map(str::to_string),
+            envelope: None,
         }
     }
 
