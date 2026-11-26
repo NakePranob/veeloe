@@ -172,6 +172,16 @@ impl Trust {
         self.manages(member, key)
     }
 
+    /// The keys revoked here that `before` still had, so what they registered
+    /// (a push token) goes with them (ADR 0044).
+    pub fn revoked_since(&self, before: &Trust) -> Vec<String> {
+        self.revoked
+            .iter()
+            .filter(|key| !before.revoked.contains(key))
+            .cloned()
+            .collect()
+    }
+
     fn to_json(&self) -> Value {
         let mut value = json!({
             "owners": self
@@ -542,6 +552,15 @@ mod tests {
         let after = apply_certificates(&linked, &[revoke(0x41, 0x42, &[0x43])], &quiet);
         assert_eq!(after.owners[0].keys, vec![key(0x41), key(0x43)]);
         assert_eq!(after.revoked, vec![key(0x42), key(0x44)]);
+    }
+
+    #[test]
+    fn only_a_key_revoked_by_this_change_is_new() {
+        let linked = apply_certificates(&paired(), &[link(0x41, 0x42), link(0x41, 0x43)], &|_| {});
+        let once = apply_certificates(&linked, &[revoke(0x41, 0x42, &[])], &|_| {});
+        assert_eq!(once.revoked_since(&linked), vec![key(0x42)]);
+        let twice = apply_certificates(&once, &[revoke(0x41, 0x43, &[])], &|_| {});
+        assert_eq!(twice.revoked_since(&once), vec![key(0x43)]);
     }
 
     #[test]

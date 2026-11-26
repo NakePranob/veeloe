@@ -32,6 +32,7 @@ use veeloe_runtime_supervisor::memory;
 use veeloe_runtime_supervisor::preflight;
 use veeloe_runtime_supervisor::providers::{load_providers, upstream_headers};
 use veeloe_runtime_supervisor::proxy::Proxies;
+use veeloe_runtime_supervisor::push::{recipients, PushKind};
 use veeloe_runtime_supervisor::service;
 use veeloe_runtime_supervisor::status::{remove_pid_file, run_status, write_pid_file};
 use veeloe_runtime_supervisor::task_log::turn_log;
@@ -187,38 +188,24 @@ impl Supervisor {
         else {
             return;
         };
-        let (kind, approval, tokens) = match event.kind.as_str() {
-            "approval.requested" => {
-                let approval = event
+        let (kind, approval) = match event.kind.as_str() {
+            "approval.requested" => (
+                PushKind::Approval,
+                event
                     .body
                     .get("request")
                     .and_then(Value::as_str)
-                    .map(str::to_string);
-                let members: Vec<String> = self
-                    .trust
-                    .lock()
-                    .expect("trust")
-                    .owners
-                    .iter()
-                    .map(|owner| owner.member.clone())
-                    .collect();
-                let tokens = members
-                    .iter()
-                    .flat_map(|member| self.push_tokens.for_member(member))
-                    .collect::<Vec<_>>();
-                (
-                    veeloe_runtime_supervisor::push::PushKind::Approval,
-                    approval,
-                    tokens,
-                )
-            }
-            "turn.ended" => (
-                veeloe_runtime_supervisor::push::PushKind::TurnEnded,
-                None,
-                self.push_tokens.for_member(starter),
+                    .map(str::to_string),
             ),
+            "turn.ended" => (PushKind::TurnEnded, None),
             _ => return,
         };
+        let tokens = recipients(
+            &self.trust.lock().expect("trust"),
+            &self.push_tokens.all(),
+            kind,
+            starter,
+        );
         if tokens.is_empty() {
             return;
         }
@@ -371,13 +358,7 @@ impl HubLinkSink for Supervisor {
             println!("could not save trust: {error}");
             return;
         }
-        let before: std::collections::HashSet<String> = held.revoked.iter().cloned().collect();
-        let revoked: Vec<String> = next
-            .revoked
-            .iter()
-            .filter(|key| !before.contains(*key))
-            .cloned()
-            .collect();
+        let revoked = next.revoked_since(&held);
         if !revoked.is_empty() {
             if let Err(error) = self.push_tokens.remove_devices(&revoked) {
                 println!("could not remove push tokens: {error}");

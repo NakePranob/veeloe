@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 
 use crate::llm::HttpClient;
 use crate::push_tokens::PushToken;
+use crate::trust::Trust;
 
 const EXPO_PUSH: &str = "https://exp.host/--/api/v2/push/send";
 
@@ -39,6 +40,27 @@ impl PushKind {
         }
         data
     }
+}
+
+/// Who gets this push (ADR 0044): an Approval goes to whoever may answer it, a
+/// Turn's end only to the Member who started that Turn. A token whose key is no
+/// longer trusted for its Member gets nothing, even before revocation drops it.
+pub fn recipients(
+    trust: &Trust,
+    tokens: &[PushToken],
+    kind: PushKind,
+    starter: &str,
+) -> Vec<PushToken> {
+    tokens
+        .iter()
+        .filter(|held| match kind {
+            PushKind::Approval => trust.approves(&held.member, Some(&held.device)),
+            PushKind::TurnEnded => {
+                held.member == starter && trust.manages(&held.member, Some(&held.device))
+            }
+        })
+        .cloned()
+        .collect()
 }
 
 /// What Expo said about one token in a send: keep it or drop it.
@@ -164,6 +186,60 @@ mod tests {
             language: language.into(),
             updated: 1,
         }
+    }
+
+    fn held(member: &str, device: &str) -> PushToken {
+        PushToken {
+            member: member.into(),
+            device: device.into(),
+            token: format!("ExponentPushToken[{device}]"),
+            language: "en".into(),
+            updated: 1,
+        }
+    }
+
+    fn two_members() -> Trust {
+        use crate::trust::Owner;
+        Trust {
+            owners: vec![
+                Owner {
+                    member: "m_1".into(),
+                    keys: vec!["k1".into()],
+                },
+                Owner {
+                    member: "m_2".into(),
+                    keys: vec!["k2".into()],
+                },
+            ],
+            ..Trust::default()
+        }
+    }
+
+    fn devices(tokens: Vec<PushToken>) -> Vec<String> {
+        tokens.into_iter().map(|held| held.device).collect()
+    }
+
+    #[test]
+    fn an_approval_goes_to_every_member_who_may_answer_it() {
+        let tokens = [held("m_1", "k1"), held("m_2", "k2")];
+        let got = recipients(&two_members(), &tokens, PushKind::Approval, "m_1");
+        assert_eq!(devices(got), vec!["k1", "k2"]);
+    }
+
+    #[test]
+    fn a_turn_end_goes_only_to_the_member_who_started_it() {
+        let tokens = [held("m_1", "k1"), held("m_2", "k2")];
+        let got = recipients(&two_members(), &tokens, PushKind::TurnEnded, "m_2");
+        assert_eq!(devices(got), vec!["k2"]);
+        assert!(recipients(&two_members(), &tokens, PushKind::TurnEnded, "").is_empty());
+    }
+
+    #[test]
+    fn a_key_no_longer_trusted_gets_no_push() {
+        // k3 was m_1's, then revoked; its token has not been dropped yet.
+        let tokens = [held("m_1", "k3"), held("m_2", "k1")];
+        assert!(recipients(&two_members(), &tokens, PushKind::Approval, "m_1").is_empty());
+        assert!(recipients(&two_members(), &tokens, PushKind::TurnEnded, "m_1").is_empty());
     }
 
     #[tokio::test]
