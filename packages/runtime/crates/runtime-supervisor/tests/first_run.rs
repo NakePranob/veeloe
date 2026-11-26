@@ -280,27 +280,41 @@ async fn an_unpaired_machine_is_asked_for_its_hub_pairs_offers_a_provider_and_th
     let controller_key = to_base64url(&public_key_of(&CONTROLLER_SEED));
     let proof =
         pairing_proof(&parsed.secret, &parsed.machine, &controller_key, "member-1").expect("proof");
-    let claim = Signer::new(&CONTROLLER_SEED).sign(
-        Outgoing {
-            type_: "pairing.claim".into(),
-            to: Some("machine-1".into()),
-            recipients: None,
-            task: None,
-            member: None,
-            body: json!({
-                "member": "member-1",
-                "proof": proof,
-                "keys": [controller_key],
-                "workspace": "w-1",
-            }),
-        },
-        1,
-    );
-    controller
-        .send(serde_json::to_value(claim).expect("claim"))
-        .await;
-    let done = controller.next().await;
-    assert_eq!(done["type"], "pairing.done");
+    // The link can be on screen a moment before the Machine is registered at
+    // the Hub, and the relay answers a claim to it then as `machine_offline`:
+    // a person rescans, the test sends again.
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let mut sequence = 1;
+    let done = loop {
+        let claim = Signer::new(&CONTROLLER_SEED).sign(
+            Outgoing {
+                type_: "pairing.claim".into(),
+                to: Some("machine-1".into()),
+                recipients: None,
+                task: None,
+                member: None,
+                body: json!({
+                    "member": "member-1",
+                    "proof": proof,
+                    "keys": [controller_key],
+                    "workspace": "w-1",
+                }),
+            },
+            sequence,
+        );
+        controller
+            .send(serde_json::to_value(claim).expect("claim"))
+            .await;
+        let answer = controller.next().await;
+        let offline =
+            answer["type"] == "hub.error" && answer.to_string().contains("machine_offline");
+        if !offline || Instant::now() > deadline {
+            break answer;
+        }
+        sequence += 1;
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    };
+    assert_eq!(done["type"], "pairing.done", "{done}");
 
     // 5. Trust is written, so the pairing survived the process.
     let trust: Value = serde_json::from_str(
