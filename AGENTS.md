@@ -172,24 +172,21 @@ Thai, and to quote the Thai copy the change is about. A body usually goes:
 - what was checked: tests that pass, and what was tried in the real app
 
 A commit that finishes an issue ends its body with `Closes #12` (one line per
-issue), so pushing it to `develop`, the default branch, closes the issue.
+issue), so merging it into `develop`, the default branch, closes the issue.
 
-## Commits on develop (v0.1)
+## Branches and pull requests on develop
 
-Until v0.1 ships, the maintainer commits straight to `develop`: no branch, no
-PR. Run `bun run check` before pushing, because nothing on GitHub gates the push — CI runs after it
-lands, and a red run is fixed with the next commit. The `develop` ruleset only
-refuses force-pushes and deleting the branch. When v0.1 ships, the PR rule and
-the required `english` check go back on `develop`, and work moves to branches
-again.
+Since v0.1 shipped, every change goes to `develop` through a branch and a pull
+request: the `develop` ruleset refuses a direct push, a force-push and deleting
+the branch, and requires the `english` check (`.github/workflows/pr-title.yml`).
+Run `bun run check` before opening the PR; CI runs on it too.
 
 ## Pull requests
 
 Outside contributors still open a PR into `develop`, and `main` is promoted
 from `develop` through a PR, so nothing targets `main` directly — dependabot
-included (`target-branch: develop`). `develop` merges by squash only; check
-that the `english` check (`.github/workflows/pr-title.yml`) is green before
-merging, because the ruleset no longer requires it during v0.1. `main` is
+included (`target-branch: develop`). `develop` merges by squash only, and the
+ruleset requires the `english` check (`.github/workflows/pr-title.yml`). `main` is
 guarded by a ruleset (no direct push, no force-push, no deletion) and merges by
 merge commit only, so promoting `develop` never forks the two histories. No
 approval is required.
