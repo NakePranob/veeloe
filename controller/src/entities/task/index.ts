@@ -7,6 +7,7 @@ export {
   addPendingMessage,
   dismissPendingMessage,
   failPendingMessage,
+  hideThread,
   isBudgetOut,
   isQuiet,
   latestEvents,
@@ -26,6 +27,7 @@ export {
   titleOfEvents,
   type TaskSummary,
 } from "./model/tasks";
-export { usePendingMessages, useTaskEvents, useTaskRow, useTaskSummaries } from "./model/use-tasks";
+export { useHiddenThreads, usePendingMessages, useTaskEvents, useTaskRow, useTaskSummaries } from "./model/use-tasks";
+export { originOf, threadsOf } from "./model/threads";
 export { TaskStatusDot } from "./ui/TaskStatusDot";
 export { TaskStatusLabel } from "./ui/TaskStatusLabel";

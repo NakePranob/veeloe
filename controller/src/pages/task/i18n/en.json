@@ -185,7 +185,8 @@
       "machine": "Machine",
       "started": "Started",
       "last": "Last activity",
-      "turns": "Turns"
+      "turns": "Turns",
+      "rounds": "All rounds of this Schedule"
     },
     "changed": {
       "heading": "Files the Agent changed",

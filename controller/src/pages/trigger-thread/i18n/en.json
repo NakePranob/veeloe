@@ -1,0 +1,19 @@
+{
+  "title": "Schedule rounds",
+  "missing": {
+    "title": "Nothing here",
+    "body": "This thread has no rounds on this device, or it was deleted."
+  },
+  "rounds_one": "{{count}} round",
+  "rounds_other": "{{count}} rounds",
+  "footer": "A round with nothing to tell stays out of the Inbox but is kept here.",
+  "quiet": "Nothing to report",
+  "untitled": "Untitled Task",
+  "delete": {
+    "row": "Delete this thread",
+    "title": "Delete this thread?",
+    "message": "Only this list goes, on this device. Every Task stays, and the Schedule keeps running.",
+    "action": "Delete"
+  },
+  "cancel": "Cancel"
+}

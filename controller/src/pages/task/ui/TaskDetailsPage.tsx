@@ -2,7 +2,7 @@ import { TASK_TITLE_MAX } from "@veeloe/protocol-ts";
 import { router, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
 import { Character, lookOfJson, moodOf, shade as darken, tint } from "../../../entities/character";
-import { latestOf, statusOf, TaskStatusDot, titleOfEvents, useTaskEvents } from "../../../entities/task";
+import { latestOf, originOf, statusOf, TaskStatusDot, titleOfEvents, useTaskEvents } from "../../../entities/task";
 import { useMachineLink } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, useNow, when } from "../../../shared/lib";
@@ -45,6 +45,7 @@ export function TaskDetailsPage() {
   const context = contextPartsOf(events);
   const compactions = events.filter((event) => event.kind === "context.compacted").length;
   const facts = factsOf(events);
+  const origin = originOf({ first_body: events.find((event) => event.kind === "member.message")?.body ?? null });
   const hint = offline ? t("details.hintOffline") : named ? null : t("details.hintFirst");
   const shade = (part: ContextPart) => {
     const value = SHADE[part];
@@ -115,6 +116,8 @@ export function TaskDetailsPage() {
         {facts.started !== null && <Row title={t("details.facts.started")} value={when(facts.started, language, now)} />}
         {facts.last !== null && <Row title={t("details.facts.last")} value={when(facts.last, language, now)} />}
         <Row title={t("details.facts.turns")} value={String(facts.turns)} />
+        {/* A round of a Schedule opens every round of it (ADR 0061). */}
+        {origin && <Row icon="time" title={t("details.facts.rounds")} href={`/threads/${origin.id}?agent=${agent.id}`} />}
       </Section>
 
       <Section title={t("details.changed.heading")} footer={facts.changed.length ? t("details.changed.footer") : undefined}>

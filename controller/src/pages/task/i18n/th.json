@@ -185,7 +185,8 @@
       "machine": "Machine",
       "started": "เริ่ม",
       "last": "เคลื่อนไหวล่าสุด",
-      "turns": "Turn"
+      "turns": "Turn",
+      "rounds": "ทุกรอบของ Schedule นี้"
     },
     "changed": {
       "heading": "ไฟล์ที่ Agent แก้",

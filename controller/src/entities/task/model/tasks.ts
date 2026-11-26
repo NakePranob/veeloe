@@ -208,3 +208,8 @@ export function statusOf(latest: Latest | undefined, online: boolean | null): Ta
     return "failed";
   }
 }
+
+/** Deletes a thread from this device's index (ADR 0061): its Tasks are left as they are. */
+export function hideThread(database: Database, trigger: string) {
+  return database.write([TASK_TOPIC], (transaction) => transaction.run("INSERT OR IGNORE INTO thread_hidden (trigger_id) VALUES (?)", [trigger]));
+}

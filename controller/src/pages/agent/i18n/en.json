@@ -85,5 +85,11 @@
   "schedule": {
     "row": "Schedule",
     "detail": "Tasks the Agent starts on its own, on a clock"
+  },
+  "threads": {
+    "heading": "Schedule threads",
+    "untitled": "Untitled Schedule",
+    "rounds_one": "{{count}} round",
+    "rounds_other": "{{count}} rounds"
   }
 }

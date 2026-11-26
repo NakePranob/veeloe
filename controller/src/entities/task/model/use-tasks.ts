@@ -20,3 +20,8 @@ export function useTaskRow(taskId: string) {
 export function usePendingMessages(taskId: string) {
   return useLiveQuery<PendingRow>("SELECT * FROM pending_message WHERE task_id = ? ORDER BY created_at", [taskId], TOPICS);
 }
+
+/** The ids of threads deleted on this device (ADR 0061). */
+export function useHiddenThreads() {
+  return useLiveQuery<{ trigger_id: string }>("SELECT trigger_id FROM thread_hidden", [], TOPICS);
+}

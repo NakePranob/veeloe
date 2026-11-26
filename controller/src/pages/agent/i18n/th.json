@@ -85,5 +85,11 @@
   "schedule": {
     "row": "Schedule",
     "detail": "Task ที่ Agent เริ่มเองตามเวลา"
+  },
+  "threads": {
+    "heading": "เส้นของ Schedule",
+    "untitled": "Schedule ไม่มีชื่อ",
+    "rounds_one": "{{count}} รอบ",
+    "rounds_other": "{{count}} รอบ"
   }
 }

@@ -17,6 +17,7 @@ import { lockI18n } from "../../pages/lock";
 import { machinesI18n } from "../../pages/machines";
 import { storageUnavailableI18n } from "../../pages/storage-unavailable";
 import { taskI18n } from "../../pages/task";
+import { triggerThreadI18n } from "../../pages/trigger-thread";
 import { usageI18n } from "../../pages/usage";
 import { workspaceI18n } from "../../pages/workspace";
 import { taskStatusI18n } from "../../entities/task";
@@ -37,6 +38,7 @@ const slices = {
   "agent-allowlist": agentAllowlistI18n,
   "agent-git": agentGitI18n,
   "agent-schedule": agentScheduleI18n,
+  "trigger-thread": triggerThreadI18n,
   "agent-model": agentModelI18n,
   agents: agentsI18n,
   "new-agent": newAgentI18n,

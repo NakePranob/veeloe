@@ -6,7 +6,7 @@ import { APPROVAL_TIMEOUT_S_DEFAULT } from "@veeloe/protocol-ts";
 import { allowlistOf, approvalTimeoutOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { STATUS_DOT, statusOf, titleOf, useTaskSummaries } from "../../../entities/task";
+import { STATUS_DOT, statusOf, threadsOf, titleOf, useHiddenThreads, useTaskSummaries } from "../../../entities/task";
 import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession, type Signed } from "../../../shared/keystore";
@@ -29,7 +29,10 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const machine = useMachines()?.find((m) => m.id === agent.machine_id);
   const machineStatus = useMachineStatus(agent.machine_id);
   const online = machineStatus.online;
-  const tasks = (useTaskSummaries() ?? []).filter((task) => task.agent_id === agent.id);
+  const summaries = useTaskSummaries() ?? [];
+  const tasks = summaries.filter((task) => task.agent_id === agent.id);
+  const hiddenThreads = useHiddenThreads();
+  const threads = threadsOf(summaries, agent.id, new Set((hiddenThreads ?? []).map((row) => row.trigger_id)), online);
   const [name, setName] = useState(agent.name);
   // The page shows the Machine's values once a save lands (ADR 0006), and another device's change comes in the same way.
   // A Machine older than `daily-budget` never says a Budget: its answer settles the save rather than spinning forever.
@@ -147,6 +150,15 @@ function AgentView({ agent }: { agent: AgentRow }) {
         offline && <Note tone="offline">{t("needsOnline")}</Note>
       )}
       {problem && <Note tone="warning">{problem === "provider" ? t("problem.provider", { provider: agent.provider }) : t("problem.model", { provider: agent.provider, model: agent.model })}</Note>}
+
+      {/* Every round of one Schedule, gathered (ADR 0061); its Tasks are in the list below too. */}
+      {threads.length > 0 && (
+        <Section title={t("threads.heading")}>
+          {threads.map((thread) => (
+            <Row key={thread.id} icon="time" title={thread.text.split("\n")[0] || t("threads.untitled")} value={t("threads.rounds", { count: thread.rounds.length })} href={`/threads/${thread.id}?agent=${agent.id}`} />
+          ))}
+        </Section>
+      )}
 
       {/* ponytail: every Task of this Agent shows; a "see all" page comes when lists get long. */}
       {tasks.length > 0 && (

@@ -94,4 +94,7 @@ export const MIGRATIONS = [
   // The GitHub repos the Agent may use through the git broker, as JSON; null from a
   // Machine older than the broker (issue #32).
   `ALTER TABLE agent ADD COLUMN git_repos TEXT`,
+  // Threads of Trigger rounds deleted on this device (ADR 0061, issue #59): only the index goes,
+  // the Tasks stay. Which Task belongs to which Trigger is read from its first message.
+  `CREATE TABLE thread_hidden (trigger_id TEXT PRIMARY KEY NOT NULL)`,
 ] as const;
