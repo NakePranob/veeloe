@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { Text } from "./text";
-import { space, useColors, type Colors } from "./theme";
+import { radius, space, useColors, type Colors } from "./theme";
 
 // A small round status mark beside words that say the same thing (online, offline).
 export function Dot({ color = "green", size = 8 }: { color?: keyof Colors; size?: number }) {
@@ -9,10 +9,11 @@ export function Dot({ color = "green", size = 8 }: { color?: keyof Colors; size?
   return <View aria-hidden style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors[color] }} />;
 }
 
-// Six dots in two columns: the handle a row is dragged by (three lines would read as a menu).
+// Six dots in two columns on a small white card: the handle a row is dragged by (three lines would read as a menu).
 export function Grip() {
+  const colors = useColors();
   return (
-    <View aria-hidden style={{ flexDirection: "row", gap: 4 }}>
+    <View aria-hidden style={{ flexDirection: "row", gap: 4, padding: space.sm, borderRadius: radius.sm, borderCurve: "continuous", backgroundColor: colors.surface }}>
       {[0, 1].map((column) => (
         <View key={column} style={{ gap: 4 }}>
           <Dot color="tertiaryLabel" size={4} />
