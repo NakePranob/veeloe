@@ -51,7 +51,7 @@ export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
 export const FOLDERS_MAX = 20;
 /** How much of the Machine's files an Agent reaches: its own folders, or those and the ones it was given (ADR 0087). */
 export const FilesSchema = z.enum(["folder", "selected"]);
-export const FoldersSchema = z.array(z.looseObject({ path: z.string().min(2).max(4096).startsWith("/"), mode: z.literal("read") })).max(FOLDERS_MAX);
+export const FoldersSchema = z.array(z.looseObject({ path: z.string().min(2).max(4096).startsWith("/"), mode: z.enum(["read", "write"]) })).max(FOLDERS_MAX);
 
 export const AgentUpdateBodySchema = z
   .looseObject({ files: FilesSchema.optional(), folders: FoldersSchema.optional(), id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional(), allowlist: AllowlistSchema.optional(), approvalTimeoutS: approvalTimeoutS.optional(), gitRepos: GitReposSchema.optional(), backgroundShare: backgroundShare.optional() })

@@ -332,7 +332,10 @@ fn is_folders(value: &Value) -> bool {
             && folders.iter().all(|folder| {
                 text(folder.get("path"))
                     .is_some_and(|path| path.starts_with('/') && (2..=4_096).contains(&chars(path)))
-                    && matches!(folder.get("mode").and_then(Value::as_str), Some("read"))
+                    && matches!(
+                        folder.get("mode").and_then(Value::as_str),
+                        Some("read" | "write")
+                    )
             })
     })
 }

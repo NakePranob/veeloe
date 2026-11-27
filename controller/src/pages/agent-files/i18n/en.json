@@ -20,11 +20,12 @@
     "warning": "The Agent reads every file in the folders you pick and can send them out through its Egress. The home folder, .ssh, browser data and system folders can never be picked."
   },
   "folders": {
-    "heading": "Folders it reads",
-    "footer": "Enter the full path of a folder on the Machine. The Machine checks that it exists and is not where secrets are kept.",
+    "heading": "Selected folders",
+    "footer": "Enter the full path of a folder on the Machine. The Machine checks that it exists and is not where secrets are kept. One Agent at a time may write a folder.",
     "empty": "No folders yet",
     "emptyDetail": "The Agent still reads only its own Workdir.",
-    "readOnly": "Read only"
+    "readOnly": "Read only · tap to let it write",
+    "readWrite": "Read and write · tap to make it read only"
   },
   "add": {
     "label": "Add a folder",
@@ -39,6 +40,8 @@
     "add": "Let {{name}} read {{path}}",
     "remove": "Remove {{path}} from {{name}}",
     "open": "Let {{name}} read selected folders on the Machine",
-    "close": "Keep {{name}} to its own folder again"
+    "close": "Keep {{name}} to its own folder again",
+    "write": "Let {{name}} write in {{path}}",
+    "readOnly": "Let {{name}} only read {{path}}"
   }
 }

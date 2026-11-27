@@ -1065,5 +1065,49 @@ async fn selected_folders_are_set_by_an_owner_and_never_reach_a_secret() {
         access(&registry).files,
         veeloe_runtime_supervisor::agents::Level::Selected
     );
+
+    // One writer per folder (#85): a1 writes the shop, so a2 cannot write it or anything inside it.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.update",
+        &json!({ "id": "a1", "folders": [{ "path": owner_home.join("code/shop"), "mode": "write" }] }),
+    )
+    .await;
+    assert_eq!(outbox.last().0, "agent.listed", "{}", outbox.last().1);
+    let mut second = registry.get("a1").expect("get").expect("a1");
+    second.id = "a2".into();
+    second.name = "Docs".into();
+    second.access = Default::default();
+    registry.add(&second).expect("add a2");
+    std::fs::create_dir_all(owner_home.join("code/shop/web")).expect("web");
+    for (path, mode) in [
+        ("code/shop", "write"),
+        ("code/shop/web", "write"),
+        ("code", "write"),
+    ] {
+        dispatch(
+            &machine,
+            &outbox,
+            &from(),
+            "agent.update",
+            &json!({ "id": "a2", "files": "selected", "folders": [{ "path": owner_home.join(path), "mode": mode }] }),
+        )
+        .await;
+        let (_, body) = outbox.last();
+        assert_eq!(body["code"], "folder.taken", "{path}: {body}");
+        assert_eq!(body["params"]["agent"], "a1");
+    }
+    // Reading it alongside is fine.
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.update",
+        &json!({ "id": "a2", "files": "selected", "folders": [{ "path": owner_home.join("code/shop"), "mode": "read" }] }),
+    )
+    .await;
+    assert_eq!(outbox.last().0, "agent.listed", "{}", outbox.last().1);
     workers.stop_all();
 }

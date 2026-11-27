@@ -11,6 +11,8 @@ export type MachineStatus = {
   createError: string | null;
   /** The code the last `agent.update` came back with, if it failed. */
   updateError: string | null;
+  /** What the Machine named with that code, such as the Agent that already writes a folder. */
+  updateErrorParams: Record<string, string | number | boolean> | null;
   /** The code the last `agent.delete` came back with, if it failed. */
   deleteError: string | null;
   /** The code the last `agent.restore` came back with, if it failed (`agent-trash`). */
@@ -33,6 +35,7 @@ export const UNKNOWN_MACHINE_STATUS: MachineStatus = {
   providers: null,
   createError: null,
   updateError: null,
+  updateErrorParams: null,
   deleteError: null,
   restoreError: null,
   stopError: null,

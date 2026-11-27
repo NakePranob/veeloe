@@ -106,7 +106,7 @@ export function gitReposOf(row: Pick<AgentRow, "git_repos">): string[] | null {
   }
 }
 
-export type Access = { files: "folder" | "selected"; folders: { path: string; mode: "read" }[] };
+export type Access = { files: "folder" | "selected"; folders: { path: string; mode: "read" | "write" }[] };
 
 /** The file level and folders the Machine last sent, or null when its Runtime has no file levels yet (ADR 0087). */
 export function accessOf(row: Pick<AgentRow, "files" | "folders">): Access | null {
@@ -114,7 +114,8 @@ export function accessOf(row: Pick<AgentRow, "files" | "folders">): Access | nul
   let folders: Access["folders"] = [];
   try {
     const parsed: unknown = JSON.parse(row.folders ?? "[]");
-    if (Array.isArray(parsed)) folders = parsed.filter((folder): folder is Access["folders"][number] => typeof folder?.path === "string").map((folder) => ({ path: folder.path, mode: "read" as const }));
+    if (Array.isArray(parsed))
+      folders = parsed.filter((folder): folder is Access["folders"][number] => typeof folder?.path === "string").map((folder) => ({ path: folder.path, mode: folder.mode === "write" ? ("write" as const) : ("read" as const) }));
   } catch {
     folders = [];
   }

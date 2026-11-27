@@ -60,7 +60,7 @@ function FilesView({ agentId, agentName, machineId, stored }: { agentId: string;
   return (
     <Screen title={t("title")} subtitle={selected ? t("subtitleSelected", { name: agentName, count: stored.folders.length }) : t("subtitle", { name: agentName })}>
       {offline && <Note tone="offline">{t("offline")}</Note>}
-      {status.updateError && <Note tone="warning">{describeError({ code: status.updateError })}</Note>}
+      {status.updateError && <Note tone="warning">{describeError({ code: status.updateError, params: status.updateErrorParams ?? undefined })}</Note>}
       <Section footer={t(selected ? "selected.warning" : "selected.footer")}>
         <ToggleRow
           icon="folder"
@@ -76,8 +76,16 @@ function FilesView({ agentId, agentName, machineId, stored }: { agentId: string;
             <Row
               key={folder.path}
               title={folder.path}
-              detail={t("folders.readOnly")}
+              detail={t(folder.mode === "write" ? "folders.readWrite" : "folders.readOnly")}
               mono
+              disabled={offline}
+              // One tap moves it between read only and read and write; the Machine refuses a folder another Agent writes.
+              onPress={() =>
+                void save(
+                  { files: "selected", folders: stored.folders.map((item) => (item.path === folder.path ? { path: item.path, mode: item.mode === "write" ? "read" : "write" } : item)) },
+                  t(folder.mode === "write" ? "authenticate.readOnly" : "authenticate.write", { path: folder.path, name: agentName }),
+                )
+              }
               accessory={
                 <Button
                   label={t("remove")}

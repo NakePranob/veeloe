@@ -242,14 +242,29 @@
       "valid": false
     },
     {
-      "name": "a folder to write is not taken yet",
+      "name": "give an Agent a folder to write",
+      "type": "agent.update",
+      "body": {
+        "id": "a1",
+        "files": "selected",
+        "folders": [
+          {
+            "path": "/Users/me/code/shop",
+            "mode": "write"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a folder mode nobody knows",
       "type": "agent.update",
       "body": {
         "id": "a1",
         "folders": [
           {
             "path": "/Users/me/code/shop",
-            "mode": "write"
+            "mode": "delete"
           }
         ]
       },

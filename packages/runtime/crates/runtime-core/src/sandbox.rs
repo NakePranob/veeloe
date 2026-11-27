@@ -38,6 +38,8 @@ pub struct Policy {
     /// Folders on the Machine the Owner gave this Agent to read (ADR 0087),
     /// by their real paths, already checked against the forbidden list.
     pub read_folders: Vec<String>,
+    /// Folders it may also write, as one Agent at a time (ADR 0087).
+    pub write_folders: Vec<String>,
 }
 
 /// Where the proxy's Unix socket appears inside a Linux worker's namespace: a
@@ -171,6 +173,7 @@ impl Policy {
             proxy_socket: None,
             ports: Vec::new(),
             read_folders: Vec::new(),
+            write_folders: Vec::new(),
         }
     }
 }
@@ -222,6 +225,7 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
     for path in [&policy.folder, &policy.bin]
         .into_iter()
         .chain(&policy.read_folders)
+        .chain(&policy.write_folders)
     {
         profile.push_str(&format!("(allow file-read* (subpath {}))\n", quote(path)));
     }
@@ -231,6 +235,9 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
         "(allow file-write* (subpath {}))\n",
         quote(&policy.folder)
     ));
+    for path in &policy.write_folders {
+        profile.push_str(&format!("(allow file-write* (subpath {}))\n", quote(path)));
+    }
     // Every command needs to be able to throw output away.
     profile.push_str("(allow file-write* (literal \"/dev/null\"))\n");
     profile.push_str("(deny network*)\n");
@@ -276,6 +283,9 @@ pub fn bwrap_args(policy: &Policy) -> Vec<String> {
     ]);
     for folder in &policy.read_folders {
         args.extend(["--ro-bind".into(), folder.clone(), folder.clone()]);
+    }
+    for folder in &policy.write_folders {
+        args.extend(["--bind".into(), folder.clone(), folder.clone()]);
     }
     args.extend([
         "--chdir".into(),

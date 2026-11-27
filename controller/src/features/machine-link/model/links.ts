@@ -230,13 +230,13 @@ export function createMachineLinks({
       for (const task of await addListedTasks(database, machine.id, message.body.tasks)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent, after: task.after } });
     } else if (message.type === "error" && message.body.ref) {
       const about = sentTo.get(message.body.ref);
-      if (about && about.kind !== "hello") await failSent(about, message.body.ref, message.body.code);
+      if (about && about.kind !== "hello") await failSent(about, message.body.ref, message.body.code, message.body.params);
       else await failPendingMessage(database, message.body.ref, message.body.code);
     }
   }
 
   /** Land the error about one envelope on the ask it belongs to; a plain message's goes to its pending row. */
-  async function failSent(about: { machine: string; kind: Kind; request?: string }, ref: string, code: string) {
+  async function failSent(about: { machine: string; kind: Kind; request?: string }, ref: string, code: string, params?: Record<string, string | number | boolean>) {
     // An offer the Machine could not take: the Hub carries everything, as before.
     if (about.kind === "direct") directs.get(about.machine)?.close();
     else if (about.kind === "usage") {
@@ -247,7 +247,7 @@ export function createMachineLinks({
     else if (about.kind === "trigger" && about.request) setTriggers(memoryKey(about.machine, about.request), { loading: false, sending: false, error: code });
     else if (about.kind === "download" && about.request) files.settle(about.request, new Error(code));
     else if (about.kind === "create") setStatus(about.machine, { createError: code });
-    else if (about.kind === "update") setStatus(about.machine, { updateError: code });
+    else if (about.kind === "update") setStatus(about.machine, { updateError: code, updateErrorParams: params ?? null });
     else if (about.kind === "delete") setStatus(about.machine, { deleteError: code });
     else if (about.kind === "restore") setStatus(about.machine, { restoreError: code });
     else if (about.kind === "stop") setStatus(about.machine, { stopError: code });
@@ -421,7 +421,7 @@ export function createMachineLinks({
      * `agent.listed` says so (ADR 0006). The sig, or null when the Hub is not connected and nothing went.
      */
     updateAgent(machine: Machine, body: AgentUpdateBody) {
-      setStatus(machine.id, { updateError: null });
+      setStatus(machine.id, { updateError: null, updateErrorParams: null });
       return sendTo(machine, "update", { type: "agent.update", body });
     },
 

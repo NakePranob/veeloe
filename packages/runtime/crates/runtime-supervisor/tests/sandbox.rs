@@ -123,6 +123,30 @@ mod running {
         assert!(!neighbour.status.success(), "a folder not given was read");
     }
 
+    #[test]
+    fn a_folder_given_to_write_takes_writes_and_one_beside_it_does_not() {
+        let mut home = home();
+        let shop = home.root.join("code/shop");
+        let docs = home.root.join("code/docs");
+        fs::create_dir_all(&shop).expect("shop");
+        fs::create_dir_all(&docs).expect("docs");
+        home.policy.write_folders = vec![shop.to_string_lossy().to_string()];
+        home.policy.read_folders = vec![docs.to_string_lossy().to_string()];
+
+        let write = run(&home, &format!("echo built > {}/out.txt", shop.display()));
+        assert!(write.status.success(), "{write:?}");
+        assert_eq!(
+            fs::read_to_string(shop.join("out.txt")).expect("out"),
+            "built\n"
+        );
+
+        let read_only = run(&home, &format!("touch {}/new.txt", docs.display()));
+        assert!(
+            !read_only.status.success(),
+            "a read-only folder was written"
+        );
+    }
+
     fn write_script(home: &Home, name: &str, text: &str) {
         fs::write(Path::new(&home.policy.workdir).join(name), text).expect("script");
     }

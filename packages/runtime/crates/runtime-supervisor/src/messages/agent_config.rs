@@ -237,6 +237,37 @@ async fn save(
                 Err(code) => return outbox.error(from, code),
             }
         }
+        // One writer per folder (ADR 0037, 0087): another Agent that writes
+        // this folder, one inside it or one around it, keeps it.
+        let others = registry.all().unwrap_or_default();
+        for folder in checked
+            .iter()
+            .filter(|folder| folder.mode == crate::agents::Mode::Write)
+        {
+            let mine = std::path::Path::new(&folder.path);
+            let holder = others.iter().find(|other| {
+                other.id != id
+                    && !other.deleted()
+                    && other.access.files == crate::agents::Level::Selected
+                    && other.access.folders.iter().any(|theirs| {
+                        let path = std::path::Path::new(&theirs.path);
+                        theirs.mode == crate::agents::Mode::Write
+                            && (path.starts_with(mine) || mine.starts_with(path))
+                    })
+            });
+            if let Some(holder) = holder {
+                return outbox.to_member(
+                    &from.member,
+                    "error",
+                    serde_json::json!({
+                        "code": "folder.taken",
+                        "ref": from.reference,
+                        "params": { "agent": holder.name },
+                    }),
+                    from.task.as_deref(),
+                );
+            }
+        }
         crate::agents::Access {
             files,
             folders: checked,

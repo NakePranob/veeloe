@@ -147,7 +147,13 @@ pub fn rules(
         );
         for folder in &agent.access.folders {
             match forbidden.check(&folder.path) {
-                Ok(real) => policy.read_folders.push(real.to_string_lossy().to_string()),
+                Ok(real) => {
+                    let path = real.to_string_lossy().to_string();
+                    match folder.mode {
+                        crate::agents::Mode::Read => policy.read_folders.push(path),
+                        crate::agents::Mode::Write => policy.write_folders.push(path),
+                    }
+                }
                 Err(code) => {
                     let _ = crate::logs::record(
                         home,

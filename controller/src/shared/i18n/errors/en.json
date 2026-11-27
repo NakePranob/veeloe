@@ -22,6 +22,7 @@
   "folder.missing": "There is no such folder on the Machine.",
   "folder.not_a_folder": "That path is a file, not a folder.",
   "folder.not_absolute": "Enter a full path starting with /.",
+  "folder.taken": "{{agent}} already writes this folder. One Agent at a time may write a folder: make it read only here, or remove it from {{agent}} first.",
   "git.forbidden": "Only the Owner can change an Agent's repos right now",
   "git.invalid_repo": "A repo is not owner/name on GitHub, so nothing was saved",
   "hub.device_offline": "Your other device isn't showing this QR code any more. Open Link new device on it again",

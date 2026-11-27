@@ -22,6 +22,7 @@
   "folder.missing": "ไม่มีโฟลเดอร์นี้บน Machine",
   "folder.not_a_folder": "path นี้เป็นไฟล์ ไม่ใช่โฟลเดอร์",
   "folder.not_absolute": "ใส่ path เต็มที่ขึ้นต้นด้วย /",
+  "folder.taken": "{{agent}} เขียนโฟลเดอร์นี้อยู่ โฟลเดอร์หนึ่งให้ Agent เขียนได้ทีละตัว ให้อ่านอย่างเดียว หรือเอาออกจาก {{agent}} ก่อน",
   "git.forbidden": "ตอนนี้แก้ repo ของ Agent ได้เฉพาะ Owner",
   "git.invalid_repo": "มี repo ที่ไม่ใช่ owner/name บน GitHub จึงไม่ได้บันทึกอะไร",
   "hub.device_offline": "เครื่องเดิมไม่ได้แสดง QR นี้แล้ว ให้เปิด Link เครื่องใหม่บนเครื่องนั้นอีกครั้ง",
