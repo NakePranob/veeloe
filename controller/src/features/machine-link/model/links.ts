@@ -446,6 +446,11 @@ export function createMachineLinks({
      * Names this Task (`task.rename`). The name shows once the Machine's `task.titled`
      * lands. The sig, or null when the Hub is not connected and nothing went.
      */
+    /** Every event of one Task again, from the start: for a quiet round whose log this device let go. */
+    refetchTask(machine: Machine, { agent, task }: { agent: string; task: string }) {
+      return sendTo(machine, "other", { type: "task.sync", task, body: { agent, after: 0 } });
+    },
+
     renameTask(machine: Machine, { agent, task, title }: { agent: string; task: string; title: string }) {
       return sendTo(machine, "other", { type: "task.rename", task, body: { agent, title } });
     },

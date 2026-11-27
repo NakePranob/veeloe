@@ -16,6 +16,7 @@ export {
   markPendingSent,
   needsYou,
   previewOf,
+  pruneQuietRounds,
   saveTaskEvents,
   STATUS_DOT,
   statusOf,

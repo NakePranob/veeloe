@@ -1,10 +1,10 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlatList, KeyboardAvoidingView, View, type TextInputInstance } from "react-native";
 import { allowlistOf } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
-import { latestOf, statusOf, titleOfEvents, usePendingMessages, useTaskEvents } from "../../../entities/task";
+import { latestOf, statusOf, titleOfEvents, usePendingMessages, useTaskEvents, useTaskRow } from "../../../entities/task";
 import { useMachineLink } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
@@ -63,6 +63,13 @@ export function TaskPage() {
   const ticking = !!settled?.items.some((item) => item.kind === "approval" && item.approval.status === "open");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `ticking && now` makes the clock a dependency only while it can change the log
   const log = useMemo(() => (events && ticking ? items(events, now) : settled), [events, ticking, ticking && now, settled]);
+  // A quiet Schedule round this device let the log of go (pruneQuietRounds): it had events, and has none here now.
+  const row = useTaskRow(task)?.[0];
+  const pruned = events?.length === 0 && (row?.synced_seq ?? 0) > 0;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on ids, since a live query hands back a new Machine row on every write
+  useEffect(() => {
+    if (pruned && link && screen?.machine) link.refetchTask(screen.machine, { agent: agentId, task });
+  }, [pruned, link, screen?.machine?.id, agentId, task]);
   const composer = useComposer({ task, screen, link, events: events ?? undefined, log: log?.items, onSend: followEnd });
   const schedule = useScheduleScope(events, screen?.machine, agentId, screen?.status.online ?? null);
 

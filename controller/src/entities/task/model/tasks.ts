@@ -37,6 +37,19 @@ export function saveTaskEvents(database: Database, { task, agent, machine }: { t
   });
 }
 
+/** How long a Schedule round that ended with nothing to say keeps its log on this device. */
+export const QUIET_KEPT_DAYS = 30;
+
+/**
+ * Frees the logs of quiet Schedule rounds older than QUIET_KEPT_DAYS: they are most of what a Schedule
+ * leaves, and nobody reads them. The row stays, with its summary and where its sync got to, so the thread
+ * still counts the round as "nothing" and the Machine is not asked for it again; opening one asks it then.
+ */
+export function pruneQuietRounds(database: Database, now = Date.now()) {
+  const before = now - QUIET_KEPT_DAYS * 24 * 60 * 60 * 1000;
+  return database.write([TASK_TOPIC], (transaction) => transaction.run("DELETE FROM task_event WHERE task_id IN (SELECT id FROM task WHERE quiet = 1 AND trigger_id IS NOT NULL AND updated_at < ?)", [before]));
+}
+
 /** A message the Owner sent, shown as sending until the Machine writes it into the log. */
 export function addPendingMessage(database: Database, { id, task, agent, machine, text }: { id: string; task: string; agent: string; machine: string; text: string }) {
   return database.write([TASK_TOPIC], async (transaction) => {

@@ -11,6 +11,7 @@ import {
   LIST_TASK_SUMMARIES,
   LIST_THREAD_HEADS,
   markPendingSent,
+  pruneQuietRounds,
   saveTaskEvents,
   statusOf,
   TASK_TOPIC,
@@ -193,4 +194,22 @@ test("a Task with no events yet still saves and is not quiet", async () => {
   const database = await open();
   await saveTaskEvents(database, where, [event(1, "task.titled", { title: "x" })]);
   expect((await database.query<TaskSummary>(LIST_TASK_SUMMARIES))[0]?.quiet).toBe(0);
+});
+
+test("an old quiet Schedule round gives its log back and keeps its row; a new one or a typed Task keeps both", async () => {
+  const database = await open();
+  const day = 24 * 60 * 60 * 1000;
+  const save = (task: string, at: number, reason: string, trigger?: string) =>
+    saveTaskEvents(database, { ...where, task }, [
+      { ...event(1, "member.message", { text: "x", ...(trigger ? { trigger: { kind: "schedule", id: trigger, at } } : {}) }), at },
+      { ...event(2, "turn.ended", { reason }), at },
+    ]);
+  await save("old-quiet", 1, "quiet", "tr_1");
+  await save("old-told", 1, "done", "tr_1");
+  await save("new-quiet", 40 * day, "quiet", "tr_1");
+  await pruneQuietRounds(database, 40 * day);
+  const left = await database.query<{ task_id: string }>("SELECT DISTINCT task_id FROM task_event ORDER BY task_id");
+  expect(left.map((r) => r.task_id)).toEqual(["new-quiet", "old-told"]);
+  const rows = await database.query<TaskSummary>("SELECT * FROM task WHERE id = 'old-quiet'");
+  expect(rows[0]).toMatchObject({ quiet: 1, synced_seq: 2, events: 2 });
 });

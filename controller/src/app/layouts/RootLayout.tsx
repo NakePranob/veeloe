@@ -1,11 +1,13 @@
 import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useGlobalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CreateKeyPage } from "../../pages/create-key";
 import { LockPage } from "../../pages/lock";
 import { StorageUnavailablePage } from "../../pages/storage-unavailable";
 import { listDevices } from "../../entities/device";
+import { pruneQuietRounds } from "../../entities/task";
 import { useMachineLinks } from "../../features/machine-link";
 import { DatabaseProvider, useDatabase } from "../../shared/db";
 import { deviceLanguage, initI18n, useT } from "../../shared/i18n";
@@ -28,6 +30,10 @@ initI18n(resources, deviceLanguage());
 function MachineLinks() {
   const t = useT("devices");
   const database = useDatabase();
+  // Old quiet Schedule rounds give their logs back once per launch; the Tasks stay listed.
+  useEffect(() => {
+    void pruneQuietRounds(database);
+  }, [database]);
   useMachineLinks({
     onRevoked: () => void forgetThisDevice(database).then(() => inform(t("revoked.title"), t("revoked.body"))),
     // ponytail: an alert in the app stands in for the push the prototype shows, until there is push (ADR 0044).

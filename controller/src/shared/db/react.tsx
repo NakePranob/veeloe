@@ -12,8 +12,12 @@ export function useDatabase() {
   return database;
 }
 
+/** The shortest gap between two reads of one live query: a Turn writes events many times a second. */
+const READ_GAP_MS = 200;
+
 /**
- * Rows that stay current: read now, and again after each commit on `topics`.
+ * Rows that stay current: read now, and again after each commit on `topics`, at most once per
+ * READ_GAP_MS: commits in between are one read after the gap, so the last one is never missed.
  * Null until the first read lands, so a screen never shows "empty" while loading.
  */
 export function useLiveQuery<Row>(sql: string, params: SQLiteBindParams, topics: readonly string[]) {
@@ -39,10 +43,24 @@ export function useLiveQuery<Row>(sql: string, params: SQLiteBindParams, topics:
         },
       );
     };
+    let lastRead = Date.now();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const changed = () => {
+      if (timer) return;
+      timer = setTimeout(
+        () => {
+          timer = null;
+          lastRead = Date.now();
+          read();
+        },
+        Math.max(0, lastRead + READ_GAP_MS - Date.now()),
+      );
+    };
     read();
-    const unsubscribe = database.subscribe(topicsKey.split("\n"), read);
+    const unsubscribe = database.subscribe(topicsKey.split("\n"), changed);
     return () => {
       latest = -1;
+      if (timer) clearTimeout(timer);
       unsubscribe();
     };
   }, [database, sql, paramsKey, topicsKey]);
