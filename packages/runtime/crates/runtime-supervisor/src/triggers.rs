@@ -42,6 +42,12 @@ pub struct TriggerRecord {
     pub notify: Option<String>,
     #[serde(default)]
     pub paused: bool,
+    /// Rounds in a row that ended in an error (ADR 0083); a done or quiet round clears it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub failed_rounds: u32,
+    /// Why it is paused when the Machine paused it, not a Member: `failures` (ADR 0083).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_for: Option<String>,
     /// Its key was revoked or its Member lost Use: it never runs again.
     #[serde(default)]
     pub suspended: bool,
@@ -62,6 +68,13 @@ pub struct TriggerRecord {
     /// The signed envelope as it arrived.
     pub envelope: Value,
 }
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
+/// A Schedule pauses itself after this many rounds in a row end in an error (ADR 0083).
+pub const FAILED_ROUNDS_TO_PAUSE: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LastSkip {
@@ -113,6 +126,12 @@ impl TriggerRecord {
         if let Some(skip) = &self.last_skip {
             value["lastSkip"] = json!({ "at": skip.at, "why": skip.why });
         }
+        if self.failed_rounds > 0 {
+            value["failedRounds"] = json!(self.failed_rounds);
+        }
+        if let Some(why) = &self.paused_for {
+            value["pausedFor"] = json!(why);
+        }
         if !self.paused && !self.suspended {
             if let Some(schedule) = Schedule::parse(&self.schedule) {
                 let after = self.last_run_at.unwrap_or(self.created_at);
@@ -148,6 +167,8 @@ pub struct Triggers {
     /// The Tasks this process started from a Trigger, and its kind, so usage
     /// can say where tokens went (`schedule`, ADR 0043).
     started: Mutex<HashMap<String, String>>,
+    /// The Schedule each round in flight belongs to: Task id to (Agent, Trigger id).
+    rounds: Mutex<HashMap<String, (String, String)>>,
     /// What each Agent proposed for its Idle Work list, not signed (ADR 0056).
     drafts_file: PathBuf,
     drafts: Mutex<HashMap<String, Vec<String>>>,
@@ -190,6 +211,7 @@ impl Triggers {
             file,
             records: Mutex::new(records),
             started: Mutex::new(HashMap::new()),
+            rounds: Mutex::new(HashMap::new()),
             drafts_file,
             drafts: Mutex::new(drafts),
             skipped: Mutex::new(HashSet::new()),
@@ -292,6 +314,45 @@ impl Triggers {
                 }
             }
         })
+    }
+
+    /// A Schedule round's Turn ended (ADR 0083): an error counts one more failure
+    /// in a row, a done or quiet round clears the count, a Stop or a spent Budget
+    /// leaves it. The third failure in a row pauses the Schedule. The round's
+    /// Agent, Schedule and signer, and whether this end paused it; None for a
+    /// Task that is no Schedule round.
+    pub fn finish_round(
+        &self,
+        task: &str,
+        ended: &Value,
+    ) -> Result<Option<(String, String, String, bool)>, TriggerError> {
+        let Some((agent, id)) = self.rounds.lock().expect("rounds").remove(task) else {
+            return Ok(None);
+        };
+        let reason = ended.get("reason").and_then(Value::as_str).unwrap_or("");
+        // A spent Budget ends the Turn as an error too, but the Schedule did nothing wrong.
+        let budget = ended
+            .get("code")
+            .and_then(Value::as_str)
+            .is_some_and(|code| code.starts_with("budget."));
+        let mut paused_now = false;
+        let mut member = String::new();
+        self.update(&agent, &id, |record| {
+            member = record.member.clone();
+            match reason {
+                "error" if !budget => {
+                    record.failed_rounds += 1;
+                    if record.failed_rounds >= FAILED_ROUNDS_TO_PAUSE && !record.paused {
+                        record.paused = true;
+                        record.paused_for = Some("failures".to_string());
+                        paused_now = true;
+                    }
+                }
+                "done" | "quiet" => record.failed_rounds = 0,
+                _ => {}
+            }
+        })?;
+        Ok(Some((agent, id, member, paused_now)))
     }
 
     /// Keep this Trigger, replacing one with the same Agent and id whole.
@@ -519,6 +580,13 @@ fn send_round(
         return None;
     }
     triggers.started(&task, &record.kind);
+    if record.kind == "schedule" {
+        triggers
+            .rounds
+            .lock()
+            .expect("rounds")
+            .insert(task.clone(), (record.agent.clone(), record.id.clone()));
+    }
     Some(task)
 }
 
@@ -806,6 +874,8 @@ mod tests {
             progress: Default::default(),
             notify: None,
             paused: false,
+            failed_rounds: 0,
+            paused_for: None,
             suspended: false,
             created_at: wednesday(0, 0),
             last_run_at: None,
@@ -814,6 +884,51 @@ mod tests {
             last_skip: None,
             envelope: json!({}),
         }
+    }
+
+    #[test]
+    fn three_failed_rounds_in_a_row_pause_a_schedule_and_a_good_round_clears_the_count() {
+        let home = tempdir().expect("home");
+        let triggers = Triggers::open(home.path()).expect("open");
+        triggers
+            .set(record(json!({ "every": "day" })))
+            .expect("set");
+        let round = |task: &str, reason: &str| {
+            let ended = if reason == "budget" {
+                json!({ "reason": "error", "code": "budget.exhausted" })
+            } else {
+                json!({ "reason": reason })
+            };
+            triggers
+                .rounds
+                .lock()
+                .expect("rounds")
+                .insert(task.into(), ("a1".into(), "tr_1".into()));
+            triggers.finish_round(task, &ended).expect("finish")
+        };
+        let held = || triggers.get("a1", "tr_1").expect("held");
+        assert_eq!(round("t1", "error").map(|r| r.3), Some(false));
+        assert_eq!(round("t2", "error").map(|r| r.3), Some(false));
+        // A done round clears the count; a Stop or a spent Budget leaves it.
+        round("t3", "done");
+        assert_eq!(held().failed_rounds, 0);
+        round("t4", "error");
+        round("t5", "stopped");
+        round("t6", "budget");
+        assert_eq!(held().failed_rounds, 1);
+        round("t7", "error");
+        let third = round("t8", "error").expect("a round");
+        assert_eq!((third.2.as_str(), third.3), ("m_1", true));
+        assert!(held().paused);
+        assert_eq!(held().paused_for.as_deref(), Some("failures"));
+        assert_eq!(held().listed(&Utc)["pausedFor"], json!("failures"));
+        // A Task that is no Schedule round is not counted.
+        assert_eq!(
+            triggers
+                .finish_round("typed", &json!({ "reason": "error" }))
+                .expect("finish"),
+            None
+        );
     }
 
     fn now(ms: u64) -> Now {

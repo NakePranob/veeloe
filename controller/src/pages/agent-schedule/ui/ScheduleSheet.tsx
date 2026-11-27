@@ -167,7 +167,7 @@ function Rounds({ trigger, agentId, agentName, last, locked, sign }: { trigger: 
       {!trigger.suspended && (
         <ToggleRow
           title={t("enabled")}
-          detail={trigger.paused ? t("state.paused") : trigger.nextRunAt ? t("state.next", { when: whenShort(trigger.nextRunAt, language) }) : undefined}
+          detail={trigger.pausedFor === "failures" ? t("state.pausedFailures") : trigger.paused ? t("state.paused") : trigger.nextRunAt ? t("state.next", { when: whenShort(trigger.nextRunAt, language) }) : undefined}
           value={!trigger.paused}
           onChange={(on) => void sign(t(on ? "authenticate.resume" : "authenticate.pause", { name: agentName }), { type: on ? "trigger.resume" : "trigger.pause", body: { agent: agentId, id: trigger.id } })}
         />

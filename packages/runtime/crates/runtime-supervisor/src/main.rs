@@ -249,6 +249,22 @@ impl Supervisor {
                         veeloe_runtime_supervisor::usage::now_ms() as u64,
                     );
                 }
+                // A Schedule round that ended in an error counts toward pausing it (ADR 0083).
+                if let Ok(Some((agent, _, member, paused_now))) =
+                    self.triggers.finish_round(task, &event.body)
+                {
+                    if let Some(outbox) = self.outbox.lock().expect("outbox").as_ref() {
+                        outbox.to_member(
+                            &member,
+                            "trigger.listed",
+                            self.triggers.listed_body(&agent),
+                            None,
+                        );
+                    }
+                    if paused_now {
+                        self.push(PushKind::SchedulePaused, &agent, task, &member, None);
+                    }
+                }
                 let piece = self.triggers.piece_of(task);
                 if self
                     .triggers
@@ -381,6 +397,18 @@ impl Supervisor {
             "turn.ended" => (PushKind::TurnEnded, None),
             _ => return,
         };
+        self.push(kind, agent, task, starter, approval);
+    }
+
+    /// Sends one Generic Push to whoever `kind` goes to (ADR 0044).
+    fn push(
+        &self,
+        kind: PushKind,
+        agent: &str,
+        task: &str,
+        starter: &str,
+        approval: Option<String>,
+    ) {
         let tokens = recipients(
             &self.trust.lock().expect("trust"),
             &self.push_tokens.all(),
@@ -394,7 +422,7 @@ impl Supervisor {
         let held = Arc::clone(&self.push_tokens);
         let home = self.home.clone();
         let agent = agent.to_string();
-        let task = task.clone();
+        let task = task.to_string();
         tokio::spawn(async move {
             match push
                 .send(&tokens, kind, &agent, &task, approval.as_deref())

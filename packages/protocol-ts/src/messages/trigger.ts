@@ -98,6 +98,10 @@ export const ListedTriggerSchema = TriggerFields.extend({
   title: z.string().min(1).max(60).optional(),
   /** The last round that did not start: the Agent was busy or its Budget spent. */
   lastSkip: z.looseObject({ at: z.number().int().nonnegative(), why: z.enum(["busy", "budget"]) }).optional(),
+  /** Rounds in a row that ended in an error (ADR 0083); absent at none. */
+  failedRounds: z.number().int().nonnegative().optional(),
+  /** Why the Machine paused it itself: `failures` after three failed rounds in a row (ADR 0083). Absent when a Member paused it. */
+  pausedFor: z.string().min(1).max(32).optional(),
   /** An Idle Work list's pieces still on it, with where each stands; a finished one-off piece is gone. */
   progress: z.array(IdleProgressSchema).max(IDLE_ITEMS_MAX).optional(),
 }).refine(kindFits);

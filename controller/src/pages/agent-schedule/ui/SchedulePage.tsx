@@ -65,7 +65,15 @@ function ScheduleList({ agentId, agentName, machine }: { agentId: string; agentN
         <Section footer={t("note")}>
           {triggers.map((trigger) => {
             const round = lastRoundOf(trigger, last.get(trigger.id));
-            const when = trigger.suspended ? t("state.suspended") : trigger.paused ? t("state.paused") : trigger.nextRunAt ? t("state.next", { when: whenShort(trigger.nextRunAt, language) }) : null;
+            const when = trigger.suspended
+              ? t("state.suspended")
+              : trigger.pausedFor === "failures"
+                ? t("state.pausedFailures")
+                : trigger.paused
+                  ? t("state.paused")
+                  : trigger.nextRunAt
+                    ? t("state.next", { when: whenShort(trigger.nextRunAt, language) })
+                    : null;
             return (
               <Row
                 key={trigger.id}

@@ -99,6 +99,8 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
             .and_then(Value::as_str)
             .map(str::to_string),
         paused: false,
+        failed_rounds: 0,
+        paused_for: None,
         suspended: false,
         created_at: now(),
         last_run_at: None,
@@ -179,9 +181,12 @@ pub(crate) fn pause(
     let id = body.get("id").and_then(Value::as_str).unwrap_or_default();
     match triggers.update(&agent, id, |record| {
         record.paused = paused;
-        // A resume counts from now: what was due while paused is not owed.
+        // A resume counts from now: what was due while paused is not owed, and
+        // a Schedule that paused itself after failing starts its count again (ADR 0083).
         if !paused {
             record.last_run_at = Some(now());
+            record.failed_rounds = 0;
+            record.paused_for = None;
         }
     }) {
         Ok(true) => listed(outbox, from, triggers, &agent),

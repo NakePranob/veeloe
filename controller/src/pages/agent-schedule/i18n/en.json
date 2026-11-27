@@ -38,7 +38,8 @@
   "state": {
     "next": "Next round {{when}}",
     "paused": "Paused",
-    "suspended": "Stopped for good: the key that set it was revoked"
+    "suspended": "Stopped for good: the key that set it was revoked",
+    "pausedFailures": "Paused itself after 3 failed rounds in a row; turn it on to try again"
   },
   "problem": {
     "empty": {
