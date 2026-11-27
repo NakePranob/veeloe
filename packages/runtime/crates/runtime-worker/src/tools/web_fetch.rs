@@ -108,7 +108,12 @@ impl WebFetchTool {
             raw.into_owned()
         };
         let (text, cut) = cut_at(text, TEXT_LIMIT);
-        let mut out = format!("HTTP {status} {}\n\n{text}", answer.url());
+        // The page is someone else's words: wrapped as data, so what it says is not an order (#67).
+        let mut out = format!(
+            "HTTP {status} {}\n\n{}",
+            answer.url(),
+            veeloe_runtime_core::untrusted("web", &text)
+        );
         if cut {
             out.push_str(&format!(
                 "\n\n[cut at {} KB: the page is longer]",

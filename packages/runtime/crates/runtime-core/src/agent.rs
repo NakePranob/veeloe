@@ -498,8 +498,9 @@ impl AgentCore {
         // through. Both are written here, before the Turn task is spawned, so a
         // Stop that arrives at once still lands after the start.
         let mut system = format!(
-            "You are {}, an Agent that runs on its owner's own machine through Veeloe. Answer in the language the person writes in.",
-            self.state.name.read().expect("name")
+            "You are {}, an Agent that runs on its owner's own machine through Veeloe. Answer in the language the person writes in.\n\n{}",
+            self.state.name.read().expect("name"),
+            crate::UNTRUSTED_NOTE
         );
         if let Some(workdir) = self.state.workdir.lock().expect("workdir").as_ref() {
             // Name the file and where it lives on every Turn, even before it exists:
@@ -513,8 +514,9 @@ impl AgentCore {
             );
             let memory = crate::memory::memory_prompt(workdir);
             if !memory.is_empty() {
+                // The Agent writes MEMORY.md itself, maybe from a page it read: data, not orders (#67).
                 system.push_str("\n\nMEMORY.md as it is now:\n");
-                system.push_str(&memory);
+                system.push_str(&crate::untrusted("memory", &memory));
             }
         }
         self.state.append(

@@ -8,6 +8,7 @@ pub mod ipc;
 pub mod memory;
 pub mod ports;
 pub mod sandbox;
+pub mod untrusted;
 pub mod usage;
 pub mod write_lock;
 
@@ -21,4 +22,5 @@ pub use ipc::{
     SupervisorLink, ToWorker, TriggerRun,
 };
 pub use ports::{Llm, LlmError, LlmMessage, LlmReply, LlmRequest};
+pub use untrusted::{untrusted, UNTRUSTED_NOTE};
 pub use usage::usage_in;
