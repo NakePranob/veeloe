@@ -56,6 +56,16 @@ pub(crate) fn message(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound
     let Some((agent, task)) = target(machine, outbox, from, body) else {
         return;
     };
+    // An Agent that reaches past its own folder takes work from an Owner who
+    // signed it, and from no one else (ADR 0087): its sandbox is the Agent's,
+    // so a Member's Turn cannot run narrower than the Owner's.
+    if agent.access.files != crate::agents::Level::Folder
+        && !machine
+            .trust
+            .is_some_and(|trust| trust.manages(&from.member, from.key.as_deref()))
+    {
+        return outbox.error(from, "files.owner_only");
+    }
     let registry = machine.registry;
     let workers = machine.workers;
     if let Some(budgets) = machine.budgets {

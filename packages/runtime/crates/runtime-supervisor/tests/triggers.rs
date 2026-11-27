@@ -434,3 +434,56 @@ async fn a_piece_finishes_done_and_leaves_or_is_marked_by_how_its_turn_ended() {
         .finish_piece("someone-else", &json!({ "reason": "done" }))
         .expect("other"));
 }
+
+/// Issue #87: an Agent that reaches past its own folder runs no Trigger and
+/// takes work from an Owner only; one that has Triggers is not widened.
+#[tokio::test]
+async fn a_wide_agent_runs_no_trigger_and_works_only_for_an_owner() {
+    let fixture = Fixture::new();
+    let owner = from("member-1", "controller-1");
+    assert_eq!(
+        fixture.send(&owner, "trigger.set", daily("tr_1")).await.0,
+        "trigger.listed"
+    );
+
+    // Widening while a Trigger is there: refused, with how many to remove first.
+    let (_, body) = fixture
+        .send(
+            &owner,
+            "agent.update",
+            json!({ "id": "a1", "files": "machine" }),
+        )
+        .await;
+    assert_eq!(body["code"], "files.has_triggers", "{body}");
+    assert_eq!(body["params"]["count"], 1);
+
+    // Once it is wide, no Trigger can be set on it.
+    fixture
+        .send(
+            &owner,
+            "trigger.delete",
+            json!({ "agent": "a1", "id": "tr_1" }),
+        )
+        .await;
+    let mut wide = fixture.registry.get("a1").expect("get").expect("a1");
+    wide.access.files = veeloe_runtime_supervisor::agents::Level::Machine;
+    fixture.registry.replace(&wide).expect("replace");
+    assert_eq!(
+        fixture.send(&owner, "trigger.set", daily("tr_2")).await.1["code"],
+        "files.wide_agent"
+    );
+
+    // A Member who is not an Owner gives it no work.
+    let stranger = Inbound {
+        task: Some("t1".into()),
+        ..from("member-2", "controller-2")
+    };
+    let (_, body) = fixture
+        .send(
+            &stranger,
+            "task.message",
+            json!({ "agent": "a1", "id": "m1", "text": "hi" }),
+        )
+        .await;
+    assert_eq!(body["code"], "files.owner_only", "{body}");
+}

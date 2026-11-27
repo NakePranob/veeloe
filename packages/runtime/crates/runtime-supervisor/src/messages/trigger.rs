@@ -56,6 +56,17 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     let Some((triggers, agent)) = checked(machine, outbox, from, body) else {
         return;
     };
+    // Nobody watches a round a Trigger starts, so an Agent that reaches past
+    // its own folder runs none (ADR 0087).
+    if machine
+        .registry
+        .get(&agent)
+        .ok()
+        .flatten()
+        .is_some_and(|found| found.access.files != crate::agents::Level::Folder)
+    {
+        return outbox.error(from, "files.wide_agent");
+    }
     let (Some(trigger), Some(key)) = (body.get("trigger"), from.key.as_deref()) else {
         return outbox.error(from, "trigger.invalid");
     };

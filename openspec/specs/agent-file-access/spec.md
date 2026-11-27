@@ -56,3 +56,14 @@ Agent ระดับ `machine` SHALL อ่านและเขียนได
 #### Scenario: แตะโฟลเดอร์ของ Runtime
 - **WHEN** คำสั่งเดียวกันอ่าน `providers.json` ของ Runtime หรือ Workdir ของ Agent อื่น
 - **THEN** ถูกปฏิเสธ
+
+### Requirement: Agent ที่กว้างเป็นของ Owner ที่สั่งเอง
+Agent ระดับ `selected` หรือ `machine` SHALL รับ `task.message` จากกุญแจของ Owner เท่านั้น คนอื่น SHALL ได้ `files.owner_only` และ SHALL NOT มี Trigger: `trigger.set` SHALL ได้ `files.wide_agent` และการขยายระดับของ Agent ที่ยังมี Trigger SHALL ได้ `files.has_triggers` พร้อมจำนวน (ADR 0087) ยังไม่มี Grant ของ Member อื่น, Channel หรือ Team ในโค้ด จึงยังไม่มีอะไรให้ปฏิเสธในส่วนนั้น
+
+#### Scenario: ขยายระดับตอนยังมี Schedule
+- **WHEN** Owner ขยาย Agent ที่มี Schedule หนึ่งอันเป็นทั้งเครื่อง
+- **THEN** Runtime ตอบ `files.has_triggers` ที่บอกว่ามี 1 อัน และระดับไม่เปลี่ยน
+
+#### Scenario: Member อื่นสั่งงาน Agent ที่กว้าง
+- **WHEN** Member ที่ไม่ใช่ Owner ส่ง `task.message` ถึง Agent ระดับ `machine`
+- **THEN** Runtime ตอบ `files.owner_only` และไม่มี Turn เริ่ม

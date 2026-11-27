@@ -237,6 +237,26 @@ async fn save(
                 Err(code) => return outbox.error(from, code),
             }
         }
+        // An Agent that reaches past its own folder runs no Trigger (ADR 0087):
+        // the ones it has go first, and the Owner is told how many.
+        if files != crate::agents::Level::Folder {
+            let held = machine
+                .triggers
+                .map(|triggers| triggers.for_agent(id).len())
+                .unwrap_or(0);
+            if held > 0 {
+                return outbox.to_member(
+                    &from.member,
+                    "error",
+                    serde_json::json!({
+                        "code": "files.has_triggers",
+                        "ref": from.reference,
+                        "params": { "count": held },
+                    }),
+                    from.task.as_deref(),
+                );
+            }
+        }
         // One writer per folder (ADR 0037, 0087): another Agent that writes
         // this folder, one inside it or one around it, keeps it.
         let others = registry.all().unwrap_or_default();
