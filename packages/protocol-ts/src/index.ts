@@ -69,6 +69,7 @@ export {
   TaskStopBodySchema,
   TASK_TITLE_MAX,
   TaskTitled,
+  ApprovalSkipped,
   ToolOutputBodySchema,
   TaskSyncBodySchema,
   type TaskEvent,

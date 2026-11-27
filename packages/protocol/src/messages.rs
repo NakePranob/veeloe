@@ -482,6 +482,7 @@ fn is_trigger(object: &Map<String, Value>) -> bool {
             .get("notify")
             .map(|notify| matches!(notify.as_str(), Some("me" | "use")))
             .unwrap_or(true)
+        && object.get("allow").map(is_allowlist).unwrap_or(true)
 }
 
 fn is_trigger_set(object: &Map<String, Value>) -> bool {
@@ -512,6 +513,16 @@ fn is_listed_trigger(value: &Value) -> bool {
         && object.get("suspended").is_some_and(Value::is_boolean)
         && optional_ms("lastRunAt")
         && optional_ms("nextRunAt")
+        && object
+            .get("lastSkip")
+            .map(|skip| {
+                skip.get("at").is_some_and(|at| at.as_u64().is_some())
+                    && matches!(
+                        skip.get("why").and_then(Value::as_str),
+                        Some("busy" | "budget")
+                    )
+            })
+            .unwrap_or(true)
 }
 
 fn is_trigger_listed(object: &Map<String, Value>) -> bool {

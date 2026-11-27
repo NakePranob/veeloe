@@ -170,3 +170,37 @@ export function Separator({ at, now }: { at: number; now: number }) {
     </Text>
   );
 }
+
+/**
+ * What a round nobody watched did not do (ADR 0079), and, for a command its Schedule still does not cover,
+ * the way to let the next rounds do it. A domain goes in the Agent's Egress, not in a Schedule.
+ */
+export function SkippedCard({ item, entries, canScope, onScope }: { item: Extract<Item, { kind: "skipped" }>; entries: readonly string[] | null; canScope: boolean; onScope: () => Promise<boolean> }) {
+  const t = useT("task");
+  const [busy, setBusy] = useState(false);
+  async function scope() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await onScope();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card style={{ padding: space.inset, gap: space.smd }}>
+      <Label icon="approval" iconColor="orange" variant="subheadline" tone="label" strong>
+        {t(item.domain ? "skipped.domainTitle" : "skipped.title")}
+      </Label>
+      <Inset chip>
+        <Text variant="callout" mono selectable>
+          {item.target}
+        </Text>
+      </Inset>
+      <Text variant="footnote" tone="secondary">
+        {item.domain ? t("skipped.domainBody") : entries?.length === 0 ? t("skipped.covered") : t("skipped.body")}
+      </Text>
+      {!item.domain && entries && entries.length > 0 && <Button label={t("skipped.allow")} variant="primary" size="small" disabled={!canScope || busy} onPress={() => void scope()} />}
+    </Card>
+  );
+}

@@ -69,6 +69,8 @@ export type Item =
   /** Commands run back to back, with no words of the Agent between them. */
   | { key: string; kind: "tools"; calls: ToolCall[] }
   | { key: string; kind: "approval"; approval: Approval }
+  /** A round nobody watched did not ask and did not do this (ADR 0079): a command and its parts, or a domain. */
+  | { key: string; kind: "skipped"; target: string; parts: string[]; domain: boolean }
   /** A Member stopped the Turn that was running (ADR 0017). */
   | { key: string; kind: "stopped"; member: string; at: number }
   /** The worker started again with a Turn still open (ADR 0033). */
@@ -187,6 +189,10 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       };
       approvals.set(body.request, { item, index: out.length });
       out.push(item);
+    } else if (event.kind === "approval.skipped" && (typeof body.command === "string" || typeof body.domain === "string")) {
+      const domain = typeof body.domain === "string";
+      const target = domain ? String(body.domain) : String(body.command);
+      out.push({ key, kind: "skipped", target, domain, parts: domain ? [] : Array.isArray(body.parts) ? body.parts.filter((part): part is string => typeof part === "string") : [target] });
     } else if (event.kind === "approval.answered" && typeof body.request === "string" && typeof body.decision === "string") {
       const found = approvals.get(body.request);
       if (found) {

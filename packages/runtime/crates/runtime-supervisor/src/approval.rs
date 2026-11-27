@@ -54,6 +54,10 @@ pub struct Turn {
     pub member: String,
     /// `task:seq` of the `turn.started` event, for the log.
     pub id: String,
+    /// A Trigger's round that came due on its own: nobody is there to answer,
+    /// so it asks no one (ADR 0079). A worker that claims otherwise only makes
+    /// the proxy ask a person, which opens nothing.
+    pub unattended: bool,
 }
 
 /// The running Turn per Agent. No Turn means no way out: the proxy refuses a
@@ -75,12 +79,16 @@ impl Turns {
                     .and_then(Value::as_str)
                     .unwrap_or_default()
                     .to_string();
+                let unattended = event.body.get("trigger").is_some_and(|trigger| {
+                    trigger.get("attended").and_then(Value::as_bool) != Some(true)
+                });
                 self.running.lock().expect("turns").insert(
                     agent.to_string(),
                     Turn {
                         task: task.to_string(),
                         member,
                         id: format!("{task}:{}", event.seq),
+                        unattended,
                     },
                 );
             }
@@ -210,6 +218,20 @@ impl Approvals {
         let Some(turn) = self.current_turn(agent) else {
             return false;
         };
+        if turn.unattended {
+            // Written down so the owner sees what the round could not reach.
+            if let Ok(event) = self.logs.record(
+                agent,
+                &turn.task,
+                &turn.member,
+                "approval.skipped",
+                &json!({ "domain": host }),
+                None,
+            ) {
+                self.emit(agent, &turn.member, &turn.task, event);
+            }
+            return false;
+        }
         // An Agent this Machine does not know, or one whose row cannot be read,
         // has no timeout and no Member to ask: refuse rather than invent both.
         let Ok(registry) = AgentRegistry::open(&self.home) else {
@@ -887,5 +909,37 @@ mod tests {
         end_turn(&fixture.approvals, "a1", "t1", "m_1");
         assert!(!asking.await.expect("join"));
         assert!(!requested(&fixture.approvals, "a1", "example.com").await);
+    }
+
+    #[tokio::test]
+    async fn a_round_nobody_watches_refuses_a_domain_at_once_and_writes_it_down() {
+        let fixture = fixture();
+        fixture.approvals.observe(
+            "a1",
+            &FromWorker::Event {
+                task: "t1".into(),
+                starter: "m_1".into(),
+                event: TaskEvent {
+                    seq: 1,
+                    kind: "turn.started".into(),
+                    at: 0,
+                    body: json!({ "member": "m_1", "trigger": { "kind": "schedule", "id": "tr_1", "at": 1, "attended": false } }),
+                },
+            },
+        );
+        // No wait: the answer is no before anyone could have been asked.
+        assert!(!requested(&fixture.approvals, "a1", "example.com").await);
+        let seen = fixture.seen.events.lock().expect("events");
+        let kinds: Vec<(&str, Value)> = seen
+            .iter()
+            .filter_map(|(_, message)| match message {
+                FromWorker::Event { event, .. } => Some((event.kind.as_str(), event.body.clone())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![("approval.skipped", json!({ "domain": "example.com" }))]
+        );
     }
 }

@@ -470,7 +470,7 @@ impl AgentCore {
             with_trigger(json!({ "member": member }), trigger),
             None,
         )?;
-        let from_trigger = trigger.is_some();
+        let trigger = trigger.cloned();
 
         let cancel = Cancel::new();
         *self.state.running.lock().expect("running") = Some(RunningTurn {
@@ -490,7 +490,7 @@ impl AgentCore {
                 owner.clone(),
                 system,
                 cancel,
-                from_trigger,
+                trigger,
             )
             .await
             .is_err();
@@ -696,14 +696,20 @@ async fn run_turn(
     starter: String,
     system: String,
     cancel: Cancel,
-    from_trigger: bool,
+    trigger: Option<TriggerRun>,
 ) -> Result<(), AgentError> {
     let rounds = state.max_rounds.load(Ordering::SeqCst);
     let mut tools = state.tools.definitions();
+    let from_trigger = trigger.is_some();
     // Only a round nobody asked for may end with nothing to say (issue #56).
     if from_trigger {
         tools.push(nothing_to_report());
     }
+    // A round nobody watches asks no one: its Schedule's scope is all it adds (ADR 0079).
+    let unattended = trigger
+        .as_ref()
+        .filter(|trigger| !trigger.attended)
+        .map(|trigger| trigger.allow.clone());
     for _ in 0..rounds {
         let mut events = state.log().events(&task, 0)?;
         if let Some(summary) = compact_if_needed(&state, &task, &starter, &events).await {
@@ -795,7 +801,8 @@ async fn run_turn(
         }
 
         let mut results = Vec::new();
-        let mut quiet = false;
+        // Where `nothing_to_report` answered in this reply, if it did.
+        let mut quiet_at = None;
         for use_block in uses {
             let name = use_block
                 .get("name")
@@ -807,12 +814,16 @@ async fn run_turn(
                 .unwrap_or_default();
             let input = use_block.get("input").cloned().unwrap_or(Value::Null);
             let result = if from_trigger && name == NOTHING_TO_REPORT {
-                quiet = true;
+                quiet_at = Some(results.len());
                 Ok("This round ends quietly: nobody is told.".to_string())
             } else if !state.tools.has(name) {
                 Err(ToolError::Unknown(name.to_string()))
             } else {
-                run_tool(&state, &task, &starter, id, name, &input, &cancel).await
+                let unattended = unattended.as_deref();
+                run_tool(
+                    &state, &task, &starter, id, name, &input, &cancel, unattended,
+                )
+                .await
             };
             match result {
                 Ok(content) => {
@@ -839,6 +850,17 @@ async fn run_turn(
         // commands as unfinished.
         if cancel.is_cancelled() {
             return end(&state, &task, &starter, "stopped", None);
+        }
+        // Decided once every call of the reply has run: a command refused after
+        // `nothing_to_report`, or a domain the proxy refused, is news too (ADR 0079).
+        let mut quiet = false;
+        if let Some(index) = quiet_at {
+            if skipped_this_turn(&state, &task)? {
+                results[index]["content"] = json!("something this round needed did not run, so it cannot end quietly: tell the owner what you needed and why");
+                results[index]["is_error"] = json!(true);
+            } else {
+                quiet = true;
+            }
         }
         state.append(
             &task,
@@ -924,7 +946,12 @@ fn nothing_to_report() -> ToolDefinition {
 /// Adds the Trigger a round came from, when it came from one.
 fn with_trigger(mut body: Value, trigger: Option<&TriggerRun>) -> Value {
     if let Some(trigger) = trigger {
-        body["trigger"] = json!({ "kind": trigger.kind, "id": trigger.id, "at": trigger.at });
+        body["trigger"] = json!({
+            "kind": trigger.kind,
+            "id": trigger.id,
+            "at": trigger.at,
+            "attended": trigger.attended,
+        });
     }
     body
 }
@@ -1289,6 +1316,11 @@ fn text_content(content: &[Value]) -> String {
 /// A tool call outside the Allowlist waits for an Approval first. `bash` matches
 /// by command prefix; any other tool matches by its exact name. The file tools
 /// never wait: the sandbox holds them already (ADR 0008, 0030).
+///
+/// `unattended` is a round nobody watches: its Schedule's scope counts as
+/// Allowlist too, and what is outside both is refused at once, written down as
+/// `approval.skipped`, instead of waiting on nobody (ADR 0079).
+#[allow(clippy::too_many_arguments)]
 async fn run_tool(
     state: &Arc<State>,
     task: &str,
@@ -1297,8 +1329,12 @@ async fn run_tool(
     name: &str,
     input: &Value,
     cancel: &Cancel,
+    unattended: Option<&[String]>,
 ) -> Result<String, ToolError> {
-    let allowlist = state.allowlist();
+    let mut allowlist = state.allowlist();
+    if let Some(allow) = unattended {
+        allowlist.extend(allow.iter().cloned());
+    }
     if name == "bash" {
         let command = input.get("command").and_then(Value::as_str);
         let Some(command) = command else {
@@ -1306,6 +1342,9 @@ async fn run_tool(
         };
         if matches_allowlist(command, &allowlist) {
             return call_tool(state, task, starter, id, name, input, cancel).await;
+        }
+        if unattended.is_some() {
+            return Err(skip(state, task, starter, command, split_command(command)));
         }
         let answer = ask_approval(
             state,
@@ -1323,6 +1362,9 @@ async fn run_tool(
     }
     if FILE_TOOL_NAMES.contains(&name) || allowlist.iter().any(|entry| entry == name) {
         return call_tool(state, task, starter, id, name, input, cancel).await;
+    }
+    if unattended.is_some() {
+        return Err(skip(state, task, starter, name, vec![name.to_string()]));
     }
     let answer = ask_approval(state, task, starter, name, vec![name.to_string()], cancel).await;
     if answer.decision == ApprovalDecision::Approve {
@@ -1506,6 +1548,34 @@ async fn ask_approval(
             }
         }
     }
+}
+
+/// Refuses what a round nobody watches may not do, and writes it down so the
+/// owner sees it and can add it to the Schedule's scope (ADR 0079).
+fn skip(state: &State, task: &str, starter: &str, command: &str, parts: Vec<String>) -> ToolError {
+    let _ = state.append(
+        task,
+        starter,
+        "approval.skipped",
+        json!({ "command": command, "parts": parts }),
+        None,
+    );
+    ToolError::Failed(
+        "nobody is watching this scheduled round, and this is outside what its Schedule may do, so it did not run. Do what you can without it, then tell the owner what you needed".into(),
+    )
+}
+
+/// Whether the Turn under way was refused anything nobody could be asked about:
+/// a command here, or a domain the supervisor's proxy wrote down (ADR 0079).
+fn skipped_this_turn(state: &State, task: &str) -> Result<bool, AgentError> {
+    let events = state.log().events(task, 0)?;
+    let start = events
+        .iter()
+        .rposition(|event| event.kind == "turn.started")
+        .unwrap_or(0);
+    Ok(events[start..]
+        .iter()
+        .any(|event| event.kind == "approval.skipped"))
 }
 
 fn denial(answer: &Answer) -> ToolError {

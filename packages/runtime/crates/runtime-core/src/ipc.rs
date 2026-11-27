@@ -53,6 +53,14 @@ pub struct TriggerRun {
     /// Unix milliseconds the round was due, which is not when it started after
     /// the Machine was off (issue #56).
     pub at: u64,
+    /// A Member pressed "run now" and is there to answer. A round that came
+    /// due on its own is not, so it asks no one (ADR 0079).
+    #[serde(default)]
+    pub attended: bool,
+    /// What a round nobody watches may do beyond the Agent's Allowlist: the
+    /// Schedule's signed scope, sent only while its signer still has Approve.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allow: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

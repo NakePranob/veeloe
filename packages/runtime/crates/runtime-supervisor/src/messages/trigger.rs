@@ -71,7 +71,25 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
             .unwrap_or_default()
             .to_string()
     };
-    let record = TriggerRecord {
+    let allow: Vec<String> = trigger
+        .get("allow")
+        .and_then(Value::as_array)
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    // A scope is an Approval given ahead of time: it takes Approve (ADR 0079).
+    let approves = machine
+        .trust
+        .is_some_and(|trust| trust.approves(&from.member, Some(key)));
+    if !allow.is_empty() && !approves {
+        return outbox.error(from, "trigger.forbidden");
+    }
+    let mut record = TriggerRecord {
         id: text("id"),
         kind: text("kind"),
         agent: agent.clone(),
@@ -87,8 +105,20 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
         suspended: false,
         created_at: now(),
         last_run_at: None,
+        allow,
+        last_skip: None,
         envelope: from.envelope.clone().unwrap_or(Value::Null),
     };
+    // The same times again is an edit of what it says or may do: its rounds stay.
+    if let Some(held) = triggers
+        .get(&agent, &record.id)
+        .filter(|held| held.schedule == record.schedule)
+    {
+        record.created_at = held.created_at;
+        record.last_run_at = held.last_run_at;
+        record.last_skip = held.last_skip;
+        record.paused = held.paused;
+    }
     if triggers.set(record).is_err() {
         return outbox.error(from, "trigger.unavailable");
     }
@@ -144,7 +174,19 @@ pub(crate) fn run(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     if record.suspended {
         return outbox.error(from, "trigger.suspended");
     }
-    if start_round(machine.workers, triggers, &record, now()).is_none() {
+    // A run now waiting behind another Turn would start long after whoever
+    // pressed it left, and ask them anyway: refuse it while the Agent works.
+    if machine
+        .approvals
+        .is_some_and(|approvals| approvals.current_turn(&agent).is_some())
+    {
+        return outbox.error(from, "agent.busy");
+    }
+    // Whoever pressed it is there to answer: this round asks as any Turn does.
+    let approves = machine
+        .trust
+        .is_some_and(|trust| trust.approves(&record.member, Some(&record.key)));
+    if start_round(machine.workers, triggers, &record, now(), true, approves).is_none() {
         return outbox.error(from, "agent.unavailable");
     }
     listed(outbox, from, triggers, &agent);

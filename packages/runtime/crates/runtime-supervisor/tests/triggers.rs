@@ -250,3 +250,39 @@ async fn running_now_needs_the_agents_worker_and_a_trigger_that_is_not_suspended
         .await;
     assert_eq!(listed["triggers"][0]["suspended"], true);
 }
+
+#[tokio::test]
+async fn a_scope_is_kept_and_an_edit_with_the_same_times_keeps_its_rounds() {
+    let fixture = Fixture::new();
+    let owner = from("member-1", "controller-1");
+    let (_, first) = fixture.send(&owner, "trigger.set", daily("tr_1")).await;
+    assert_eq!(first["triggers"][0]["allow"], json!([]));
+    fixture
+        .send(
+            &owner,
+            "trigger.pause",
+            json!({ "agent": "a1", "id": "tr_1" }),
+        )
+        .await;
+    fixture
+        .triggers
+        .update("a1", "tr_1", |held| held.last_run_at = Some(1_000))
+        .expect("update");
+
+    // Adding to the scope from a Task is a whole `trigger.set` again (ADR 0079).
+    let mut scoped = daily("tr_1");
+    scoped["trigger"]["allow"] = json!(["curl"]);
+    let (type_, body) = fixture.send(&owner, "trigger.set", scoped).await;
+    assert_eq!(type_, "trigger.listed");
+    let listed = &body["triggers"][0];
+    assert_eq!(listed["allow"], json!(["curl"]));
+    assert_eq!(listed["paused"], true);
+    assert_eq!(listed["lastRunAt"], 1_000);
+
+    // New times start over.
+    let mut moved = daily("tr_1");
+    moved["trigger"]["schedule"] = json!({ "daily": { "at": "10:00" } });
+    let (_, body) = fixture.send(&owner, "trigger.set", moved).await;
+    assert_eq!(body["triggers"][0]["paused"], false);
+    assert!(body["triggers"][0].get("lastRunAt").is_none());
+}

@@ -86,7 +86,8 @@
     "outcomeExpired": "{{outcome}} counted as denied · {{target}}",
     "outcomeAlways": "{{outcome}} · added {{target}} to Egress",
     "outcomeByYou": "{{outcome}} by you · {{target}}",
-    "redirected": "Told to do something else"
+    "redirected": "Told to do something else",
+    "forSchedule": "Approve, and let this Schedule do it"
   },
   "openAgent": "Open {{name}}",
   "stopped": "{{member}} stopped this Turn · {{when}}",
@@ -108,7 +109,8 @@
     "approve": "Approve this command for {{name}}",
     "always": "Add {{entries}} to the Allowlist and approve",
     "domain": "Allow this domain for {{name}}: {{domain}}",
-    "domainAlways": "Add {{domain}} to {{name}}'s Egress"
+    "domainAlways": "Add {{domain}} to {{name}}'s Egress",
+    "scope": "Let this Schedule run {{entries}} without asking"
   },
   "changes_one": "Changed {{count}} file",
   "changes_other": "Changed {{count}} files",
@@ -204,5 +206,13 @@
     "title": "Answering the Approval: telling it what to do instead",
     "cancel": "Cancel",
     "placeholder": "Tell {{name}} what to do instead"
+  },
+  "skipped": {
+    "title": "Nobody was watching this round, so this command did not run",
+    "domainTitle": "Nobody was watching this round, so it did not reach this domain",
+    "body": "This command is not in the Allowlist or in what this Schedule may do. Allow it and the next rounds run it without asking.",
+    "covered": "This Schedule may do it from the next round on",
+    "domainBody": "For the next rounds to reach it, the domain has to be in the Agent's Egress.",
+    "allow": "Let this Schedule do it"
   }
 }

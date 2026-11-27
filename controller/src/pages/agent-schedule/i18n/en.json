@@ -1,12 +1,13 @@
 {
   "title": "Schedule",
-  "note": "A Schedule starts a new Task on the Machine at the time you set, in your name, even with your phone off. If there is nothing to tell you, the Task stays out of your Inbox.",
+  "note": "A Schedule starts a new Task on the Machine at the times you set, in your name, even while your phone is off. A round with nothing to report stays out of the Inbox.",
   "offline": "The Machine is offline, so Schedules can't be changed right now.",
   "loading": "Asking the Machine…",
   "add": "Add",
   "missing": {
     "title": "Agent not found",
-    "body": "This Agent is no longer on this device."
+    "body": "This Agent is no longer on this device.",
+    "schedule": "The Machine no longer has this Schedule"
   },
   "empty": {
     "title": "No Schedules yet",
@@ -20,9 +21,9 @@
     "textPlaceholder": "Check the CI and tell me what failed",
     "when": "Runs",
     "day": "Day",
-    "minutes": "Every (minutes)",
-    "minutesFooter": "At least 15 minutes.",
-    "at": "Time"
+    "minutes": "How often",
+    "hour": "Hour",
+    "minute": "Minute"
   },
   "mode": {
     "every": "Every few minutes",
@@ -58,18 +59,35 @@
     "pause": "Pause this Schedule of {{name}}",
     "resume": "Resume this Schedule of {{name}}",
     "run": "Run this Schedule of {{name}} now",
-    "delete": "Delete this Schedule of {{name}}"
+    "delete": "Delete this Schedule of {{name}}",
+    "unscope": "Make this Schedule of {{name}} ask before running {{entry}}"
   },
   "delete": {
     "title": "Delete this Schedule?",
     "message": "{{name}} stops running it. Tasks it already started stay.",
-    "action": "Delete"
+    "action": "Delete",
+    "row": "Delete this Schedule"
   },
   "save": "Save",
   "saving": "Saving…",
   "cancel": "Cancel",
   "run": "Run now",
-  "pause": "Pause",
-  "resume": "Resume",
-  "edit": "Edit"
+  "last": {
+    "busy": "{{when}} skipped, Agent busy",
+    "budget": "{{when}} skipped, Budget spent",
+    "quiet": "{{when}} nothing to report",
+    "done": "{{when}} reported",
+    "working": "{{when}} running",
+    "waiting": "{{when}} waiting for an Approval",
+    "failed": "{{when}} did not finish",
+    "row": "Last round",
+    "none": "Not run yet"
+  },
+  "scope": {
+    "heading": "Allowed without asking",
+    "none": "Nothing yet",
+    "footer": "A round that comes due on its own has nobody watching, so it asks for no Approval: it does only what the Agent's Allowlist and this list cover. Run it once and approve in that round to add what it needs.",
+    "remove": "Remove"
+  },
+  "enabled": "On"
 }

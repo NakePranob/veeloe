@@ -86,7 +86,8 @@
     "outcomeExpired": "{{outcome}} นับว่าปฏิเสธ · {{target}}",
     "outcomeAlways": "{{outcome}} · เพิ่ม {{target}} เข้า Egress",
     "outcomeByYou": "{{outcome}} โดยคุณ · {{target}}",
-    "redirected": "บอกให้ทำอย่างอื่นแทน"
+    "redirected": "บอกให้ทำอย่างอื่นแทน",
+    "forSchedule": "อนุมัติ และให้ Schedule นี้ทำได้เลย"
   },
   "openAgent": "เปิดหน้า {{name}}",
   "stopped": "{{member}} หยุด Turn นี้ · {{when}}",
@@ -108,7 +109,8 @@
     "approve": "อนุมัติให้ {{name}} รันคำสั่งนี้",
     "always": "เพิ่ม {{entries}} เข้า Allowlist และอนุมัติ",
     "domain": "อนุญาตโดเมนนี้ให้ {{name}}: {{domain}}",
-    "domainAlways": "เพิ่ม {{domain}} เข้า Egress ของ {{name}}"
+    "domainAlways": "เพิ่ม {{domain}} เข้า Egress ของ {{name}}",
+    "scope": "ให้ Schedule นี้รัน {{entries}} ได้โดยไม่ต้องขอ"
   },
   "changes_one": "แก้ {{count}} ไฟล์",
   "changes_other": "แก้ {{count}} ไฟล์",
@@ -204,5 +206,13 @@
     "title": "ตอบ Approval: บอกให้ทำอย่างอื่นแทน",
     "cancel": "ยกเลิก",
     "placeholder": "บอก {{name}} ว่าให้ทำอะไรแทน"
+  },
+  "skipped": {
+    "title": "รอบนี้ไม่มีคนเฝ้า เลยไม่ได้รันคำสั่งนี้",
+    "domainTitle": "รอบนี้ไม่มีคนเฝ้า เลยไม่ได้ออกไปที่โดเมนนี้",
+    "body": "คำสั่งนี้ไม่อยู่ใน Allowlist และไม่อยู่ในสิ่งที่ Schedule นี้ทำได้ ถ้าให้ทำได้ รอบหน้าจะรันเองโดยไม่ต้องขอ",
+    "covered": "Schedule นี้ทำได้แล้วตั้งแต่รอบหน้า",
+    "domainBody": "โดเมนต้องอยู่ใน Egress ของ Agent ถ้าจะให้รอบถัดไปออกไปที่นี่ได้",
+    "allow": "ให้ Schedule นี้ทำได้เลย"
   }
 }

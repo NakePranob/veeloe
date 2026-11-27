@@ -219,3 +219,11 @@ test("a time line opens the log and marks each gap of more than an hour", () => 
   const kinds = items([at(1, 0, "a"), at(2, 30, "b"), at(3, 120, "c")]).items.map((item) => item.kind);
   expect(kinds).toEqual(["time", "member", "member", "time", "member"]);
 });
+
+test("what a round nobody watched did not do is shown, a command with its parts and a domain alone (ADR 0079)", () => {
+  const log = items([row(1, "approval.skipped", { command: "rm -rf build && make", parts: ["rm -rf build", "make"] }), row(2, "approval.skipped", { domain: "example.com" })]).items;
+  expect(log).toEqual([
+    { key: "1", kind: "skipped", target: "rm -rf build && make", parts: ["rm -rf build", "make"], domain: false },
+    { key: "2", kind: "skipped", target: "example.com", parts: [], domain: true },
+  ]);
+});

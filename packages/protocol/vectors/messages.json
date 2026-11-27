@@ -1806,6 +1806,68 @@
       "valid": false
     },
     {
+      "name": "a Schedule that may run curl without asking",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "check the site",
+          "schedule": {
+            "daily": {
+              "at": "09:00"
+            }
+          },
+          "allow": [
+            "curl",
+            "github/create_issue"
+          ]
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "a Schedule scope with an empty entry",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "x",
+          "schedule": {
+            "daily": {
+              "at": "09:00"
+            }
+          },
+          "allow": [
+            ""
+          ]
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "a Schedule scope that is not a list",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "x",
+          "schedule": {
+            "daily": {
+              "at": "09:00"
+            }
+          },
+          "allow": "curl"
+        }
+      },
+      "valid": false
+    },
+    {
       "name": "pause a Trigger",
       "type": "trigger.pause",
       "body": {
@@ -1863,6 +1925,63 @@
         ]
       },
       "valid": true
+    },
+    {
+      "name": "a listed Trigger whose last round was skipped",
+      "type": "trigger.listed",
+      "body": {
+        "agent": "a1",
+        "triggers": [
+          {
+            "id": "tr_1",
+            "kind": "schedule",
+            "text": "x",
+            "schedule": {
+              "daily": {
+                "at": "09:00"
+              }
+            },
+            "allow": [
+              "curl"
+            ],
+            "member": "m_1",
+            "paused": false,
+            "suspended": false,
+            "lastSkip": {
+              "at": 1,
+              "why": "busy"
+            }
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a listed Trigger skipped for a reason nobody knows",
+      "type": "trigger.listed",
+      "body": {
+        "agent": "a1",
+        "triggers": [
+          {
+            "id": "tr_1",
+            "kind": "schedule",
+            "text": "x",
+            "schedule": {
+              "daily": {
+                "at": "09:00"
+              }
+            },
+            "member": "m_1",
+            "paused": false,
+            "suspended": false,
+            "lastSkip": {
+              "at": 1,
+              "why": "bored"
+            }
+          }
+        ]
+      },
+      "valid": false
     },
     {
       "name": "a listed Trigger that does not say whether it is paused",

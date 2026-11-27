@@ -38,7 +38,7 @@ use veeloe_runtime_supervisor::status::{remove_pid_file, run_status, write_pid_f
 use veeloe_runtime_supervisor::task_log::turn_log;
 use veeloe_runtime_supervisor::task_routes::TaskRoutes;
 use veeloe_runtime_supervisor::tasks::{dispatch, forward, Inbound, Machine, MachineOutbox};
-use veeloe_runtime_supervisor::triggers::{MachineTime, Round, Triggers};
+use veeloe_runtime_supervisor::triggers::{LastSkip, MachineTime, Round, Triggers};
 use veeloe_runtime_supervisor::trust::{
     load_hub_url, load_or_create_machine_key, load_trust, supervisor_dir, Trust,
 };
@@ -272,20 +272,25 @@ impl Supervisor {
                     let _ = logs::record(&self.home, "warn", "trigger.suspended", fields(now.ms));
                 }
                 Round::Skip { at, why } => {
-                    let _ = self
-                        .triggers
-                        .update(agent_id, id, |held| held.last_run_at = Some(at));
+                    let _ = self.triggers.update(agent_id, id, |held| {
+                        held.last_run_at = Some(at);
+                        held.last_skip = Some(LastSkip::new(at, why));
+                    });
                     let mut skipped = fields(at);
                     skipped["why"] = json!(why);
                     let _ = logs::record(&self.home, "info", "trigger.skipped", skipped);
                 }
                 Round::Run { at } => {
+                    // Came due on its own: nobody is there to answer (ADR 0079).
+                    let approves = trust.approves(&record.member, Some(&record.key));
                     let start = || {
                         veeloe_runtime_supervisor::triggers::start_round(
                             workers,
                             &self.triggers,
                             &record,
                             at,
+                            false,
+                            approves,
                         )
                     };
                     // Workers start when the Hub connects; with no Hub there may be

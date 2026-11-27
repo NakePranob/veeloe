@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AllowlistSchema } from "./allowlist";
 import { AgentIdSchema } from "./ids";
 
 /** Every N minutes is at least this often (issue #56): a tighter loop is a cost, not a Schedule. */
@@ -32,6 +33,11 @@ export const TriggerSchema = z.looseObject({
   schedule: ScheduleSchema,
   /** Who a finished round tells once pushes come (ADR 0076): the one who set it, or everyone with Use. */
   notify: z.enum(["me", "use"]).optional(),
+  /**
+   * What a round nobody watches may do without asking (ADR 0079): entries as in
+   * an Allowlist, for this Schedule's rounds only. Non-empty needs Approve.
+   */
+  allow: AllowlistSchema.optional(),
 });
 export type Trigger = z.infer<typeof TriggerSchema>;
 
@@ -56,6 +62,8 @@ export const ListedTriggerSchema = TriggerSchema.extend({
   lastRunAt: z.number().int().nonnegative().optional(),
   /** Computed by the Machine; absent while paused or suspended. */
   nextRunAt: z.number().int().nonnegative().optional(),
+  /** The last round that did not start: the Agent was busy or its Budget spent. */
+  lastSkip: z.looseObject({ at: z.number().int().nonnegative(), why: z.enum(["busy", "budget"]) }).optional(),
 });
 export type ListedTrigger = z.infer<typeof ListedTriggerSchema>;
 

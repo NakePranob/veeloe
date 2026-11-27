@@ -132,3 +132,9 @@ export const TaskEventKind = {
  * a Task's status and Mood are worked out from, and a name says nothing about either.
  */
 export const TaskTitled = "task.titled";
+/**
+ * `{ command, parts } | { domain }`: a round nobody watches did not ask and did
+ * not do this (ADR 0079). Outside `TaskEventKind` like `task.titled`: the Turn
+ * goes on, so it says nothing of the Task's status.
+ */
+export const ApprovalSkipped = "approval.skipped";

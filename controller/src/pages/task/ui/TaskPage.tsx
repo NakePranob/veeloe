@@ -6,16 +6,18 @@ import { allowlistOf } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { latestOf, statusOf, titleOfEvents, usePendingMessages, useTaskEvents } from "../../../entities/task";
 import { useMachineLink } from "../../../features/machine-link";
-import { useT } from "../../../shared/i18n";
-import { useNow } from "../../../shared/lib";
+import { useLanguage, useT } from "../../../shared/i18n";
+import { keySession } from "../../../shared/keystore";
+import { formatList, useNow } from "../../../shared/lib";
 import { Bubble, Card, column, Fade, FADE, HeaderAction, radius, space, Spinner, Text, useSplit } from "../../../shared/ui";
 import { contextUsageOf, items, type Item, type ToolCall } from "../model/items";
 import { useTaskScreen } from "../model/use-task-screen";
+import { scopeNeeds, useScheduleScope } from "../model/use-schedule-scope";
 import { useComposer } from "../model/use-composer";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
 import { Composer } from "./Composer";
-import { BudgetCard, CompactedCard, FailedCard, FileCard, InterruptedCard, Separator, StoppedLine } from "./LogCards";
+import { BudgetCard, CompactedCard, FailedCard, FileCard, InterruptedCard, Separator, SkippedCard, StoppedLine } from "./LogCards";
 import { PendingBubble } from "./PendingBubble";
 import { TaskTitle } from "./TaskTitle";
 import { ChangesRow, ToolCalls } from "./ToolCalls";
@@ -30,6 +32,7 @@ const PAGE = 200;
 export function TaskPage() {
   const insets = useSafeAreaInsets();
   const t = useT("task");
+  const language = useLanguage();
   const { task, agent: agentId } = useLocalSearchParams<{ task: string; agent: string }>();
   const screen = useTaskScreen(task, agentId);
   const link = useMachineLink();
@@ -61,6 +64,7 @@ export function TaskPage() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: `ticking && now` makes the clock a dependency only while it can change the log
   const log = useMemo(() => (events && ticking ? items(events, now) : settled), [events, ticking, ticking && now, settled]);
   const composer = useComposer({ task, screen, link, events: events ?? undefined, log: log?.items, onSend: followEnd });
+  const schedule = useScheduleScope(events, screen?.machine, agentId, screen?.status.online ?? null);
 
   // A Machine no longer paired (or a deleted Agent's unknown one) still shows the log, read from the device.
   if (!screen || !events || !pending || !log) return <Stack.Screen options={{ title: t("title") }} />;
@@ -73,6 +77,9 @@ export function TaskPage() {
   const taskStatus = statusOf(latest, status.online);
   const machineName = machine?.name ?? "";
   const openAgent = () => router.push({ pathname: "/agents/[agent]", params: { agent: agent.id } });
+  const allowlist = allowlistOf(agent) ?? [];
+  const canSign = !readOnly && status.online !== false && !!link && !schedule.sending;
+  const scopeFor = (command: string) => (schedule.trigger ? scopeNeeds(command, allowlist, schedule.trigger) : null);
 
   const renderItem = ({ item }: { item: Item }) =>
     item.kind === "member" ? (
@@ -88,7 +95,7 @@ export function TaskPage() {
         approval={item.approval}
         agentName={agent.name}
         look={lookOfJson(agent.character)}
-        allowlist={allowlistOf(agent) ?? []}
+        allowlist={allowlist}
         // v0.1 Members in trust are all Owners, who may Approve and Manage every Agent; v0.3 reads Grants.
         canAnswer={!readOnly}
         canManage={!readOnly}
@@ -100,6 +107,17 @@ export function TaskPage() {
         onSteer={() => {
           composer.steer(item.approval.request);
           input.current?.focus();
+        }}
+        scope={item.approval.kind !== "domain" && schedule.trigger && !schedule.sending ? { entries: scopeFor(item.approval.command) ?? [], add: schedule.add } : undefined}
+      />
+    ) : item.kind === "skipped" ? (
+      <SkippedCard
+        item={item}
+        entries={item.domain ? null : scopeFor(item.target)}
+        canScope={canSign}
+        onScope={async () => {
+          const entries = scopeFor(item.target) ?? [];
+          return (await keySession.signed(t("authenticate.scope", { entries: formatList(entries, language) }), () => schedule.add(entries))).status === "sent";
         }}
       />
     ) : item.kind === "stopped" ? (

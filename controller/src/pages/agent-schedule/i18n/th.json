@@ -6,7 +6,8 @@
   "add": "เพิ่ม",
   "missing": {
     "title": "ไม่พบ Agent",
-    "body": "เครื่องนี้ไม่มี Agent นี้แล้ว"
+    "body": "เครื่องนี้ไม่มี Agent นี้แล้ว",
+    "schedule": "Machine ไม่มี Schedule นี้แล้ว"
   },
   "empty": {
     "title": "ยังไม่มี Schedule",
@@ -20,9 +21,9 @@
     "textPlaceholder": "ดู CI แล้วบอกว่าอะไรพัง",
     "when": "รัน",
     "day": "วัน",
-    "minutes": "ทุกกี่นาที",
-    "minutesFooter": "อย่างน้อย 15 นาที",
-    "at": "เวลา"
+    "minutes": "ความถี่",
+    "hour": "ชั่วโมง",
+    "minute": "นาที"
   },
   "mode": {
     "every": "ทุกกี่นาที",
@@ -58,18 +59,35 @@
     "pause": "พัก Schedule นี้ของ {{name}}",
     "resume": "ทำ Schedule นี้ของ {{name}} ต่อ",
     "run": "รัน Schedule นี้ของ {{name}} ตอนนี้",
-    "delete": "ลบ Schedule นี้ของ {{name}}"
+    "delete": "ลบ Schedule นี้ของ {{name}}",
+    "unscope": "ให้ Schedule นี้ของ {{name}} ต้องขอก่อนรัน {{entry}}"
   },
   "delete": {
     "title": "ลบ Schedule นี้ไหม?",
     "message": "{{name}} จะไม่รันอีก ส่วน Task ที่เริ่มไปแล้วยังอยู่",
-    "action": "ลบ"
+    "action": "ลบ",
+    "row": "ลบ Schedule นี้"
   },
   "save": "บันทึก",
   "saving": "กำลังบันทึก…",
   "cancel": "ยกเลิก",
   "run": "รันเลย",
-  "pause": "พัก",
-  "resume": "ทำต่อ",
-  "edit": "แก้"
+  "last": {
+    "busy": "{{when}} ข้าม Agent ไม่ว่าง",
+    "budget": "{{when}} ข้าม Budget หมด",
+    "quiet": "{{when}} ไม่มีอะไร",
+    "done": "{{when}} มีเรื่องบอก",
+    "working": "{{when}} กำลังทำ",
+    "waiting": "{{when}} รอ Approval",
+    "failed": "{{when}} ไม่สำเร็จ",
+    "row": "รอบล่าสุด",
+    "none": "ยังไม่เคยรัน"
+  },
+  "scope": {
+    "heading": "ทำได้โดยไม่ต้องขอ",
+    "none": "ยังไม่มี",
+    "footer": "รอบที่ถึงเวลาเองไม่มีใครเฝ้า จึงไม่ขอ Approval ทำได้แค่สิ่งที่อยู่ใน Allowlist ของ Agent กับรายการนี้ กดรันเลยหนึ่งครั้งแล้วอนุมัติในรอบนั้น เพื่อเพิ่มสิ่งที่รอบต้องใช้",
+    "remove": "เอาออก"
+  },
+  "enabled": "เปิดใช้"
 }

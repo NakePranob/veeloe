@@ -42,8 +42,31 @@ pub struct TriggerRecord {
     /// Unix ms the last round was due, run or skipped.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_run_at: Option<u64>,
+    /// What a round nobody watches may do beyond the Agent's Allowlist (ADR 0079).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allow: Vec<String>,
+    /// The last round that came due and did not start: when, and `busy` or `budget`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_skip: Option<LastSkip>,
     /// The signed envelope as it arrived.
     pub envelope: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LastSkip {
+    pub at: u64,
+    pub why: String,
+}
+
+impl LastSkip {
+    /// [`decide`]'s reason, in the words `trigger.listed` uses.
+    pub fn new(at: u64, why: &str) -> Self {
+        let why = if why == "busy" { "busy" } else { "budget" };
+        Self {
+            at,
+            why: why.to_string(),
+        }
+    }
 }
 
 impl TriggerRecord {
@@ -63,6 +86,10 @@ impl TriggerRecord {
         }
         if let Some(last) = self.last_run_at {
             value["lastRunAt"] = json!(last);
+        }
+        value["allow"] = json!(self.allow);
+        if let Some(skip) = &self.last_skip {
+            value["lastSkip"] = json!({ "at": skip.at, "why": skip.why });
         }
         if !self.paused && !self.suspended {
             if let Some(schedule) = Schedule::parse(&self.schedule) {
@@ -246,11 +273,18 @@ pub fn new_task_id() -> String {
 
 /// Starts one round in a new Task, in the name of whoever set the Trigger.
 /// The Task id, or None when the Agent has no worker running.
+///
+/// `attended` is a Member who pressed "run now": that round asks for Approvals
+/// as any Turn does. `approves` is whether the signer still has Approve: without
+/// it the Schedule's scope is not sent and the round may do only the Allowlist
+/// (ADR 0079).
 pub fn start_round(
     workers: &crate::workers::Workers,
     triggers: &Triggers,
     record: &TriggerRecord,
     at: u64,
+    attended: bool,
+    approves: bool,
 ) -> Option<String> {
     let task = new_task_id();
     let sent = workers.send(
@@ -263,6 +297,12 @@ pub fn start_round(
                 kind: record.kind.clone(),
                 id: record.id.clone(),
                 at,
+                attended,
+                allow: if approves {
+                    record.allow.clone()
+                } else {
+                    Vec::new()
+                },
             },
         },
     );
@@ -538,6 +578,8 @@ mod tests {
             suspended: false,
             created_at: wednesday(0, 0),
             last_run_at: None,
+            allow: Vec::new(),
+            last_skip: None,
             envelope: json!({}),
         }
     }

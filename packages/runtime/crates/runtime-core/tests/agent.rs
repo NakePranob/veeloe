@@ -495,8 +495,100 @@ fn scheduled(task: &str) -> ToWorker {
             kind: "schedule".into(),
             id: "tr_1".into(),
             at: 1_000,
+            attended: false,
+            allow: Vec::new(),
         },
     }
+}
+
+/// A round of `tr_1`, with who is there and what its Schedule may do.
+fn round(attended: bool, allow: &[&str]) -> ToWorker {
+    let ToWorker::Run {
+        task,
+        member,
+        text,
+        mut trigger,
+    } = scheduled("t9")
+    else {
+        unreachable!()
+    };
+    trigger.attended = attended;
+    trigger.allow = allow.iter().map(|entry| entry.to_string()).collect();
+    ToWorker::Run {
+        task,
+        member,
+        text,
+        trigger,
+    }
+}
+
+#[tokio::test]
+async fn a_round_nobody_watches_asks_no_one_and_does_only_its_scope() {
+    let ran = Arc::new(Mutex::new(Vec::new()));
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "u1",
+                "bash",
+                json!({ "command": "curl -s example.com" }),
+            )),
+            Ok(tool_use("u2", "bash", json!({ "command": "rm -rf build" }))),
+            Ok(tool_use("u3", "nothing_to_report", json!({}))),
+            Ok(text("I could not clean build/")),
+        ],
+        runners: vec![Arc::new(Bash {
+            ran: Arc::clone(&ran),
+        })],
+        ..Setup::default()
+    });
+    harness
+        .core
+        .receive(round(false, &["curl"]))
+        .expect("receive");
+    harness.core.idle().await;
+
+    // In scope ran; outside it was refused at once, never asked.
+    assert_eq!(*ran.lock().expect("ran"), vec!["curl -s example.com"]);
+    let events = harness.core.events("t9").expect("events");
+    assert!(!kinds(&events).contains(&"approval.requested".to_string()));
+    let skipped = events
+        .iter()
+        .find(|event| event.kind == "approval.skipped")
+        .expect("skipped");
+    assert_eq!(skipped.body["command"], "rm -rf build");
+    assert_eq!(
+        events
+            .iter()
+            .find(|event| event.kind == "turn.started")
+            .expect("started")
+            .body["trigger"]["attended"],
+        false
+    );
+    // What did not run cannot end quietly: the owner hears of it.
+    assert_eq!(
+        events.last().expect("last").body,
+        json!({ "reason": "done" })
+    );
+}
+
+#[tokio::test]
+async fn a_round_someone_ran_asks_as_any_turn_does() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use("u1", "bash", json!({ "command": "rm -rf build" }))),
+            Ok(text("ok")),
+        ],
+        runners: vec![Arc::new(Bash {
+            ran: Arc::new(Mutex::new(Vec::new())),
+        })],
+        timeout_ms: Some(50),
+        ..Setup::default()
+    });
+    harness.core.receive(round(true, &[])).expect("receive");
+    harness.core.idle().await;
+    let events = harness.core.events("t9").expect("events");
+    assert!(kinds(&events).contains(&"approval.requested".to_string()));
+    assert!(!kinds(&events).contains(&"approval.skipped".to_string()));
 }
 
 fn tool_names(request: &LlmRequest) -> Vec<String> {
@@ -518,7 +610,7 @@ async fn a_trigger_round_says_where_it_came_from_and_who_set_it() {
         .expect("started");
     assert_eq!(
         started.body,
-        json!({ "member": "m_owner", "trigger": { "kind": "schedule", "id": "tr_1", "at": 1_000 } })
+        json!({ "member": "m_owner", "trigger": { "kind": "schedule", "id": "tr_1", "at": 1_000, "attended": false } })
     );
     let said = events
         .iter()
@@ -2109,4 +2201,31 @@ async fn waiting_on_an_approval_is_not_a_stall() {
         .receive(approval(&request, ApprovalDecision::Deny))
         .expect("answer");
     harness.core.idle().await;
+}
+
+#[tokio::test]
+async fn nothing_to_report_before_a_refused_command_in_the_same_reply_is_not_quiet() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(LlmReply {
+                content: vec![
+                    json!({ "type": "tool_use", "id": "u1", "name": "nothing_to_report", "input": {} }),
+                    json!({ "type": "tool_use", "id": "u2", "name": "bash", "input": { "command": "rm -rf build" } }),
+                ],
+                stop_reason: Some("tool_use".into()),
+            }),
+            Ok(text("I could not clean build/")),
+        ],
+        runners: vec![Arc::new(Bash {
+            ran: Arc::new(Mutex::new(Vec::new())),
+        })],
+        ..Setup::default()
+    });
+    harness.core.receive(round(false, &[])).expect("receive");
+    harness.core.idle().await;
+    let events = harness.core.events("t9").expect("events");
+    assert_eq!(
+        events.last().expect("last").body,
+        json!({ "reason": "done" })
+    );
 }

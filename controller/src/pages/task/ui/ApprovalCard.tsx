@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { View } from "react-native";
+// biome-ignore lint/correctness/useReactNativePlatformComponents: used only behind the EXPO_OS === "ios" check in moreOptions()
+import { ActionSheetIOS, View } from "react-native";
 import { covers, missingParts } from "../../../entities/agent";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { fromNow } from "../../../shared/lib";
+import { formatList, fromNow } from "../../../shared/lib";
 import { AgentCard, Character, type Look } from "../../../entities/character";
 import { Button, Field, Inset, Label, space, Text, TextLink } from "../../../shared/ui";
 import { canAllowAlways } from "../model/allow-always";
@@ -29,11 +30,16 @@ interface Props {
   onAnswer: (answer: Answer) => string | null;
   /** Puts the cursor in the composer so the Member can say what to do instead. */
   onSteer: () => void;
+  /**
+   * A round of a Schedule someone ran (ADR 0079): the entries this command still needs in the Schedule's
+   * scope, and how to add them. Absent outside a Schedule's round, and for a domain.
+   */
+  scope?: { entries: string[]; add: (entries: string[]) => string | null };
 }
 
 // The one orange thing on the screen while it waits; once answered it settles
 // into the log like any other event.
-export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, canManage, online, now, me, onAnswer, onSteer }: Props) {
+export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, canManage, online, now, me, onAnswer, onSteer, scope }: Props) {
   const t = useT("task");
   const language = useLanguage();
   const open = approval.status === "open";
@@ -59,6 +65,40 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
     } finally {
       setBusy(false);
     }
+  }
+
+  // Yes to this one, and to the same in every later round of its Schedule, under one unlock (ADR 0079).
+  async function approveForSchedule() {
+    if (!scope || sent || busy) return;
+    setBusy(true);
+    try {
+      const signed = await keySession.signed(t("authenticate.scope", { entries: formatList(scope.entries, language) }), () => {
+        const answered = onAnswer({ decision: "approve" });
+        if (answered) scope.add(scope.entries);
+        return answered;
+      });
+      if (signed.status === "sent") setSent(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const startAllowAlways = () =>
+    setEntries(
+      missingParts(approval.command, allowlist)
+        .slice(0, 20)
+        .map((part) => ({ entry: part, part })),
+    );
+
+  // The rarer answers in the platform's own menu on iOS; Android keeps them as links under the card.
+  function moreOptions() {
+    if (process.env.EXPO_OS !== "ios") return setMore(true);
+    const choices = [
+      ...(canManage ? [{ label: t("approval.always"), run: startAllowAlways }] : []),
+      ...(scope && scope.entries.length > 0 ? [{ label: t("approval.forSchedule"), run: () => void approveForSchedule() }] : []),
+      { label: t("approval.steer"), run: onSteer },
+    ];
+    ActionSheetIOS.showActionSheetWithOptions({ options: [...choices.map((choice) => choice.label), t("approval.cancel")], cancelButtonIndex: choices.length }, (index) => choices[index]?.run());
   }
 
   async function allowAlways() {
@@ -124,26 +164,20 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
             {!domain && !more && (
               <>
                 <Dot />
-                <TextLink role="button" strong label={t("approval.more")} onPress={() => setMore(true)} />
+                <TextLink role="button" strong label={t("approval.more")} disabled={!online || busy} onPress={moreOptions} />
               </>
             )}
             {!domain && more && canManage && (
               <>
                 <Dot />
                 {/* The Protocol takes at most 20, so the card offers at most that many. */}
-                <TextLink
-                  role="button"
-                  strong
-                  label={t("approval.always")}
-                  disabled={!online}
-                  onPress={() =>
-                    setEntries(
-                      missingParts(approval.command, allowlist)
-                        .slice(0, 20)
-                        .map((part) => ({ entry: part, part })),
-                    )
-                  }
-                />
+                <TextLink role="button" strong label={t("approval.always")} disabled={!online} onPress={startAllowAlways} />
+              </>
+            )}
+            {!domain && more && scope && scope.entries.length > 0 && (
+              <>
+                <Dot />
+                <TextLink role="button" strong label={t("approval.forSchedule")} disabled={!online || busy} onPress={() => void approveForSchedule()} />
               </>
             )}
             {!domain && more && (
