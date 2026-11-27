@@ -23,7 +23,27 @@
     },
     "other": "Used {{tool}}",
     "more": "+{{count}}",
-    "unfinished": "Not finished"
+    "unfinished": "Not finished",
+    "count": {
+      "bash_one": "Ran {{count}} command",
+      "bash_other": "Ran {{count}} commands",
+      "read_one": "read {{count}} file",
+      "read_other": "read {{count}} files",
+      "glob_one": "found files {{count}} time",
+      "glob_other": "found files {{count}} times",
+      "grep_one": "searched {{count}} time",
+      "grep_other": "searched {{count}} times",
+      "edit_one": "edited {{count}} file",
+      "edit_other": "edited {{count}} files",
+      "write_one": "created {{count}} file",
+      "write_other": "created {{count}} files",
+      "memory_one": "noted Memory {{count}} time",
+      "memory_other": "noted Memory {{count}} times",
+      "send_file_one": "sent {{count}} file",
+      "send_file_other": "sent {{count}} files",
+      "other_one": "used {{tool}} {{count}} time",
+      "other_other": "used {{tool}} {{count}} times"
+    }
   },
   "queued": "You can send; it waits until this Turn ends",
   "queuedPosition": "Queued #{{position}} for the running Turn",

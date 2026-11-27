@@ -23,7 +23,18 @@
     },
     "other": "ใช้ {{tool}}",
     "more": "+{{count}}",
-    "unfinished": "ไม่เสร็จ"
+    "unfinished": "ไม่เสร็จ",
+    "count": {
+      "bash_other": "รัน {{count}} คำสั่ง",
+      "read_other": "อ่าน {{count}} ไฟล์",
+      "glob_other": "หาไฟล์ {{count}} ครั้ง",
+      "grep_other": "ค้นหา {{count}} ครั้ง",
+      "edit_other": "แก้ {{count}} ไฟล์",
+      "write_other": "สร้าง {{count}} ไฟล์",
+      "memory_other": "จด Memory {{count}} ครั้ง",
+      "send_file_other": "ส่ง {{count}} ไฟล์",
+      "other_other": "ใช้ {{tool}} {{count}} ครั้ง"
+    }
   },
   "queued": "ส่งได้ จะรอจน Turn นี้จบ",
   "queuedPosition": "คิว #{{position}} รอ Turn ที่กำลังทำงาน",

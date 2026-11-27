@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useToolOutput } from "../../../features/machine-link";
-import { useT } from "../../../shared/i18n";
-import { clock } from "../../../shared/lib";
+import { useLanguage, useT } from "../../../shared/i18n";
+import { clock, formatList } from "../../../shared/lib";
 import { Card, Chip, Icon, icon, radius, space, Spinner, Tap, Text } from "../../../shared/ui";
 import { summaryOf, type ToolCall } from "../model/items";
 
@@ -93,17 +93,33 @@ function Live({ id }: { id: string }) {
 // else the latest that failed with its last error line, else the last, and how many more it hides.
 export function ToolCalls({ calls }: { calls: ToolCall[] }) {
   const t = useT("task");
+  const language = useLanguage();
   const [open, setOpen] = useState(false);
-  const { call, error, hidden, hiddenFailed } = summaryOf(calls);
+  const { call, error, hidden, hiddenFailed, counts } = summaryOf(calls);
+  // Once nothing runs, the head says what the group did, counted by tool, instead of its last call (issue #73).
+  const finished = calls.length > 1 && !calls.some((c) => c.state === "running");
+  const counted = formatList(
+    counts.map(({ tool, count }) => ((VERBS as readonly string[]).includes(tool) ? t(`tools.count.${tool as (typeof VERBS)[number]}`, { count }) : t("tools.count.other", { tool, count }))),
+    language,
+  );
+  const failedAny = calls.some((c) => c.state === "failed");
   return (
     <Card style={{ padding: space.xs, gap: 0 }}>
       <Tap onPress={() => setOpen(!open)} style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 44, paddingHorizontal: space.sm }}>
         <View style={{ width: icon.md, alignItems: "center" }}>
-          <Status state={call.state} />
+          <Status state={finished ? (failedAny ? "failed" : "ok") : call.state} />
         </View>
-        <CallLabel call={call} numberOfLines={1} tone={call.state === "failed" ? "danger" : "label"} />
-        {hidden > 0 && <Chip tone="count" label={t("tools.more", { count: hidden })} urgent={false} />}
-        {hiddenFailed && <Icon name="failed" size="xs" color="red" />}
+        {finished ? (
+          <Text variant="footnote" tone={failedAny ? "danger" : "label"} numberOfLines={1} style={{ flex: 1 }}>
+            {counted}
+          </Text>
+        ) : (
+          <>
+            <CallLabel call={call} numberOfLines={1} tone={call.state === "failed" ? "danger" : "label"} />
+            {hidden > 0 && <Chip tone="count" label={t("tools.more", { count: hidden })} urgent={false} />}
+            {hiddenFailed && <Icon name="failed" size="xs" color="red" />}
+          </>
+        )}
         <Icon name={open ? "collapse" : "expand"} size="xs" weight="semibold" />
       </Tap>
       {!open && call.state === "running" && <Live id={call.id} />}

@@ -199,9 +199,19 @@ test("every tool names what it worked on, and a tool this build does not know sh
 
 test("a folded group names the running call, else the latest failed with its last error line, else the last", () => {
   const c = (id: string, state: "running" | "ok" | "failed", output?: string) => ({ id, tool: "bash", target: id, state, ...(output ? { output } : {}) });
-  expect(summaryOf([c("a", "ok"), c("b", "running"), c("c", "failed", "x")])).toEqual({ call: c("b", "running"), hidden: 2, hiddenFailed: true });
-  expect(summaryOf([c("a", "failed", "first\nlast line\n"), c("b", "ok")])).toEqual({ call: c("a", "failed", "first\nlast line\n"), error: "last line", hidden: 1, hiddenFailed: false });
-  expect(summaryOf([c("a", "ok"), c("b", "ok")])).toEqual({ call: c("b", "ok"), hidden: 1, hiddenFailed: false });
+  const bash = [{ tool: "bash", count: 3 }];
+  expect(summaryOf([c("a", "ok"), c("b", "running"), c("c", "failed", "x")])).toEqual({ call: c("b", "running"), hidden: 2, hiddenFailed: true, counts: bash });
+  expect(summaryOf([c("a", "failed", "first\nlast line\n"), c("b", "ok")])).toEqual({ call: c("a", "failed", "first\nlast line\n"), error: "last line", hidden: 1, hiddenFailed: false, counts: [{ tool: "bash", count: 2 }] });
+  expect(summaryOf([c("a", "ok"), c("b", "ok")])).toEqual({ call: c("b", "ok"), hidden: 1, hiddenFailed: false, counts: [{ tool: "bash", count: 2 }] });
+});
+
+test("a finished group counts its calls by tool, in the order each first came (issue #73)", () => {
+  const c = (id: string, tool: string) => ({ id, tool, target: id, state: "ok" as const });
+  expect(summaryOf([c("a", "bash"), c("b", "edit"), c("c", "bash"), c("d", "read"), c("e", "edit"), c("f", "bash")]).counts).toEqual([
+    { tool: "bash", count: 3 },
+    { tool: "edit", count: 2 },
+    { tool: "read", count: 1 },
+  ]);
 });
 
 test("a Turn that ended lists the files edit and write changed, once each, and none when it only read or failed", () => {

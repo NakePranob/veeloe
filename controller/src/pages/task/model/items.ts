@@ -26,7 +26,8 @@ const atOf = (event: EventRow) => event.at ?? 0;
 export type ToolCall = { id: string; tool: string; target: string; state: "running" | "ok" | "failed" | "unfinished"; output?: string };
 
 /** What a folded group shows: the call to name, the line of error under it, how many others it hides, and whether a hidden one failed. */
-export type ToolSummary = { call: ToolCall; error?: string; hidden: number; hiddenFailed: boolean };
+/** `counts`: how many calls of each tool, in the order each tool first came, for the header of a finished group (issue #73). */
+export type ToolSummary = { call: ToolCall; error?: string; hidden: number; hiddenFailed: boolean; counts: { tool: string; count: number }[] };
 
 /** The call that says what a group is doing: the one running, else the latest that failed, else the last. */
 export function summaryOf(calls: ToolCall[]): ToolSummary {
@@ -34,7 +35,13 @@ export function summaryOf(calls: ToolCall[]): ToolSummary {
   // biome-ignore lint/style/noNonNullAssertion: a group always holds at least one call
   const call = calls.find((c) => c.state === "running") ?? failed.at(-1) ?? calls.at(-1)!;
   const error = call.state === "failed" ? call.output?.trim().split("\n").filter(Boolean).at(-1) : undefined;
-  return { call, ...(error ? { error } : {}), hidden: calls.length - 1, hiddenFailed: failed.some((c) => c !== call) };
+  const counts: { tool: string; count: number }[] = [];
+  for (const c of calls) {
+    const held = counts.find((entry) => entry.tool === c.tool);
+    if (held) held.count++;
+    else counts.push({ tool: c.tool, count: 1 });
+  }
+  return { call, ...(error ? { error } : {}), hidden: calls.length - 1, hiddenFailed: failed.some((c) => c !== call), counts };
 }
 
 /**
