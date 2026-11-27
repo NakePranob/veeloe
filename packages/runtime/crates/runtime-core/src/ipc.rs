@@ -232,6 +232,10 @@ pub enum FromWorker {
     /// a draft only, until a Member signs a list with it (ADR 0056).
     #[serde(rename = "idle.proposed")]
     IdleProposed { items: Vec<String> },
+    /// The token a Turn's requests carry through the proxy, so a domain Approval
+    /// reaches that Turn's Member (ADR 0080). Never written to the Task log.
+    #[serde(rename = "turn.proxy")]
+    TurnProxy { task: String, token: String },
     /// The name for a Schedule asked for with `trigger.title`.
     #[serde(rename = "trigger.titled")]
     TriggerTitled { id: String, title: String },

@@ -65,7 +65,7 @@ _Avoid_: API, SDK, contract
 ### Agent และงาน
 
 **Agent**:
-ตัวทำงานที่ใช้ LLM ตัดสินใจแล้วลงมือทำผ่าน tool อยู่บน Machine เดียวตลอดและแตะได้แค่สิ่งที่เครื่องนั้นมี ทำได้ทีละ Turn ยกเว้น Turn ที่อยู่คนละ Worktree ซึ่งรันพร้อมกันได้ Machine หนึ่งมีได้หลาย Agent
+ตัวทำงานที่ใช้ LLM ตัดสินใจแล้วลงมือทำผ่าน tool อยู่บน Machine เดียวตลอดและแตะได้แค่สิ่งที่เครื่องนั้นมี Turn ของคนละ Task ทำพร้อมกันได้ และรอกันเฉพาะตอนจะเขียนที่เดียวกัน (ADR 0080) Machine หนึ่งมีได้หลาย Agent
 _Avoid_: Bot, worker
 
 **Character**:
@@ -97,7 +97,7 @@ _Avoid_: Plugin, template, preset, package
 _Avoid_: Integration, plugin, MCP server, borrowed account
 
 **Memory**:
-ไฟล์ `MEMORY.md` ใน Workdir ที่ Agent จดสิ่งที่ทุก Task ต้องรู้ Runtime ใส่เข้า prompt ตอนเริ่ม Task และตรึงไว้ทั้ง Task มีเพดาน 4,000 ตัวอักษร และ Agent แก้เองได้ เรื่องที่ไม่ต้องรู้ทุกครั้ง Agent ค้นเอาจาก Task เก่าของตัวเอง ส่วนความรู้ที่ใช้ร่วมกันหลาย Agent อยู่ใน Library
+ไฟล์ `MEMORY.md` ใน Workdir ที่ Agent จดสิ่งที่ทุก Task ต้องรู้ Runtime ใส่เข้า prompt ตอนเริ่ม Task และตรึงไว้ทั้ง Task มีเพดาน 4,000 ตัวอักษร และ Agent แก้เองได้ การเขียนมีล็อกของตัวเองที่ถือเฉพาะระหว่างเขียน Turn หลายตัวจึงจดพร้อมกันได้โดยไม่มีบรรทัดหาย เรื่องที่ไม่ต้องรู้ทุกครั้ง Agent ค้นเอาจาก Task เก่าของตัวเอง ส่วนความรู้ที่ใช้ร่วมกันหลาย Agent อยู่ใน Library
 _Avoid_: Knowledge, notes, context
 
 **Library**:
@@ -129,7 +129,7 @@ _Avoid_: Chat, thread, session, job, run, room, Private Task
 _Avoid_: Upload, file message
 
 **Turn**:
-ช่วงที่ Agent ลงมือทำงานเพื่อตอบข้อความหนึ่งข้อความใน Task ทำในนามของคนที่ส่งข้อความนั้น ซึ่งไม่จำเป็นต้องเป็นคนที่เริ่ม Task เพราะ Member หลายคนพิมพ์ใน Task เดียวกันได้ เริ่มเมื่อได้รับข้อความ และจบเมื่อ Agent ตอบเสร็จหรือถูก Stop ระหว่าง Turn รวมถึงตอนรอ Approval Agent จะไม่ว่าง ส่วน Task ที่เปิดค้างไว้ไม่ได้ถือ Agent ถ้า worker หรือ Runtime เริ่มใหม่กลาง Turn Turn นั้นจบเหมือนโดน Stop และไม่ทำต่อเอง
+ช่วงที่ Agent ลงมือทำงานเพื่อตอบข้อความหนึ่งข้อความใน Task ทำในนามของคนที่ส่งข้อความนั้น ซึ่งไม่จำเป็นต้องเป็นคนที่เริ่ม Task เพราะ Member หลายคนพิมพ์ใน Task เดียวกันได้ เริ่มเมื่อได้รับข้อความ และจบเมื่อ Agent ตอบเสร็จหรือถูก Stop Turn ของคนละ Task ทำพร้อมกันได้ ส่วน Turn ใน Task เดียวกันทำทีละ Turn และข้อความที่เข้ามาระหว่างนั้นรอ Turn ของ Task นั้นจบ Turn ขอล็อกที่เขียนเมื่อจะแก้ไฟล์หรือรันคำสั่งที่ไม่ใช่คำสั่งในตัว และถือไว้จน Turn จบ Turn ของคนได้ล็อกก่อน Turn ของงานพื้นหลัง (ADR 0080) Task ที่เปิดค้างไว้ไม่ได้ถืออะไร ถ้า worker หรือ Runtime เริ่มใหม่กลาง Turn Turn นั้นจบเหมือนโดน Stop และไม่ทำต่อเอง
 _Avoid_: Run, step, iteration
 
 **Schedule**:
@@ -141,7 +141,7 @@ _Avoid_: Heartbeat, cron, automation, routine, trigger
 _Avoid_: Event, heartbeat, cron
 
 **Idle Work**:
-งานในลิสต์ที่ Member เซ็นไว้ให้ Agent ตัวหนึ่งทำเอง เมื่อไม่มี Turn กำลังทำ คิวว่าง และเงียบครบเวลาที่ตั้ง ทำในนามของคนเซ็น ข้อความที่เข้ามาระหว่างนั้นต่อคิวตามปกติ ไม่ขัดงานกลางคัน และงานหนึ่งชิ้นมีเพดานเวลา
+งานในลิสต์ที่ Member เซ็นไว้ให้ Agent ตัวหนึ่งทำเอง เมื่อไม่มี Turn ของคนกำลังทำ และ Turn ของคนล่าสุดจบมาครบเวลาที่ตั้ง ทำในนามของคนเซ็น ทีละชิ้นจากบนลงล่าง และแต่ละชิ้นทำครั้งเดียวจบ ข้อความของคนเริ่ม Turn ได้ทันที รอเฉพาะตอนจะเขียน และไม่ขัดงานกลางคัน งานหนึ่งชิ้นมีเพดานเวลา 15 นาที
 _Avoid_: Background job, heartbeat, daemon
 
 **Watch**:
@@ -153,7 +153,7 @@ _Avoid_: Trigger, listener, automation
 _Avoid_: Integration, connector, gateway, bot
 
 **Stop**:
-การสั่งให้ Turn ที่กำลังทำอยู่จบทันที พร้อมกับ Turn ของ Task ย่อยทั้งหมดที่อยู่ใต้ Task นั้น ไฟล์ที่แก้ไปแล้วคงสภาพเดิม และ Task ยังคุยต่อได้ Member ที่มี Use กับ Agent ตัวไหน กด Stop ได้ทุก Turn ของ Agent ตัวนั้น ไม่ว่าใครเป็นคนสั่ง ยกเว้น Turn ใน Task ที่คนเริ่มยังไม่ได้เปิดให้เห็น ซึ่งกดได้เฉพาะคนเริ่มกับคนที่มี Manage ส่วนใน Project คนที่มี Use ของ Project กด Stop ได้
+การสั่งให้ Turn ที่กำลังทำอยู่ของ Task หนึ่งจบทันที รวมถึง Turn ที่กำลังรอล็อกที่เขียน พร้อมกับ Turn ของ Task ย่อยทั้งหมดที่อยู่ใต้ Task นั้น ไฟล์ที่แก้ไปแล้วคงสภาพเดิม และ Task ยังคุยต่อได้ Member ที่มี Use กับ Agent ตัวไหน กด Stop ได้ทุก Turn ของ Agent ตัวนั้น ไม่ว่าใครเป็นคนสั่ง ยกเว้น Turn ใน Task ที่คนเริ่มยังไม่ได้เปิดให้เห็น ซึ่งกดได้เฉพาะคนเริ่มกับคนที่มี Manage ส่วนใน Project คนที่มี Use ของ Project กด Stop ได้
 _Avoid_: Cancel, abort, kill, close
 
 ### Project
@@ -183,7 +183,7 @@ _Avoid_: Lead, leader, manager, orchestrator
 _Avoid_: Handoff, dispatch, Flow
 
 **Ask**:
-คำถามใน Project ที่ตอบด้วย Turn แบบอ่านอย่างเดียว คนถามคือ Member ที่มีสิทธิ์ Ask ขึ้นไปใน Project หรือพนักงานด้วยกัน คนตอบคือเจ้าของ Task หรือพนักงานที่ถูก Mention Turn แบบนี้มีแค่ tool อ่านไฟล์ ค้น Task ของ Project และอ่าน wiki ไม่มี bash ไม่ส่งงานต่อ และไม่เรียก Connector จึงไม่ต้องรอคิว path ที่ Project ห้ามและ Task ที่ปิดจาก Ask อ่านไม่ได้ ส่วนหัวข้อที่ห้ามตอบเป็นแค่คำขอที่ LLM อาจไม่ทำตาม นอก Project Member ที่มี Use ถาม Agent ที่ไม่ว่างด้วย Ask แทนการต่อคิวได้
+คำถามใน Project ที่ตอบด้วย Turn แบบอ่านอย่างเดียว คนถามคือ Member ที่มีสิทธิ์ Ask ขึ้นไปใน Project หรือพนักงานด้วยกัน คนตอบคือเจ้าของ Task หรือพนักงานที่ถูก Mention Turn แบบนี้มีแค่ tool อ่านไฟล์ ค้น Task ของ Project และอ่าน wiki ไม่มี bash ไม่ส่งงานต่อ และไม่เรียก Connector จึงไม่ขอล็อกที่เขียนเลย path ที่ Project ห้ามและ Task ที่ปิดจาก Ask อ่านไม่ได้ ส่วนหัวข้อที่ห้ามตอบเป็นแค่คำขอที่ LLM อาจไม่ทำตาม นอก Project Turn ของคนละ Task ทำพร้อมกันได้อยู่แล้ว (ADR 0080)
 _Avoid_: Query, read-only mode
 
 **Mention**:

@@ -190,6 +190,21 @@ pub fn progress() -> Option<Progress> {
     PROGRESS.try_with(Arc::clone).ok()
 }
 
+tokio::task_local! {
+    static TURN_TOKEN: String;
+}
+
+/// Runs `call` as part of the Turn that `token` names, so a tool that reaches
+/// the network can tell the proxy which Turn it is (ADR 0080).
+pub async fn with_turn<F: std::future::Future>(token: String, call: F) -> F::Output {
+    TURN_TOKEN.scope(token, call).await
+}
+
+/// The token of the Turn this call is part of, if any.
+pub fn turn_token() -> Option<String> {
+    TURN_TOKEN.try_with(Clone::clone).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

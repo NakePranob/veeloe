@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
-use veeloe_plugin_api::{progress, Cancel, ToolDefinition, ToolError, ToolRunner};
+use veeloe_plugin_api::{progress, turn_token, Cancel, ToolDefinition, ToolError, ToolRunner};
 use veeloe_runtime_core::sandbox::Sandbox;
 
 pub const DEFAULT_TIMEOUT_S: u64 = 120;
@@ -96,6 +96,27 @@ impl BashTool {
     }
 }
 
+/// The proxy variables carry the Turn's token as the URL's user, so the proxy
+/// knows which Turn a request is part of (ADR 0080). Without a Turn they stay
+/// as they are, and the proxy refuses a request it cannot place.
+pub fn with_turn_in_proxy(
+    env: &HashMap<String, String>,
+    token: Option<&str>,
+) -> HashMap<String, String> {
+    let mut env = env.clone();
+    let Some(token) = token.filter(|token| !token.is_empty()) else {
+        return env;
+    };
+    for (name, value) in env.iter_mut() {
+        if name.to_ascii_lowercase().ends_with("_proxy") && !name.eq_ignore_ascii_case("no_proxy") {
+            if let Some(rest) = value.strip_prefix("http://") {
+                *value = format!("http://{token}@{rest}");
+            }
+        }
+    }
+    env
+}
+
 #[async_trait]
 impl ToolRunner for BashTool {
     fn definitions(&self) -> Vec<ToolDefinition> {
@@ -144,7 +165,7 @@ impl ToolRunner for BashTool {
             .args(rest)
             .current_dir(&self.workdir)
             .env_clear()
-            .envs(&self.env)
+            .envs(with_turn_in_proxy(&self.env, turn_token().as_deref()))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
@@ -251,5 +272,32 @@ fn kill_group(pid: u32) {
     }
     unsafe {
         libc::kill(-(pid as i32), libc::SIGKILL);
+    }
+}
+
+#[cfg(test)]
+mod turn_proxy_tests {
+    use super::*;
+
+    #[test]
+    fn the_proxy_variables_carry_the_turns_token_and_nothing_else_changes() {
+        let env = HashMap::from([
+            (
+                "HTTP_PROXY".to_string(),
+                "http://127.0.0.1:4000".to_string(),
+            ),
+            (
+                "https_proxy".to_string(),
+                "http://127.0.0.1:4000".to_string(),
+            ),
+            ("NO_PROXY".to_string(), "localhost".to_string()),
+            ("HOME".to_string(), "/home/a".to_string()),
+        ]);
+        let with = with_turn_in_proxy(&env, Some("tt123"));
+        assert_eq!(with["HTTP_PROXY"], "http://tt123@127.0.0.1:4000");
+        assert_eq!(with["https_proxy"], "http://tt123@127.0.0.1:4000");
+        assert_eq!(with["NO_PROXY"], "localhost");
+        assert_eq!(with["HOME"], "/home/a");
+        assert_eq!(with_turn_in_proxy(&env, None), env);
     }
 }

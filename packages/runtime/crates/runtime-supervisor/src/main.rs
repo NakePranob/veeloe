@@ -160,6 +160,9 @@ struct Supervisor {
     /// When each Agent last started or ended a Turn, for Idle Work's quiet time
     /// (ADR 0056). An Agent not here has been quiet since this process started.
     quiet_since: Mutex<HashMap<String, u64>>,
+    /// The Tasks whose running Turn is a person's: only those move the quiet
+    /// time, so a Schedule's round does not keep Idle Work waiting (ADR 0080).
+    person_turns: Mutex<std::collections::HashSet<(String, String)>>,
     started_at: u64,
 }
 
@@ -179,17 +182,31 @@ impl Supervisor {
         // whoever is talking to it hears the new draft (ADR 0056).
         if let FromWorker::IdleProposed { items } = &message {
             if self.triggers.propose(agent, items).is_ok() {
-                if let (Some(outbox), Some(turn)) =
-                    (outbox.as_ref(), self.approvals.current_turn(agent))
-                {
-                    outbox.to_member(
-                        &turn.member,
-                        "trigger.listed",
-                        self.triggers.listed_body(agent),
-                        None,
-                    );
+                if let Some(outbox) = outbox.as_ref() {
+                    // Whoever is talking to the Agent now: one draft each.
+                    let mut members: Vec<String> = self
+                        .approvals
+                        .turns(agent)
+                        .into_iter()
+                        .map(|turn| turn.member)
+                        .collect();
+                    members.sort();
+                    members.dedup();
+                    for member in members {
+                        outbox.to_member(
+                            &member,
+                            "trigger.listed",
+                            self.triggers.listed_body(agent),
+                            None,
+                        );
+                    }
                 }
             }
+            return;
+        }
+        // Kept for the proxy, never forwarded (ADR 0080).
+        if let FromWorker::TurnProxy { task, token } = &message {
+            self.approvals.turn_token(agent, task, token);
             return;
         }
         if let FromWorker::TriggerTitled { id, title } = &message {
@@ -215,8 +232,10 @@ impl Supervisor {
         let FromWorker::Event { task, event, .. } = message else {
             return;
         };
+        let key = (agent.to_string(), task.clone());
         match event.kind.as_str() {
-            "turn.started" => {
+            "turn.started" if event.body.get("trigger").is_none() => {
+                self.person_turns.lock().expect("person turns").insert(key);
                 self.quiet_since.lock().expect("quiet").insert(
                     agent.to_string(),
                     veeloe_runtime_supervisor::usage::now_ms() as u64,
@@ -224,10 +243,12 @@ impl Supervisor {
             }
             "approval.skipped" => self.triggers.skipped(task),
             "turn.ended" => {
-                self.quiet_since.lock().expect("quiet").insert(
-                    agent.to_string(),
-                    veeloe_runtime_supervisor::usage::now_ms() as u64,
-                );
+                if self.person_turns.lock().expect("person turns").remove(&key) {
+                    self.quiet_since.lock().expect("quiet").insert(
+                        agent.to_string(),
+                        veeloe_runtime_supervisor::usage::now_ms() as u64,
+                    );
+                }
                 let piece = self.triggers.piece_of(task);
                 if self
                     .triggers
@@ -290,7 +311,8 @@ impl Supervisor {
             .get(&record.agent)
             .copied()
             .unwrap_or(self.started_at);
-        if self.approvals.current_turn(&record.agent).is_some()
+        // Only a person's Turn keeps Idle Work waiting; other rounds do not (ADR 0080).
+        if self.approvals.person_running(&record.agent)
             || !list.quiet_enough(now_ms as u64, since)
             || list.next(&record.progress).is_none()
             || self.budgets.exhausted(&agent, now_ms).unwrap_or(true)
@@ -415,7 +437,8 @@ impl Supervisor {
                 // An Agent purged from the trash waits too: it has no rounds left.
                 in_trash: agent.as_ref().is_none_or(|agent| agent.deleted()),
                 allowed: trust.uses(&record.member, Some(&record.key)),
-                busy: self.approvals.current_turn(&record.agent).is_some(),
+                // Only this Schedule's own round still running skips the next (ADR 0080).
+                busy: self.approvals.round_running(&record.agent, &record.id),
                 budget_spent: agent
                     .as_ref()
                     .is_some_and(|agent| self.budgets.exhausted(agent, now_ms).unwrap_or(true)),
@@ -850,6 +873,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         outbox: Mutex::new(None),
         workers: OnceLock::new(),
         quiet_since: Mutex::new(HashMap::new()),
+        person_turns: Mutex::new(std::collections::HashSet::new()),
         started_at: veeloe_runtime_supervisor::usage::now_ms() as u64,
     });
 

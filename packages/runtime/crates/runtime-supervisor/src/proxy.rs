@@ -403,11 +403,15 @@ where
     // One spelling for the Egress check, the approval request and the log.
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     // No Turn, no answer: a connection nobody is acting for is refused rather
-    // than opened (issue #44), the git broker's included.
-    if approvals
-        .as_ref()
-        .is_some_and(|approvals| approvals.current_turn(&agent).is_none())
-    {
+    // than opened (issue #44), the git broker's included. With Turns running at
+    // once, the request says which one it is part of (ADR 0080).
+    let token = turn_token(&text);
+    if approvals.as_ref().is_some_and(|approvals| {
+        token
+            .as_deref()
+            .and_then(|token| approvals.turn_by_token(&agent, token))
+            .is_none()
+    }) {
         return Ok(());
     }
     if host == git_broker::HOST {
@@ -426,7 +430,7 @@ where
                 // name is refused as before: a permanent yes could never cover
                 // it (ADR 0029).
                 let askable = crate::egress::is_valid_egress(std::slice::from_ref(&host));
-                if !askable || !approvals.ask(&agent, &host).await {
+                if !askable || !approvals.ask(&agent, token.as_deref(), &host).await {
                     // No answer at all: a 403 is still an HTTP response a
                     // command could treat as success. Dropping the connection
                     // is the refusal.
@@ -594,6 +598,48 @@ fn hello_server_name(handshake: &[u8]) -> Option<Option<String>> {
         }
     }
     Some(None)
+}
+
+/// The Turn token a request carries as its proxy user (`Proxy-Authorization:
+/// Basic`, `token:` encoded), if any (ADR 0080).
+fn turn_token(head: &str) -> Option<String> {
+    let encoded = head.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        if !name.trim().eq_ignore_ascii_case("proxy-authorization") {
+            return None;
+        }
+        let (scheme, credentials) = value.trim().split_once(' ')?;
+        scheme
+            .eq_ignore_ascii_case("basic")
+            .then(|| credentials.trim().to_string())
+    })?;
+    let decoded = String::from_utf8(base64_decode(&encoded)?).ok()?;
+    let user = decoded.split(':').next().unwrap_or_default();
+    (!user.is_empty()).then(|| user.to_string())
+}
+
+/// Standard base64, as `Basic` credentials use; None for anything else.
+fn base64_decode(text: &str) -> Option<Vec<u8>> {
+    let value = |c: u8| match c {
+        b'A'..=b'Z' => Some(c - b'A'),
+        b'a'..=b'z' => Some(c - b'a' + 26),
+        b'0'..=b'9' => Some(c - b'0' + 52),
+        b'+' => Some(62),
+        b'/' => Some(63),
+        _ => None,
+    };
+    let mut out = Vec::new();
+    let (mut bits, mut count) = (0u32, 0);
+    for c in text.bytes().filter(|c| *c != b'=') {
+        bits = (bits << 6) | u32::from(value(c)?);
+        count += 6;
+        if count >= 8 {
+            count -= 8;
+            out.push((bits >> count) as u8);
+            bits &= (1 << count) - 1;
+        }
+    }
+    Some(out)
 }
 
 /// One plain HTTP request in origin-form, with the proxy's own headers dropped
@@ -815,6 +861,8 @@ mod tests {
                 },
             },
         );
+        // The token this Turn's requests carry (ADR 0080).
+        approvals.turn_token(agent, task, &format!("tok-{task}"));
         approvals
     }
 
@@ -845,7 +893,7 @@ mod tests {
             .await
             .expect("connect");
         client
-            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\nProxy-Authorization: Basic dG9rLXQxOg==\r\n\r\n")
             .await
             .expect("write");
         let mut answer = [0u8; 16];
@@ -873,7 +921,7 @@ mod tests {
             .await
             .expect("connect");
         client
-            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\nProxy-Authorization: Basic dG9rLXQxOg==\r\n\r\n")
             .await
             .expect("write");
 
@@ -939,7 +987,7 @@ mod tests {
             .await
             .expect("connect the socket");
         client
-            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+            .write_all(b"CONNECT example.com:443 HTTP/1.1\r\nProxy-Authorization: Basic dG9rLXQxOg==\r\n\r\n")
             .await
             .expect("write");
         let mut answer = [0u8; 16];
@@ -966,7 +1014,7 @@ mod tests {
             .await
             .expect("connect a1");
         client
-            .write_all(b"CONNECT b.example.com:443 HTTP/1.1\r\n\r\n")
+            .write_all(b"CONNECT b.example.com:443 HTTP/1.1\r\nProxy-Authorization: Basic dG9rLXQxOg==\r\n\r\n")
             .await
             .expect("write");
         let mut answer = [0u8; 16];
@@ -978,7 +1026,7 @@ mod tests {
             .await
             .expect("connect a2");
         client
-            .write_all(b"CONNECT a.example.com:443 HTTP/1.1\r\n\r\n")
+            .write_all(b"CONNECT a.example.com:443 HTTP/1.1\r\nProxy-Authorization: Basic dG9rLXQxOg==\r\n\r\n")
             .await
             .expect("write");
         let mut answer = [0u8; 16];
@@ -1044,7 +1092,7 @@ mod tests {
             String::from_utf8_lossy(&answer).into_owned()
         }
         let fetch = format!(
-            "GET http://{}/acme/shop.git/info/refs?service=git-upload-pack HTTP/1.1\r\n\r\n",
+            "GET http://{}/acme/shop.git/info/refs?service=git-upload-pack HTTP/1.1\r\nProxy-Authorization: Basic dG9rLXQxOg==\r\n\r\n",
             git_broker::HOST
         );
         let home = tempfile::tempdir().expect("home");
@@ -1089,7 +1137,10 @@ mod tests {
             answer.starts_with("HTTP/1.1 403") && answer.contains("veeloe git repos a1"),
             "{answer}"
         );
-        let tunnel = format!("CONNECT {}:443 HTTP/1.1\r\n\r\n", git_broker::HOST);
+        let tunnel = format!(
+            "CONNECT {}:443 HTTP/1.1\r\nProxy-Authorization: Basic dG9rLXQxOg==\r\n\r\n",
+            git_broker::HOST
+        );
         assert_eq!(
             send(proxy.port, tunnel.as_bytes()).await,
             "",
@@ -1171,5 +1222,28 @@ mod tests {
         ours.write_all(&cut).await.expect("write");
         drop(ours);
         assert_eq!(read_opening(&mut theirs, "api.example.com").await, None);
+    }
+}
+
+#[cfg(test)]
+mod turn_token_tests {
+    use super::turn_token;
+
+    #[test]
+    fn the_turn_token_is_the_proxy_user_and_nothing_else_is_taken_for_one() {
+        assert_eq!(
+            turn_token("CONNECT a:443 HTTP/1.1\r\nproxy-authorization: Basic dG9rLXQxOg==")
+                .as_deref(),
+            Some("tok-t1")
+        );
+        assert_eq!(turn_token("CONNECT a:443 HTTP/1.1\r\nHost: a"), None);
+        assert_eq!(
+            turn_token("CONNECT a:443 HTTP/1.1\r\nProxy-Authorization: Bearer x"),
+            None
+        );
+        assert_eq!(
+            turn_token("CONNECT a:443 HTTP/1.1\r\nProxy-Authorization: Basic !!!"),
+            None
+        );
     }
 }

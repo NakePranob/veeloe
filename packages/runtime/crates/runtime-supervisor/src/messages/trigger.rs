@@ -214,11 +214,11 @@ pub(crate) fn run(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     if record.suspended {
         return outbox.error(from, "trigger.suspended");
     }
-    // A run now waiting behind another Turn would start long after whoever
-    // pressed it left, and ask them anyway: refuse it while the Agent works.
+    // Other Tasks running do not hold a round back (ADR 0080); only this
+    // Trigger's own round still running does.
     if machine
         .approvals
-        .is_some_and(|approvals| approvals.current_turn(&agent).is_some())
+        .is_some_and(|approvals| approvals.round_running(&agent, id))
     {
         return outbox.error(from, "agent.busy");
     }

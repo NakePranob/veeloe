@@ -191,6 +191,18 @@ test("the Inbox's newest Task per Agent skips a quiet round, and a thread head c
   expect(heads.map((h) => [h.id, h.rounds])).toEqual([["r2", 2]]);
 });
 
+test("an Agent's row shows a Task still running over a newer one that ended (ADR 0080)", async () => {
+  const database = await open();
+  const now = Date.now();
+  const at = (seq: number, kind: string, body: unknown, ms: number) => ({ seq, kind, at: ms, body });
+  await saveTaskEvents(database, { ...where, task: "running" }, [at(1, "member.message", { text: "long" }, now - 60_000), at(2, "turn.started", {}, now - 59_000)]);
+  await saveTaskEvents(database, { ...where, task: "newer" }, [at(1, "member.message", { text: "quick" }, now - 1_000), at(2, "turn.ended", { reason: "done" }, now)]);
+  expect((await database.query<TaskSummary>(LIST_LATEST_TASKS)).map((t) => t.id)).toEqual(["running"]);
+  // Once it ends, the newest Task is shown again.
+  await saveTaskEvents(database, { ...where, task: "running" }, [at(3, "turn.ended", { reason: "done" }, now - 30_000)]);
+  expect((await database.query<TaskSummary>(LIST_LATEST_TASKS)).map((t) => t.id)).toEqual(["newer"]);
+});
+
 test("a Task with no events yet still saves and is not quiet", async () => {
   const database = await open();
   await saveTaskEvents(database, where, [event(1, "task.titled", { title: "x" })]);

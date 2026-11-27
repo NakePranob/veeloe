@@ -1,6 +1,6 @@
 {
   "_unknown": "Something went wrong ({{code}})",
-  "agent.busy": "The Agent is still working on the last message. Send this when it's done",
+  "agent.busy": "That is still running from before. Try again when it is done",
   "agent.provider_unknown": "That Provider or model isn't on this Machine",
   "agent.unavailable": "The Agent couldn't take this right now. Try again in a moment",
   "agent.unknown": "This Machine doesn't have that Agent",

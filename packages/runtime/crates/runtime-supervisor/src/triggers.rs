@@ -155,6 +155,11 @@ pub struct Triggers {
     skipped: Mutex<HashSet<String>>,
 }
 
+/// The most one background round may run, a Schedule's or a piece of Idle
+/// Work, before it ends as if stopped. A person waiting to write waits behind
+/// it at most this long (ADR 0056, 0080); it is the Runtime's, not a setting.
+pub const BACKGROUND_LIMIT_S: u64 = 15 * 60;
+
 /// The most an Agent's Idle Work draft holds.
 pub const DRAFT_MAX: usize = 50;
 
@@ -438,7 +443,7 @@ pub fn start_round(
         attended,
         approves,
         &record.text,
-        None,
+        Some(BACKGROUND_LIMIT_S),
     )
 }
 
@@ -462,7 +467,7 @@ pub fn start_piece(
         attended,
         approves,
         &piece.text,
-        Some(crate::idle::PIECE_LIMIT_S),
+        Some(BACKGROUND_LIMIT_S),
     )?;
     let _ = triggers.update(&record.agent, &record.id, |held| {
         held.last_run_at = Some(now);

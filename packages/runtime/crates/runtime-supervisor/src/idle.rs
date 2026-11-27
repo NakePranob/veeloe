@@ -10,11 +10,6 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-/// The most one piece's Turn may run before it stops as if stopped. A person's
-/// message waits behind the piece in progress (ADR 0056), so this is also the
-/// longest they wait; it is the Runtime's, not a setting.
-pub const PIECE_LIMIT_S: u64 = 15 * 60;
-
 /// One piece of work, as signed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IdleItem {

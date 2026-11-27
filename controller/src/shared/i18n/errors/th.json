@@ -1,6 +1,6 @@
 {
   "_unknown": "เกิดข้อผิดพลาด ({{code}})",
-  "agent.busy": "Agent ยังทำข้อความก่อนหน้าอยู่ ส่งข้อความนี้อีกครั้งเมื่อเสร็จ",
+  "agent.busy": "งานก่อนหน้ายังทำอยู่ ลองอีกครั้งเมื่อเสร็จ",
   "agent.provider_unknown": "Machine เครื่องนี้ไม่มี Provider หรือ model นั้น",
   "agent.unavailable": "Agent รับข้อความนี้ไม่ได้ตอนนี้ ลองใหม่อีกครู่",
   "agent.unknown": "Machine เครื่องนี้ไม่มี Agent ตัวนั้น",

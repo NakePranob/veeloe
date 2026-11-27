@@ -40,13 +40,6 @@ supervisor SHALL เก็บทุก Task ของ Agent เป็นลำ�
 - **WHEN** ข้อความเดิมถูกส่งอีกครั้งเพราะ Controller ต่อใหม่
 - **THEN** log ไม่มีข้อความนั้นซ้ำและไม่มี Turn ใหม่
 
-### Requirement: Agent ทำทีละ Turn
-Agent SHALL ทำได้ทีละ Turn ข้อความที่มาถึงระหว่างที่ Turn ทำอยู่ SHALL ได้ error code `agent.busy` และ SHALL NOT ถูกเพิ่มลง log จนกว่าคิวงานจะมาใน `one-writer-queue`
-
-#### Scenario: ส่งระหว่าง Turn
-- **WHEN** Owner ส่งข้อความขณะที่ Agent ยังทำ Turn ก่อนหน้าอยู่
-- **THEN** Controller ได้ `agent.busy` และ log ไม่เปลี่ยน
-
 ### Requirement: harness ทำ Turn จาก log และเรียก tool เป็นรอบ
 harness SHALL สร้างบทสนทนาที่ส่งให้ LLM จาก event ใน log เท่านั้น เมื่อ LLM ขอเรียก tool harness SHALL เรียก tool บันทึกผล แล้วส่งให้ LLM ต่อจนกว่า LLM จะตอบโดยไม่ขอ tool เมื่อ LLM ขอ tool ที่ Agent ไม่มี harness SHALL ส่งผลว่าเป็น error ให้ LLM แทนการหยุด Turn เมื่อ Provider ล้มเหลว Turn SHALL จบด้วย error code ที่บอกว่าเป็นที่ Provider
 

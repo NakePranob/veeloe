@@ -9,6 +9,7 @@ pub mod memory;
 pub mod ports;
 pub mod sandbox;
 pub mod usage;
+pub mod write_lock;
 
 pub use agent::{AgentCore, AgentError, APPROVAL_TIMEOUT_MS, MAX_ROUNDS};
 pub use conversation::conversation;

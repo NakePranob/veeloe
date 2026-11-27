@@ -16,7 +16,7 @@
   "editor": {
     "new": "New Schedule",
     "edit": "Edit Schedule",
-    "footer": "Times are on the Machine's own clock. A round is skipped while the Agent is busy or its Budget is used up.",
+    "footer": "Times are on the Machine's own clock. A round is skipped while the one before it is still running or the Budget is used up. Each round runs at most 15 minutes.",
     "text": "What to do",
     "textPlaceholder": "Check the CI and tell me what failed",
     "when": "Runs",
@@ -73,7 +73,7 @@
   "cancel": "Cancel",
   "run": "Run now",
   "last": {
-    "busy": "{{when}} skipped, Agent busy",
+    "busy": "{{when}} skipped, the last round was still running",
     "budget": "{{when}} skipped, Budget spent",
     "quiet": "{{when}} nothing to report",
     "done": "{{when}} reported",

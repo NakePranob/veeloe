@@ -344,7 +344,8 @@ pub fn forward(outbox: &dyn Outbox, agent: &str, message: FromWorker) {
         | FromWorker::LogRead { .. }
         // The supervisor keeps a Schedule's name before it says anything (`triggers::titled`).
         | FromWorker::TriggerTitled { .. }
-        | FromWorker::IdleProposed { .. } => {}
+        | FromWorker::IdleProposed { .. }
+        | FromWorker::TurnProxy { .. } => {}
     }
 }
 

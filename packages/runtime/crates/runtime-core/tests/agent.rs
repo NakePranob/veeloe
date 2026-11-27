@@ -377,9 +377,13 @@ async fn a_message_starts_a_task_and_a_turn_and_every_event_reaches_the_member_w
         .map(|event| event.seq)
         .collect();
     assert_eq!(seqs, vec![1, 2, 4, 5]);
+    // Every event goes to the starter; the Turn's proxy token is for the supervisor alone.
     assert!(harness.link.take().iter().all(|message| matches!(
         message,
         FromWorker::Event { starter, .. } if starter == "m_owner"
+    ) || matches!(
+        message,
+        FromWorker::TurnProxy { .. }
     )));
     assert_eq!(
         events.last().expect("last").body,
@@ -2317,4 +2321,486 @@ async fn any_turn_may_propose_idle_work_and_the_supervisor_hears_it() {
         FromWorker::IdleProposed { items } if items == &vec!["write the parser tests".to_string()]
     )));
     assert!(tool_names(&harness.llm.requests()[0]).contains(&"propose_idle_work".to_string()));
+}
+
+// ---- Turns at once and the write lock (ADR 0080) ----
+
+/// An LLM that answers each Task from its own script, so Turns that run at once
+/// do not take each other's replies. A Task's `hold`-th request waits for its gate.
+#[derive(Default)]
+struct ByTask {
+    replies: Mutex<std::collections::HashMap<String, VecDeque<LlmReply>>>,
+    holds: Mutex<std::collections::HashMap<String, (usize, watch::Receiver<bool>)>>,
+    asked: Mutex<std::collections::HashMap<String, usize>>,
+}
+
+impl ByTask {
+    fn script(&self, task: &str, replies: Vec<LlmReply>) {
+        self.replies
+            .lock()
+            .unwrap()
+            .insert(task.into(), replies.into());
+    }
+
+    /// The `nth` request of `task` (0 is the first) waits until the returned gate opens.
+    fn hold(&self, task: &str, nth: usize) -> watch::Sender<bool> {
+        let (open, gate) = watch::channel(false);
+        self.holds.lock().unwrap().insert(task.into(), (nth, gate));
+        open
+    }
+}
+
+#[async_trait]
+impl Llm for ByTask {
+    async fn send(&self, request: LlmRequest, _cancel: &Cancel) -> Result<LlmReply, LlmError> {
+        if is_title(&request) {
+            return Err(LlmError::Failed("unnamed".into()));
+        }
+        let nth = {
+            let mut asked = self.asked.lock().unwrap();
+            let count = asked.entry(request.task.clone()).or_default();
+            *count += 1;
+            *count - 1
+        };
+        let gate = self
+            .holds
+            .lock()
+            .unwrap()
+            .get(&request.task)
+            .filter(|(at, _)| *at == nth)
+            .map(|(_, gate)| gate.clone());
+        if let Some(mut gate) = gate {
+            while !*gate.borrow() {
+                if gate.changed().await.is_err() {
+                    break;
+                }
+            }
+        }
+        let reply = self
+            .replies
+            .lock()
+            .unwrap()
+            .get_mut(&request.task)
+            .and_then(VecDeque::pop_front)
+            .unwrap_or_else(|| text("ok"));
+        // A reply that says FAIL is the Provider failing.
+        if reply.content.first().and_then(|block| block.get("text")) == Some(&json!("FAIL")) {
+            return Err(LlmError::Failed("down".into()));
+        }
+        Ok(reply)
+    }
+}
+
+/// Tools that only say they ran: `write`, `read`, `memory`, and a `bash` that
+/// writes its command down. `memory` takes a moment, to catch two at once.
+struct Recorder {
+    ran: Arc<Mutex<Vec<String>>>,
+    in_memory: Arc<std::sync::atomic::AtomicUsize>,
+    most_in_memory: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+#[async_trait]
+impl ToolRunner for Recorder {
+    fn definitions(&self) -> Vec<ToolDefinition> {
+        ["write", "read", "memory", "bash"]
+            .into_iter()
+            .map(definition)
+            .collect()
+    }
+
+    async fn run(&self, name: &str, input: &Value, _cancel: &Cancel) -> Result<String, ToolError> {
+        use std::sync::atomic::Ordering;
+        let what = input
+            .get("command")
+            .or_else(|| input.get("path"))
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        self.ran.lock().unwrap().push(format!("{name}:{what}"));
+        if name == "memory" {
+            let now = self.in_memory.fetch_add(1, Ordering::SeqCst) + 1;
+            self.most_in_memory.fetch_max(now, Ordering::SeqCst);
+            tokio::time::sleep(Duration::from_millis(40)).await;
+            self.in_memory.fetch_sub(1, Ordering::SeqCst);
+        }
+        Ok("done".into())
+    }
+}
+
+struct Lanes {
+    core: AgentCore,
+    llm: Arc<ByTask>,
+    ran: Arc<Mutex<Vec<String>>>,
+    most_in_memory: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+fn lanes(allowlist: &[&str], stall_after: Option<Duration>) -> Lanes {
+    let dir = tempdir().expect("tempdir");
+    let store = EventStore::open(dir.path().join("tasks.db")).expect("store");
+    let ran = Arc::new(Mutex::new(Vec::new()));
+    let most_in_memory = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let mut tools = ToolRegistry::default();
+    tools
+        .register(Arc::new(Recorder {
+            ran: Arc::clone(&ran),
+            in_memory: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            most_in_memory: Arc::clone(&most_in_memory),
+        }))
+        .expect("tools");
+    let llm = Arc::new(ByTask::default());
+    let core = AgentCore::new(
+        "Deployer",
+        store,
+        Arc::clone(&llm) as Arc<dyn Llm>,
+        tools,
+        Arc::new(RecordingLink::default()) as Arc<dyn SupervisorLink>,
+    );
+    core.set_allowlist(allowlist.iter().map(|entry| entry.to_string()).collect());
+    let core = match stall_after {
+        Some(after) => core.with_stall_after(after),
+        None => core,
+    };
+    std::mem::forget(dir);
+    Lanes {
+        core,
+        llm,
+        ran,
+        most_in_memory,
+    }
+}
+
+impl Lanes {
+    fn ran(&self) -> Vec<String> {
+        self.ran.lock().unwrap().clone()
+    }
+
+    fn has(&self, task: &str, kind: &str) -> bool {
+        self.core
+            .events(task)
+            .map(|events| events.iter().any(|event| event.kind == kind))
+            .unwrap_or(false)
+    }
+
+    async fn until(&self, done: impl Fn(&Self) -> bool, what: &str) {
+        for _ in 0..500 {
+            if done(self) {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        panic!("never: {what}");
+    }
+}
+
+#[tokio::test]
+async fn turns_of_two_tasks_run_at_once_and_a_tasks_own_message_still_waits() {
+    let lanes = lanes(&[], None);
+    let open_a = lanes.llm.hold("a", 0);
+    lanes
+        .core
+        .receive(message_in("a", "first in a", "m_owner"))
+        .expect("a");
+    lanes
+        .core
+        .receive(message_in("b", "first in b", "m_owner"))
+        .expect("b");
+    lanes
+        .core
+        .receive(message_in("a", "second in a", "m_owner"))
+        .expect("a again");
+    // B starts and ends while A's first Turn is still waiting on its LLM.
+    lanes
+        .until(|lanes| lanes.has("b", "turn.ended"), "b ends")
+        .await;
+    let a = lanes.core.events("a").expect("events");
+    assert_eq!(
+        a.iter()
+            .filter(|event| event.kind == "turn.started")
+            .count(),
+        1
+    );
+    assert!(!a.iter().any(|event| event.kind == "turn.ended"));
+    // A's second message waited for A's own Turn, and then ran.
+    let _ = open_a.send(true);
+    lanes.core.idle().await;
+    let a = lanes.core.events("a").expect("events");
+    assert_eq!(
+        a.iter().filter(|event| event.kind == "turn.ended").count(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn a_turn_reads_while_another_writes_and_waits_only_to_write() {
+    let lanes = lanes(&["npm"], None);
+    // A writes, then waits on its LLM while it still holds the lock.
+    lanes.llm.script(
+        "a",
+        vec![
+            tool_use("w", "write", json!({ "path": "a.txt" })),
+            text("a done"),
+        ],
+    );
+    let open_a = lanes.llm.hold("a", 1);
+    lanes.llm.script(
+        "b",
+        vec![
+            tool_use("r", "read", json!({ "path": "a.txt" })),
+            tool_use("ls", "bash", json!({ "command": "ls" })),
+            tool_use("m", "memory", json!({ "text": "note" })),
+            text("b done"),
+        ],
+    );
+    lanes.llm.script(
+        "c",
+        vec![
+            tool_use("t", "bash", json!({ "command": "npm test" })),
+            text("c done"),
+        ],
+    );
+    lanes
+        .core
+        .receive(message_in("a", "write it", "m_owner"))
+        .expect("a");
+    lanes
+        .until(
+            |lanes| lanes.ran().contains(&"write:a.txt".to_string()),
+            "a writes",
+        )
+        .await;
+    lanes
+        .core
+        .receive(message_in("b", "look", "m_owner"))
+        .expect("b");
+    lanes
+        .core
+        .receive(message_in("c", "test", "m_owner"))
+        .expect("c");
+    // B reads, lists and writes memory without waiting; C's command waits for A.
+    lanes
+        .until(|lanes| lanes.has("b", "turn.ended"), "b ends")
+        .await;
+    assert!(lanes.ran().contains(&"read:a.txt".to_string()));
+    assert!(lanes.ran().contains(&"bash:ls".to_string()));
+    assert!(lanes.ran().contains(&"memory:".to_string()));
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    assert!(!lanes.ran().contains(&"bash:npm test".to_string()));
+    let _ = open_a.send(true);
+    lanes.core.idle().await;
+    assert!(lanes.ran().contains(&"bash:npm test".to_string()));
+    assert!(lanes.has("c", "turn.ended"));
+}
+
+#[tokio::test]
+async fn a_turn_waiting_to_write_can_be_stopped_and_is_not_stalled_meanwhile() {
+    let lanes = lanes(&[], Some(Duration::from_millis(40)));
+    lanes.llm.script(
+        "a",
+        vec![
+            tool_use("w", "write", json!({ "path": "a.txt" })),
+            text("a done"),
+        ],
+    );
+    let open_a = lanes.llm.hold("a", 1);
+    lanes.llm.script(
+        "c",
+        vec![
+            tool_use("w2", "write", json!({ "path": "c.txt" })),
+            text("c done"),
+        ],
+    );
+    lanes
+        .core
+        .receive(message_in("a", "write a", "m_owner"))
+        .expect("a");
+    lanes
+        .until(
+            |lanes| lanes.ran().contains(&"write:a.txt".to_string()),
+            "a writes",
+        )
+        .await;
+    lanes
+        .core
+        .receive(message_in("c", "write c", "m_owner"))
+        .expect("c");
+    // Well past the stall time, C is waiting for the lock, not stalled.
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert!(!lanes.has("c", "turn.stalled"));
+    lanes.core.receive(stop_in("c", "stop-c")).expect("stop");
+    lanes
+        .until(|lanes| lanes.has("c", "turn.ended"), "c ends")
+        .await;
+    let ended = lanes
+        .core
+        .events("c")
+        .expect("events")
+        .into_iter()
+        .find(|event| event.kind == "turn.ended")
+        .expect("ended");
+    assert_eq!(ended.body["reason"], "stopped");
+    assert!(!lanes.ran().contains(&"write:c.txt".to_string()));
+    // A still holds the lock and goes on.
+    let _ = open_a.send(true);
+    lanes.core.idle().await;
+    assert!(lanes.has("a", "turn.ended"));
+}
+
+#[tokio::test]
+async fn two_turns_writing_memory_at_once_each_land_whole() {
+    let lanes = lanes(&[], None);
+    lanes
+        .llm
+        .script("a", vec![tool_use("m1", "memory", json!({})), text("a")]);
+    lanes
+        .llm
+        .script("b", vec![tool_use("m2", "memory", json!({})), text("b")]);
+    lanes
+        .core
+        .receive(message_in("a", "remember a", "m_owner"))
+        .expect("a");
+    lanes
+        .core
+        .receive(message_in("b", "remember b", "m_owner"))
+        .expect("b");
+    lanes.core.idle().await;
+    let memory_calls = lanes
+        .ran()
+        .iter()
+        .filter(|call| call.starts_with("memory"))
+        .count();
+    assert_eq!(memory_calls, 2);
+    assert_eq!(
+        lanes
+            .most_in_memory
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+}
+
+#[tokio::test]
+async fn a_turn_that_fails_while_holding_the_lock_lets_the_next_writer_in() {
+    let lanes = lanes(&[], None);
+    // A writes, then its Provider fails while it holds the lock.
+    lanes.llm.script(
+        "a",
+        vec![
+            tool_use("w", "write", json!({ "path": "a.txt" })),
+            text("FAIL"),
+        ],
+    );
+    lanes.llm.script(
+        "b",
+        vec![
+            tool_use("w2", "write", json!({ "path": "b.txt" })),
+            text("b"),
+        ],
+    );
+    lanes
+        .core
+        .receive(message_in("a", "write a", "m_owner"))
+        .expect("a");
+    lanes
+        .core
+        .receive(message_in("b", "write b", "m_owner"))
+        .expect("b");
+    lanes.core.idle().await;
+    assert!(lanes.ran().contains(&"write:a.txt".to_string()));
+    assert!(lanes.ran().contains(&"write:b.txt".to_string()));
+    let ended = lanes
+        .core
+        .events("a")
+        .expect("events")
+        .into_iter()
+        .rev()
+        .find(|event| event.kind == "turn.ended")
+        .expect("ended");
+    assert_eq!(ended.body["reason"], "error");
+}
+
+#[tokio::test]
+async fn a_quiet_turn_is_stalled_even_while_another_task_is_busy() {
+    let lanes = lanes(&[], Some(Duration::from_millis(40)));
+    let open_a = lanes.llm.hold("a", 0);
+    lanes
+        .core
+        .receive(message_in("a", "slow", "m_owner"))
+        .expect("a");
+    // B keeps writing events while A says nothing.
+    for round in 0..6 {
+        lanes
+            .core
+            .receive(message_in("b", &format!("busy {round}"), "m_owner"))
+            .expect("b");
+        tokio::time::sleep(Duration::from_millis(15)).await;
+    }
+    lanes
+        .until(|lanes| lanes.has("a", "turn.stalled"), "a is stalled")
+        .await;
+    assert!(!lanes.has("b", "turn.stalled"));
+    let _ = open_a.send(true);
+    lanes.core.idle().await;
+}
+
+/// Answers with the token of the Turn it was called from.
+struct WhoAmI;
+
+#[async_trait]
+impl ToolRunner for WhoAmI {
+    fn definitions(&self) -> Vec<ToolDefinition> {
+        vec![definition("whoami")]
+    }
+
+    async fn run(
+        &self,
+        _name: &str,
+        _input: &Value,
+        _cancel: &Cancel,
+    ) -> Result<String, ToolError> {
+        Ok(veeloe_plugin_api::turn_token().unwrap_or_default())
+    }
+}
+
+#[tokio::test]
+async fn each_turn_tells_the_supervisor_its_proxy_token_and_its_tools_carry_it() {
+    let harness = setup(Setup {
+        runners: vec![Arc::new(WhoAmI)],
+        allowlist: vec!["whoami".into()],
+        replies: vec![
+            Ok(tool_use("u1", "whoami", json!({}))),
+            Ok(text("first")),
+            Ok(text("second")),
+        ],
+        ..Setup::default()
+    });
+    harness.core.receive(message("one")).expect("one");
+    harness.core.idle().await;
+    harness.core.receive(message("two")).expect("two");
+    harness.core.idle().await;
+    let tokens: Vec<(String, String)> = harness
+        .link
+        .take()
+        .into_iter()
+        .filter_map(|message| match message {
+            FromWorker::TurnProxy { task, token } => Some((task, token)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tokens.len(), 2);
+    assert!(tokens
+        .iter()
+        .all(|(task, token)| task == "t1" && token.len() > 8));
+    assert_ne!(tokens[0].1, tokens[1].1, "every Turn has its own token");
+    // The tool saw the first Turn's token, and the log never holds it.
+    let events = harness.core.events("t1").expect("events");
+    let result = events
+        .iter()
+        .find(|event| event.kind == "tool.result")
+        .expect("result");
+    assert_eq!(result.body["content"][0]["content"], json!(tokens[0].1));
+    let without_results: Vec<_> = events
+        .iter()
+        .filter(|event| event.kind != "tool.result")
+        .collect();
+    assert!(!serde_json::to_string(&without_results)
+        .unwrap()
+        .contains(&tokens[0].1));
 }

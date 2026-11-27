@@ -650,9 +650,13 @@ async fn session(
     let mut writing = child.stdin.take().expect("stdin is piped");
     let mut lines = BufReader::new(child.stdout.take().expect("stdout is piped")).lines();
     let mut is_ready = false;
+    // Provider answers come back here: each request runs on its own, so one
+    // Turn waiting on its Provider holds up no other Turn's frames (ADR 0080).
+    let (answered, mut answers) = mpsc::unbounded_channel::<ToWorker>();
 
     let ending = loop {
         tokio::select! {
+            Some(answer) = answers.recv() => write(&mut writing, &answer).await,
             frame = queue.recv() => match frame {
                 Some(frame) => {
                     if is_ready {
@@ -686,20 +690,20 @@ async fn session(
                             }
                         }
                         FromWorker::LlmRequest { id, method, path, headers, body } => {
-                            let answer = inner
-                                .llm
-                                .answer(&agent.id, LlmHttpRequest { method, path, headers, body })
-                                .await;
-                            write(
-                                &mut writing,
-                                &ToWorker::LlmResponse {
+                            let (inner, agent, answered) =
+                                (Arc::clone(&inner), agent.id.clone(), answered.clone());
+                            tokio::spawn(async move {
+                                let answer = inner
+                                    .llm
+                                    .answer(&agent, LlmHttpRequest { method, path, headers, body })
+                                    .await;
+                                let _ = answered.send(ToWorker::LlmResponse {
                                     id,
                                     status: answer.status,
                                     headers: answer.headers,
                                     body: answer.body,
-                                },
-                            )
-                            .await;
+                                });
+                            });
                         }
                         FromWorker::LogAppend { id, task, starter, kind, body, message_id } => {
                             match inner.logs.record(

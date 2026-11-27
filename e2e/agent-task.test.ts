@@ -374,3 +374,32 @@ test("a signed Idle Work list is kept with each piece waiting, and a run-now rou
   await owner.waitFor((m) => m.type === "task.event" && m.task === started.task && m.body.kind === "turn.ended");
   owner.client.stop();
 }, 60_000);
+
+test("two Tasks of one Agent run at once: the second starts while the first is still waiting on its Provider (ADR 0080)", async () => {
+  const owner = controller();
+  await owner.ready;
+  owner.send("agent.create", { id: "agent-lanes", name: "Lanes", provider: "main", model: "model-a" });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-lanes"));
+
+  // The Provider holds the slow Task's answer until the test lets it go.
+  const release = Promise.withResolvers<void>();
+  const before = provider.reply;
+  provider.reply = async (body) => {
+    if (JSON.stringify(body?.messages ?? []).includes("slow one")) await release.promise;
+    return before(body);
+  };
+  try {
+    owner.send("task.message", { agent: "agent-lanes", id: "lane-a", text: "slow one" }, "lane-a");
+    await owner.waitFor((m) => m.type === "task.event" && m.task === "lane-a" && m.body.kind === "turn.started");
+    owner.send("task.message", { agent: "agent-lanes", id: "lane-b", text: "quick one" }, "lane-b");
+    // B starts and ends while A has not ended.
+    await owner.waitFor((m) => m.type === "task.event" && m.task === "lane-b" && m.body.kind === "turn.ended");
+    expect(owner.inbox.some((m) => m.type === "task.event" && m.task === "lane-a" && m.body.kind === "turn.ended")).toBe(false);
+    release.resolve();
+    await owner.waitFor((m) => m.type === "task.event" && m.task === "lane-a" && m.body.kind === "turn.ended");
+  } finally {
+    release.resolve();
+    provider.reply = before;
+    owner.client.stop();
+  }
+}, 60_000);

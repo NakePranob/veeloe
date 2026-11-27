@@ -12,7 +12,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use regex::Regex;
 use serde_json::{json, Value};
-use veeloe_plugin_api::{Cancel, ToolDefinition, ToolError, ToolRunner};
+use veeloe_plugin_api::{turn_token, Cancel, ToolDefinition, ToolError, ToolRunner};
 
 /// How much text a page gives the model (100 KB), with a note when cut.
 pub const TEXT_LIMIT: usize = 100 * 1024;
@@ -46,8 +46,12 @@ impl WebFetchTool {
                 "web_fetch.refused: this Agent has no way to the network".into(),
             ));
         };
-        let proxy = reqwest::Proxy::all(proxy)
+        let mut proxy = reqwest::Proxy::all(proxy)
             .map_err(|_| ToolError::Failed("web_fetch.refused: the proxy is not usable".into()))?;
+        // The Turn's token, so the proxy asks this Turn's Member (ADR 0080).
+        if let Some(token) = turn_token() {
+            proxy = proxy.basic_auth(&token, "");
+        }
         let client = reqwest::Client::builder()
             .proxy(proxy)
             .redirect(reqwest::redirect::Policy::custom(|attempt| {

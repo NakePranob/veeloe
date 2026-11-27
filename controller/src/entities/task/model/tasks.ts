@@ -138,9 +138,16 @@ export const LIST_AGENT_TASK_SUMMARIES = "SELECT * FROM task WHERE agent_id = ? 
 /** How many Tasks one Agent has. */
 export const COUNT_AGENT_TASKS = "SELECT count(*) AS count FROM task WHERE agent_id = ?";
 
-/** Each Agent's newest Task that is news: a round that ended quietly is not (the Inbox, the Agents and Machine pages). */
+/**
+ * Each Agent's Task to show (the Inbox, the Agents and Machine pages): the newest one whose Turn is still
+ * running, since Turns of different Tasks run at once (ADR 0080); else the newest that is news, which a
+ * round that ended quietly is not. Only a Task that moved in the last six hours counts as running, so one
+ * whose end never reached this device does not hold the row forever.
+ */
 export const LIST_LATEST_TASKS = `SELECT * FROM task t WHERE t.id = (
-  SELECT n.id FROM task n WHERE n.agent_id = t.agent_id AND n.quiet = 0 ORDER BY n.updated_at DESC LIMIT 1
+  SELECT n.id FROM task n WHERE n.agent_id = t.agent_id AND n.quiet = 0
+  ORDER BY (n.latest_kind IS NOT NULL AND n.latest_kind != '${TaskEventKind.TurnEnded}'
+    AND n.updated_at > strftime('%s', 'now') * 1000 - 6 * 3600 * 1000) DESC, n.updated_at DESC LIMIT 1
 ) ORDER BY t.updated_at DESC`;
 
 /** The newest round of each Trigger of one Agent, with how many rounds it has; `?` is 1 to leave out threads deleted on this device. */

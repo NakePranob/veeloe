@@ -16,7 +16,7 @@
   "editor": {
     "new": "Schedule ใหม่",
     "edit": "แก้ Schedule",
-    "footer": "เวลาเป็นเวลาของ Machine รอบจะถูกข้ามถ้า Agent ไม่ว่างหรือ Budget หมด",
+    "footer": "เวลาเป็นเวลาของ Machine รอบจะถูกข้ามถ้ารอบก่อนยังไม่จบหรือ Budget หมด แต่ละรอบทำได้ไม่เกิน 15 นาที",
     "text": "ให้ทำอะไร",
     "textPlaceholder": "ดู CI แล้วบอกว่าอะไรพัง",
     "when": "รัน",
@@ -73,7 +73,7 @@
   "cancel": "ยกเลิก",
   "run": "รันเลย",
   "last": {
-    "busy": "{{when}} ข้าม Agent ไม่ว่าง",
+    "busy": "{{when}} ข้าม รอบก่อนยังไม่จบ",
     "budget": "{{when}} ข้าม Budget หมด",
     "quiet": "{{when}} ไม่มีอะไร",
     "done": "{{when}} มีเรื่องบอก",

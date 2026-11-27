@@ -1,5 +1,6 @@
-//! One Agent: one Turn at a time (ADR 0011), each in the name of the Member who
-//! sent its message (ADR 0010). Everything it does is an event in the log first,
+//! One Agent: Turns of different Tasks run at once and wait only to write
+//! (ADR 0080); a Task's own Turns run one after another. Each is in the name of
+//! the Member who sent its message (ADR 0010). Everything it does is an event in the log first,
 //! and every event goes to the Member who started the Task.
 //!
 //! Ported from `packages/runtime-legacy/src/worker/core/agent.ts`. The Stop and
@@ -8,7 +9,7 @@
 //! denied (ADR 0030), and the file tools never wait because the sandbox holds
 //! them already.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::{BuildHasher, Hasher};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -19,7 +20,8 @@ use serde_json::{json, Value};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use veeloe_plugin_api::{
-    with_progress, Cancel, PluginError, Progress, ToolDefinition, ToolError, ToolRegistry,
+    with_progress, with_turn, Cancel, PluginError, Progress, ToolDefinition, ToolError,
+    ToolRegistry,
 };
 use veeloe_protocol::{matches_allowlist, split_command};
 
@@ -27,6 +29,7 @@ use crate::conversation::conversation;
 use crate::event_store::{Clock, EventLog, EventStore, StoreError, SystemClock, TaskEvent};
 use crate::ipc::{ApprovalDecision, FromWorker, SupervisorLink, ToWorker, TriggerRun};
 use crate::ports::{Llm, LlmError, LlmMessage, LlmRequest};
+use crate::write_lock::{Class, WriteLock};
 
 /// How many times one Turn may go back to the LLM, so a tool loop cannot run all night.
 pub const MAX_ROUNDS: usize = 50;
@@ -74,6 +77,31 @@ struct RunningTurn {
     task: String,
     starter: String,
     cancel: Cancel,
+    /// Started by a Trigger rather than a person: it waits behind people for the
+    /// write lock (ADR 0080).
+    background: bool,
+    /// When this Turn last did anything: an event, or command output.
+    activity: Mutex<Instant>,
+    /// This Turn's current quiet stretch is already written down as stalled.
+    stalled: AtomicBool,
+    /// Waits on a person (an Approval) or on the write lock: not a stall.
+    waiting: AtomicUsize,
+    /// What this Turn's network requests carry, so the proxy knows whose they are.
+    token: String,
+}
+
+impl RunningTurn {
+    fn touch(&self) {
+        *self.activity.lock().expect("activity") = Instant::now();
+        self.stalled.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Which Tasks have a Turn running or starting, and what waits behind each.
+#[derive(Default)]
+struct Tasks {
+    busy: HashSet<String>,
+    queued: HashMap<String, VecDeque<ToWorker>>,
 }
 
 #[derive(Debug)]
@@ -101,25 +129,22 @@ struct State {
     clock: RwLock<Arc<dyn Clock + Send + Sync>>,
     allowlist: RwLock<Vec<String>>,
     approval_timeout_ms: AtomicU64,
-    running: Mutex<Option<RunningTurn>>,
-    /// Messages that arrived while a Turn was running, in arrival order.
-    queued: Mutex<VecDeque<ToWorker>>,
-    /// One drainer owns the hand-off between a finished Turn and the next.
-    draining: AtomicBool,
+    /// The Turns running now, one per Task at most.
+    running: Mutex<HashMap<String, Arc<RunningTurn>>>,
+    /// Messages for a Task whose Turn has not ended, in arrival order.
+    tasks: Mutex<Tasks>,
+    /// Who may write the Workdir now (ADR 0080).
+    write_lock: WriteLock,
+    /// `MEMORY.md` and the daily notes: held only while one write lands.
+    memory_lock: tokio::sync::Mutex<()>,
     stopped_ids: Mutex<VecDeque<String>>,
     waiting: Mutex<HashMap<String, Waiter>>,
     approvals: AtomicU64,
     max_rounds: AtomicUsize,
     context_window: AtomicUsize,
-    turn: Mutex<Option<JoinHandle<()>>>,
+    turns: Mutex<Vec<JoinHandle<()>>>,
     /// Naming a Task after its first Turn that ends `done`: beside the queue, not in it.
-    titling: Mutex<Option<JoinHandle<()>>>,
-    /// When the running Turn last did anything: an event, or command output.
-    activity: Mutex<Instant>,
-    /// The current quiet stretch is already written down as stalled.
-    stalled: AtomicBool,
-    /// Approvals waiting on a person: that wait is not a stall.
-    waiting_for_person: AtomicUsize,
+    titling: Mutex<Vec<JoinHandle<()>>>,
     stall_after_ms: AtomicU64,
 }
 
@@ -135,7 +160,7 @@ impl State {
         let event = self.log().record(task, starter, kind, &body, message_id)?;
         // Any event but the stall itself ends a quiet stretch.
         if kind != "turn.stalled" {
-            self.touch();
+            self.touch(task);
         }
         self.link.send(FromWorker::Event {
             task: task.to_string(),
@@ -145,10 +170,15 @@ impl State {
         Ok(event)
     }
 
-    /// The Turn just did something, so it is not stalled.
-    fn touch(&self) {
-        *self.activity.lock().expect("activity") = Instant::now();
-        self.stalled.store(false, Ordering::SeqCst);
+    /// The Task's Turn just did something, so it is not stalled.
+    fn touch(&self, task: &str) {
+        if let Some(turn) = self.turn_of(task) {
+            turn.touch();
+        }
+    }
+
+    fn turn_of(&self, task: &str) -> Option<Arc<RunningTurn>> {
+        self.running.lock().expect("running").get(task).cloned()
     }
 
     fn log(&self) -> Arc<dyn EventLog> {
@@ -200,19 +230,17 @@ impl AgentCore {
                 clock: RwLock::new(Arc::new(SystemClock)),
                 allowlist: RwLock::new(Vec::new()),
                 approval_timeout_ms: AtomicU64::new(APPROVAL_TIMEOUT_MS),
-                running: Mutex::new(None),
-                queued: Mutex::new(VecDeque::new()),
-                draining: AtomicBool::new(false),
+                running: Mutex::new(HashMap::new()),
+                tasks: Mutex::new(Tasks::default()),
+                write_lock: WriteLock::default(),
+                memory_lock: tokio::sync::Mutex::new(()),
                 stopped_ids: Mutex::new(VecDeque::new()),
                 waiting: Mutex::new(HashMap::new()),
                 approvals: AtomicU64::new(0),
                 max_rounds: AtomicUsize::new(MAX_ROUNDS),
                 context_window: AtomicUsize::new(128_000),
-                turn: Mutex::new(None),
-                titling: Mutex::new(None),
-                activity: Mutex::new(Instant::now()),
-                stalled: AtomicBool::new(false),
-                waiting_for_person: AtomicUsize::new(0),
+                turns: Mutex::new(Vec::new()),
+                titling: Mutex::new(Vec::new()),
                 stall_after_ms: AtomicU64::new(STALL_AFTER_MS),
             }),
         }
@@ -275,7 +303,7 @@ impl AgentCore {
     }
 
     /// Everything the supervisor says to this worker, synchronous up to the
-    /// start of a Turn, so two messages can never both find the Agent free.
+    /// start of a Turn, so two messages can never both find the same Task free.
     pub fn receive(&self, message: ToWorker) -> Result<(), AgentError> {
         match message {
             ToWorker::List { member } => self.list(&member),
@@ -390,6 +418,9 @@ impl AgentCore {
         Ok(())
     }
 
+    /// A message for a Task: it waits behind that Task's running Turn, and
+    /// starts at once otherwise, whatever other Tasks are doing (ADR 0080).
+    #[allow(clippy::too_many_arguments)]
     fn message(
         &self,
         task: &str,
@@ -400,40 +431,59 @@ impl AgentCore {
         from_queue: bool,
         trigger: Option<&TriggerRun>,
     ) -> Result<(), AgentError> {
+        if !from_queue {
+            let mut tasks = self.state.tasks.lock().expect("tasks");
+            if tasks.busy.contains(task) {
+                tasks
+                    .queued
+                    .entry(task.to_string())
+                    .or_default()
+                    .push_back(match trigger {
+                        Some(trigger) => ToWorker::Run {
+                            task: task.to_string(),
+                            member: member.to_string(),
+                            text: text.to_string(),
+                            trigger: trigger.clone(),
+                        },
+                        None => ToWorker::Message {
+                            task: task.to_string(),
+                            id: id.to_string(),
+                            member: member.to_string(),
+                            text: text.to_string(),
+                            reference: reference.to_string(),
+                        },
+                    });
+                return Ok(());
+            }
+            tasks.busy.insert(task.to_string());
+        }
+        // The Task is reserved: anything that ends here without a Turn hands it on.
+        let started = self.begin(task, id, member, text, reference, trigger);
+        if !matches!(started, Ok(true)) {
+            release(Arc::clone(&self.state), task);
+        }
+        started.map(|_| ())
+    }
+
+    /// Starts the Turn of a reserved Task. True when a Turn is now running.
+    fn begin(
+        &self,
+        task: &str,
+        id: &str,
+        member: &str,
+        text: &str,
+        reference: &str,
+        trigger: Option<&TriggerRun>,
+    ) -> Result<bool, AgentError> {
         let starter = self.state.log().starter_of(task)?;
         if let Some(starter) = starter.as_deref() {
             if starter != member {
-                return self.refuse(member, reference, "task.not_found", Some(task));
+                self.refuse(member, reference, "task.not_found", Some(task))?;
+                return Ok(false);
             }
         }
         if self.state.log().has_message(id)? {
-            return Ok(()); // a resend: it is in the log already
-        }
-        if !from_queue
-            && (self.state.running.lock().expect("running").is_some()
-                || self.state.draining.load(Ordering::SeqCst)
-                || !self.state.queued.lock().expect("queued").is_empty())
-        {
-            self.state
-                .queued
-                .lock()
-                .expect("queued")
-                .push_back(match trigger {
-                    Some(trigger) => ToWorker::Run {
-                        task: task.to_string(),
-                        member: member.to_string(),
-                        text: text.to_string(),
-                        trigger: trigger.clone(),
-                    },
-                    None => ToWorker::Message {
-                        task: task.to_string(),
-                        id: id.to_string(),
-                        member: member.to_string(),
-                        text: text.to_string(),
-                        reference: reference.to_string(),
-                    },
-                });
-            return Ok(());
+            return Ok(false); // a resend: it is in the log already
         }
         let owner = starter.unwrap_or_else(|| member.to_string());
         self.state.append(
@@ -477,13 +527,27 @@ impl AgentCore {
         let trigger = trigger.cloned();
 
         let cancel = Cancel::new();
-        *self.state.running.lock().expect("running") = Some(RunningTurn {
+        let turn = Arc::new(RunningTurn {
             task: task.to_string(),
             starter: owner.clone(),
             cancel: cancel.clone(),
+            background: trigger.is_some(),
+            activity: Mutex::new(Instant::now()),
+            stalled: AtomicBool::new(false),
+            waiting: AtomicUsize::new(0),
+            token: turn_token(),
         });
-        self.state.touch();
-        tokio::spawn(watch_stall(Arc::clone(&self.state), task.to_string()));
+        self.state
+            .running
+            .lock()
+            .expect("running")
+            .insert(task.to_string(), Arc::clone(&turn));
+        // Before any tool can reach the proxy, so it knows this Turn's requests.
+        self.state.link.send(FromWorker::TurnProxy {
+            task: task.to_string(),
+            token: turn.token.clone(),
+        });
+        tokio::spawn(watch_stall(Arc::clone(&self.state), turn));
 
         let state = Arc::clone(&self.state);
         let started = task.to_string();
@@ -498,7 +562,9 @@ impl AgentCore {
             )
             .await
             .is_err();
-            *state.running.lock().expect("running") = None;
+            state.running.lock().expect("running").remove(&started);
+            // Whatever ended the Turn, it no longer writes (ADR 0080).
+            state.write_lock.release(&started);
             // The answer is already written; the name comes after it, and the
             // next Turn does not wait for it.
             let titling = tokio::spawn(title_task(
@@ -506,7 +572,7 @@ impl AgentCore {
                 started.clone(),
                 owner.clone(),
             ));
-            *state.titling.lock().expect("titling") = Some(titling);
+            state.titling.lock().expect("titling").push(titling);
             if failed {
                 // The log says the Turn ended even when the core itself failed,
                 // so a Task never stays open because of an internal error.
@@ -518,10 +584,10 @@ impl AgentCore {
                     None,
                 );
             }
-            drain_queued(state);
+            release(state, &started);
         });
-        *self.state.turn.lock().expect("turn") = Some(handle);
-        Ok(())
+        self.state.turns.lock().expect("turns").push(handle);
+        Ok(true)
     }
 
     fn stop(&self, task: &str, id: &str, member: &str, reference: &str) -> Result<(), AgentError> {
@@ -540,8 +606,7 @@ impl AgentCore {
                 return self.refuse(member, reference, "task.not_found", Some(task));
             }
         }
-        let turn = self.state.running.lock().expect("running");
-        let Some(turn) = turn.as_ref().filter(|turn| turn.task == task) else {
+        let Some(turn) = self.state.turn_of(task) else {
             return self.refuse(member, reference, "turn.not_running", Some(task));
         };
 
@@ -653,16 +718,24 @@ impl AgentCore {
         Ok(())
     }
 
-    /// Resolves when the Turn running now, if any, has ended, and the Task it
-    /// may have named has its name.
+    /// Resolves when every Turn, the ones they started from a queue included,
+    /// has ended, and each Task they may have named has its name.
     pub async fn idle(&self) {
-        let handle = self.state.turn.lock().expect("turn").take();
-        if let Some(handle) = handle {
-            let _ = handle.await;
-        }
-        let titling = self.state.titling.lock().expect("titling").take();
-        if let Some(titling) = titling {
-            let _ = titling.await;
+        loop {
+            let handles: Vec<_> = self.state.turns.lock().expect("turns").drain(..).collect();
+            let titling: Vec<_> = self
+                .state
+                .titling
+                .lock()
+                .expect("titling")
+                .drain(..)
+                .collect();
+            if handles.is_empty() && titling.is_empty() {
+                return;
+            }
+            for handle in handles.into_iter().chain(titling) {
+                let _ = handle.await;
+            }
         }
     }
 
@@ -903,34 +976,35 @@ async fn run_turn(
     )
 }
 
-/// Start one queued message after a Turn ends; that Turn's own end drains the next.
-fn drain_queued(state: Arc<State>) {
-    if state.draining.swap(true, Ordering::SeqCst) {
-        return;
-    }
+/// A Task's Turn ended, or never started: the next message of that Task starts,
+/// and with none waiting the Task is free. Other Tasks are not touched.
+fn release(state: Arc<State>, task: &str) {
     loop {
-        let next = state.queued.lock().expect("queued").pop_front();
-        let Some(next) = next else {
-            state.draining.store(false, Ordering::SeqCst);
-            // A message may have queued while this drainer was deciding to stop.
-            if state.queued.lock().expect("queued").is_empty()
-                || state.draining.swap(true, Ordering::SeqCst)
-            {
-                return;
+        let next = {
+            let mut tasks = state.tasks.lock().expect("tasks");
+            let next = tasks.queued.get_mut(task).and_then(VecDeque::pop_front);
+            if tasks.queued.get(task).is_some_and(VecDeque::is_empty) {
+                tasks.queued.remove(task);
             }
-            continue;
+            if next.is_none() {
+                tasks.busy.remove(task);
+            }
+            next
+        };
+        let Some(next) = next else {
+            return;
         };
         let core = AgentCore {
             state: Arc::clone(&state),
         };
-        let result = match next {
+        let started = match next {
             ToWorker::Message {
                 task,
                 id,
                 member,
                 text,
                 reference,
-            } => core.message(&task, &id, &member, &text, &reference, true, None),
+            } => core.begin(&task, &id, &member, &text, &reference, None),
             ToWorker::Run {
                 task,
                 member,
@@ -938,17 +1012,16 @@ fn drain_queued(state: Arc<State>) {
                 trigger,
             } => {
                 let id = format!("trigger:{}:{}", trigger.id, trigger.at);
-                core.message(&task, &id, &member, &text, "", true, Some(&trigger))
+                core.begin(&task, &id, &member, &text, "", Some(&trigger))
             }
-            other => core.receive(other),
+            _ => Ok(false),
         };
-        if let Err(error) = result {
+        match started {
+            // That Turn's own end hands the Task on.
+            Ok(true) => return,
+            Ok(false) => {}
             // The message was already popped; say so without its text and keep the queue moving.
-            eprintln!("queued message failed: {error}");
-        }
-        if state.running.lock().expect("running").is_some() {
-            state.draining.store(false, Ordering::SeqCst);
-            return;
+            Err(error) => eprintln!("queued message failed: {error}"),
         }
     }
 }
@@ -1170,6 +1243,7 @@ async fn flush_memory(state: &Arc<State>, task: &str, transcript: &str) -> Optio
     }
     // The prompt asks for 400 characters; take exactly that even when it forgets.
     let answer: String = answer.chars().take(FLUSH_MAX_CHARS).collect();
+    let _memory = state.memory_lock.lock().await;
     crate::memory::write_memory(&workdir, &answer, crate::memory::Mode::Append).ok()
 }
 
@@ -1481,8 +1555,30 @@ async fn call_tool(
     input: &Value,
     cancel: &Cancel,
 ) -> Result<String, ToolError> {
+    // Allowed by now; a write waits for the Workdir until it is this Turn's (ADR 0080).
+    if writes(name, input) {
+        let class = match state.turn_of(task) {
+            Some(turn) if turn.background => Class::Background,
+            _ => Class::Person,
+        };
+        let waiting = Waiting::on(state, task);
+        let got = state.write_lock.acquire(task, class, cancel).await;
+        drop(waiting);
+        if !got {
+            return Err(ToolError::Stopped);
+        }
+    }
+    let token = state
+        .turn_of(task)
+        .map(|turn| turn.token.clone())
+        .unwrap_or_default();
+    if name == "memory" {
+        // Two Turns writing memory at once each land whole.
+        let _memory = state.memory_lock.lock().await;
+        return with_turn(token, state.tools.run(name, input, cancel)).await;
+    }
     if name != "bash" {
-        return state.tools.run(name, input, cancel).await;
+        return with_turn(token, state.tools.run(name, input, cancel)).await;
     }
     let sink = output_sink(
         Arc::clone(state),
@@ -1490,7 +1586,25 @@ async fn call_tool(
         starter.to_string(),
         id.to_string(),
     );
-    with_progress(sink, state.tools.run(name, input, cancel)).await
+    with_turn(
+        token,
+        with_progress(sink, state.tools.run(name, input, cancel)),
+    )
+    .await
+}
+
+/// Whether this call writes the Workdir and so needs its lock: the file tools
+/// that change files, and every command but the built-in ones of ADR 0075.
+/// Reading, searching and every other tool never wait (ADR 0080).
+fn writes(name: &str, input: &Value) -> bool {
+    match name {
+        "write" | "edit" => true,
+        "bash" => input
+            .get("command")
+            .and_then(Value::as_str)
+            .is_some_and(|command| !matches_allowlist(command, &[])),
+        _ => false,
+    }
 }
 
 /// Keeps the end of a command's output and sends it at most once a second.
@@ -1499,7 +1613,7 @@ fn output_sink(state: Arc<State>, task: String, starter: String, id: String) -> 
     let started = Instant::now();
     let seen: Mutex<(Vec<u8>, u64, Option<Instant>)> = Mutex::new((Vec::new(), 0, None));
     Arc::new(move |chunk: &[u8]| {
-        state.touch();
+        state.touch(&task);
         let mut seen = seen.lock().expect("output");
         seen.0.extend_from_slice(chunk);
         if seen.0.len() > OUTPUT_TAIL {
@@ -1522,30 +1636,32 @@ fn output_sink(state: Arc<State>, task: String, starter: String, id: String) -> 
     })
 }
 
-/// Writes `turn.stalled` once per quiet stretch of the running Turn: no event
-/// and no output for the stall time, an Approval wait aside (ADR 0073). Ends
-/// with the Turn.
-async fn watch_stall(state: Arc<State>, task: String) {
+/// Writes `turn.stalled` once per quiet stretch of one running Turn: no event
+/// and no output for the stall time, a wait on a person or on the write lock
+/// aside (ADR 0073, 0080). Ends with the Turn.
+async fn watch_stall(state: Arc<State>, turn: Arc<RunningTurn>) {
     loop {
         let after = Duration::from_millis(state.stall_after_ms.load(Ordering::SeqCst));
         tokio::time::sleep((after / 5).clamp(Duration::from_millis(10), Duration::from_secs(5)))
             .await;
-        let starter = match state.running.lock().expect("running").as_ref() {
-            Some(turn) if turn.task == task => turn.starter.clone(),
-            _ => return,
-        };
-        if state.waiting_for_person.load(Ordering::SeqCst) > 0 {
-            state.touch();
+        let still = state
+            .turn_of(&turn.task)
+            .is_some_and(|running| Arc::ptr_eq(&running, &turn));
+        if !still {
+            return;
+        }
+        if turn.waiting.load(Ordering::SeqCst) > 0 {
+            turn.touch();
             continue;
         }
-        let quiet = state.activity.lock().expect("activity").elapsed();
-        if quiet < after || state.stalled.swap(true, Ordering::SeqCst) {
+        let quiet = turn.activity.lock().expect("activity").elapsed();
+        if quiet < after || turn.stalled.swap(true, Ordering::SeqCst) {
             continue;
         }
         let since = state.now_ms() - quiet.as_millis() as i64;
         let _ = state.append(
-            &task,
-            &starter,
+            &turn.task,
+            &turn.starter,
             "turn.stalled",
             json!({ "since": since }),
             None,
@@ -1553,12 +1669,26 @@ async fn watch_stall(state: Arc<State>, task: String) {
     }
 }
 
-/// Counts an Approval waiting on a person for as long as it lives.
-struct WaitingForPerson(Arc<State>);
+/// Counts a wait (an Approval, the write lock) for as long as it lives, so the
+/// Turn is not written down as stalled meanwhile.
+struct Waiting(Option<Arc<RunningTurn>>);
 
-impl Drop for WaitingForPerson {
+impl Waiting {
+    fn on(state: &State, task: &str) -> Self {
+        let turn = state.turn_of(task);
+        if let Some(turn) = &turn {
+            turn.waiting.fetch_add(1, Ordering::SeqCst);
+        }
+        Self(turn)
+    }
+}
+
+impl Drop for Waiting {
     fn drop(&mut self) {
-        self.0.waiting_for_person.fetch_sub(1, Ordering::SeqCst);
+        if let Some(turn) = &self.0 {
+            turn.waiting.fetch_sub(1, Ordering::SeqCst);
+            turn.touch();
+        }
     }
 }
 
@@ -1570,8 +1700,7 @@ async fn ask_approval(
     parts: Vec<String>,
     cancel: &Cancel,
 ) -> Answer {
-    state.waiting_for_person.fetch_add(1, Ordering::SeqCst);
-    let _waiting = WaitingForPerson(Arc::clone(state));
+    let _waiting = Waiting::on(state, task);
     let request = request_id(state);
     let timeout = state.approval_timeout();
     let expires_at = state.now_ms() + timeout.as_millis() as i64;
@@ -1705,6 +1834,19 @@ impl State {
     fn now_ms(&self) -> i64 {
         self.clock.read().expect("clock").now()
     }
+}
+
+/// A Turn's proxy token: random, never in the log, and of no use outside this
+/// Agent's own sandbox (ADR 0080).
+fn turn_token() -> String {
+    let part = || {
+        base36(
+            std::collections::hash_map::RandomState::new()
+                .build_hasher()
+                .finish(),
+        )
+    };
+    format!("tt{}{}", part(), part())
 }
 
 fn request_id(state: &State) -> String {

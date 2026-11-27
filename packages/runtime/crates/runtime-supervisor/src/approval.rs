@@ -58,13 +58,17 @@ pub struct Turn {
     /// so it asks no one (ADR 0079). A worker that claims otherwise only makes
     /// the proxy ask a person, which opens nothing.
     pub unattended: bool,
+    /// The Trigger this Turn is a round of; none for a person's Turn.
+    pub trigger: Option<String>,
+    /// What this Turn's requests carry through the proxy (ADR 0080).
+    pub token: Option<String>,
 }
 
-/// The running Turn per Agent. No Turn means no way out: the proxy refuses a
-/// connection instead of opening one nobody is answerable for.
+/// The running Turns of each Agent, one per Task at most (ADR 0080). No Turn
+/// means no way out: the proxy refuses a connection it cannot place.
 #[derive(Debug, Default)]
 pub struct Turns {
-    running: Mutex<HashMap<String, Turn>>,
+    running: Mutex<HashMap<String, HashMap<String, Turn>>>,
 }
 
 impl Turns {
@@ -82,28 +86,62 @@ impl Turns {
                 let unattended = event.body.get("trigger").is_some_and(|trigger| {
                     trigger.get("attended").and_then(Value::as_bool) != Some(true)
                 });
-                self.running.lock().expect("turns").insert(
-                    agent.to_string(),
-                    Turn {
-                        task: task.to_string(),
-                        member,
-                        id: format!("{task}:{}", event.seq),
-                        unattended,
-                    },
-                );
+                let trigger = event
+                    .body
+                    .get("trigger")
+                    .and_then(|trigger| trigger.get("id"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                self.running
+                    .lock()
+                    .expect("turns")
+                    .entry(agent.to_string())
+                    .or_default()
+                    .insert(
+                        task.to_string(),
+                        Turn {
+                            task: task.to_string(),
+                            member,
+                            id: format!("{task}:{}", event.seq),
+                            unattended,
+                            trigger,
+                            token: None,
+                        },
+                    );
             }
             "turn.ended" => {
                 let mut running = self.running.lock().expect("turns");
-                if running.get(agent).is_some_and(|turn| turn.task == task) {
-                    running.remove(agent);
+                if let Some(turns) = running.get_mut(agent) {
+                    turns.remove(task);
+                    if turns.is_empty() {
+                        running.remove(agent);
+                    }
                 }
             }
             _ => {}
         }
     }
 
-    pub fn current(&self, agent: &str) -> Option<Turn> {
-        self.running.lock().expect("turns").get(agent).cloned()
+    /// The token a Turn's requests carry; a Turn that already ended keeps none.
+    pub fn set_token(&self, agent: &str, task: &str, token: &str) {
+        if let Some(turn) = self
+            .running
+            .lock()
+            .expect("turns")
+            .get_mut(agent)
+            .and_then(|turns| turns.get_mut(task))
+        {
+            turn.token = Some(token.to_string());
+        }
+    }
+
+    pub fn all(&self, agent: &str) -> Vec<Turn> {
+        self.running
+            .lock()
+            .expect("turns")
+            .get(agent)
+            .map(|turns| turns.values().cloned().collect())
+            .unwrap_or_default()
     }
 
     pub fn forget(&self, agent: &str) {
@@ -183,9 +221,33 @@ impl Approvals {
         }
     }
 
-    /// The Turn this Agent is running now, if any.
-    pub fn current_turn(&self, agent: &str) -> Option<Turn> {
-        self.turns.current(agent)
+    /// Every Turn this Agent is running now (ADR 0080).
+    pub fn turns(&self, agent: &str) -> Vec<Turn> {
+        self.turns.all(agent)
+    }
+
+    /// The running Turn whose requests carry `token`, if any.
+    pub fn turn_by_token(&self, agent: &str, token: &str) -> Option<Turn> {
+        self.turns(agent)
+            .into_iter()
+            .find(|turn| turn.token.as_deref() == Some(token))
+    }
+
+    /// A person's Turn is running: Idle Work waits for it (ADR 0080).
+    pub fn person_running(&self, agent: &str) -> bool {
+        self.turns(agent).iter().any(|turn| turn.trigger.is_none())
+    }
+
+    /// The previous round of this Trigger has not ended: the next one is skipped.
+    pub fn round_running(&self, agent: &str, trigger: &str) -> bool {
+        self.turns(agent)
+            .iter()
+            .any(|turn| turn.trigger.as_deref() == Some(trigger))
+    }
+
+    /// A worker said which token one of its Turns carries through the proxy.
+    pub fn turn_token(&self, agent: &str, task: &str, token: &str) {
+        self.turns.set_token(agent, task, token);
     }
 
     /// A worker ended without a `turn.ended`: nothing of that Agent may ask or
@@ -214,8 +276,8 @@ impl Approvals {
     /// Holds one connection until this Agent's Member answers, or the wait ends.
     /// False closes the connection: no Turn, no Egress, no answer, or a timeout
     /// all end the same way, so nothing passes by staying quiet.
-    pub async fn ask(&self, agent: &str, host: &str) -> bool {
-        let Some(turn) = self.current_turn(agent) else {
+    pub async fn ask(&self, agent: &str, token: Option<&str>, host: &str) -> bool {
+        let Some(turn) = token.and_then(|token| self.turn_by_token(agent, token)) else {
             return false;
         };
         if turn.unattended {
@@ -611,6 +673,8 @@ mod tests {
                 },
             },
         );
+        // Each Turn tells which token its requests carry (ADR 0080).
+        approvals.turn_token(agent, task, &format!("tok-{task}"));
     }
 
     fn end_turn(approvals: &Approvals, agent: &str, task: &str, member: &str) {
@@ -649,8 +713,13 @@ mod tests {
             .collect()
     }
 
+    /// Asks as the Agent's running Turn would, with that Turn's token.
     async fn requested(approvals: &Approvals, agent: &str, host: &str) -> bool {
-        approvals.ask(agent, host).await
+        let token = approvals
+            .turns(agent)
+            .into_iter()
+            .find_map(|turn| turn.token);
+        approvals.ask(agent, token.as_deref(), host).await
     }
 
     #[tokio::test]
@@ -658,7 +727,8 @@ mod tests {
         let fixture = fixture();
         start_turn(&fixture.approvals, "a1", "t1", "m_1");
         let approvals = Arc::clone(&fixture.approvals);
-        let asking = tokio::spawn(async move { approvals.ask("a1", "example.com").await });
+        let asking =
+            tokio::spawn(async move { approvals.ask("a1", Some("tok-t1"), "example.com").await });
         // The request is written into the Turn's log and sent to its Member.
         let mut request = String::new();
         for _ in 0..100 {
@@ -712,7 +782,8 @@ mod tests {
         let fixture = fixture();
         start_turn(&fixture.approvals, "a1", "t1", "m_1");
         let approvals = Arc::clone(&fixture.approvals);
-        let asking = tokio::spawn(async move { approvals.ask("a1", "example.com").await });
+        let asking =
+            tokio::spawn(async move { approvals.ask("a1", Some("tok-t1"), "example.com").await });
         let request = wait_for_request(&fixture).await;
         let outbox = Seen::new();
         assert!(fixture.approvals.answer(
@@ -763,7 +834,8 @@ mod tests {
         let fixture = fixture();
         start_turn(&fixture.approvals, "a1", "t1", "m_1");
         let approvals = Arc::clone(&fixture.approvals);
-        let asking = tokio::spawn(async move { approvals.ask("a1", "example.com").await });
+        let asking =
+            tokio::spawn(async move { approvals.ask("a1", Some("tok-t1"), "example.com").await });
         let request = wait_for_request(&fixture).await;
         let outbox = Seen::new();
         assert!(fixture.approvals.answer(
@@ -790,7 +862,8 @@ mod tests {
         let fixture = fixture();
         start_turn(&fixture.approvals, "a1", "t1", "m_1");
         let approvals = Arc::clone(&fixture.approvals);
-        let asking = tokio::spawn(async move { approvals.ask("a1", "example.com").await });
+        let asking =
+            tokio::spawn(async move { approvals.ask("a1", Some("tok-t1"), "example.com").await });
         let request = wait_for_request(&fixture).await;
         let outbox = Seen::new();
         // m_2 is not an Owner here, so has no Approve at this Agent.
@@ -831,8 +904,10 @@ mod tests {
         start_turn(&fixture.approvals, "a2", "t2", "m_1");
         let one = Arc::clone(&fixture.approvals);
         let two = Arc::clone(&fixture.approvals);
-        let first = tokio::spawn(async move { one.ask("a1", "one.example.com").await });
-        let second = tokio::spawn(async move { two.ask("a2", "two.example.com").await });
+        let first =
+            tokio::spawn(async move { one.ask("a1", Some("tok-t1"), "one.example.com").await });
+        let second =
+            tokio::spawn(async move { two.ask("a2", Some("tok-t2"), "two.example.com").await });
         // Wait for both requests, then answer only a1's.
         let mut requests = Vec::new();
         for _ in 0..100 {
@@ -899,13 +974,93 @@ mod tests {
         assert!(!second.await.expect("join"));
     }
 
+    /// ADR 0080: Turns of one Agent run at once, and a domain request goes to
+    /// the Turn its token names, never to "the" Turn.
+    #[tokio::test]
+    async fn each_turn_asks_for_itself_and_a_round_nobody_watches_asks_no_one() {
+        let fixture = fixture();
+        start_turn(&fixture.approvals, "a1", "t1", "m_1");
+        start_turn(&fixture.approvals, "a1", "t2", "m_2");
+        fixture.approvals.observe(
+            "a1",
+            &FromWorker::Event {
+                task: "t3".into(),
+                starter: "m_1".into(),
+                event: TaskEvent {
+                    seq: 1,
+                    kind: "turn.started".into(),
+                    at: 0,
+                    body: json!({ "member": "m_1", "trigger": { "kind": "schedule", "id": "tr_1", "attended": false } }),
+                },
+            },
+        );
+        fixture.approvals.turn_token("a1", "t3", "tok-t3");
+        assert!(fixture.approvals.person_running("a1"));
+        assert!(fixture.approvals.round_running("a1", "tr_1"));
+        assert!(!fixture.approvals.round_running("a1", "tr_2"));
+        // A token no running Turn carries is refused at once.
+        assert!(
+            !fixture
+                .approvals
+                .ask("a1", Some("tok-nobody"), "example.com")
+                .await
+        );
+        assert!(!fixture.approvals.ask("a1", None, "example.com").await);
+        // The round nobody watches is refused and written into its own Task.
+        assert!(
+            !fixture
+                .approvals
+                .ask("a1", Some("tok-t3"), "example.com")
+                .await
+        );
+        // The second Turn's request is in its own Task, for its own Member.
+        let approvals = Arc::clone(&fixture.approvals);
+        let asking =
+            tokio::spawn(async move { approvals.ask("a1", Some("tok-t2"), "example.com").await });
+        let mut asked = None;
+        for _ in 0..100 {
+            asked = fixture
+                .seen
+                .events
+                .lock()
+                .expect("events")
+                .iter()
+                .find_map(|(_, message)| match message {
+                    FromWorker::Event {
+                        task,
+                        starter,
+                        event,
+                    } if event.kind == "approval.requested" => {
+                        Some((task.clone(), starter.clone()))
+                    }
+                    _ => None,
+                });
+            if asked.is_some() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(asked, Some(("t2".to_string(), "m_2".to_string())));
+        let skipped = fixture
+            .seen
+            .events
+            .lock()
+            .expect("events")
+            .iter()
+            .any(|(_, message)| matches!(message, FromWorker::Event { task, event, .. } if task == "t3" && event.kind == "approval.skipped"));
+        assert!(skipped);
+        end_turn(&fixture.approvals, "a1", "t2", "m_2");
+        assert!(!asking.await.expect("join"));
+    }
+
     #[tokio::test]
     async fn no_running_turn_and_a_finished_turn_both_refuse() {
         let fixture = fixture();
         assert!(!requested(&fixture.approvals, "a1", "example.com").await);
         start_turn(&fixture.approvals, "a1", "t1", "m_1");
         let approvals = Arc::clone(&fixture.approvals);
-        let asking = tokio::spawn(async move { approvals.ask("a1", "example.com").await });
+        let asking =
+            tokio::spawn(async move { approvals.ask("a1", Some("tok-t1"), "example.com").await });
         let _request = wait_for_request(&fixture).await;
         end_turn(&fixture.approvals, "a1", "t1", "m_1");
         assert!(!asking.await.expect("join"));
@@ -928,6 +1083,7 @@ mod tests {
                 },
             },
         );
+        fixture.approvals.turn_token("a1", "t1", "tok-t1");
         // No wait: the answer is no before anyone could have been asked.
         assert!(!requested(&fixture.approvals, "a1", "example.com").await);
         let seen = fixture.seen.events.lock().expect("events");
