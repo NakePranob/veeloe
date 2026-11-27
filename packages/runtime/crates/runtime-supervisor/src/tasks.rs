@@ -51,6 +51,18 @@ pub struct Inbound {
 /// the Members named.
 pub trait Outbox: Send + Sync {
     fn to_member(&self, member: &str, type_: &str, body: Value, task: Option<&str>);
+    /// One envelope on one device's direct link and nowhere else; false when
+    /// that device has none (ADR 0090).
+    fn to_device_direct(
+        &self,
+        _key: &str,
+        _member: &str,
+        _type_: &str,
+        _body: Value,
+        _task: Option<&str>,
+    ) -> bool {
+        false
+    }
     fn error(&self, to: &Inbound, code: &str) {
         self.to_member(
             &to.member,
@@ -96,8 +108,8 @@ impl MachineOutbox {
     }
 }
 
-impl Outbox for MachineOutbox {
-    fn to_member(&self, member: &str, type_: &str, body: Value, task: Option<&str>) {
+impl MachineOutbox {
+    fn sign(&self, member: &str, type_: &str, body: Value, task: Option<&str>) -> Option<Value> {
         let seq = {
             let mut seen = self.seen.lock().expect("seen");
             seen.next(&self.machine_key)
@@ -113,7 +125,31 @@ impl Outbox for MachineOutbox {
             },
             seq,
         );
-        if let Ok(value) = serde_json::to_value(envelope) {
+        serde_json::to_value(envelope).ok()
+    }
+}
+
+impl Outbox for MachineOutbox {
+    fn to_device_direct(
+        &self,
+        key: &str,
+        member: &str,
+        type_: &str,
+        body: Value,
+        task: Option<&str>,
+    ) -> bool {
+        let Some(direct) = &self.direct else {
+            return false;
+        };
+        if !direct.links.keys_of(member).iter().any(|open| open == key) {
+            return false;
+        }
+        self.sign(member, type_, body, task)
+            .is_some_and(|value| direct.links.send(key, &value.to_string()))
+    }
+
+    fn to_member(&self, member: &str, type_: &str, body: Value, task: Option<&str>) {
+        if let Some(value) = self.sign(member, type_, body, task) {
             if let Some(direct) = &self.direct {
                 let text = value.to_string();
                 let open: Vec<String> = direct

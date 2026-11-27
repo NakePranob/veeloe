@@ -263,6 +263,18 @@ impl PeerConnectionEventHandler for Handler {
     }
 }
 
+/// Above this a file goes only on the direct link of the device that asked,
+/// never through the Hub (ADR 0090).
+pub const DIRECT_ONLY_BYTES: usize = 1024 * 1024;
+/// A chunk small enough for the direct link once it is base64url and signed.
+pub const DIRECT_CHUNK_BYTES: usize = 32 * 1024;
+
+/// The chunk size a file of `len` bytes goes out in through the outbox, or
+/// None when it must go on a direct link instead.
+pub fn download_chunk(len: usize) -> Option<usize> {
+    (len <= DIRECT_ONLY_BYTES).then_some(256 * 1024)
+}
+
 /// Whether an envelope for a Member must also go through the Hub: when any of
 /// that Member's devices has no open link, or the Machine knows none of them.
 /// A device that gets it both ways takes it once (ADR 0090's window).
@@ -272,6 +284,18 @@ pub fn hub_too(open: &[String], devices: &[String]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_file_over_a_megabyte_goes_only_on_a_direct_link() {
+        assert_eq!(
+            super::download_chunk(super::DIRECT_ONLY_BYTES),
+            Some(256 * 1024)
+        );
+        assert_eq!(super::download_chunk(super::DIRECT_ONLY_BYTES + 1), None);
+        // A direct chunk, base64url and inside a signed envelope, still fits the link.
+        let encoded = super::DIRECT_CHUNK_BYTES.div_ceil(3) * 4;
+        assert!(encoded + 2_000 < super::DIRECT_MAX_BYTES);
+    }
+
     #[test]
     fn the_hub_is_skipped_only_when_every_device_is_direct() {
         let keys = |keys: &[&str]| keys.iter().map(|key| key.to_string()).collect::<Vec<_>>();

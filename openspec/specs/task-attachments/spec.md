@@ -43,3 +43,18 @@ Hub MUST ส่งต่อ `file.chunk` ตามหัวซองโดยไ
 #### Scenario: Machine ออฟไลน์
 - **WHEN** Machine ไม่ได้ต่อ Hub
 - **THEN** การส่งไฟล์ล้มเหลวและ Controller ไม่ถือว่าสำเร็จ
+
+### Requirement: ไฟล์เกิน 1 MB วิ่งทางตรงเท่านั้น
+ไฟล์ที่ใหญ่เกิน 1 MB ทั้ง Attachment ที่ส่งเข้าและไฟล์ที่ Agent ส่งกลับ SHALL วิ่งบนทางตรง (spec `direct-link`) เป็นชิ้นละ 32 KB เท่านั้น และ SHALL NOT ผ่าน Hub (ADR 0090) ไฟล์ที่ไม่เกิน 1 MB ยังผ่าน Hub ได้
+
+#### Scenario: แนบไฟล์ใหญ่ตอนต่อตรง
+- **WHEN** Controller ต่อตรงอยู่และแนบไฟล์ 3 MB
+- **THEN** ไฟล์วิ่งบนทางตรงเป็นชิ้นละ 32 KB และ Hub ไม่ได้รับชิ้นใดเลย
+
+#### Scenario: แนบไฟล์ใหญ่ตอนไม่ได้ต่อตรง
+- **WHEN** Controller ไม่ได้ต่อตรงและแนบไฟล์ 3 MB
+- **THEN** Controller ไม่ส่งไฟล์ และบอกว่ากำลังรอทางตรง (`attachment.needs_direct`)
+
+#### Scenario: เปิดไฟล์ใหญ่ที่ Agent ส่งกลับตอนไม่ได้ต่อตรง
+- **WHEN** Controller ขอไฟล์ 3 MB ที่ Agent ส่งกลับ โดยเครื่องนั้นไม่มีทางตรง
+- **THEN** Machine ตอบ `file.needs_direct` และไม่ส่งชิ้นใดผ่าน Hub

@@ -65,7 +65,14 @@ pub(crate) fn get(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     if to_base64url(&Sha256::digest(&bytes)) != hash {
         return outbox.error(from, "attachment.invalid");
     }
-    let chunk = 256 * 1024;
+    let name = real
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("file")
+        .to_string();
+    let Some(chunk) = crate::direct::download_chunk(bytes.len()) else {
+        return send_direct(outbox, from, task, hash, &name, &bytes);
+    };
     let total = std::cmp::max(1, bytes.len().div_ceil(chunk));
     for index in 0..total {
         let start = index * chunk;
@@ -75,12 +82,48 @@ pub(crate) fn get(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
             "file.chunk",
             json!({
                 "file": hash,
-                "name": real.file_name().and_then(|name| name.to_str()).unwrap_or("file"),
+                "name": name,
                 "index": index,
                 "total": total,
                 "data": veeloe_protocol::base64url::to_base64url(&bytes[start..end]),
             }),
             Some(task),
         );
+    }
+}
+
+/// A big file, on the asking device's own direct link only. Without one the
+/// Controller hears `file.needs_direct` and asks again once it has one.
+fn send_direct(
+    outbox: &dyn Outbox,
+    from: &Inbound,
+    task: &str,
+    hash: &str,
+    name: &str,
+    bytes: &[u8],
+) {
+    let Some(key) = from.key.as_deref() else {
+        return outbox.error(from, "file.needs_direct");
+    };
+    let total = bytes.len().div_ceil(crate::direct::DIRECT_CHUNK_BYTES);
+    for index in 0..total {
+        let start = index * crate::direct::DIRECT_CHUNK_BYTES;
+        let end = std::cmp::min(start + crate::direct::DIRECT_CHUNK_BYTES, bytes.len());
+        let sent = outbox.to_device_direct(
+            key,
+            &from.member,
+            "file.chunk",
+            json!({
+                "file": hash,
+                "name": name,
+                "index": index,
+                "total": total,
+                "data": to_base64url(&bytes[start..end]),
+            }),
+            Some(task),
+        );
+        if !sent {
+            return outbox.error(from, "file.needs_direct");
+        }
     }
 }

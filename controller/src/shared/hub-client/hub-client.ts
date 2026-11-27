@@ -113,13 +113,17 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
   );
   return {
     /** The sent envelope's sig, which answers name it by; null when not connected, and nothing was signed or sent. */
-    send(out: Outgoing): string | null {
+    send(out: Outgoing, { directOnly = false }: { directOnly?: boolean } = {}): string | null {
       if (!socket || member === undefined) return null;
+      const direct = "to" in out ? directs.get(out.to) : undefined;
+      if (directOnly && !direct) return null;
       const envelope = signEnvelope(out);
       const text = JSON.stringify(envelope);
-      // A direct link first; one that cannot take it leaves it to the Hub (ADR 0090).
-      const direct = "to" in out ? directs.get(out.to) : undefined;
-      if (!direct?.(text)) socket.send(text);
+      // A direct link first; one that cannot take it leaves it to the Hub, unless it must not go there (ADR 0090).
+      if (!direct?.(text)) {
+        if (directOnly) return null;
+        socket.send(text);
+      }
       return envelope.sig;
     },
     /** Where envelopes for one Machine go first; undefined goes back to the Hub alone. */

@@ -22,7 +22,7 @@ import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
 import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
 import { openDirect, type DirectLink, type Peer } from "./direct";
-import { MAX_ATTACHMENT_BYTES } from "./downloads";
+import { attachmentPlan, MAX_ATTACHMENT_BYTES } from "./downloads";
 import { createFileCache } from "./file-cache";
 import { createStatusStore, memoryKey, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, UNKNOWN_TRIGGERS, UNKNOWN_USAGE, type MachineStatus, type MemoryStatus, type TriggerStatus, type UsageStatus, NO_OUTPUT } from "./statuses";
 
@@ -134,11 +134,11 @@ export function createMachineLinks({
     }
   }
 
-  function sendTo(machine: Machine, kind: Kind, out: { type: string; task?: string; body: unknown }, request?: string) {
+  function sendTo(machine: Machine, kind: Kind, out: { type: string; task?: string; body: unknown }, request?: string, directOnly = false) {
     const entry = clients.get(machine.hub_url);
     const member = entry?.client.member();
     if (!entry || !member) return null;
-    const sig = entry.client.send({ ...out, to: machine.id, member });
+    const sig = entry.client.send({ ...out, to: machine.id, member }, { directOnly });
     if (sig) sentTo.set(sig, { machine: machine.id, kind, ...(request ? { request } : {}) });
     return sig;
   }
@@ -449,16 +449,20 @@ export function createMachineLinks({
       return sendTo(machine, "provider", { type: "provider.add", body: { ...provider, key } });
     },
 
-    /** Send one attachment as 256 KiB chunks before its Task message (ADR 0050). */
+    /** Send one attachment in chunks before its Task message (ADR 0050); one over 1 MB goes only on the direct link (ADR 0090). */
     async sendAttachment(machine: Machine, task: string, file: { name: string; uri: string }) {
       const bytes = new Uint8Array(await (await fetch(file.uri)).arrayBuffer());
       if (bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("attachment.too_large");
+      const { chunk, directOnly } = attachmentPlan(bytes.length);
+      if (directOnly && !statuses.get(machine.id)?.direct) throw new Error("attachment.needs_direct");
       const hash = hashBytes(bytes);
-      const chunk = 256 * 1024;
       const total = Math.max(1, Math.ceil(bytes.length / chunk));
       for (let index = 0; index < total; index += 1) {
         const data = toBase64url(bytes.slice(index * chunk, (index + 1) * chunk));
-        if (!sendTo(machine, "other", { type: "file.chunk", task, body: { file: hash, index, total, data } })) return null;
+        if (!sendTo(machine, "other", { type: "file.chunk", task, body: { file: hash, index, total, data } }, undefined, directOnly)) {
+          if (directOnly) throw new Error("attachment.needs_direct");
+          return null;
+        }
       }
       return { name: file.name, size: bytes.length, hash };
     },
