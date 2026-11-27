@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Keyboard, View } from "react-native";
 import { APPROVAL_TIMEOUT_S_DEFAULT } from "@veeloe/protocol-ts";
-import { allowlistOf, approvalTimeoutOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
+import { allowlistOf, approvalTimeoutOf, egressOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { headsOf, STATUS_DOT, statusOf, titleOf, useAgentTaskCount, useAgentTaskSummaries, useThreadHeads } from "../../../entities/task";
@@ -11,7 +11,7 @@ import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../featu
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession, type Signed } from "../../../shared/keystore";
 import { formatTokens, mark, splitMarks, useNow, when } from "../../../shared/lib";
-import { Button, Dot, DotLabel, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, TextLink, Tile, confirm, inform, space } from "../../../shared/ui";
+import { Button, Dot, DotLabel, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, TextLink, Tile, ToggleRow, confirm, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
@@ -214,6 +214,19 @@ function AgentView({ agent }: { agent: AgentRow }) {
           disabled={offline}
           onPick={(next) => {
             if (link && machine) link.updateAgent(machine, { id: agent.id, approvalTimeoutS: next });
+          }}
+        />
+        {/* \`*\` in this Agent's own Egress: the whole public internet, for an Agent that does research (ADR 0029, issue #81). */}
+        <ToggleRow
+          icon="network"
+          title={t("openNet.title")}
+          detail={t(egressOf(agent).includes("*") ? "openNet.warning" : "openNet.detail")}
+          value={egressOf(agent).includes("*")}
+          onChange={(on) => {
+            if (!link || !machine || away) return;
+            const egress = egressOf(agent);
+            const next = on ? [...egress, "*"] : egress.filter((domain) => domain !== "*");
+            void keySession.signed(t(on ? "openNet.onPrompt" : "openNet.offPrompt", { name: agent.name }), () => (link.setEgress(machine, next, agent.id) ? "sent" : null));
           }}
         />
         <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} disabled={away} />

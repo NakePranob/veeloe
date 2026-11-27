@@ -104,14 +104,7 @@
     },
     "duplicate": "This domain is already listed",
     "top": "Only the domains on this list are open to {{who}}; the sandbox shuts out everything else.",
-    "topOne": "Only the domains on this list are open to {{who}}, and the other Agents are untouched. The sandbox shuts out everything else.",
-    "open": {
-      "title": "Reach the whole public internet",
-      "detail": "For an Agent that does research: no Approval for each domain. Private networks stay closed.",
-      "onPrompt": "Let {{who}} reach the whole public internet",
-      "offPrompt": "Let {{who}} reach only the domains in the list",
-      "warning": "Any page can try to trick the Agent into sending what is in its Workdir out. Use it only for an Agent that holds no tokens or important files."
-    }
+    "topOne": "Only the domains on this list are open to {{who}}, and the other Agents are untouched. The sandbox shuts out everything else."
   },
   "pickCancel": "Cancel"
 }

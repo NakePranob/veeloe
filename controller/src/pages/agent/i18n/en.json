@@ -93,5 +93,12 @@
   "allThreads": "All Schedule threads",
   "trigger": {
     "detail": "Schedules and Idle Work: work the Agent starts itself"
+  },
+  "openNet": {
+    "title": "Reach the whole public internet",
+    "detail": "For an Agent that does research: no Approval for each domain. Private networks stay closed.",
+    "onPrompt": "Let {{name}} reach the whole public internet",
+    "offPrompt": "Let {{name}} reach only the domains in the list",
+    "warning": "Any page can try to trick the Agent into sending what is in its Workdir out. Use it only for an Agent that holds no tokens or important files."
   }
 }
