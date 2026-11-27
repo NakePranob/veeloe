@@ -1,22 +1,15 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { FlatList, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { STATUS_DOT, statusOf, threadsOf, titleOf, useAgentTaskSummaries, useHiddenThreads, useTaskSummaries } from "../../../entities/task";
 import { useMachineStatus } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
-import { Card, column, Dot, Row, Spinner, radius, space } from "../../../shared/ui";
+import { column, Dot, Row, Spinner, space } from "../../../shared/ui";
 
 /** How many Tasks one read brings; scrolling near the end reads the next page. */
 const PAGE = 30;
-
-/** A row in one long grey card: the first and last carry the card's corners. */
-function InCard({ index, count, children }: { index: number; count: number; children: ReactNode }) {
-  const top = index === 0 ? radius.card : 0;
-  const bottom = index === count - 1 ? radius.card : 0;
-  return <Card style={{ padding: 0, gap: 0, overflow: "hidden", borderTopLeftRadius: top, borderTopRightRadius: top, borderBottomLeftRadius: bottom, borderBottomRightRadius: bottom }}>{children}</Card>;
-}
 
 /**
  * Every Task, or every Schedule thread, of one Agent in a sheet over its page, which shows only the newest few.
@@ -50,7 +43,7 @@ function Tasks({ agentId, online }: { agentId: string; online: boolean | null })
       data={tasks}
       keyExtractor={(task) => task.id}
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={[column, { padding: space.lg }]}
+      contentContainerStyle={[column, { paddingVertical: space.sm }]}
       onEndReachedThreshold={0.5}
       onEndReached={() => {
         if (more) setLimit(limit + PAGE);
@@ -62,16 +55,14 @@ function Tasks({ agentId, online }: { agentId: string; online: boolean | null })
           </View>
         ) : undefined
       }
-      renderItem={({ item: task, index }) => (
-        <InCard index={index} count={tasks.length}>
-          <Row
-            leading={<Dot color={STATUS_DOT[statusOf(task, online)]} size={9} />}
-            title={titleOf(task) || t("tasks.untitled")}
-            detail={task.events ? t("tasks.detail", { status: status(statusOf(task, online)), when: when(task.updated_at, language, now) }) : status(statusOf(task, online))}
-            // The Task takes the sheet's place, as the Task details sheet opens its Task.
-            onPress={() => router.replace({ pathname: "/tasks/[task]", params: { task: task.id, agent: agentId } })}
-          />
-        </InCard>
+      renderItem={({ item: task }) => (
+        <Row
+          leading={<Dot color={STATUS_DOT[statusOf(task, online)]} size={9} />}
+          title={titleOf(task) || t("tasks.untitled")}
+          detail={task.events ? t("tasks.detail", { status: status(statusOf(task, online)), when: when(task.updated_at, language, now) }) : status(statusOf(task, online))}
+          // The Task takes the sheet's place, as the Task details sheet opens its Task.
+          onPress={() => router.replace({ pathname: "/tasks/[task]", params: { task: task.id, agent: agentId } })}
+        />
       )}
     />
   );
@@ -88,16 +79,14 @@ function Threads({ agentId, online }: { agentId: string; online: boolean | null 
       data={threads}
       keyExtractor={(thread) => thread.id}
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={[column, { padding: space.lg }]}
-      renderItem={({ item: thread, index }) => (
-        <InCard index={index} count={threads.length}>
-          <Row
-            icon="time"
-            title={thread.text.split("\n")[0] || t("threads.untitled")}
-            value={t("threads.rounds", { count: thread.rounds.length })}
-            onPress={() => router.replace({ pathname: "/threads/[trigger]", params: { trigger: thread.id, agent: agentId } })}
-          />
-        </InCard>
+      contentContainerStyle={[column, { paddingVertical: space.sm }]}
+      renderItem={({ item: thread }) => (
+        <Row
+          icon="time"
+          title={thread.text.split("\n")[0] || t("threads.untitled")}
+          value={t("threads.rounds", { count: thread.rounds.length })}
+          onPress={() => router.replace({ pathname: "/threads/[trigger]", params: { trigger: thread.id, agent: agentId } })}
+        />
       )}
     />
   );
