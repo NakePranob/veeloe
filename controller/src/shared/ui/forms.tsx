@@ -253,10 +253,15 @@ export function Field({ label, value, onChangeText, placeholder, footer, multili
 }
 
 // For a list with nothing in it: what it is for and what to do first.
-export function Empty({ icon, title, detail, action }: { icon: IconName; title: string; detail?: string; action?: ReactNode }) {
+export function Empty({ icon, title, detail, action, headerless }: { icon: IconName; title: string; detail?: string; action?: ReactNode; headerless?: boolean }) {
+  const insets = useSafeAreaInsets();
+  // On iOS the scroll view runs under the header and its content is inset by it, so a centre
+  // worked out from the whole height lands half a header low: move it up by that half.
+  // ponytail: 44pt is the bar's own height; read the real one if a page grows a taller header.
+  const lift = process.env.EXPO_OS === "ios" && !headerless ? insets.top + 44 : 0;
   return (
     // flex: 1 centres it in the room its list leaves, which grows to the screen (Screen, the inbox).
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, padding: space.xl }}>
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, padding: space.xl, transform: [{ translateY: -lift / 2 }] }}>
       {/* The icon in the title's colour, both faint. */}
       <View style={{ opacity: 0.3 }}>
         <Icon name={icon} size="xxl" color="label" />
