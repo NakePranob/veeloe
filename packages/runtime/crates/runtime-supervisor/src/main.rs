@@ -169,6 +169,9 @@ struct Supervisor {
     /// The Tasks whose running Turn is a person's: only those move the quiet
     /// time, so a Schedule's round does not keep Idle Work waiting (ADR 0080).
     person_turns: Mutex<std::collections::HashSet<(String, String)>>,
+    /// Agents that narrowed their file level and wait for their Turns to end
+    /// before their worker starts again with it (ADR 0087).
+    narrowed: Mutex<std::collections::HashSet<String>>,
     started_at: u64,
 }
 
@@ -184,6 +187,7 @@ impl Supervisor {
         self.log_turn(agent, &message);
         self.notify(agent, &message);
         self.follow_idle(agent, &message);
+        self.follow_files(agent, &message);
         let outbox = self.outbox.lock().expect("outbox");
         // What the Agent proposed for its Idle Work list is kept, not forwarded;
         // whoever is talking to it hears the new draft (ADR 0056).
@@ -230,6 +234,77 @@ impl Supervisor {
         }
         if let Some(outbox) = outbox.as_ref() {
             forward(outbox.as_ref(), agent, message);
+        }
+    }
+
+    /// An Agent that narrowed itself keeps the new level now, and its worker
+    /// starts again with the narrower sandbox once no Turn of it is running
+    /// (ADR 0087). Until then the old sandbox stays, as the tool tells it.
+    fn follow_files(&self, agent: &str, message: &FromWorker) {
+        let FromWorker::Event { task, event, .. } = message else {
+            return;
+        };
+        match event.kind.as_str() {
+            "files.narrowed" => {
+                let files = event
+                    .body
+                    .get("files")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default();
+                if veeloe_runtime_supervisor::agents::narrow(&self.registry, agent, files).is_some()
+                {
+                    self.narrowed
+                        .lock()
+                        .expect("narrowed")
+                        .insert(agent.to_string());
+                    // Whoever is talking to it sees the narrower level now.
+                    let mut members: Vec<String> = self
+                        .approvals
+                        .turns(agent)
+                        .into_iter()
+                        .map(|turn| turn.member)
+                        .collect();
+                    members.sort();
+                    members.dedup();
+                    if let Some(me) = self.me.upgrade() {
+                        tokio::spawn(async move {
+                            let providers = load_providers(&me.home).unwrap_or_default();
+                            let info = veeloe_runtime_supervisor::models::info(
+                                &providers,
+                                me.http.as_ref(),
+                            )
+                            .await;
+                            let body = veeloe_runtime_supervisor::tasks::agents_listed(
+                                &me.registry,
+                                &info,
+                                Some(me.budgets.as_ref()),
+                            );
+                            if let Some(outbox) = me.outbox.lock().expect("outbox").as_ref() {
+                                for member in members {
+                                    outbox.to_member(&member, "agent.listed", body.clone(), None);
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+            "turn.ended" => {
+                let others = self
+                    .approvals
+                    .turns(agent)
+                    .into_iter()
+                    .filter(|turn| turn.task != *task)
+                    .count();
+                if others == 0 && self.narrowed.lock().expect("narrowed").remove(agent) {
+                    if let (Some(workers), Ok(Some(fresh))) =
+                        (self.workers.get(), self.registry.get(agent))
+                    {
+                        workers.stop(agent);
+                        workers.start(&fresh);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
@@ -1067,6 +1142,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         workers: OnceLock::new(),
         quiet_since: Mutex::new(HashMap::new()),
         person_turns: Mutex::new(std::collections::HashSet::new()),
+        narrowed: Mutex::new(std::collections::HashSet::new()),
         started_at: veeloe_runtime_supervisor::usage::now_ms() as u64,
     });
 

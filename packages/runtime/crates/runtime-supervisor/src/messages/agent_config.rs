@@ -200,7 +200,10 @@ async fn save(
     // Which of the Machine's files an Agent reaches is the Owner's to set
     // (ADR 0087): in v0.1 an Owner whose key signed. Every folder is checked
     // against the forbidden list by its real path, and kept as that path.
-    let access = if body.get("files").is_none() && body.get("folders").is_none() {
+    // A new Agent starts in its own folder, whatever drafted it (ADR 0087).
+    let access = if create {
+        crate::agents::Access::default()
+    } else if body.get("files").is_none() && body.get("folders").is_none() {
         base.access.clone()
     } else {
         if !machine

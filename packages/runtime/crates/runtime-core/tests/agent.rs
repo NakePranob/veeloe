@@ -2997,3 +2997,48 @@ async fn a_schedule_without_a_goal_has_no_goal_tools() {
     let names = tool_names(&harness.llm.requests()[0]);
     assert!(!names.contains(&"goal_note".to_string()) && !names.contains(&"goal_met".to_string()));
 }
+
+#[tokio::test]
+async fn an_agent_that_reaches_past_its_folder_may_narrow_itself_but_never_widen() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "n1",
+                "files_narrow",
+                json!({ "files": "machine" }),
+            )),
+            Ok(tool_use("n2", "files_narrow", json!({ "files": "folder" }))),
+            Ok(text("done")),
+        ],
+        ..Setup::default()
+    });
+    harness.core.set_files(veeloe_runtime_core::Files::Selected);
+    harness
+        .core
+        .receive(message_in("t1", "read the web", "m_owner"))
+        .expect("receive");
+    harness.core.idle().await;
+    assert!(tool_names(&harness.llm.requests()[0]).contains(&"files_narrow".to_string()));
+    let events = harness.core.events("t1").expect("events");
+    // Widening is refused; narrowing to its own folder is recorded for the supervisor.
+    let narrowed: Vec<_> = events
+        .iter()
+        .filter(|event| event.kind == "files.narrowed")
+        .map(|event| event.body.clone())
+        .collect();
+    assert_eq!(narrowed, vec![json!({ "files": "folder" })]);
+}
+
+#[tokio::test]
+async fn an_agent_in_its_own_folder_has_no_narrowing_tool() {
+    let harness = setup(Setup {
+        replies: vec![Ok(text("hi"))],
+        ..Setup::default()
+    });
+    harness
+        .core
+        .receive(message_in("t1", "hello", "m_owner"))
+        .expect("receive");
+    harness.core.idle().await;
+    assert!(!tool_names(&harness.llm.requests()[0]).contains(&"files_narrow".to_string()));
+}

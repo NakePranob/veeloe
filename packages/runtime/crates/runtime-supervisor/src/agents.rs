@@ -95,6 +95,15 @@ pub enum Level {
 }
 
 impl Level {
+    /// How far it reaches: an Agent may only move itself to a smaller one.
+    fn reach(self) -> u8 {
+        match self {
+            Level::Folder => 0,
+            Level::Selected => 1,
+            Level::Machine => 2,
+        }
+    }
+
     fn is_folder(&self) -> bool {
         *self == Level::Folder
     }
@@ -121,6 +130,20 @@ pub struct Folder {
 pub enum Mode {
     Read,
     Write,
+}
+
+/// The Agent narrowed itself (`files.narrowed`, ADR 0087): the new level is
+/// kept only when it reaches less than the one held, so a worker can never
+/// widen it. The Agent as now kept, or None when nothing changed.
+pub fn narrow(registry: &AgentRegistry, id: &str, files: &str) -> Option<Agent> {
+    let next: Level = serde_json::from_value(serde_json::Value::String(files.to_string())).ok()?;
+    let mut agent = registry.get(id).ok()??;
+    if next.reach() >= agent.access.files.reach() {
+        return None;
+    }
+    agent.access.files = next;
+    registry.replace(&agent).ok()?;
+    Some(agent)
 }
 
 /// What Idle Work and Watch may use of a Budget a day when nobody set it (ADR 0056).

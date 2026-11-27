@@ -865,6 +865,11 @@ async fn run_turn(
         tools.push(goal_note());
         tools.push(goal_met());
     }
+    // An Agent that reaches past its own folder may narrow itself, never widen (ADR 0087).
+    let files = *state.files.read().expect("files");
+    if files != Files::Folder {
+        tools.push(files_narrow(files));
+    }
     // A round nobody watches asks no one: its Schedule's scope is all it adds (ADR 0079).
     let unattended = trigger
         .as_ref()
@@ -986,6 +991,8 @@ async fn run_turn(
                 ask_card(&state, &task, &starter, &events, name, &input, &cancel).await
             } else if goal && (name == GOAL_NOTE || name == GOAL_MET) {
                 goal_event(&state, &task, &starter, name, &input)
+            } else if files != Files::Folder && name == FILES_NARROW {
+                narrow_files(&state, &task, &starter, files, &input)
             } else if from_trigger && name == NOTHING_TO_REPORT {
                 quiet_at = Some(results.len());
                 Ok("This round ends quietly: nobody is told.".to_string())
@@ -1162,6 +1169,70 @@ fn goal_event(
     } else {
         "The Schedule stops here; its owner is told why.".into()
     })
+}
+
+const FILES_NARROW: &str = "files_narrow";
+
+impl Files {
+    /// How far it reaches: a level may only move to a smaller one.
+    fn reach(self) -> u8 {
+        match self {
+            Files::Folder => 0,
+            Files::Selected => 1,
+            Files::Machine => 2,
+        }
+    }
+}
+
+fn files_narrow(current: Files) -> ToolDefinition {
+    let narrower: Vec<&str> = [Files::Folder, Files::Selected]
+        .into_iter()
+        .filter(|level| level.reach() < current.reach())
+        .map(Files::as_str)
+        .collect();
+    ToolDefinition {
+        name: FILES_NARROW.into(),
+        description: format!(
+            "Narrows which of the Machine's files you reach, now set to {}: \"folder\" keeps you to your own Workdir, \"selected\" to the folders the owner gave you. Use it before work that does not need more, such as reading pages from the web. It cannot widen: only your owner can. It takes effect once the work running now ends.",
+            current.as_str()
+        ),
+        input_schema: json!({ "type": "object", "properties": { "files": { "type": "string", "enum": narrower } }, "required": ["files"] }),
+    }
+}
+
+/// `files.narrowed` in the Task: the supervisor keeps the narrower level and
+/// starts the worker again with it once the Turn ends (ADR 0087).
+fn narrow_files(
+    state: &State,
+    task: &str,
+    starter: &str,
+    current: Files,
+    input: &Value,
+) -> Result<String, ToolError> {
+    let asked = input
+        .get("files")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let next = Files::parse(asked);
+    if asked != next.as_str() || next.reach() >= current.reach() {
+        return Err(ToolError::Failed(format!(
+            "files: only narrower than {} (an Agent never widens itself)",
+            current.as_str()
+        )));
+    }
+    state
+        .append(
+            task,
+            starter,
+            "files.narrowed",
+            json!({ "files": next.as_str() }),
+            None,
+        )
+        .map_err(|error| ToolError::Failed(error.to_string()))?;
+    Ok(format!(
+        "Narrowed to {}. It takes effect once the work running now ends.",
+        next.as_str()
+    ))
 }
 
 fn propose_idle_work() -> ToolDefinition {

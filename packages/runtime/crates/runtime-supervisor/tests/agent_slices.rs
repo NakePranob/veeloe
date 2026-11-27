@@ -1111,3 +1111,50 @@ async fn selected_folders_are_set_by_an_owner_and_never_reach_a_secret() {
     assert_eq!(outbox.last().0, "agent.listed", "{}", outbox.last().1);
     workers.stop_all();
 }
+
+/// Issue #88: what a worker says it narrowed to is kept only when it reaches
+/// less; nothing a worker says widens an Agent.
+#[test]
+fn a_worker_narrows_its_agent_and_never_widens_it() {
+    use veeloe_runtime_supervisor::agents::{narrow, Level};
+    let home = tempdir().expect("home");
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    let mut agent = veeloe_runtime_supervisor::agents::Agent {
+        id: "a1".into(),
+        name: "a1".into(),
+        provider: "main".into(),
+        model: "model-a".into(),
+        character: None,
+        allowlist: Vec::new(),
+        egress: Vec::new(),
+        approval_timeout_s: 3_600,
+        budget: None,
+        deleted_at: None,
+        git_repos: Vec::new(),
+        background_share: None,
+        access: Default::default(),
+    };
+    agent.access.files = Level::Selected;
+    registry.add(&agent).expect("add");
+
+    assert!(narrow(&registry, "a1", "machine").is_none());
+    assert!(narrow(&registry, "a1", "selected").is_none());
+    assert!(narrow(&registry, "a1", "everything").is_none());
+    assert_eq!(
+        registry.get("a1").expect("get").expect("a1").access.files,
+        Level::Selected
+    );
+
+    assert_eq!(
+        narrow(&registry, "a1", "folder")
+            .expect("narrowed")
+            .access
+            .files,
+        Level::Folder
+    );
+    assert_eq!(
+        registry.get("a1").expect("get").expect("a1").access.files,
+        Level::Folder
+    );
+    assert!(narrow(&registry, "a1", "selected").is_none());
+}

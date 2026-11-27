@@ -67,3 +67,14 @@ Agent ระดับ `selected` หรือ `machine` SHALL รับ `task.me
 #### Scenario: Member อื่นสั่งงาน Agent ที่กว้าง
 - **WHEN** Member ที่ไม่ใช่ Owner ส่ง `task.message` ถึง Agent ระดับ `machine`
 - **THEN** Runtime ตอบ `files.owner_only` และไม่มี Turn เริ่ม
+
+### Requirement: Agent ลดระดับตัวเองได้ เพิ่มไม่ได้
+Agent ระดับ `selected` หรือ `machine` SHALL มี tool `files_narrow` ที่ลดระดับลงได้เท่านั้น tool SHALL ปฏิเสธระดับที่เท่าหรือกว้างกว่าเดิม และ Runtime SHALL เก็บระดับใหม่เฉพาะเมื่อแคบกว่าที่เก็บไว้ Runtime SHALL เริ่ม worker ใหม่ด้วย sandbox ที่แคบลงเมื่อไม่มี Turn ของ Agent นั้นทำอยู่ และ SHALL ส่ง `agent.listed` ให้คนที่คุยกับ Agent อยู่ Agent ที่สร้างใหม่ SHALL เริ่มที่ `folder` เสมอ ไม่ว่าคำสั่งสร้างจะขออะไร
+
+#### Scenario: Agent ขอกว้างขึ้น
+- **WHEN** Agent ระดับ `selected` เรียก `files_narrow` ด้วย `machine`
+- **THEN** tool ปฏิเสธ และไม่มี `files.narrowed`
+
+#### Scenario: Agent ลดเป็นในโฟลเดอร์
+- **WHEN** Agent ระดับ `selected` เรียก `files_narrow` ด้วย `folder`
+- **THEN** Task log มี `files.narrowed` และ Runtime เก็บ `folder`
