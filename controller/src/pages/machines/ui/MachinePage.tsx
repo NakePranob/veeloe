@@ -52,7 +52,7 @@ export function MachinePage() {
   const providerTrouble = !!status.providerError || !!status.providers?.some((p) => errorOf(p) !== null);
 
   return (
-    <Screen title={machine.name} subtitle={status.online === null ? t("status.checking") : t(status.online ? "online" : "offline")}>
+    <Screen title={machine.name} subtitle={status.online === null ? t("status.checking") : t(status.online ? (status.direct ? "onlineDirect" : "online") : "offline")}>
       {/* The board spaces its blocks 14 apart, closer than the Screen's sections. */}
       <View style={{ gap: space.inset }}>
         <View style={{ flexDirection: "row", gap: space.md }}>

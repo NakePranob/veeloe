@@ -13,7 +13,7 @@ export { answerChallenge, handshakeBytes, HubAuthSchema, normalizeHubUrl, type H
 export { HubChallengeSchema, type HubChallenge } from "./messages/hub-challenge";
 export { HubErrorSchema, type HubError } from "./messages/hub-error";
 export { HubCloseCode, HubReadySchema, type HubReady } from "./messages/hub-ready";
-export { MemorySeenSequences, verify, type Rejection, type SeenSequences, type Verified } from "./envelope/verify";
+export { MemorySeenSequences, SEEN_WINDOW, SeenWindow, verify, type Rejection, type SeenSequences, type Verified } from "./envelope/verify";
 export { parseMessage, type KnownMessage, type ParsedMessage } from "./messages";
 export { ErrorBodySchema, type ErrorBody } from "./messages/error";
 export { checkPairingProof, pairingProof, PairingClaimBodySchema, PairingDoneBodySchema, type PairingClaimBody, type PairingDoneBody } from "./messages/pairing-claim";
@@ -83,6 +83,7 @@ export {
   type CardAnswerBody,
   type TaskSyncBody,
 } from "./messages/task";
+export { DIRECT_SDP_MAX, DirectAnswerBodySchema, DirectCloseBodySchema, DirectOfferBodySchema, type DirectAnswerBody, type DirectCloseBody, type DirectOfferBody } from "./messages/direct";
 export { GIT_REPOS_MAX, GitRepoSchema, GitReposSchema } from "./messages/git-repos";
 export { EGRESS_MAX, EgressDomainSchema, EgressSchema, EgressSetBodySchema, type EgressSetBody } from "./messages/egress";
 export {

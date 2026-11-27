@@ -2,6 +2,7 @@ import type { z } from "zod";
 import type { SignedPart } from "../envelope/schema";
 import { AgentCreateBodySchema, AgentDeleteBodySchema, AgentListBodySchema, AgentListedBodySchema, AgentRestoreBodySchema, AgentUpdateBodySchema, AgentUsageBodySchema, MachineStatusBodySchema } from "./agent";
 import { ApprovalAnswerBodySchema } from "./approval";
+import { DirectAnswerBodySchema, DirectCloseBodySchema, DirectOfferBodySchema } from "./direct";
 import { EgressSetBodySchema } from "./egress";
 import { ErrorBodySchema } from "./error";
 import { DeviceHandoffBodySchema, DeviceLinkedBodySchema } from "./linking";
@@ -57,6 +58,9 @@ const known = {
   "trigger.run": TriggerTargetBodySchema,
   "trigger.list": TriggerListBodySchema,
   "trigger.listed": TriggerListedBodySchema,
+  "direct.offer": DirectOfferBodySchema,
+  "direct.answer": DirectAnswerBodySchema,
+  "direct.close": DirectCloseBodySchema,
 };
 
 type KnownType = keyof typeof known;

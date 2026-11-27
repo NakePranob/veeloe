@@ -26,6 +26,7 @@ serde_json.workspace = true
 sha2 = "0.10"
 veeloe-runtime-core = { path = "../runtime-core" }
 veeloe-runtime-worker = { path = "../runtime-worker" }
+webrtc = "0.21.1"
 
 [dev-dependencies]
 tokio.workspace = true

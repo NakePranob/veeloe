@@ -1,11 +1,13 @@
 import { randomUUID } from "expo-crypto";
 import type { DeviceLink } from "@veeloe/protocol-ts";
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import { AppState } from "react-native";
 import { useMachines } from "../../../entities/machine";
 import { useDatabase } from "../../../shared/db";
 import { deviceName } from "../../../shared/device-name";
 import { keySession, useKeyStatus } from "../../../shared/keystore";
 import { NO_OUTPUT, type ToolOutput } from "./statuses";
+import { rtcPeer } from "./rtc-peer";
 import { createMachineLinks, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, type MachineLinks, type MachineStatus, type MemoryStatus, type UsageStatus } from "./links";
 import { UNKNOWN_TRIGGERS, type TriggerStatus } from "./statuses";
 
@@ -36,7 +38,7 @@ export function useMachineLinks({ onRevoked, onLinked }: { onRevoked: () => void
     const secretKey = unlocked ? keySession.secretKey() : null;
     if (!secretKey) return;
     kept.__veeloeMachineLinks?.stop();
-    const links = createMachineLinks({ database, secretKey, newId: randomUUID, deviceName: deviceName(), onRevoked: () => handlers.current.onRevoked() });
+    const links = createMachineLinks({ database, secretKey, newId: randomUUID, deviceName: deviceName(), onRevoked: () => handlers.current.onRevoked(), createPeer: rtcPeer });
     links.onLinked((news) => handlers.current.onLinked(news));
     current = links;
     kept.__veeloeMachineLinks = links;
@@ -48,6 +50,13 @@ export function useMachineLinks({ onRevoked, onLinked }: { onRevoked: () => void
       announce();
     };
   }, [database, unlocked]);
+
+  // iOS drops a direct link in the background, so it is closed there and offered again in front (ADR 0090).
+  useEffect(() => {
+    if (!live) return;
+    const subscription = AppState.addEventListener("change", (state) => (state === "active" ? live.resume() : live.pause()));
+    return () => subscription.remove();
+  }, [live]);
 
   // Every new set of links (a new key, a new database) gets the Machines, not only the first.
   useEffect(() => {

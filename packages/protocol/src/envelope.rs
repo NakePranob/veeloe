@@ -122,6 +122,57 @@ pub struct Verified {
 pub trait SeenSequences {
     fn last(&self, sender: &str) -> Option<u64>;
     fn record(&mut self, sender: &str, seq: u64);
+    /// Whether `seq` was never accepted from `sender`. By default only a
+    /// number above the last one is; a store that keeps a [`Window`] also takes
+    /// one that came late by the slower of two paths (ADR 0090).
+    fn is_new(&self, sender: &str, seq: u64) -> bool {
+        self.last(sender).is_none_or(|last| seq > last)
+    }
+}
+
+/// How many of the latest numbers from one sender may still arrive out of
+/// order (ADR 0090). An envelope later than this is refused as replayed.
+pub const SEEN_WINDOW: usize = 1024;
+
+/// The numbers accepted from each sender in this run, so that an envelope that
+/// took the Hub while the next one took the direct link is accepted once and
+/// only once (ADR 0090). Only the highest number is kept on disk: after a
+/// restart, everything at or below it is refused, as before.
+#[derive(Debug, Default)]
+pub struct Window {
+    senders: HashMap<String, Recent>,
+}
+
+#[derive(Debug)]
+struct Recent {
+    /// Everything at or below this is refused.
+    floor: u64,
+    accepted: std::collections::BTreeSet<u64>,
+}
+
+impl Window {
+    /// Whether `seq` is new from a sender whose highest kept number is `last`.
+    pub fn is_new(&self, sender: &str, seq: u64, last: Option<u64>) -> bool {
+        match self.senders.get(sender) {
+            Some(recent) => seq > recent.floor && !recent.accepted.contains(&seq),
+            None => last.is_none_or(|last| seq > last),
+        }
+    }
+
+    /// Remembers `seq`, for a sender whose highest kept number was `last`
+    /// before it.
+    pub fn record(&mut self, sender: &str, seq: u64, last: Option<u64>) {
+        let recent = self.senders.entry(sender.to_string()).or_insert(Recent {
+            floor: last.unwrap_or(0),
+            accepted: Default::default(),
+        });
+        recent.accepted.insert(seq);
+        while recent.accepted.len() > SEEN_WINDOW {
+            if let Some(oldest) = recent.accepted.pop_first() {
+                recent.floor = recent.floor.max(oldest);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -226,10 +277,8 @@ where
         return Err(Rejection::NotAddressed);
     }
 
-    if let Some(last) = seen.last(&header.from) {
-        if part.seq <= last {
-            return Err(Rejection::Replayed);
-        }
+    if !seen.is_new(&header.from, part.seq) {
+        return Err(Rejection::Replayed);
     }
     seen.record(&header.from, part.seq);
 
@@ -237,4 +286,35 @@ where
         from: header.from,
         signed: part,
     })
+}
+
+#[cfg(test)]
+mod window_tests {
+    use super::*;
+
+    #[test]
+    fn a_late_number_is_taken_once_and_a_replay_never() {
+        let mut window = Window::default();
+        // Restarted with 10 kept: nothing at or below it is new.
+        assert!(!window.is_new("k", 10, Some(10)));
+        assert!(window.is_new("k", 12, Some(10)));
+        window.record("k", 12, Some(10));
+        // 11 took the slower path: still new, once.
+        assert!(window.is_new("k", 11, Some(12)));
+        window.record("k", 11, Some(12));
+        assert!(!window.is_new("k", 11, Some(12)));
+        assert!(!window.is_new("k", 12, Some(12)));
+        assert!(!window.is_new("k", 10, Some(12)));
+    }
+
+    #[test]
+    fn a_number_older_than_the_window_is_refused() {
+        let mut window = Window::default();
+        for seq in 2..=(SEEN_WINDOW as u64 + 2) {
+            window.record("k", seq, Some(seq - 1));
+        }
+        // 1 was never taken, but more than a window of numbers came after it.
+        assert!(!window.is_new("k", 1, Some(SEEN_WINDOW as u64 + 2)));
+        assert!(window.is_new("k", SEEN_WINDOW as u64 + 3, None));
+    }
 }

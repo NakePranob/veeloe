@@ -6,6 +6,39 @@ import { COPIED_HEADER_FIELDS, EnvelopeSchema, SignedPartSchema, type Route, typ
 export interface SeenSequences {
   last(senderKey: string): number | undefined;
   record(senderKey: string, seq: number): void;
+  /** Whether `seq` was never accepted. Without it only a number above the last one is; a store with a `SeenWindow` also takes one that came late by the slower of two paths (ADR 0090). */
+  isNew?(senderKey: string, seq: number): boolean;
+}
+
+/** How many of the latest numbers from one sender may still arrive out of order (ADR 0090). */
+export const SEEN_WINDOW = 1024;
+
+/**
+ * The numbers accepted from each sender in this run, so an envelope that took the Hub while the
+ * next one took the direct link is accepted once and only once (ADR 0090). Only the highest number
+ * is kept on disk: after a restart everything at or below it is refused, as before.
+ */
+export class SeenWindow {
+  #senders = new Map<string, { floor: number; accepted: Set<number> }>();
+  isNew(senderKey: string, seq: number, last: number | undefined) {
+    const recent = this.#senders.get(senderKey);
+    if (!recent) return last === undefined || seq > last;
+    return seq > recent.floor && !recent.accepted.has(seq);
+  }
+  record(senderKey: string, seq: number, last: number | undefined) {
+    let recent = this.#senders.get(senderKey);
+    if (!recent) {
+      recent = { floor: last ?? 0, accepted: new Set() };
+      this.#senders.set(senderKey, recent);
+    }
+    recent.accepted.add(seq);
+    // ponytail: a linear scan for the oldest, over at most SEEN_WINDOW + 1 numbers, only once the window is full.
+    if (recent.accepted.size > SEEN_WINDOW) {
+      const oldest = Math.min(...recent.accepted);
+      recent.accepted.delete(oldest);
+      recent.floor = Math.max(recent.floor, oldest);
+    }
+  }
 }
 
 // ponytail: in memory only. The Runtime's own store, which survives a restart,
@@ -71,7 +104,8 @@ export function verify(envelope: unknown, trustedKeys: { has(key: string): boole
   if (!isForMe(route)) return { ok: false, reason: "not-addressed" };
 
   const last = seen.last(from);
-  if (last !== undefined && part.seq <= last) return { ok: false, reason: "replayed" };
+  const fresh = seen.isNew ? seen.isNew(from, part.seq) : last === undefined || part.seq > last;
+  if (!fresh) return { ok: false, reason: "replayed" };
   seen.record(from, part.seq);
 
   return { ok: true, from, signed: part };

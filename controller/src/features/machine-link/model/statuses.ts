@@ -4,6 +4,8 @@ import type { ListedTrigger, ProviderInfo } from "@veeloe/protocol-ts";
 export type MachineStatus = {
   /** Null until it has answered or the Hub said it is not there. */
   online: boolean | null;
+  /** Whether envelopes to it go on a direct link now, not through the Hub (ADR 0090). */
+  direct: boolean;
   providers: ProviderInfo[] | null;
   /** The code the last `agent.create` came back with, if it failed. */
   createError: string | null;
@@ -27,6 +29,7 @@ export type MachineStatus = {
 
 export const UNKNOWN_MACHINE_STATUS: MachineStatus = {
   online: null,
+  direct: false,
   providers: null,
   createError: null,
   updateError: null,

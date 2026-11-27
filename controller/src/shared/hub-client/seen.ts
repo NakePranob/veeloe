@@ -1,4 +1,4 @@
-import type { SeenSequences } from "@veeloe/protocol-ts";
+import { type SeenSequences, SeenWindow } from "@veeloe/protocol-ts";
 import type { Database } from "../db";
 
 /**
@@ -22,10 +22,15 @@ export function createSeenSequences(database: Database) {
   // Writes go through in order, in the background: the number in memory is the truth for this run.
   let writes: Promise<unknown> = Promise.resolve();
 
+  // What this run took, so an envelope that came late by the other path is taken once (ADR 0090).
+  const window = new SeenWindow();
+
   const seen: SeenSequences = {
     last: (senderKey) => last.get(senderKey),
+    isNew: (senderKey, seq) => window.isNew(senderKey, seq, last.get(senderKey)),
     record(senderKey, seq) {
       const kept = last.get(senderKey);
+      window.record(senderKey, seq, kept);
       if (kept !== undefined && seq <= kept) return;
       last.set(senderKey, seq);
       writes = database

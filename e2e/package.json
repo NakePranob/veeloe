@@ -4,5 +4,8 @@
   "type": "module",
   "dependencies": {
     "@veeloe/protocol-ts": "workspace:*"
+  },
+  "devDependencies": {
+    "werift": "0.27.0"
   }
 }

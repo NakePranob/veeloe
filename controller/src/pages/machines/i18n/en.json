@@ -7,6 +7,7 @@
   "footer": "Pairing starts on the Machine with veeloe pair; then scan or paste its link in this app.",
   "agents_one": "{{count}} Agent",
   "agents_other": "{{count}} Agents",
+  "onlineDirect": "Online · direct",
   "online": "Online",
   "offline": "Offline",
   "budgetTotal": "Budget today, all",

@@ -68,6 +68,15 @@ pub struct MachineOutbox {
     signer: Signer,
     seen: Mutex<FileSeenSequences>,
     hub: HubSender,
+    direct: Option<Direct>,
+}
+
+/// The direct links an outbox may write on, and each Member's device keys, so
+/// an envelope skips the Hub only when every device of its Member has one
+/// (ADR 0090).
+pub struct Direct {
+    pub links: crate::direct::DirectLinks,
+    pub devices: std::sync::Arc<dyn Fn(&str) -> Vec<String> + Send + Sync>,
 }
 
 impl MachineOutbox {
@@ -77,7 +86,13 @@ impl MachineOutbox {
             signer: Signer::new(secret_key),
             seen: Mutex::new(FileSeenSequences::open(home)?),
             hub,
+            direct: None,
         })
+    }
+
+    pub fn with_direct(mut self, direct: Direct) -> Self {
+        self.direct = Some(direct);
+        self
     }
 }
 
@@ -99,6 +114,18 @@ impl Outbox for MachineOutbox {
             seq,
         );
         if let Ok(value) = serde_json::to_value(envelope) {
+            if let Some(direct) = &self.direct {
+                let text = value.to_string();
+                let open: Vec<String> = direct
+                    .links
+                    .keys_of(member)
+                    .into_iter()
+                    .filter(|key| direct.links.send(key, &text))
+                    .collect();
+                if !crate::direct::hub_too(&open, &(direct.devices)(member)) {
+                    return;
+                }
+            }
             self.hub.send(value);
         }
     }

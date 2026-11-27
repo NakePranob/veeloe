@@ -24,6 +24,7 @@ use veeloe_runtime_core::ipc::LlmHttpRequest;
 use veeloe_runtime_core::{FromWorker, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
 use veeloe_runtime_supervisor::approval::Approvals;
+use veeloe_runtime_supervisor::direct::DirectLinks;
 use veeloe_runtime_supervisor::doctor;
 use veeloe_runtime_supervisor::egress::Egress;
 use veeloe_runtime_supervisor::help::{help_for, USAGE};
@@ -39,7 +40,9 @@ use veeloe_runtime_supervisor::service;
 use veeloe_runtime_supervisor::status::{remove_pid_file, run_status, write_pid_file};
 use veeloe_runtime_supervisor::task_log::turn_log;
 use veeloe_runtime_supervisor::task_routes::TaskRoutes;
-use veeloe_runtime_supervisor::tasks::{dispatch, forward, Inbound, Machine, MachineOutbox};
+use veeloe_runtime_supervisor::tasks::{
+    dispatch, forward, Direct, Inbound, Machine, MachineOutbox,
+};
 use veeloe_runtime_supervisor::triggers::{LastSkip, MachineTime, Round, Triggers};
 use veeloe_runtime_supervisor::trust::{
     load_hub_url, load_or_create_machine_key, load_trust, supervisor_dir, Trust,
@@ -156,6 +159,9 @@ struct Supervisor {
     /// to it, not to the key, so nothing can be verified before it is known.
     machine: Mutex<Option<String>>,
     outbox: Mutex<Option<Arc<MachineOutbox>>>,
+    /// Controllers on a direct link (ADR 0090). None when WebRTC could not
+    /// start here: everything still goes through the Hub.
+    direct: Option<DirectLinks>,
     workers: OnceLock<Workers>,
     /// When each Agent last started or ended a Turn, for Idle Work's quiet time
     /// (ADR 0056). An Agent not here has been quiet since this process started.
@@ -166,8 +172,9 @@ struct Supervisor {
     started_at: u64,
 }
 
-/// The counters a connection reads before it trusts anything.
-type MemorySeen = veeloe_protocol::envelope::MemorySeenSequences;
+/// The counters a connection reads before it trusts anything, with a window
+/// so an envelope late by the other path is still taken once (ADR 0090).
+type MemorySeen = veeloe_runtime_supervisor::trust::WindowSeenSequences;
 
 impl Supervisor {
     fn deliver(&self, agent: &str, message: FromWorker) {
@@ -605,15 +612,110 @@ impl HubLinkSink for Supervisor {
     }
 
     fn on_envelope(&self, value: Value, send: &HubSender) {
-        let outbox = {
+        {
             let mut held = self.outbox.lock().expect("outbox");
             if held.is_none() {
                 *held = MachineOutbox::new(&self.home, &self.secret_key, send.clone())
                     .ok()
+                    .map(|outbox| self.with_direct(outbox))
                     .map(Arc::new);
             }
-            held.clone()
+        }
+        self.receive(value);
+    }
+
+    fn on_certificates(&self, certificates: Vec<Value>) {
+        self.apply_certificates(certificates);
+    }
+}
+
+impl Supervisor {
+    /// The outbox writes on a Member's direct links, and through the Hub as
+    /// well unless every device of that Member has one (ADR 0090).
+    fn with_direct(&self, outbox: MachineOutbox) -> MachineOutbox {
+        let Some(links) = self.direct.clone() else {
+            return outbox;
         };
+        let me = self.me.clone();
+        outbox.with_direct(Direct {
+            links,
+            devices: Arc::new(move |member| {
+                me.upgrade()
+                    .map(|me| me.devices_of(member))
+                    .unwrap_or_default()
+            }),
+        })
+    }
+
+    /// The Member holding one trusted, unrevoked key.
+    fn member_of(&self, key: &str) -> Option<String> {
+        let trust = self.trust.lock().expect("trust");
+        if trust.revoked.iter().any(|revoked| revoked == key) {
+            return None;
+        }
+        trust
+            .owners
+            .iter()
+            .find(|owner| owner.keys.iter().any(|known| known == key))
+            .map(|owner| owner.member.clone())
+    }
+
+    /// The device keys of one Member this Machine trusts.
+    fn devices_of(&self, member: &str) -> Vec<String> {
+        let trust = self.trust.lock().expect("trust");
+        trust
+            .owners
+            .iter()
+            .filter(|owner| owner.member == member)
+            .flat_map(|owner| owner.keys.iter())
+            .filter(|key| !trust.revoked.contains(key))
+            .cloned()
+            .collect()
+    }
+
+    /// Answers a verified `direct.offer` through the Hub, and reads what comes
+    /// on the link it opens exactly as what comes from the Hub.
+    fn answer_offer(&self, from: Inbound, body: Value, outbox: Arc<MachineOutbox>) {
+        let (Some(links), Some(key)) = (self.direct.clone(), from.key.clone()) else {
+            return outbox.error(&from, "direct.unavailable");
+        };
+        // The link belongs to the Member who holds this key, never to a Member
+        // the envelope names: what goes on it is that Member's (ADR 0090).
+        let Some(member) = self.member_of(&key) else {
+            return outbox.error(&from, "direct.unavailable");
+        };
+        let (Some(id), Some(sdp)) = (
+            body.get("id").and_then(Value::as_str).map(str::to_string),
+            body.get("sdp").and_then(Value::as_str).map(str::to_string),
+        ) else {
+            return;
+        };
+        let me = self.me.clone();
+        tokio::spawn(async move {
+            let on_frame = Arc::new(move |value: Value| {
+                if let Some(me) = me.upgrade() {
+                    me.receive(value);
+                }
+            });
+            match links.answer(&key, &member, &sdp, on_frame).await {
+                Ok(answer) => outbox.to_member(
+                    &member,
+                    "direct.answer",
+                    json!({ "id": id, "sdp": answer }),
+                    None,
+                ),
+                Err(error) => {
+                    println!("direct link refused: {error}");
+                    outbox.error(&from, "direct.failed");
+                }
+            }
+        });
+    }
+
+    /// One envelope, from the Hub or a direct link: the same checks either way
+    /// (ADR 0006, 0090).
+    fn receive(&self, value: Value) {
+        let outbox = self.outbox.lock().expect("outbox").clone();
         let Some(outbox) = outbox else { return };
         let Some(machine) = self.machine.lock().expect("machine").clone() else {
             return;
@@ -648,6 +750,15 @@ impl HubLinkSink for Supervisor {
         let trust = me.trust.lock().expect("trust").clone();
         let type_ = verified.signed.type_.clone();
         let body = verified.signed.body.clone();
+        if type_ == "direct.offer" {
+            return self.answer_offer(from, body, outbox);
+        }
+        if type_ == "direct.close" {
+            if let (Some(links), Some(key)) = (self.direct.as_ref(), from.key.as_deref()) {
+                links.release(key);
+            }
+            return;
+        }
         // Off the link's own task: a Provider's models come over the wire, and
         // the next envelope must not wait for them.
         tokio::spawn(async move {
@@ -677,7 +788,7 @@ impl HubLinkSink for Supervisor {
         });
     }
 
-    fn on_certificates(&self, certificates: Vec<Value>) {
+    fn apply_certificates(&self, certificates: Vec<Value>) {
         if certificates.is_empty() {
             return;
         }
@@ -701,6 +812,15 @@ impl HubLinkSink for Supervisor {
             // A lost phone must not keep giving work (ADR 0031).
             if let Err(error) = self.triggers.suspend_keys(&revoked) {
                 println!("could not suspend triggers: {error}");
+            }
+            // Nor keep a direct link (ADR 0090).
+            if let Some(links) = self.direct.clone() {
+                let keys = revoked.clone();
+                tokio::spawn(async move {
+                    for key in keys {
+                        links.close(&key).await;
+                    }
+                });
             }
         }
         *held = next;
@@ -943,6 +1063,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         triggers: Arc::clone(&triggers),
         machine: Mutex::new(None),
         outbox: Mutex::new(None),
+        direct: DirectLinks::new().ok(),
         workers: OnceLock::new(),
         quiet_since: Mutex::new(HashMap::new()),
         person_turns: Mutex::new(std::collections::HashSet::new()),

@@ -21,6 +21,7 @@ import { addListedTasks, addPendingMessage, failPendingMessage, markPendingSent,
 import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
 import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
+import { openDirect, type DirectLink, type Peer } from "./direct";
 import { MAX_ATTACHMENT_BYTES } from "./downloads";
 import { createFileCache } from "./file-cache";
 import { createStatusStore, memoryKey, UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY, UNKNOWN_TRIGGERS, UNKNOWN_USAGE, type MachineStatus, type MemoryStatus, type TriggerStatus, type UsageStatus, NO_OUTPUT } from "./statuses";
@@ -30,7 +31,10 @@ export { UNKNOWN_MACHINE_STATUS, UNKNOWN_MEMORY };
 
 type Client = ReturnType<typeof startHubClient>;
 /** What an envelope was, so the error about it lands in the right place. */
-type Kind = "create" | "update" | "delete" | "restore" | "stop" | "hello" | "status" | "provider" | "usage" | "memory" | "trigger" | "download" | "other";
+type Kind = "create" | "update" | "delete" | "restore" | "stop" | "hello" | "status" | "provider" | "usage" | "memory" | "trigger" | "download" | "direct" | "other";
+
+/** How long a closing direct link is still read, for what the Machine sent before it heard `direct.close`. */
+const DRAIN_MS = 1500;
 
 /**
  * One connection per Hub while the key is open (ADR 0021): on every connect it
@@ -45,6 +49,7 @@ export function createMachineLinks({
   deviceName = "",
   onRevoked,
   start = startHubClient,
+  createPeer,
 }: {
   database: Database;
   secretKey: Uint8Array;
@@ -54,6 +59,8 @@ export function createMachineLinks({
   /** The Hub closed with 4403: this key was revoked. */
   onRevoked?: () => void;
   start?: typeof startHubClient;
+  /** A WebRTC peer for direct links (ADR 0090); without one, everything goes through the Hub. */
+  createPeer?: () => Peer;
 }) {
   const ownKey = toBase64url(publicKeyOf(secretKey));
   const clients = new Map<string, { client: Client; machines: Machine[] }>();
@@ -73,7 +80,48 @@ export function createMachineLinks({
   // The Hub does not say when a Machine comes back, so one that was offline is asked again, later each time.
   const retries = new Map<string, { timer?: ReturnType<typeof setTimeout>; backoff: ReturnType<typeof createBackoff> }>();
 
+  /** The direct link to each Machine, open or being offered. */
+  const directs = new Map<string, DirectLink>();
+  /** False while the app is in the background: iOS drops the link there anyway (ADR 0090). */
+  let active = true;
+
   const setStatus = (machine: string, change: Partial<MachineStatus>) => statuses.set(machine, change);
+
+  /** Offers a direct link to a Machine this device is connected to through its Hub, unless one is up or on its way. */
+  function offerDirect(machine: Machine) {
+    const entry = clients.get(machine.hub_url);
+    if (!createPeer || !active || stopped || !entry || directs.has(machine.id)) return;
+    const { client } = entry;
+    const link = openDirect({
+      createPeer,
+      newId,
+      offer: (body) => {
+        if (!sendTo(machine, "direct", { type: "direct.offer", body })) link.close();
+      },
+      onOpen: (write) => {
+        client.setDirect(machine.id, write);
+        setStatus(machine.id, { direct: true });
+      },
+      onClose: () => {
+        if (directs.get(machine.id) === link) directs.delete(machine.id);
+        client.setDirect(machine.id, undefined);
+        setStatus(machine.id, { direct: false });
+      },
+      onFrame: (text) => client.receive(text),
+    });
+    directs.set(machine.id, link);
+  }
+
+  /** Tells each Machine on its link to stop writing there, then lets what is on its way arrive (ADR 0090). */
+  function closeDirects() {
+    for (const [machineId, link] of [...directs]) {
+      const machine = [...clients.values()].flatMap((entry) => entry.machines).find((m) => m.id === machineId);
+      if (machine) sendTo(machine, "direct", { type: "direct.close", body: { id: link.id } });
+      clients.get(machine?.hub_url ?? "")?.client.setDirect(machineId, undefined);
+      link.close(DRAIN_MS);
+    }
+    directs.clear();
+  }
   const setUsage = (machine: string, change: Partial<UsageStatus>) => usage.set(machine, change);
   const setMemory = (key: string, change: Partial<MemoryStatus>) => memory.set(key, change);
   const setTriggers = (key: string, change: Partial<TriggerStatus>) => triggers.set(key, change);
@@ -119,6 +167,10 @@ export function createMachineLinks({
       files.chunk(message.body as { file?: unknown; index?: unknown; total?: unknown; data?: unknown; name?: unknown });
       return;
     }
+    if (message.type === "direct.answer") {
+      directs.get(machine.id)?.answer(message.body.id, message.body.sdp);
+      return;
+    }
     if (message.type === "agent.listed") {
       const retry = retries.get(machine.id);
       if (retry) {
@@ -129,6 +181,8 @@ export function createMachineLinks({
       // A Machine older than `sandboxed-commands` says nothing of it, which is not the same as an empty Egress.
       if (message.body.egress) await saveEgress(database, machine.id, message.body.egress);
       setStatus(machine.id, { online: true, providers: message.body.providers });
+      // It answered, so it is online: now is when a direct link can come up.
+      offerDirect(machine);
     } else if (message.type === "machine.status") {
       setStatus(machine.id, {
         version: message.body.version,
@@ -183,7 +237,9 @@ export function createMachineLinks({
 
   /** Land the error about one envelope on the ask it belongs to; a plain message's goes to its pending row. */
   async function failSent(about: { machine: string; kind: Kind; request?: string }, ref: string, code: string) {
-    if (about.kind === "usage") {
+    // An offer the Machine could not take: the Hub carries everything, as before.
+    if (about.kind === "direct") directs.get(about.machine)?.close();
+    else if (about.kind === "usage") {
       const current = usage.get(about.machine);
       if (current && current.request === about.request) setUsage(about.machine, { loading: false, error: code });
     } else if (about.kind === "memory") failMemory(about.machine, about.request, code);
@@ -234,7 +290,11 @@ export function createMachineLinks({
       // A Hub that cannot be reached tells nothing about its Machines: until it is back, they are as good as offline,
       // so the screens stop showing "checking" and a head stops showing the last Task's mood.
       onDisconnected: () => {
-        for (const machine of machines) setStatus(machine.id, { online: false });
+        for (const machine of machines) {
+          setStatus(machine.id, { online: false });
+          // ponytail: the link could outlive the Hub on a LAN (#96); until then it goes with it.
+          directs.get(machine.id)?.close();
+        }
       },
       onHubError: (error) => {
         const ref = error.ref;
@@ -511,7 +571,20 @@ export function createMachineLinks({
 
     ownKey,
 
+    /** The app went to the background: direct links close, and the Hub carries everything. */
+    pause() {
+      active = false;
+      closeDirects();
+    },
+
+    /** Back in front: a direct link is offered again to every Machine that answered. */
+    resume() {
+      active = true;
+      for (const { machines } of clients.values()) for (const machine of machines) if (statuses.get(machine.id)?.online) offerDirect(machine);
+    },
+
     stop() {
+      closeDirects();
       stopped = true;
       watchers.clear();
       linkListeners.clear();

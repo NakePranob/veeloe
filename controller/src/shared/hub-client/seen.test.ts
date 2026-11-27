@@ -59,3 +59,19 @@ test("the number only goes up, and a lower one changes nothing", async () => {
   await again.ready;
   expect(again.seen.last("key-a")).toBe(9);
 });
+
+test("an envelope late by the other path is taken once, and after a restart nothing at or below the kept number is (ADR 0090)", async () => {
+  const first = createSeenSequences(database);
+  await first.ready;
+  const { seen } = first;
+  seen.record("key-a", 12);
+  expect(seen.isNew?.("key-a", 11)).toBe(true);
+  seen.record("key-a", 11);
+  expect(seen.isNew?.("key-a", 11)).toBe(false);
+  expect(seen.last("key-a")).toBe(12);
+  await first.settled();
+  const again = createSeenSequences(database);
+  await again.ready;
+  expect(again.seen.isNew?.("key-a", 10)).toBe(false);
+  expect(again.seen.isNew?.("key-a", 13)).toBe(true);
+});

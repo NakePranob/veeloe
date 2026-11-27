@@ -383,11 +383,40 @@ pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&s
     next
 }
 
+/// The numbers a connection takes in memory, with a window so an envelope that
+/// came late by the other path is still taken once (ADR 0090).
+#[derive(Debug, Default)]
+pub struct WindowSeenSequences {
+    last: HashMap<String, u64>,
+    window: veeloe_protocol::envelope::Window,
+}
+
+impl SeenSequences for WindowSeenSequences {
+    fn last(&self, sender: &str) -> Option<u64> {
+        self.last.get(sender).copied()
+    }
+
+    fn record(&mut self, sender: &str, seq: u64) {
+        let last = self.last(sender);
+        self.window.record(sender, seq, last);
+        if last.is_none_or(|last| seq > last) {
+            self.last.insert(sender.to_string(), seq);
+        }
+    }
+
+    fn is_new(&self, sender: &str, seq: u64) -> bool {
+        self.window.is_new(sender, seq, self.last(sender))
+    }
+}
+
 /// The last sequence number per key, in `seen.json`. It also holds this
 /// Machine's own key: the last number it sent.
 pub struct FileSeenSequences {
     file: PathBuf,
     last: HashMap<String, u64>,
+    /// What this run accepted, so a number that came late by the other path
+    /// is still taken once (ADR 0090). Not kept: a restart refuses all of it.
+    window: veeloe_protocol::envelope::Window,
 }
 
 impl FileSeenSequences {
@@ -403,7 +432,11 @@ impl FileSeenSequences {
                 }
             }
         }
-        Ok(Self { file, last })
+        Ok(Self {
+            file,
+            last,
+            window: Default::default(),
+        })
     }
 
     /// The next number for this Machine to sign with.
@@ -431,9 +464,19 @@ impl SeenSequences for FileSeenSequences {
     }
 
     fn record(&mut self, sender: &str, seq: u64) {
+        let last = self.last(sender);
+        self.window.record(sender, seq, last);
+        // Only ever up: a number taken late must not lower what is kept.
+        if last.is_some_and(|last| seq <= last) {
+            return;
+        }
         self.last.insert(sender.to_string(), seq);
         // A tally that cannot be written is reported by the caller that needs it.
         let _ = self.save();
+    }
+
+    fn is_new(&self, sender: &str, seq: u64) -> bool {
+        self.window.is_new(sender, seq, self.last(sender))
     }
 }
 

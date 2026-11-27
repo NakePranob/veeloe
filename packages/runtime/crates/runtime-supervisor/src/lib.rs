@@ -5,6 +5,7 @@ pub mod agents;
 pub mod approval;
 pub mod cgroup;
 pub mod denials;
+pub mod direct;
 pub mod doctor;
 pub mod egress;
 pub mod git_broker;

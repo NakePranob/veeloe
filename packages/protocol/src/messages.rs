@@ -21,6 +21,10 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "task.message" => object.map(is_task_message).unwrap_or(false),
         "task.stop" => object.map(is_task_stop).unwrap_or(false),
         "card.answer" => object.map(is_card_answer).unwrap_or(false),
+        "direct.offer" | "direct.answer" => object.map(is_direct).unwrap_or(false),
+        "direct.close" => object
+            .map(|object| text(object.get("id")).is_some_and(|id| (1..=64).contains(&chars(id))))
+            .unwrap_or(false),
         "task.rename" => object.map(is_task_rename).unwrap_or(false),
         "task.event" => object.map(is_task_event_body).unwrap_or(false),
         "tool.output" => object.map(is_tool_output).unwrap_or(false),
@@ -747,6 +751,19 @@ fn is_card_answer(object: &Map<String, Value>) -> bool {
     text(object.get("agent")).map(is_agent_id).unwrap_or(false)
         && short(object.get("id"), 64)
         && answer
+}
+
+/// The largest SDP a direct link's offer or answer carries (ADR 0090).
+pub const DIRECT_SDP_MAX: usize = 16_384;
+
+/// An offer or an answer for a direct link: the offer's id and one SDP.
+fn is_direct(object: &Map<String, Value>) -> bool {
+    let within = |value: Option<&Value>, max: usize| {
+        text(value)
+            .map(|value| (1..=max).contains(&chars(value)))
+            .unwrap_or(false)
+    };
+    within(object.get("id"), 64) && within(object.get("sdp"), DIRECT_SDP_MAX)
 }
 
 /// One line of 1 to 60 characters, not only spaces.

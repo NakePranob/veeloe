@@ -7,6 +7,7 @@
   "footer": "Pairing ทำที่หน้าเครื่องด้วย veeloe pair แล้วสแกนหรือวางลิงก์ในแอปนี้",
   "agents_one": "{{count}} Agent",
   "agents_other": "{{count}} Agent",
+  "onlineDirect": "ออนไลน์ · ต่อตรง",
   "online": "ออนไลน์",
   "offline": "ออฟไลน์",
   "budgetTotal": "Budget วันนี้ รวม",

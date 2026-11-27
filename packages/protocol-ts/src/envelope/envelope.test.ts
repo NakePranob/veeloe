@@ -1,9 +1,9 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { toBase64url } from "../crypto/base64url";
 import { publicKeyOf, sign } from "../crypto/ed25519";
 import type { Route } from "./schema";
 import { createSigner } from "./sign";
-import { MemorySeenSequences, verify } from "./verify";
+import { MemorySeenSequences, SEEN_WINDOW, SeenWindow, verify } from "./verify";
 
 // Test-only keys, from fixed seeds.
 const alice = new Uint8Array(32).fill(1);
@@ -161,4 +161,26 @@ test("no rejection moves the counter", () => {
   const bad = [{ ...env, v: 2 }, createSigner(mallory, () => 9)(message), { ...env, sig: env.sig.replace(/^./, (c) => (c === "A" ? "B" : "A")) }, { ...env, member: "member-2" }, createSigner(alice, () => 9)({ ...message, to: "agent-2" })];
   for (const frame of bad) expect(verify(frame, trusted, forAgent1, seen).ok).toBe(false);
   expect(seen.last(aliceKey)).toBeUndefined();
+});
+
+describe("SeenWindow (ADR 0090)", () => {
+  test("a number that came late by the other path is taken once, and a replay never", () => {
+    const window = new SeenWindow();
+    // Restarted with 10 kept: nothing at or below it is new.
+    expect(window.isNew("k", 10, 10)).toBe(false);
+    expect(window.isNew("k", 12, 10)).toBe(true);
+    window.record("k", 12, 10);
+    expect(window.isNew("k", 11, 12)).toBe(true);
+    window.record("k", 11, 12);
+    expect(window.isNew("k", 11, 12)).toBe(false);
+    expect(window.isNew("k", 12, 12)).toBe(false);
+    expect(window.isNew("k", 10, 12)).toBe(false);
+  });
+
+  test("a number older than the window is refused", () => {
+    const window = new SeenWindow();
+    for (let seq = 2; seq <= SEEN_WINDOW + 2; seq++) window.record("k", seq, seq - 1);
+    expect(window.isNew("k", 1, SEEN_WINDOW + 2)).toBe(false);
+    expect(window.isNew("k", SEEN_WINDOW + 3, undefined)).toBe(true);
+  });
 });

@@ -44,8 +44,25 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
   let stopped = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
 
+  /** Machines this device has a direct link to (ADR 0090): where an envelope for one goes first. */
+  const directs = new Map<string, (text: string) => boolean>();
+
   /** Set once the kept numbers are in hand, so no envelope is checked against an empty memory. */
   const began = seenReady ?? Promise.resolve();
+
+  /** One envelope, from the Hub or a direct link: the same checks either way (ADR 0006, 0090). */
+  function receive(text: string) {
+    if (member === undefined) return;
+    const mine = member;
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      return;
+    }
+    const result = verify(value, trustedKeys, (route) => "recipients" in route && route.recipients.includes(mine), seen);
+    if (result.ok) onEnvelope?.(result);
+  }
 
   function connect() {
     const ws = new WebSocket(url);
@@ -69,10 +86,8 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
         } else if (message.type === "hub.link_request" && member !== undefined) {
           onLinkRequest?.(message);
         }
-      } else if (frame.kind === "unknown" && member !== undefined) {
-        const mine = member;
-        const result = verify(JSON.parse(text), trustedKeys, (route) => "recipients" in route && route.recipients.includes(mine), seen);
-        if (result.ok) onEnvelope?.(result);
+      } else if (frame.kind === "unknown") {
+        receive(text);
       }
     };
 
@@ -101,9 +116,19 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
     send(out: Outgoing): string | null {
       if (!socket || member === undefined) return null;
       const envelope = signEnvelope(out);
-      socket.send(JSON.stringify(envelope));
+      const text = JSON.stringify(envelope);
+      // A direct link first; one that cannot take it leaves it to the Hub (ADR 0090).
+      const direct = "to" in out ? directs.get(out.to) : undefined;
+      if (!direct?.(text)) socket.send(text);
       return envelope.sig;
     },
+    /** Where envelopes for one Machine go first; undefined goes back to the Hub alone. */
+    setDirect(machine: string, write: ((text: string) => boolean) | undefined) {
+      if (write) directs.set(machine, write);
+      else directs.delete(machine);
+    },
+    /** What a direct link read, checked as if the Hub had carried it. */
+    receive,
     /** The Member the Hub named for this Controller, once connected. */
     member: () => member,
     stop() {
