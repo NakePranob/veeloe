@@ -215,12 +215,25 @@ test("an old quiet Schedule round gives its log back and keeps its row; a new on
   expect(rows[0]).toMatchObject({ quiet: 1, synced_seq: 2, events: 2 });
 });
 
-test("a listed Task is synced when it is new or moved on the Machine, and not again until it moves", async () => {
+test("a listed Task is synced until its events land, and again only when it moves on the Machine", async () => {
   const database = await open();
   const list = (updated: number) => addListedTasks(database, "mac", [{ id: "t1", agent: "a1", updated }]);
-  expect(await list(10)).toEqual([{ id: "t1", agent: "a1", after: 0 }]);
-  expect(await list(10)).toEqual([]);
+  expect(await list(1002)).toEqual([{ id: "t1", agent: "a1", after: 0 }]);
+  // Asked for, but nothing landed yet: still asked for next time.
+  expect(await list(1002)).toEqual([{ id: "t1", agent: "a1", after: 0 }]);
   await saveTaskEvents(database, where, [event(1), event(2)]);
-  expect(await list(20)).toEqual([{ id: "t1", agent: "a1", after: 2 }]);
-  expect(await list(20)).toEqual([]);
+  expect(await list(1002)).toEqual([]);
+  expect(await list(1005)).toEqual([{ id: "t1", agent: "a1", after: 2 }]);
+});
+
+test("after the update, a Task already caught up is not asked for again", async () => {
+  const sqlite = new Sqlite(":memory:");
+  const c = connection(sqlite);
+  const before = MIGRATIONS.length - 1;
+  await migrate(c, MIGRATIONS.slice(0, before));
+  const old = createDatabase(c);
+  await saveTaskEvents(old, where, [event(1), event(2)]);
+  sqlite.exec("UPDATE task SET listed_updated = 0");
+  await migrate(c, MIGRATIONS);
+  expect(await addListedTasks(old, "mac", [{ id: "t1", agent: "a1", updated: 1002 }])).toEqual([]);
 });

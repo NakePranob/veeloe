@@ -30,7 +30,9 @@ export function saveTaskEvents(database: Database, { task, agent, machine }: { t
       if (seq !== synced + 1) break;
       synced = seq;
     }
-    await transaction.run("UPDATE task SET synced_seq = ?, updated_at = max(updated_at, ?) WHERE id = ?", [synced, latest, task]);
+    // The Machine's "last moved" counts every event, a name too: once those land, this device has caught up to it.
+    const landed = events.reduce((at, e) => Math.max(at, e.at), 0);
+    await transaction.run("UPDATE task SET synced_seq = ?, updated_at = max(updated_at, ?), listed_updated = max(listed_updated, ?) WHERE id = ?", [synced, latest, landed, task]);
     // Worked out again from all its events, so events that arrive out of order still leave it right.
     await transaction.run(REFRESH_SUMMARY, [task]);
     await transaction.run(REFRESH_FLAGS, [task]);
@@ -88,11 +90,11 @@ export function addListedTasks(database: Database, machine: string, tasks: { id:
     const toSync: { id: string; agent: string; after: number }[] = [];
     for (const task of tasks) {
       const [known] = await transaction.all<{ synced_seq: number; listed_updated: number }>("SELECT synced_seq, listed_updated FROM task WHERE id = ?", [task.id]);
+      // Caught up is only what landed (saveTaskEvents), never what was asked for: a sync lost on the way is asked for again.
       if (!known) {
-        await transaction.run("INSERT INTO task (id, agent_id, machine_id, synced_seq, updated_at, listed_updated) VALUES (?, ?, ?, 0, ?, ?)", [task.id, task.agent, machine, task.updated, task.updated]);
+        await transaction.run("INSERT INTO task (id, agent_id, machine_id, synced_seq, updated_at) VALUES (?, ?, ?, 0, ?)", [task.id, task.agent, machine, task.updated]);
         toSync.push({ id: task.id, agent: task.agent, after: 0 });
       } else if (task.updated > known.listed_updated) {
-        await transaction.run("UPDATE task SET listed_updated = ? WHERE id = ?", [task.updated, task.id]);
         toSync.push({ id: task.id, agent: task.agent, after: known.synced_seq });
       }
     }
