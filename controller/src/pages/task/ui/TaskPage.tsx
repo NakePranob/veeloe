@@ -4,8 +4,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlatList, KeyboardAvoidingView, View, type TextInputInstance } from "react-native";
 import { allowlistOf } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
-import { latestOf, statusOf, titleOfEvents, usePendingMessages, useTaskEvents, useTaskRow } from "../../../entities/task";
+import { latestOf, markRead, statusOf, titleOfEvents, usePendingMessages, useTaskEvents, useTaskRow } from "../../../entities/task";
 import { useMachineLink } from "../../../features/machine-link";
+import { useDatabase } from "../../../shared/db";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatList, useNow } from "../../../shared/lib";
@@ -70,6 +71,12 @@ export function TaskPage() {
   useEffect(() => {
     if (pruned && link && screen?.machine) link.refetchTask(screen.machine, { agent: agentId, task });
   }, [pruned, link, screen?.machine?.id, agentId, task]);
+  // What is on screen is read: the Inbox stops listing this Task as unread, and an answer that comes while it is open is read too.
+  const database = useDatabase();
+  const newest = events?.at(-1)?.seq ?? 0;
+  useEffect(() => {
+    if (newest > 0) void markRead(database, task, newest);
+  }, [database, task, newest]);
   const composer = useComposer({ task, screen, link, events: events ?? undefined, log: log?.items, onSend: followEnd });
   const schedule = useScheduleScope(events, screen?.machine, agentId, screen?.status.online ?? null);
 

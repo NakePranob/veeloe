@@ -18,5 +18,9 @@
     "done": "No Agent has finished yet"
   },
   "answer": "Answer",
-  "addBudget": "Add Budget"
+  "addBudget": "Add Budget",
+  "allTasks": "All Tasks",
+  "newTask": "New Task",
+  "untitled": "Untitled Task",
+  "unreadTitle": "{{title}}, unread"
 }

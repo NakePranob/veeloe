@@ -12,6 +12,7 @@ export {
   isQuiet,
   latestEvents,
   latestOf,
+  markRead,
   markPendingSent,
   needsYou,
   previewOf,
@@ -27,7 +28,7 @@ export {
   titleOfEvents,
   type TaskSummary,
 } from "./model/tasks";
-export { useAgentTaskCount, useAgentTaskSummaries, useHiddenThreads, useLatestTasks, usePendingMessages, useTaskEvents, useTaskRow, useTasksByIds, useThreadHeads, useTriggerRounds } from "./model/use-tasks";
+export { useAgentTaskCount, useAgentTaskSummaries, useHiddenThreads, useLatestTasks, useOpenTasks, usePendingMessages, useTaskEvents, useTaskRow, useTasksByIds, useThreadHeads, useTriggerRounds } from "./model/use-tasks";
 export { headsOf, originOf, threadsOf } from "./model/threads";
 export { TaskStatusDot } from "./ui/TaskStatusDot";
 export { TaskStatusLabel } from "./ui/TaskStatusLabel";

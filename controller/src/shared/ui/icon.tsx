@@ -12,6 +12,8 @@ const SYMBOLS = {
   agent: { ios: "face.smiling", android: "smart_toy" },
   send: { ios: "arrow.up", android: "arrow_upward" },
   add: { ios: "plus", android: "add" },
+  // Every item of something, such as all of an Agent's Tasks.
+  list: { ios: "list.bullet", android: "list" },
   attach: { ios: "paperclip", android: "attach_file" },
   disclosure: { ios: "chevron.right", android: "chevron_right" },
   thread: { ios: "rectangle.stack", android: "layers" },

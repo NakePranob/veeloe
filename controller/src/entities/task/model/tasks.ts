@@ -110,7 +110,8 @@ const KNOWN_SQL = KNOWN.map((kind) => `'${kind}'`).join(", ");
 export type Latest = { latest_kind: string | null; latest_body: string | null };
 
 /** A Task as lists show it: when it last moved, what it is doing, its latest words, its name and its first message. */
-export type TaskSummary = TaskRow & Latest & { events: number; last_kind: string | null; last_body: string | null; title_body: string | null; first_body: string | null; trigger_id: string | null; quiet: number };
+export type TaskSummary = TaskRow &
+  Latest & { events: number; read_seq?: number; unread?: number; last_kind: string | null; last_body: string | null; title_body: string | null; first_body: string | null; trigger_id: string | null; quiet: number };
 
 /** What lists show of one Task, from its events, kept on its row (migration `task.events`). */
 const REFRESH_SUMMARY = `UPDATE task SET
@@ -144,11 +145,30 @@ export const COUNT_AGENT_TASKS = "SELECT count(*) AS count FROM task WHERE agent
  * round that ended quietly is not. Only a Task that moved in the last six hours counts as running, so one
  * whose end never reached this device does not hold the row forever.
  */
-export const LIST_LATEST_TASKS = `SELECT * FROM task t WHERE t.id = (
+export const LIST_LATEST_TASKS = `SELECT t.*, coalesce((SELECT max(seq) FROM task_event e WHERE e.task_id = t.id AND e.kind = 'llm.message') > t.read_seq, 0) AS unread FROM task t WHERE t.id = (
   SELECT n.id FROM task n WHERE n.agent_id = t.agent_id AND n.quiet = 0
   ORDER BY (n.latest_kind IS NOT NULL AND n.latest_kind != '${TaskEventKind.TurnEnded}'
     AND n.updated_at > strftime('%s', 'now') * 1000 - 6 * 3600 * 1000) DESC, n.updated_at DESC LIMIT 1
 ) ORDER BY t.updated_at DESC`;
+
+/** Whether an Agent answered in a Task after the newest event this device had on screen (`read_seq`). */
+const UNREAD_SQL = `(SELECT max(seq) FROM task_event e WHERE e.task_id = task.id AND e.kind = 'llm.message') > task.read_seq`;
+
+/**
+ * The Tasks the Inbox lists under each Agent, newest first: every one whose Turn has not ended (running,
+ * waiting on an Approval, stalled or cut off), since an Agent runs Turns of several Tasks at once (ADR 0080),
+ * and every finished one with an answer not read yet. The same six hours as LIST_LATEST_TASKS keep a Turn
+ * whose end never reached this device from showing as running for good.
+ */
+export const LIST_OPEN_TASKS = `SELECT task.*, coalesce(${UNREAD_SQL}, 0) AS unread FROM task WHERE quiet = 0 AND latest_kind IS NOT NULL AND (
+  (latest_kind != '${TaskEventKind.TurnEnded}' AND updated_at > strftime('%s', 'now') * 1000 - 6 * 3600 * 1000)
+  OR (latest_kind = '${TaskEventKind.TurnEnded}' AND coalesce(${UNREAD_SQL}, 0))
+) ORDER BY updated_at DESC`;
+
+/** Marks a Task read on this device up to `seq`, the newest event on screen; never moves it back. */
+export function markRead(database: Database, task: string, seq: number) {
+  return database.write([TASK_TOPIC], (transaction) => transaction.run("UPDATE task SET read_seq = ? WHERE id = ? AND read_seq < ?", [seq, task, seq]));
+}
 
 /** The newest round of each Trigger of one Agent, with how many rounds it has; `?` is 1 to leave out threads deleted on this device. */
 export const LIST_THREAD_HEADS = `SELECT t.*, (SELECT count(*) FROM task c WHERE c.trigger_id = t.trigger_id) AS rounds FROM task t

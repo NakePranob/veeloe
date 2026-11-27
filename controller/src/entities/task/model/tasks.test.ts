@@ -9,9 +9,11 @@ import {
   isBudgetOut,
   latestOf,
   LIST_LATEST_TASKS,
+  LIST_OPEN_TASKS,
   LIST_TASK_SUMMARIES,
   LIST_THREAD_HEADS,
   markPendingSent,
+  markRead,
   pruneQuietRounds,
   saveTaskEvents,
   statusOf,
@@ -201,6 +203,27 @@ test("an Agent's row shows a Task still running over a newer one that ended (ADR
   // Once it ends, the newest Task is shown again.
   await saveTaskEvents(database, { ...where, task: "running" }, [at(3, "turn.ended", { reason: "done" }, now - 30_000)]);
   expect((await database.query<TaskSummary>(LIST_LATEST_TASKS)).map((t) => t.id)).toEqual(["newer"]);
+});
+
+test("an answer past what was on screen is unread until the Task is opened, and a finished unread Task stays listed (Inbox)", async () => {
+  const database = await open();
+  const now = Date.now();
+  const at = (seq: number, kind: string, body: unknown) => ({ seq, kind, at: now - 10_000 + seq, body });
+  await saveTaskEvents(database, { ...where, task: "answered" }, [
+    at(1, "member.message", { text: "hi" }),
+    at(2, "turn.started", {}),
+    at(3, "llm.message", { content: [{ type: "text", text: "hello" }] }),
+    at(4, "turn.ended", { reason: "done" }),
+  ]);
+  await saveTaskEvents(database, { ...where, task: "asked" }, [at(1, "member.message", { text: "still typing" }), at(2, "turn.ended", { reason: "done" })]);
+  const open1 = await database.query<TaskSummary>(LIST_OPEN_TASKS);
+  expect(open1.map((t) => [t.id, t.unread])).toEqual([["answered", 1]]);
+  await markRead(database, "answered", 4);
+  expect(await database.query<TaskSummary>(LIST_OPEN_TASKS)).toEqual([]);
+  // Reading an older event never moves the mark back.
+  await markRead(database, "answered", 2);
+  expect((await database.query<{ read_seq: number }>("SELECT read_seq FROM task WHERE id = 'answered'"))[0]?.read_seq).toBe(4);
+  expect((await database.query<TaskSummary>(LIST_LATEST_TASKS))[0]?.unread).toBe(0);
 });
 
 test("a Task with no events yet still saves and is not quiet", async () => {

@@ -18,5 +18,9 @@
     "done": "ยังไม่มี Agent ที่ทำเสร็จ"
   },
   "answer": "ตอบ",
-  "addBudget": "เพิ่ม Budget"
+  "addBudget": "เพิ่ม Budget",
+  "allTasks": "Task ทั้งหมด",
+  "newTask": "Task ใหม่",
+  "untitled": "Task ไม่มีชื่อ",
+  "unreadTitle": "{{title}} ยังไม่ได้อ่าน"
 }

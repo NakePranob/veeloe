@@ -1,3 +1,4 @@
+export { Branch } from "./branch";
 export { Button } from "./button";
 export { Bars } from "./bars";
 export { Card } from "./card";
@@ -15,6 +16,7 @@ export { PartKey, PartsBar } from "./parts-bar";
 export { useReduceMotion } from "./reduce-motion";
 export { QrCode, QrScanner } from "./qr";
 export { Select } from "./select";
+export { closeSwipes, Swipe, type SwipeAccess } from "./swipe";
 export { Tabs } from "./tabs";
 export { EditableTitle } from "./editable-title";
 export { Text, TextLink } from "./text";

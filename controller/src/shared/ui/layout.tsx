@@ -1,6 +1,6 @@
 import { Link, type Href } from "expo-router";
 import { Children, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, View, type StyleProp, type ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, View, type AccessibilityActionEvent, type AccessibilityActionInfo, type Insets, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, type IconName } from "./icon";
 import { Text } from "./text";
@@ -34,16 +34,23 @@ interface TapProps {
   onPress?: () => void;
   // Kept highlighted, such as the Task open beside the inbox.
   selected?: boolean;
+  // Grey at rest, as a small card is, and a step darker pressed or selected: a Task under its Agent in the Inbox.
+  filled?: boolean;
+  // Reach past the edges, for an area drawn smaller than the 44pt it takes to press.
+  hitSlop?: Insets;
   // Layout only: padding, gap, direction. The background is the Tap's.
   style?: StyleProp<ViewStyle>;
   children: ReactNode | ((state: { pressed: boolean }) => ReactNode);
+  // What VoiceOver offers besides the press, such as the actions a Swipe hides behind the row.
+  accessibilityActions?: readonly AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }
 
 /** A rounded area that highlights while pressed, for a row richer than Row (a Character and several lines). */
-export function Tap({ href, onPress, selected, style, children }: TapProps) {
+export function Tap({ href, onPress, selected, filled, hitSlop, style, children, accessibilityActions, onAccessibilityAction }: TapProps) {
   const colors = useColors();
   const body = (pressed: boolean) => (
-    <View style={[{ borderRadius: radius.md, borderCurve: "continuous", backgroundColor: pressed ? colors.chipPressed : selected ? colors.chip : "transparent" }, style]}>
+    <View style={[{ borderRadius: radius.md, borderCurve: "continuous", backgroundColor: pressed || (filled && selected) ? colors.chipPressed : selected || filled ? colors.chip : "transparent" }, style]}>
       {typeof children === "function" ? children({ pressed }) : children}
     </View>
   );
@@ -51,12 +58,14 @@ export function Tap({ href, onPress, selected, style, children }: TapProps) {
   if (href) {
     return (
       <Link href={href} asChild>
-        <Pressable role="link">{({ pressed }) => body(pressed)}</Pressable>
+        <Pressable role="link" hitSlop={hitSlop} accessibilityActions={accessibilityActions} onAccessibilityAction={onAccessibilityAction}>
+          {({ pressed }) => body(pressed)}
+        </Pressable>
       </Link>
     );
   }
   return (
-    <Pressable role="button" aria-selected={selected} onPress={onPress}>
+    <Pressable role="button" aria-selected={selected} onPress={onPress} hitSlop={hitSlop} accessibilityActions={accessibilityActions} onAccessibilityAction={onAccessibilityAction}>
       {({ pressed }) => body(pressed)}
     </Pressable>
   );

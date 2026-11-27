@@ -1,5 +1,5 @@
 import { useLiveQuery } from "../../../shared/db";
-import { COUNT_AGENT_TASKS, LIST_AGENT_TASK_SUMMARIES, LIST_LATEST_TASKS, LIST_THREAD_HEADS, LIST_TRIGGER_ROUNDS, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskRow, type TaskSummary } from "./tasks";
+import { COUNT_AGENT_TASKS, LIST_AGENT_TASK_SUMMARIES, LIST_LATEST_TASKS, LIST_OPEN_TASKS, LIST_THREAD_HEADS, LIST_TRIGGER_ROUNDS, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskRow, type TaskSummary } from "./tasks";
 
 const TOPICS = [TASK_TOPIC];
 
@@ -16,6 +16,11 @@ export function useAgentTaskCount(agentId: string) {
 /** Each Agent's newest Task that is news: what the Inbox, Agents and Machine pages show. */
 export function useLatestTasks() {
   return useLiveQuery<TaskSummary>(LIST_LATEST_TASKS, [], TOPICS);
+}
+
+/** Every Task whose Turn has not ended yet, of every Agent: the Inbox's rows under each Agent. */
+export function useOpenTasks() {
+  return useLiveQuery<TaskSummary>(LIST_OPEN_TASKS, [], TOPICS);
 }
 
 /** The newest round of each of one Agent's Triggers, with its round count; `hideDeleted` leaves out threads deleted on this device. */

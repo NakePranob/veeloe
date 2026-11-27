@@ -129,4 +129,8 @@ export const MIGRATIONS = [
   `UPDATE task SET listed_updated = coalesce((SELECT max(at) FROM task_event e WHERE e.task_id = task.id), 0) WHERE listed_updated = 0`,
   // The share of the Budget Idle Work and Watch may use a day, as the Machine last said (ADR 0056).
   `ALTER TABLE agent ADD COLUMN background_share INTEGER`,
+  // The newest event of a Task this device has had on screen: an Agent's answer past it is unread (the Inbox).
+  `ALTER TABLE task ADD COLUMN read_seq INTEGER NOT NULL DEFAULT 0`,
+  // What is here already counts as read, so an update does not light up every old Task.
+  `UPDATE task SET read_seq = coalesce((SELECT max(seq) FROM task_event e WHERE e.task_id = task.id), 0)`,
 ] as const;
