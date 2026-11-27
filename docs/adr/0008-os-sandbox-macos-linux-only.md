@@ -1,5 +1,7 @@
 # คำสั่งของ Agent รันใน sandbox ระดับ OS และ v0.1 รองรับแค่ macOS กับ Linux
 
+> **ADR 0087 แก้บางส่วน** Agent มีระดับไฟล์สามระดับ ระดับโฟลเดอร์ที่เลือกและทั้งเครื่องเป็นของ Owner เท่านั้น ค่าเริ่มต้นยังเป็นในโฟลเดอร์ตาม ADR นี้
+
 > **ADR 0069 แก้บางส่วน** Runtime ไม่ใช้ `@anthropic-ai/sandbox-runtime` แล้ว แต่ครอบ worker ทั้งโปรเซสด้วย `sandbox-exec` หรือ `bwrap` เอง Agent มี localhost ของตัวเอง (บน Linux เป็น network namespace ส่วน macOS เป็นช่วง port ต่อ Agent) และ Egress แยกต่อ Agent ตั้งแต่ v0.1 ผ่าน proxy ต่อ Turn ข้อจำกัดเรื่องรายชื่อโดเมนร่วมทั้ง Machine ด้านล่างจึงไม่ใช้แล้ว
 
 > **ADR 0068 แก้บางส่วน** การอ่านไฟล์เป็น allow list: Workdir, Project ที่ได้งาน และ Library ตามสิทธิ์; home ของผู้ใช้และ secret ถูกปฏิเสธเสมอ แม้ใน Turn ของ Owner. ใน Rust runtime worker ยังไม่ถูก wrap ทั้งโปรเซส (sandbox-exec abort) จึงบังคับที่ทุกคำสั่งและให้ tool ใช้ root ชุดเดียวกันแทน จนกว่าจะแก้ข้อจำกัดนั้นได้

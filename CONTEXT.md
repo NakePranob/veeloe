@@ -19,7 +19,7 @@ _Avoid_: Node, host, device
 _Avoid_: Daemon, client, worker
 
 **Member**:
-คนหนึ่งคนที่อยู่ใน Workspace และมี Grant ต่อ Agent แต่ละตัว ระบบรู้จัก Member จากรหัส เช่น `m_kai` ไม่ใช่จากชื่อ ชื่อที่แสดงตั้งโดย Owner ตอน Invitation แล้ว Member เปลี่ยนเองหรือให้ Owner เปลี่ยนได้ด้วยคำสั่งที่เซ็น ห้ามซ้ำกับคนอื่นใน Workspace และ Hub เก็บไว้เป็น metadata Controller แต่ละเครื่องมีชื่อเครื่องของตัวเองไว้ใช้ตอนถอนกุญแจ
+คนหนึ่งคนที่อยู่ใน Workspace และมี Grant ต่อ Agent แต่ละตัว ระบบรู้จัก Member จากรหัส เช่น `m_kai` ไม่ใช่จากชื่อ ชื่อที่แสดงตั้งโดย Owner ตอน Invitation แล้ว Member เปลี่ยนเองหรือให้ Owner เปลี่ยนได้ด้วยคำสั่งที่เซ็น ห้ามซ้ำกับคนอื่นใน Workspace และ Hub เก็บไว้เป็น metadata Controller แต่ละเครื่องมีชื่อเครื่องของตัวเองไว้ใช้ตอนถอนกุญแจ Member มีป้ายตำแหน่งสั้นๆ ได้หนึ่งอัน เช่น "ฝ่ายขาย" ไว้แสดงหลังชื่อ ป้ายไม่ให้สิทธิ์อะไร (ADR 0091)
 _Avoid_: User, account, seat
 
 **Owner**:
@@ -29,6 +29,10 @@ _Avoid_: Admin, root
 **Grant**:
 สิทธิ์ที่ Member มีต่อ Agent ตัวหนึ่ง มีสามระดับคือ Use (สั่งงาน และเปิดดู Task ของ Agent นั้นที่คนเริ่มเปิดให้เห็น), Approve (ตอบ Approval) และ Manage (แก้ค่า Agent, Allowlist, Egress, ใส่หรือเอา Agent ตัวนี้ออกจาก Project หรือ Team และตั้ง Agent ตัวนี้เป็น Entry ของ Team) ทุก Turn อ่านไฟล์ได้แค่ Workdir, Project ที่ได้งาน และ Library ตามสิทธิ์เท่านั้น แม้เป็นคนที่มี Manage (ADR 0068) ส่วนสิทธิ์ต่อ Project มีสี่ระดับคือ View (เห็น Task และ wiki ของ Project), Ask (ถามได้), Use (สั่งงานและกด Stop) และ Manage (ให้สิทธิ์ใน Project จัดรายชื่อผู้ทำงาน และตั้งค่าของ Project) Owner มี Manage ของทุก Project ใน Project ใช้สิทธิ์ของ Project นอก Project ใช้สิทธิ์ของ Agent แต่ Approval ไปที่คนที่มี Approve ที่ Agent ตัวนั้นเสมอ ระดับที่สูงกว่าได้สิทธิ์ของระดับที่ต่ำกว่าด้วย
 _Avoid_: Role, permission, ACL
+
+**Group**:
+ชุดของ Member กับชุด Grant ราย Agent ที่เซ็นแล้ว Owner สร้าง และตั้งผู้ดูแลกลุ่มที่เพิ่มหรือเอา Member ออกได้แต่แก้ชุด Grant ไม่ได้ Machine ตรวจสิทธิ์จากสำเนาที่เซ็นของกลุ่ม Member ได้ระดับสูงสุดจาก Grant เดี่ยวและทุกกลุ่มที่อยู่ (ADR 0091)
+_Avoid_: Role, team (Team คือกลุ่มของ Agent)
 
 **Controller**:
 แอปที่ Member คนหนึ่งติดตั้งบน iPhone, iPad หรือ Android และได้รับความไว้ใจจาก Workspace คำสั่งทุกอย่างต้องมาจาก Controller และถือว่าเป็นคำสั่งของ Member เจ้าของ Controller นั้น ข้อยกเว้นเดียวคือข้อความในแชตของ Channel ซึ่งทำในนามของ Member ที่ผูก Channel นั้นไว้ กุญแจของ Controller ใช้ได้หลังยืนยันตัว ด้วย Face ID หรือลายนิ้วมือ (ADR 0077: Controller บนเว็บและเดสก์ท็อปมาทีหลัง) ตอนเปิดแอปและหลังไม่ได้ใช้เกิน 5 นาที และต้องยืนยันใหม่ทุกครั้งก่อนอนุมัติ Approval, Link เครื่อง, เปลี่ยน Grant หรือ Owner, ติดตั้ง Skill, Connector หรือ Blueprint, แก้ Allowlist หรือ Egress, Pairing, ปล่อย Machine และถอนกุญแจ
