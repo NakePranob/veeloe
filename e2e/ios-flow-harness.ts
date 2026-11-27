@@ -286,6 +286,32 @@ function toolUseSse(name: string, id: string, input: Record<string, unknown>) {
   return new Response([start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
 }
 
+type Block = { type?: string; text?: string; name?: string; content?: unknown };
+type Message = { role?: string; content?: string | Block[] };
+
+/**
+ * HARNESS_CARDS=1: the Provider picks its move from the person's latest words (issues #71, #75).
+ * "ask" asks a choice, "form" a form, "goal-note" notes progress, "goal-met" notes then says it is met;
+ * after a tool's answer it says what it read back.
+ */
+function cardsReply(body: { messages?: unknown[] }) {
+  const messages = (body.messages ?? []) as Message[];
+  const blocks = (message?: Message) => (typeof message?.content === "string" ? [{ type: "text", text: message.content }] : (message?.content ?? []));
+  const words = [...messages].reverse().find((m) => m.role === "user" && blocks(m).some((b) => b.type === "text"));
+  const said = blocks(words).map((b) => b.text ?? "").join(" ");
+  const last = messages.at(-1);
+  const result = blocks(last).find((b) => b.type === "tool_result");
+  const used = blocks(messages.at(-2)).find((b) => b.type === "tool_use")?.name;
+  if (result) {
+    if (used === "goal_note" && said.includes("goal-met")) return toolUseSse("goal_met", "tu-met", { reason: "PR #41 merged (harness)" });
+    return sse([{ type: "text", text: `ได้คำตอบแล้ว: ${typeof result.content === "string" ? result.content : JSON.stringify(result.content)}` }]);
+  }
+  if (said.includes("form")) return toolUseSse("ask_form", "tu-form", { question: "ตั้งค่า deploy", fields: [{ name: "env", label: "ที่ไหน", kind: "choice", options: ["staging", "production"] }, { name: "count", label: "กี่เครื่อง", kind: "number" }, { name: "note", label: "หมายเหตุ", kind: "text" }] });
+  if (said.includes("ask")) return toolUseSse("ask_choice", "tu-ask", { question: "Deploy ไปที่ไหนดี?", options: ["staging", "production"] });
+  if (said.includes("goal-")) return toolUseSse("goal_note", "tu-note", { note: "เช็ก PR #41 แล้ว ยังเปิดอยู่ (harness)" });
+  return sse([{ type: "text", text: "done" }]);
+}
+
 async function serve() {
   // 5.8b-2c: the first message asks for a command outside the Agent's
   // Allowlist, so the app must answer an Approval; the command then runs long
@@ -297,6 +323,8 @@ async function serve() {
           await Bun.sleep(4_000);
           return sse([{ type: "text", text: "done" }]);
         }
+      : process.env.HARNESS_CARDS === "1"
+      ? cardsReply
       : process.env.HARNESS_FILE === "1"
       ? () => {
           answered += 1;

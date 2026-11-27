@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useMachines, type Machine } from "../../../entities/machine";
@@ -40,6 +40,8 @@ function ScheduleList({ agentId, agentName, machine }: { agentId: string; agentN
   const idle = status.triggers?.find((trigger) => trigger.kind === "idle");
   const waiting = idle?.progress?.filter((piece) => piece.status !== "done").length ?? 0;
   const [choosing, setChoosing] = useState(false);
+  // The choice closes once it has opened the form, so coming back shows the list.
+  useFocusEffect(useCallback(() => () => setChoosing(false), []));
   const open = (trigger: string) => router.push({ pathname: "/agents/[agent]/schedule/[trigger]", params: { agent: agentId, trigger } });
 
   // Ask on open and again when the Machine comes back.
@@ -53,7 +55,7 @@ function ScheduleList({ agentId, agentName, machine }: { agentId: string; agentN
       {/* ponytail: an inline choice, not a sheet; Watch and Webhook join it when #58 and #76 land. */}
       {choosing && (
         <Section title={t("start.title")}>
-          <Row icon="time" title={t("start.schedule")} detail={t("start.scheduleDetail")} onPress={() => open("new")} />
+          <Row icon="time" title={t("start.schedule")} detail={t("start.scheduleDetail")} href={`/agents/${agentId}/schedule/new`} />
           <Row icon="refresh" title={t("start.idle")} detail={t("start.idleDetail")} href={`/agents/${agentId}/idle`} />
         </Section>
       )}

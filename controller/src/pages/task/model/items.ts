@@ -125,11 +125,14 @@ const textOf = (content: unknown) =>
     : "";
 
 // What each tool works on, by the field its input names it with; a tool this build does not know shows by name alone.
-const TARGET: Record<string, string> = { bash: "command", read: "path", write: "path", edit: "path", send_file: "path", glob: "pattern", grep: "pattern", memory: "text" };
+const TARGET: Record<string, string> = { bash: "command", read: "path", write: "path", edit: "path", send_file: "path", glob: "pattern", grep: "pattern", memory: "text", goal_note: "note", goal_met: "reason" };
 const targetOf = (tool: string, input: unknown) => {
   const value = (input as Record<string, unknown> | null)?.[TARGET[tool] ?? ""];
   return typeof value === "string" ? (value.split("\n")[0] ?? "") : "";
 };
+
+// A Question draws as its own card (ADR 0082), so its call is not listed among the commands too.
+const CARD_TOOLS = new Set(["ask_choice", "ask_form"]);
 
 type ToolUse = { type: "tool_use"; id: string; name?: unknown; input?: unknown };
 type ToolResult = { tool_use_id?: unknown; content?: unknown; is_error?: unknown };
@@ -194,7 +197,7 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
     else if (event.kind === "llm.message") {
       const text = textOf(body.content);
       if (text) out.push({ key, kind: "agent", text });
-      const uses = Array.isArray(body.content) ? body.content.filter((block): block is ToolUse => block?.type === "tool_use" && typeof block.id === "string") : [];
+      const uses = Array.isArray(body.content) ? body.content.filter((block): block is ToolUse => block?.type === "tool_use" && typeof block.id === "string" && !CARD_TOOLS.has(String(block.name))) : [];
       for (const use of uses) {
         const tool = String(use.name ?? "");
         const call: ToolCall = { id: use.id, tool, target: targetOf(tool, use.input), state: "running" };

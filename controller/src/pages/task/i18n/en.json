@@ -19,7 +19,9 @@
       "edit": "Edited {{target}}",
       "write": "Created {{target}}",
       "memory": "Remembered: {{target}}",
-      "send_file": "Sent {{target}}"
+      "send_file": "Sent {{target}}",
+      "goal_note": "Noted progress: {{target}}",
+      "goal_met": "Goal met: {{target}}"
     },
     "other": "Used {{tool}}",
     "more": "+{{count}}",
@@ -42,7 +44,11 @@
       "send_file_one": "sent {{count}} file",
       "send_file_other": "sent {{count}} files",
       "other_one": "used {{tool}} {{count}} time",
-      "other_other": "used {{tool}} {{count}} times"
+      "other_other": "used {{tool}} {{count}} times",
+      "goal_note_one": "noted progress",
+      "goal_note_other": "noted progress {{count}} times",
+      "goal_met_one": "said the goal is met",
+      "goal_met_other": "said the goal is met"
     }
   },
   "queued": "You can send; it waits until this Turn ends",

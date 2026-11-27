@@ -19,7 +19,9 @@
       "edit": "แก้ {{target}}",
       "write": "สร้าง {{target}}",
       "memory": "จำไว้: {{target}}",
-      "send_file": "ส่งไฟล์ {{target}}"
+      "send_file": "ส่งไฟล์ {{target}}",
+      "goal_note": "บันทึกความคืบหน้า: {{target}}",
+      "goal_met": "ถึงเป้าแล้ว: {{target}}"
     },
     "other": "ใช้ {{tool}}",
     "more": "+{{count}}",
@@ -33,7 +35,9 @@
       "write_other": "สร้าง {{count}} ไฟล์",
       "memory_other": "จด Memory {{count}} ครั้ง",
       "send_file_other": "ส่ง {{count}} ไฟล์",
-      "other_other": "ใช้ {{tool}} {{count}} ครั้ง"
+      "other_other": "ใช้ {{tool}} {{count}} ครั้ง",
+      "goal_note_other": "บันทึกความคืบหน้า {{count}} ครั้ง",
+      "goal_met_other": "บอกว่าถึงเป้าแล้ว"
     }
   },
   "queued": "ส่งได้ จะรอจน Turn นี้จบ",

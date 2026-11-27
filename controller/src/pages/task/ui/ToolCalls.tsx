@@ -10,7 +10,7 @@ import { summaryOf, type ToolCall } from "../model/items";
 const SHOWN_LINES = 20;
 const tailOf = (output: string) => output.split("\n").slice(-SHOWN_LINES).join("\n");
 
-const VERBS = ["bash", "read", "glob", "grep", "edit", "write", "memory", "send_file"] as const;
+const VERBS = ["bash", "read", "glob", "grep", "edit", "write", "memory", "send_file", "goal_note", "goal_met"] as const;
 
 function Status({ state }: { state: ToolCall["state"] }) {
   if (state === "running") return <Spinner />;

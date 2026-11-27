@@ -258,3 +258,8 @@ test("a Question waits as a card, settles with its answer, and closes when its T
   const closed = items([row(1, "turn.started", {}), shown(2, "cd_2"), row(3, "turn.ended", { reason: "stopped" })], 0).items;
   expect(closed.find((item) => item.kind === "question")).toMatchObject({ question: { status: "closed" } });
 });
+
+test("a Question's own tool call is not listed among the commands", () => {
+  const log = items([row(1, "turn.started", {}), row(2, "llm.message", { content: [{ type: "tool_use", id: "q1", name: "ask_choice", input: { question: "Where?" } }] })], 0).items;
+  expect(log.some((item) => item.kind === "tools")).toBe(false);
+});
