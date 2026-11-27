@@ -96,7 +96,7 @@ export function Pieces({
 
   const when = (at: number) => new Date(at).toLocaleString(language, { weekday: "short", hour: "2-digit", minute: "2-digit" });
   return (
-    <Section title={t("pieces.heading")} footer={list.idle?.order === "oldest-first" ? t("pieces.oldestFirst") : t("pieces.ordered")}>
+    <Section title={t("pieces.heading")} footer={t("pieces.footer")}>
       {pieces.length === 0 && <Row title={t("pieces.allDone")} />}
       {pieces.map((piece, index) => {
         const lifted = drag?.from === index;
@@ -113,7 +113,7 @@ export function Pieces({
               <Row
                 leading={<Dot color={STATUS[piece.status].dot} />}
                 title={piece.text}
-                detail={[t(STATUS[piece.status].words), piece.lastRunAt ? when(piece.lastRunAt) : null, piece.repeat ? t("pieces.repeat") : null].filter(Boolean).join(" · ")}
+                detail={[t(STATUS[piece.status].words), piece.lastRunAt ? when(piece.lastRunAt) : null].filter(Boolean).join(" · ")}
                 onPress={() => open(piece.id)}
                 accessory={
                   pieces.length > 1 && !locked ? (

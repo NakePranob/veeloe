@@ -14,7 +14,7 @@ const newId = () => `i-${randomUUID().slice(0, 8)}`;
 
 /**
  * One piece of an Idle Work list in a sheet over its page (ADR 0056), as a Schedule has its own sheet: what it says,
- * whether it repeats, where it sits, how its last round went, and removing it. `new` writes a new piece and `draft`
+ * how its last round went, and removing it. `new` writes a new piece and `draft`
  * reads what the Agent proposed. The Machine holds the list as one signed Trigger, so a save signs the whole list as
  * the Machine holds it at that moment, with this one change.
  */
@@ -65,7 +65,7 @@ function PieceForm({ pieceId, ...props }: Props & { pieceId: string }) {
     const now = piecesOf(list);
     const at = now.findIndex((piece) => piece.id === id);
     if (at >= 0) setForm({ ...now[at], position: at });
-    else if (isNew) setForm({ id, text: "", repeat: false, position: now.length });
+    else if (isNew) setForm({ id, text: "", position: now.length });
   }, [form, status.triggers, list, isNew, id]);
   const [saving, setSaving] = useState(false);
   // ponytail: the iOS toolbar keeps the first onPress it was given, so save reads what it needs through a ref.
@@ -140,9 +140,6 @@ function PieceForm({ pieceId, ...props }: Props & { pieceId: string }) {
           <Section footer={t("piece.footer")}>
             <Field label={t("piece.text")} value={form.text} onChangeText={(text) => set({ text })} placeholder={t("piece.placeholder")} multiline />
           </Section>
-          <Section>
-            <ToggleRow title={t("piece.repeat")} detail={t("piece.repeatDetail")} value={form.repeat} onChange={(repeat) => set({ repeat })} />
-          </Section>
         </>
       )}
       {progress && (
@@ -201,7 +198,7 @@ function DraftForm(props: Props) {
     Keyboard.dismiss();
     setSaving(true);
     try {
-      const taken = proposals.filter((one) => one.take).map(({ id, text }) => ({ id, text, repeat: false }));
+      const taken = proposals.filter((one) => one.take).map(({ id, text }) => ({ id, text }));
       // ponytail: with no list yet, leaving every proposal cannot be signed (a list needs a piece), so they wait.
       if (await signList(where, list, [...piecesOf(list), ...taken], settingsOf(list))) router.back();
     } finally {

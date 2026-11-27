@@ -30,15 +30,13 @@ export const IDLE_DRAFT_MAX = 50;
 const IdleItemIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
 /**
- * An Idle Work list (ADR 0056, issue #57): what the Agent works through when quiet, in the order given or the
- * one waiting longest first; how long it must be quiet before it starts, and how long one piece may take.
- * A finished piece leaves the list; one marked `repeat` goes back to wait again.
+ * An Idle Work list (ADR 0056, issue #57): one-off pieces the Agent works through top to bottom when it has
+ * been quiet `quietMinutes`. A finished piece leaves the list; work that should come back is a Schedule.
+ * Fields an older Controller signed (`repeat`, `order`, `itemMinutes`) are let through and mean nothing.
  */
 export const IdleSchema = z.looseObject({
-  items: z.array(z.looseObject({ id: IdleItemIdSchema, text: z.string().min(1).max(TRIGGER_TEXT_MAX), repeat: z.boolean().optional() })).min(1).max(IDLE_ITEMS_MAX),
-  order: z.enum(["ordered", "oldest-first"]),
+  items: z.array(z.looseObject({ id: IdleItemIdSchema, text: z.string().min(1).max(TRIGGER_TEXT_MAX) })).min(1).max(IDLE_ITEMS_MAX),
   quietMinutes: z.number().int().min(5).max(1440),
-  itemMinutes: z.number().int().min(1).max(120),
 });
 export type Idle = z.infer<typeof IdleSchema>;
 

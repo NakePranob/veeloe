@@ -1,38 +1,33 @@
-//! Idle Work (ADR 0056, issue #57): a signed list an Agent works through when
-//! nobody has needed it for a while, one piece at a time. This is the list's
-//! own logic: what the signed `idle` says, which piece is next, when the Agent
-//! counts as quiet, and what a finished Turn makes of its piece. The Trigger
-//! book (`triggers.rs`) keeps each piece's progress; `main.rs` acts on it.
+//! Idle Work (ADR 0056, issue #57): a signed list of one-off pieces an Agent works
+//! through, top to bottom, when nobody has needed it for a while. Work that should
+//! come back is a Schedule, not a piece. This is the list's own logic: what the
+//! signed `idle` says, which piece is next, when the Agent counts as quiet, and what
+//! a finished Turn makes of its piece. The Trigger book (`triggers.rs`) keeps each
+//! piece's progress; `main.rs` acts on it.
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+/// The most one piece's Turn may run before it stops as if stopped. A person's
+/// message waits behind the piece in progress (ADR 0056), so this is also the
+/// longest they wait; it is the Runtime's, not a setting.
+pub const PIECE_LIMIT_S: u64 = 15 * 60;
+
 /// One piece of work, as signed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IdleItem {
     pub id: String,
     pub text: String,
-    /// Goes back to wait again once done, instead of leaving the list.
-    pub repeat: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Order {
-    /// The first piece still waiting, in the order signed.
-    Ordered,
-    /// The piece that has waited longest: never run first, then oldest run.
-    OldestFirst,
-}
-
-/// A signed Idle Work list.
+/// A signed Idle Work list. Fields an older Controller signed (`repeat`,
+/// `order`, `itemMinutes`) are read past.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IdleList {
     pub items: Vec<IdleItem>,
-    pub order: Order,
     pub quiet_minutes: u64,
-    pub item_minutes: u64,
 }
 
 /// Where one piece stands.
@@ -91,24 +86,16 @@ impl IdleList {
                 Some(IdleItem {
                     id: item.get("id")?.as_str()?.to_string(),
                     text: item.get("text")?.as_str()?.to_string(),
-                    repeat: item.get("repeat").and_then(Value::as_bool).unwrap_or(false),
                 })
             })
             .collect::<Option<Vec<_>>>()?;
-        let order = match value.get("order")?.as_str()? {
-            "ordered" => Order::Ordered,
-            "oldest-first" => Order::OldestFirst,
-            _ => return None,
-        };
         Some(Self {
             items,
-            order,
             quiet_minutes: value.get("quietMinutes")?.as_u64()?,
-            item_minutes: value.get("itemMinutes")?.as_u64()?,
         })
     }
 
-    /// The piece to start now, or None: one is already working, or none waits.
+    /// The piece to start now, the first still waiting, or None: one is already working, or none waits.
     pub fn next<'a>(&'a self, progress: &BTreeMap<String, Progress>) -> Option<&'a IdleItem> {
         let status = |item: &IdleItem| progress.get(&item.id).map(|p| p.status);
         if self
@@ -118,20 +105,9 @@ impl IdleList {
         {
             return None;
         }
-        let waiting = self
-            .items
+        self.items
             .iter()
-            .filter(|item| matches!(status(item), None | Some(Status::Pending)));
-        match self.order {
-            Order::Ordered => waiting.into_iter().next(),
-            // Never run sorts before any run; among run ones, the oldest; ties keep the signed order.
-            Order::OldestFirst => waiting.min_by_key(|item| {
-                progress
-                    .get(&item.id)
-                    .and_then(|p| p.last_run_at)
-                    .map_or((0, 0), |at| (1, at))
-            }),
-        }
+            .find(|item| matches!(status(item), None | Some(Status::Pending)))
     }
 
     /// True when the Agent has been quiet long enough: its last Turn ended (or
@@ -141,7 +117,7 @@ impl IdleList {
     }
 
     /// What `trigger.listed` shows: every piece still on the list, with where it
-    /// stands. A one-off piece that is done is gone; a repeat one waits again.
+    /// stands. A piece that is done is gone.
     pub fn listed_progress(&self, progress: &BTreeMap<String, Progress>) -> Vec<Value> {
         self.items
             .iter()
@@ -151,7 +127,7 @@ impl IdleList {
                     last_run_at: None,
                     task: None,
                 });
-                if held.status == Status::Done && !item.repeat {
+                if held.status == Status::Done {
                     return None;
                 }
                 let mut value = json!({ "id": item.id, "status": held.status });
@@ -167,10 +143,9 @@ impl IdleList {
     }
 }
 
-/// What a finished Turn leaves of its piece: a repeat piece that is done waits again.
-pub fn finished(held: &Progress, outcome: Outcome, repeat: bool) -> Progress {
+/// What a finished Turn leaves of its piece.
+pub fn finished(held: &Progress, outcome: Outcome) -> Progress {
     let status = match outcome {
-        Outcome::Done if repeat => Status::Pending,
         Outcome::Done => Status::Done,
         Outcome::TimedOut => Status::TimedOut,
         Outcome::NeedsApproval => Status::NeedsApproval,
@@ -185,14 +160,15 @@ pub fn finished(held: &Progress, outcome: Outcome, repeat: bool) -> Progress {
 mod tests {
     use super::*;
 
-    fn list(order: &str) -> IdleList {
+    fn list() -> IdleList {
         IdleList::parse(&json!({
             "items": [
                 { "id": "a", "text": "first" },
+                // An older Controller's fields are read past.
                 { "id": "b", "text": "second", "repeat": true },
                 { "id": "c", "text": "third" },
             ],
-            "order": order,
+            "order": "oldest-first",
             "quietMinutes": 15,
             "itemMinutes": 15,
         }))
@@ -208,8 +184,8 @@ mod tests {
     }
 
     #[test]
-    fn ordered_takes_the_first_waiting_piece_and_nothing_while_one_works() {
-        let list = list("ordered");
+    fn the_first_waiting_piece_goes_next_and_nothing_while_one_works() {
+        let list = list();
         let mut progress = BTreeMap::new();
         assert_eq!(list.next(&progress).map(|i| i.id.as_str()), Some("a"));
         progress.insert("a".into(), at(Status::Done, Some(1)));
@@ -219,19 +195,8 @@ mod tests {
     }
 
     #[test]
-    fn oldest_first_takes_a_never_run_piece_then_the_one_run_longest_ago() {
-        let list = list("oldest-first");
-        let mut progress = BTreeMap::new();
-        progress.insert("a".into(), at(Status::Pending, Some(50)));
-        progress.insert("b".into(), at(Status::Pending, Some(10)));
-        assert_eq!(list.next(&progress).map(|i| i.id.as_str()), Some("c"));
-        progress.insert("c".into(), at(Status::Pending, Some(30)));
-        assert_eq!(list.next(&progress).map(|i| i.id.as_str()), Some("b"));
-    }
-
-    #[test]
     fn a_piece_that_needed_approval_or_ran_out_of_time_waits_for_a_person() {
-        let list = list("ordered");
+        let list = list();
         let mut progress = BTreeMap::new();
         progress.insert("a".into(), at(Status::NeedsApproval, Some(1)));
         progress.insert("b".into(), at(Status::TimedOut, Some(1)));
@@ -240,36 +205,28 @@ mod tests {
 
     #[test]
     fn quiet_means_the_whole_quiet_time_since_the_last_turn() {
-        let list = list("ordered");
+        let list = list();
         assert!(!list.quiet_enough(14 * 60_000, 0));
         assert!(list.quiet_enough(15 * 60_000, 0));
     }
 
     #[test]
-    fn a_finished_turn_leaves_its_piece_done_waiting_again_or_marked() {
+    fn a_finished_turn_leaves_its_piece_done_or_marked() {
         let working = at(Status::Working, Some(5));
         let ended = |reason: &str| json!({ "reason": reason });
-        assert_eq!(
-            finished(&working, Outcome::of(&ended("done"), false), false).status,
-            Status::Done
-        );
-        assert_eq!(
-            finished(&working, Outcome::of(&ended("quiet"), false), true).status,
-            Status::Pending
-        );
-        assert_eq!(
-            finished(&working, Outcome::of(&ended("stopped"), false), false).status,
-            Status::TimedOut
-        );
-        assert_eq!(
-            finished(&working, Outcome::of(&ended("done"), true), false).status,
-            Status::NeedsApproval
-        );
+        let after = |reason: &str, skipped: bool| {
+            finished(&working, Outcome::of(&ended(reason), skipped)).status
+        };
+        assert_eq!(after("done", false), Status::Done);
+        assert_eq!(after("quiet", false), Status::Done);
+        assert_eq!(after("stopped", false), Status::TimedOut);
+        assert_eq!(after("error", false), Status::TimedOut);
+        assert_eq!(after("done", true), Status::NeedsApproval);
     }
 
     #[test]
-    fn the_list_shown_leaves_out_a_one_off_piece_once_done() {
-        let list = list("ordered");
+    fn the_list_shown_leaves_out_a_piece_once_done() {
+        let list = list();
         let mut progress = BTreeMap::new();
         progress.insert("a".into(), at(Status::Done, Some(1)));
         progress.insert("b".into(), at(Status::Pending, Some(2)));

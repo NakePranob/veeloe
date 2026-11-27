@@ -478,7 +478,9 @@ pub fn is_schedule(value: &Value) -> bool {
         })
 }
 
-/// An Idle Work list (ADR 0056): 1 to 50 pieces, an order, and its two times.
+/// An Idle Work list (ADR 0056): 1 to 50 one-off pieces and how long the Agent
+/// must be quiet first. An older Controller's `repeat`, `order` and
+/// `itemMinutes` are let through and mean nothing.
 pub fn is_idle(value: &Value) -> bool {
     let Some(object) = value.as_object() else {
         return false;
@@ -491,14 +493,9 @@ pub fn is_idle(value: &Value) -> bool {
                     text(item.get("id")).is_some_and(is_trigger_id)
                         && text(item.get("text"))
                             .is_some_and(|text| (1..=TRIGGER_TEXT_MAX).contains(&chars(text)))
-                        && item.get("repeat").map(Value::is_boolean).unwrap_or(true)
                 })
             })
-    }) && matches!(
-        object.get("order").and_then(Value::as_str),
-        Some("ordered" | "oldest-first")
-    ) && int_in(object.get("quietMinutes"), 5, 1440)
-        && int_in(object.get("itemMinutes"), 1, 120)
+    }) && int_in(object.get("quietMinutes"), 5, 1440)
 }
 
 fn is_trigger(object: &Map<String, Value>) -> bool {

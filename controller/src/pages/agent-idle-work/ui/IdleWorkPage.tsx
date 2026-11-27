@@ -8,7 +8,7 @@ import { useMachineLink, useMachineStatus, useTriggerStatus } from "../../../fea
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { Button, confirm, Empty, Note, Row, Screen, Section, Select, Spinner, Text, ToggleRow, space } from "../../../shared/ui";
-import { ITEM_CHOICES, piecesOf, QUIET_CHOICES, settingsOf, SHARE_CHOICES, withPiece, type Settings } from "../model/idle";
+import { piecesOf, QUIET_CHOICES, settingsOf, SHARE_CHOICES, withPiece, type Settings } from "../model/idle";
 import { Pieces } from "./pieces";
 import { deleteList, signList } from "./sign";
 
@@ -104,17 +104,6 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
       {list && (
         <Section footer={t("settings.footer")}>
           <ToggleRow title={t("enabled")} value={!list.paused && !list.suspended} onChange={(on) => void act(on ? "trigger.resume" : "trigger.pause", list)} />
-          <Select<Settings["order"]>
-            label={t("settings.order")}
-            value={settingsOf(list).order}
-            cancel={t("cancel")}
-            disabled={locked}
-            onChange={(order) => setting(list, { order })}
-            options={[
-              { value: "ordered", label: t("order.ordered") },
-              { value: "oldest-first", label: t("order.oldestFirst") },
-            ]}
-          />
           <Select<string>
             label={t("settings.quiet")}
             value={String(settingsOf(list).quietMinutes)}
@@ -122,14 +111,6 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
             disabled={locked}
             onChange={(m) => setting(list, { quietMinutes: Number(m) })}
             options={minutes(QUIET_CHOICES, settingsOf(list).quietMinutes)}
-          />
-          <Select<string>
-            label={t("settings.item")}
-            value={String(settingsOf(list).itemMinutes)}
-            cancel={t("cancel")}
-            disabled={locked}
-            onChange={(m) => setting(list, { itemMinutes: Number(m) })}
-            options={minutes(ITEM_CHOICES, settingsOf(list).itemMinutes)}
           />
           <Select<string>
             label={t("share.label")}

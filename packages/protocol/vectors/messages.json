@@ -1902,13 +1902,10 @@
               },
               {
                 "id": "i2",
-                "text": "check for stale dependencies",
-                "repeat": true
+                "text": "check for stale dependencies"
               }
             ],
-            "order": "oldest-first",
-            "quietMinutes": 15,
-            "itemMinutes": 15
+            "quietMinutes": 15
           }
         }
       },
@@ -1925,9 +1922,7 @@
           "text": "x",
           "idle": {
             "items": [],
-            "order": "ordered",
-            "quietMinutes": 15,
-            "itemMinutes": 15
+            "quietMinutes": 15
           }
         }
       },
@@ -1949,16 +1944,14 @@
                 "text": "x"
               }
             ],
-            "order": "ordered",
-            "quietMinutes": 1,
-            "itemMinutes": 15
+            "quietMinutes": 1
           }
         }
       },
       "valid": false
     },
     {
-      "name": "an Idle Work list in an order nobody knows",
+      "name": "an Idle Work list an older Controller signed, with repeat and order",
       "type": "trigger.set",
       "body": {
         "agent": "a1",
@@ -1970,16 +1963,17 @@
             "items": [
               {
                 "id": "i1",
-                "text": "x"
+                "text": "x",
+                "repeat": true
               }
             ],
-            "order": "random",
+            "order": "oldest-first",
             "quietMinutes": 15,
             "itemMinutes": 15
           }
         }
       },
-      "valid": false
+      "valid": true
     },
     {
       "name": "an Idle Work list that also carries a Schedule",
@@ -2003,13 +1997,10 @@
               },
               {
                 "id": "i2",
-                "text": "check for stale dependencies",
-                "repeat": true
+                "text": "check for stale dependencies"
               }
             ],
-            "order": "oldest-first",
-            "quietMinutes": 15,
-            "itemMinutes": 15
+            "quietMinutes": 15
           }
         }
       },
@@ -2046,13 +2037,10 @@
                 },
                 {
                   "id": "i2",
-                  "text": "check for stale dependencies",
-                  "repeat": true
+                  "text": "check for stale dependencies"
                 }
               ],
-              "order": "oldest-first",
-              "quietMinutes": 15,
-              "itemMinutes": 15
+              "quietMinutes": 15
             },
             "member": "m_1",
             "paused": false,
@@ -2095,13 +2083,10 @@
                 },
                 {
                   "id": "i2",
-                  "text": "check for stale dependencies",
-                  "repeat": true
+                  "text": "check for stale dependencies"
                 }
               ],
-              "order": "oldest-first",
-              "quietMinutes": 15,
-              "itemMinutes": 15
+              "quietMinutes": 15
             },
             "member": "m_1",
             "paused": false,

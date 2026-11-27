@@ -1,16 +1,15 @@
 import { IDLE_ITEMS_MAX, TRIGGER_TEXT_MAX, type IdleProgress, type ListedTrigger, type Trigger } from "@veeloe/protocol-ts";
 
 /** One piece of the list as signed. */
-export type Piece = { id: string; text: string; repeat: boolean };
+export type Piece = { id: string; text: string };
 
-/** The list's own settings: its order and its two times in minutes. */
-export type Settings = { order: "ordered" | "oldest-first"; quietMinutes: number; itemMinutes: number };
+/** The list's own setting: how long the Agent must be quiet first, in minutes. */
+export type Settings = { quietMinutes: number };
 
 export type Problem = "empty" | "tooMany";
 
-/** The quiet times and time limits offered, in minutes. */
+/** The quiet times offered, in minutes. */
 export const QUIET_CHOICES = [5, 10, 15, 30, 60, 120, 240] as const;
-export const ITEM_CHOICES = [5, 10, 15, 30, 60, 120] as const;
 /** The shares of the Budget background work may take, in percent. */
 export const SHARE_CHOICES = [0, 10, 20, 30, 50, 100] as const;
 
@@ -20,12 +19,11 @@ const LIST_TEXT = "Idle Work";
 /** The pieces still on the list, in the signed order: a one-off piece already done is gone, as `progress` shows. */
 export function piecesOf(list: ListedTrigger | undefined): Piece[] {
   const still = list?.progress ? new Set(list.progress.map((p) => p.id)) : null;
-  return (list?.idle?.items ?? []).filter((item) => !still || still.has(item.id)).map((item) => ({ id: item.id, text: item.text, repeat: item.repeat ?? false }));
+  return (list?.idle?.items ?? []).filter((item) => !still || still.has(item.id)).map((item) => ({ id: item.id, text: item.text }));
 }
 
 export function settingsOf(list: ListedTrigger | undefined): Settings {
-  const idle = list?.idle;
-  return { order: idle?.order ?? "ordered", quietMinutes: idle?.quietMinutes ?? 15, itemMinutes: idle?.itemMinutes ?? 15 };
+  return { quietMinutes: list?.idle?.quietMinutes ?? 15 };
 }
 
 /** The pieces with `piece` at `position` (0-based), in place of the one with its id or added; past the end means last. */
@@ -44,7 +42,7 @@ export function listOf(pieces: readonly Piece[], settings: Settings, id: string,
     id,
     kind: "idle",
     text: LIST_TEXT,
-    idle: { items: items.map(({ id: piece, text, repeat }) => ({ id: piece, text, ...(repeat && { repeat }) })), ...settings },
+    idle: { items: items.map(({ id: piece, text }) => ({ id: piece, text })), ...settings },
     ...(allow.length > 0 && { allow: [...allow] }),
   };
 }

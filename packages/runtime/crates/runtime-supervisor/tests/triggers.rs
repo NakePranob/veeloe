@@ -320,7 +320,7 @@ async fn a_schedule_keeps_its_name_while_its_words_do_and_loses_it_when_they_cha
 fn idle_list(id: &str, items: Value) -> Value {
     json!({
         "agent": "a1",
-        "trigger": { "id": id, "kind": "idle", "text": "when quiet", "idle": { "items": items, "order": "ordered", "quietMinutes": 15, "itemMinutes": 15 } },
+        "trigger": { "id": id, "kind": "idle", "text": "when quiet", "idle": { "items": items, "quietMinutes": 15 } },
     })
 }
 
@@ -393,7 +393,7 @@ async fn a_piece_finishes_done_and_leaves_or_is_marked_by_how_its_turn_ended() {
     let fixture = Fixture::new();
     let owner = from("member-1", "controller-1");
     fixture
-        .send(&owner, "trigger.set", idle_list("idle", json!([{ "id": "a", "text": "one" }, { "id": "b", "text": "two", "repeat": true }, { "id": "c", "text": "three" }])))
+        .send(&owner, "trigger.set", idle_list("idle", json!([{ "id": "a", "text": "one" }, { "id": "b", "text": "two" }, { "id": "c", "text": "three" }])))
         .await;
     let working = |task: &str| Progress {
         status: Status::Working,
@@ -414,7 +414,7 @@ async fn a_piece_finishes_done_and_leaves_or_is_marked_by_how_its_turn_ended() {
         .expect("a");
     fixture
         .triggers
-        .finish_piece("t-b", &json!({ "reason": "quiet" }))
+        .finish_piece("t-b", &json!({ "reason": "stopped" }))
         .expect("b");
     fixture.triggers.skipped("t-c");
     fixture
@@ -424,7 +424,7 @@ async fn a_piece_finishes_done_and_leaves_or_is_marked_by_how_its_turn_ended() {
     let listed = fixture.triggers.listed_body("a1");
     let progress = &listed["triggers"][0]["progress"];
     assert_eq!(progress[0]["id"], "b");
-    assert_eq!(progress[0]["status"], "pending");
+    assert_eq!(progress[0]["status"], "timedOut");
     assert_eq!(progress[1]["id"], "c");
     assert_eq!(progress[1]["status"], "needsApproval");
     // A Turn of no piece finishes nothing.

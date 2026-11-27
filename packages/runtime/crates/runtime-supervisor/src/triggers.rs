@@ -280,15 +280,9 @@ impl Triggers {
         let skipped = self.skipped.lock().expect("skipped").remove(task);
         let outcome = crate::idle::Outcome::of(ended, skipped);
         self.update(&agent, &id, |record| {
-            let repeat = record
-                .idle
-                .as_ref()
-                .and_then(crate::idle::IdleList::parse)
-                .and_then(|list| list.items.into_iter().find(|piece| piece.id == item))
-                .is_some_and(|piece| piece.repeat);
             if let Some(held) = record.progress.get(&item) {
                 if held.status == crate::idle::Status::Working {
-                    let next = crate::idle::finished(held, outcome, repeat);
+                    let next = crate::idle::finished(held, outcome);
                     record.progress.insert(item.clone(), next);
                 }
             }
@@ -468,7 +462,7 @@ pub fn start_piece(
         attended,
         approves,
         &piece.text,
-        Some(list.item_minutes * 60),
+        Some(crate::idle::PIECE_LIMIT_S),
     )?;
     let _ = triggers.update(&record.agent, &record.id, |held| {
         held.last_run_at = Some(now);

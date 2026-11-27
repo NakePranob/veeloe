@@ -362,7 +362,7 @@ test("a signed Idle Work list is kept with each piece waiting, and a run-now rou
   owner.send("agent.create", { id: "agent-idle", name: "Idler", provider: "main", model: "model-a" });
   await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-idle"));
 
-  const idle = { items: [{ id: "p1", text: "tidy the README" }, { id: "p2", text: "check the links", repeat: true }], order: "ordered", quietMinutes: 15, itemMinutes: 15 };
+  const idle = { items: [{ id: "p1", text: "tidy the README" }, { id: "p2", text: "check the links" }], quietMinutes: 15 };
   owner.send("trigger.set", { agent: "agent-idle", trigger: { id: "idle", kind: "idle", text: "Idle Work", idle } });
   const listed = await owner.waitFor((m) => m.type === "trigger.listed" && m.body.triggers.some((t) => t.kind === "idle"));
   const list = listed.type === "trigger.listed" ? listed.body.triggers.find((t) => t.kind === "idle") : undefined;
