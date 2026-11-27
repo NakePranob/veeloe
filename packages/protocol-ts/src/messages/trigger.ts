@@ -62,6 +62,8 @@ export const ListedTriggerSchema = TriggerSchema.extend({
   lastRunAt: z.number().int().nonnegative().optional(),
   /** Computed by the Machine; absent while paused or suspended. */
   nextRunAt: z.number().int().nonnegative().optional(),
+  /** A short name the Agent's model gave it from its words, like a Task's; absent until it answers. */
+  title: z.string().min(1).max(60).optional(),
   /** The last round that did not start: the Agent was busy or its Budget spent. */
   lastSkip: z.looseObject({ at: z.number().int().nonnegative(), why: z.enum(["busy", "budget"]) }).optional(),
 });

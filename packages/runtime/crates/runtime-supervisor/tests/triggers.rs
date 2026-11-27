@@ -286,3 +286,32 @@ async fn a_scope_is_kept_and_an_edit_with_the_same_times_keeps_its_rounds() {
     assert_eq!(body["triggers"][0]["paused"], false);
     assert!(body["triggers"][0].get("lastRunAt").is_none());
 }
+
+#[tokio::test]
+async fn a_schedule_keeps_its_name_while_its_words_do_and_loses_it_when_they_change() {
+    let fixture = Fixture::new();
+    let owner = from("member-1", "controller-1");
+    fixture.send(&owner, "trigger.set", daily("tr_1")).await;
+    let outbox = Recording::default();
+    veeloe_runtime_supervisor::triggers::titled(
+        &fixture.triggers,
+        &outbox,
+        "a1",
+        "tr_1",
+        "CI check",
+    );
+    // Whoever set it hears the whole list again, named.
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "trigger.listed");
+    assert_eq!(body["triggers"][0]["title"], "CI check");
+
+    let mut moved = daily("tr_1");
+    moved["trigger"]["schedule"] = json!({ "daily": { "at": "10:00" } });
+    let (_, body) = fixture.send(&owner, "trigger.set", moved).await;
+    assert_eq!(body["triggers"][0]["title"], "CI check");
+
+    let mut reworded = daily("tr_1");
+    reworded["trigger"]["text"] = json!("check the deploy");
+    let (_, body) = fixture.send(&owner, "trigger.set", reworded).await;
+    assert!(body["triggers"][0].get("title").is_none());
+}

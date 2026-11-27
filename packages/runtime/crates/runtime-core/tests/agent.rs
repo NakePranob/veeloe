@@ -2229,3 +2229,36 @@ async fn nothing_to_report_before_a_refused_command_in_the_same_reply_is_not_qui
         json!({ "reason": "done" })
     );
 }
+
+#[tokio::test]
+async fn a_schedule_is_named_from_its_words_as_a_task_is() {
+    let harness = setup(Setup {
+        replies: vec![Ok(text("\"Check MEMORY.md daily\"\nmore"))],
+        ..Setup::default()
+    });
+    harness
+        .core
+        .receive(ToWorker::TitleTrigger {
+            id: "tr_1".into(),
+            text: "Read MEMORY.md and tell me what needs updating".into(),
+        })
+        .expect("receive");
+    for _ in 0..100 {
+        if harness
+            .link
+            .take()
+            .iter()
+            .any(|message| matches!(message, FromWorker::TriggerTitled { .. }))
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    assert_eq!(
+        harness.link.last(),
+        Some(FromWorker::TriggerTitled {
+            id: "tr_1".into(),
+            title: "Check MEMORY.md daily".into(),
+        })
+    );
+}

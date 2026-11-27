@@ -106,6 +106,7 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
         created_at: now(),
         last_run_at: None,
         allow,
+        title: None,
         last_skip: None,
         envelope: from.envelope.clone().unwrap_or(Value::Null),
     };
@@ -119,10 +120,26 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
         record.last_skip = held.last_skip;
         record.paused = held.paused;
     }
+    // The same words keep their name; new words are named again by the Agent's model.
+    let held_title = triggers
+        .get(&agent, &record.id)
+        .filter(|held| held.text == record.text)
+        .and_then(|held| held.title);
+    let name_it = held_title.is_none();
+    record.title = held_title;
+    let (id, text) = (record.id.clone(), record.text.clone());
     if triggers.set(record).is_err() {
         return outbox.error(from, "trigger.unavailable");
     }
     listed(outbox, from, triggers, &agent);
+    if name_it {
+        // Counted as the Schedule's own tokens; with no worker running it stays unnamed.
+        triggers.started(&format!("trigger:{id}"), "schedule");
+        machine.workers.send(
+            &agent,
+            veeloe_runtime_core::ToWorker::TitleTrigger { id, text },
+        );
+    }
 }
 
 /// Pauses or resumes one Trigger.

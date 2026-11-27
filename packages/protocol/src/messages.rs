@@ -514,6 +514,10 @@ fn is_listed_trigger(value: &Value) -> bool {
         && optional_ms("lastRunAt")
         && optional_ms("nextRunAt")
         && object
+            .get("title")
+            .map(|title| text(Some(title)).is_some_and(|title| (1..=60).contains(&chars(title))))
+            .unwrap_or(true)
+        && object
             .get("lastSkip")
             .map(|skip| {
                 skip.get("at").is_some_and(|at| at.as_u64().is_some())

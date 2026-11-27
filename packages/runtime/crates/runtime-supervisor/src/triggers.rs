@@ -42,6 +42,9 @@ pub struct TriggerRecord {
     /// Unix ms the last round was due, run or skipped.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_run_at: Option<u64>,
+    /// A short name the Agent's model gave it from its words; absent until it answers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     /// What a round nobody watches may do beyond the Agent's Allowlist (ADR 0079).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allow: Vec<String>,
@@ -88,6 +91,9 @@ impl TriggerRecord {
             value["lastRunAt"] = json!(last);
         }
         value["allow"] = json!(self.allow);
+        if let Some(title) = &self.title {
+            value["title"] = json!(title);
+        }
         if let Some(skip) = &self.last_skip {
             value["lastSkip"] = json!({ "at": skip.at, "why": skip.why });
         }
@@ -311,6 +317,36 @@ pub fn start_round(
     }
     triggers.started(&task, &record.kind);
     Some(task)
+}
+
+/// The name the Agent's model gave a Schedule: kept, and the whole list sent
+/// again to whoever set it, so their screen shows the name without asking.
+pub fn titled(
+    triggers: &Triggers,
+    outbox: &dyn crate::tasks::Outbox,
+    agent: &str,
+    id: &str,
+    title: &str,
+) {
+    let mut member = None;
+    let _ = triggers.update(agent, id, |held| {
+        held.title = Some(title.to_string());
+        member = Some(held.member.clone());
+    });
+    let Some(member) = member else {
+        return;
+    };
+    let held: Vec<Value> = triggers
+        .for_agent(agent)
+        .iter()
+        .map(|record| record.listed(&MachineTime))
+        .collect();
+    outbox.to_member(
+        &member,
+        "trigger.listed",
+        json!({ "agent": agent, "triggers": held }),
+        None,
+    );
 }
 
 /// A wall-clock moment on the Machine, in its own time zone.
@@ -578,6 +614,7 @@ mod tests {
             suspended: false,
             created_at: wednesday(0, 0),
             last_run_at: None,
+            title: None,
             allow: Vec::new(),
             last_skip: None,
             envelope: json!({}),

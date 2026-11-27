@@ -108,6 +108,10 @@ pub enum ToWorker {
         #[serde(rename = "ref")]
         reference: String,
     },
+    /// A Schedule was set: name it from what it says, as a Task is named, so a
+    /// list of Schedules reads by name and not by the whole instruction.
+    #[serde(rename = "trigger.title")]
+    TitleTrigger { id: String, text: String },
     /// The Member who started this Task names it (`task.rename`).
     #[serde(rename = "retitle")]
     Retitle {
@@ -220,6 +224,9 @@ pub enum FromWorker {
         member: String,
         events: Vec<TaskEvent>,
     },
+    /// The name for a Schedule asked for with `trigger.title`.
+    #[serde(rename = "trigger.titled")]
+    TriggerTitled { id: String, title: String },
     #[serde(rename = "tasks")]
     Tasks {
         member: String,

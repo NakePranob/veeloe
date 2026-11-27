@@ -338,7 +338,9 @@ pub fn forward(outbox: &dyn Outbox, agent: &str, message: FromWorker) {
         FromWorker::Ready
         | FromWorker::LlmRequest { .. }
         | FromWorker::LogAppend { .. }
-        | FromWorker::LogRead { .. } => {}
+        | FromWorker::LogRead { .. }
+        // The supervisor keeps a Schedule's name before it says anything (`triggers::titled`).
+        | FromWorker::TriggerTitled { .. } => {}
     }
 }
 

@@ -79,7 +79,7 @@ function ScheduleForm({ agentId, agentName, machine, triggerId }: { agentId: str
 
   const locked = offline || status.sending || saving;
   return (
-    <Screen title={isNew ? t("editor.new") : t("editor.edit")} subtitle={agentName}>
+    <Screen title={isNew ? t("editor.new") : (held?.title ?? t("editor.edit"))} subtitle={agentName}>
       <HeaderAction label={t("cancel")} placement="left" onPress={() => router.back()} />
       <HeaderAction label={saving ? t("saving") : t("save")} onPress={() => void save()} disabled={locked || !draft?.text.trim()} />
       {offline && <Note tone="offline">{t("offline")}</Note>}

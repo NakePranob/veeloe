@@ -168,6 +168,18 @@ impl Supervisor {
         self.log_turn(agent, &message);
         self.notify(agent, &message);
         let outbox = self.outbox.lock().expect("outbox");
+        if let FromWorker::TriggerTitled { id, title } = &message {
+            if let Some(outbox) = outbox.as_ref() {
+                veeloe_runtime_supervisor::triggers::titled(
+                    &self.triggers,
+                    outbox.as_ref(),
+                    agent,
+                    id,
+                    title,
+                );
+            }
+            return;
+        }
         if let Some(outbox) = outbox.as_ref() {
             forward(outbox.as_ref(), agent, message);
         }

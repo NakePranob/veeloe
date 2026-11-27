@@ -1957,6 +1957,54 @@
       "valid": true
     },
     {
+      "name": "a listed Trigger with the name its Agent gave it",
+      "type": "trigger.listed",
+      "body": {
+        "agent": "a1",
+        "triggers": [
+          {
+            "id": "tr_1",
+            "kind": "schedule",
+            "text": "x",
+            "schedule": {
+              "daily": {
+                "at": "09:00"
+              }
+            },
+            "title": "Daily check",
+            "member": "m_1",
+            "paused": false,
+            "suspended": false
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a listed Trigger with an empty name",
+      "type": "trigger.listed",
+      "body": {
+        "agent": "a1",
+        "triggers": [
+          {
+            "id": "tr_1",
+            "kind": "schedule",
+            "text": "x",
+            "schedule": {
+              "daily": {
+                "at": "09:00"
+              }
+            },
+            "title": "",
+            "member": "m_1",
+            "paused": false,
+            "suspended": false
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
       "name": "a listed Trigger skipped for a reason nobody knows",
       "type": "trigger.listed",
       "body": {

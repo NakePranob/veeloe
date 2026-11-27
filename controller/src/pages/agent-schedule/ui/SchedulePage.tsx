@@ -68,7 +68,8 @@ function ScheduleList({ agentId, agentName, machine }: { agentId: string; agentN
             return (
               <Row
                 key={trigger.id}
-                title={trigger.text}
+                // The name the Agent gave it, as a Task's; its words until the name comes.
+                title={trigger.title ?? trigger.text}
                 detail={[rhythm(trigger.schedule), when].filter(Boolean).join(" · ")}
                 leading={<Dot color={trigger.suspended ? "red" : round ? OUTCOME[round.outcome].dot : "tertiaryLabel"} />}
                 onPress={() => open(trigger.id)}

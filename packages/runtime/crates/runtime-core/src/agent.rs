@@ -291,6 +291,10 @@ impl AgentCore {
                 member,
                 reference,
             } => self.retitle(&task, &title, &member, &reference),
+            ToWorker::TitleTrigger { id, text } => {
+                tokio::spawn(title_trigger(Arc::clone(&self.state), id, text));
+                Ok(())
+            }
             ToWorker::Approval {
                 request,
                 decision,
@@ -1144,6 +1148,35 @@ fn clean_title(answer: &str) -> String {
         .collect::<String>()
         .trim_end()
         .to_string()
+}
+
+const TRIGGER_TITLE_SYSTEM: &str =
+    "You name a scheduled instruction a person gave an AI Agent so they can tell it apart in a \
+     list. Reply with only the name: one line, at most 60 characters, in the language the \
+     instruction is written in, without quotes.";
+
+/// Name a Schedule from its instruction. A Provider failure or an empty answer
+/// sends nothing: the Controller shows the instruction itself instead.
+async fn title_trigger(state: Arc<State>, id: String, text: String) {
+    let request = LlmRequest {
+        task: format!("trigger:{id}"),
+        system: TRIGGER_TITLE_SYSTEM.into(),
+        messages: vec![LlmMessage {
+            role: "user".into(),
+            content: vec![json!({
+                "type": "text",
+                "text": text.chars().take(TITLE_SOURCE_CHARS).collect::<String>(),
+            })],
+        }],
+        tools: Vec::new(),
+    };
+    let Ok(reply) = state.llm.send(request, &Cancel::new()).await else {
+        return;
+    };
+    let title = clean_title(&text_content(&reply.content));
+    if !title.is_empty() {
+        state.link.send(FromWorker::TriggerTitled { id, title });
+    }
 }
 
 /// Name the Task from its first message and the answer that ended its first
