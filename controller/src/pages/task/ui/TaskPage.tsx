@@ -18,7 +18,7 @@ import { useComposer } from "../model/use-composer";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
 import { Composer } from "./Composer";
-import { BudgetCard, CompactedCard, FailedCard, FileCard, InterruptedCard, Separator, SkippedCard, StoppedLine } from "./LogCards";
+import { BudgetCard, CompactedCard, FailedCard, FileCard, InterruptedCard, RoundLine, Separator, SkippedCard, StoppedLine } from "./LogCards";
 import { PendingBubble } from "./PendingBubble";
 import { TaskTitle } from "./TaskTitle";
 import { ChangesRow, ToolCalls } from "./ToolCalls";
@@ -96,7 +96,9 @@ export function TaskPage() {
   const scopeFor = (command: string) => (schedule.trigger ? scopeNeeds(command, allowlist, schedule.trigger) : null);
 
   const renderItem = ({ item }: { item: Item }) =>
-    item.kind === "member" ? (
+    item.kind === "round" ? (
+      <RoundLine item={item} />
+    ) : item.kind === "member" ? (
       <Bubble text={item.text} />
     ) : item.kind === "agent" ? (
       <AgentText text={item.text} />

@@ -156,6 +156,34 @@ export function StoppedLine({ member, me, at, now }: { member: string; me: strin
   );
 }
 
+// A round a Trigger started (issue #74): a centred line saying which kind and when, not the setter's bubble,
+// since nobody typed it then. Tapping it shows the words it was set with.
+export function RoundLine({ item }: { item: Extract<Item, { kind: "round" }> }) {
+  const t = useT("task");
+  const language = useLanguage();
+  const [open, setOpen] = useState(false);
+  const time = new Date(item.at).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" });
+  const kind = item.trigger === "idle" || item.trigger === "watch" ? item.trigger : "schedule";
+  const icon = kind === "idle" ? "refresh" : kind === "watch" ? "file" : "time";
+  return (
+    <View style={{ alignSelf: "center", alignItems: "center", gap: space.sm, maxWidth: "100%" }}>
+      <Pressable role="button" aria-expanded={open} hitSlop={6} onPress={() => setOpen(!open)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+        <Card style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, paddingVertical: space.smd, borderRadius: 14 }}>
+          <Label icon={icon}>{item.attended ? t(`round.ranNow.${kind}`) : t(`round.due.${kind}`, { time })}</Label>
+          <Icon name={open ? "collapse" : "expand"} size="xs" weight="semibold" />
+        </Card>
+      </Pressable>
+      {open && (
+        <Card style={{ padding: space.inset }}>
+          <Text variant="callout" tone="body" selectable>
+            {item.text}
+          </Text>
+        </Card>
+      )}
+    </View>
+  );
+}
+
 // The boards' centred time line between groups far apart: today and yesterday by name, else the date.
 export function Separator({ at, now }: { at: number; now: number }) {
   const t = useT("task");

@@ -227,3 +227,16 @@ test("what a round nobody watched did not do is shown, a command with its parts 
     { key: "2", kind: "skipped", target: "example.com", parts: [], domain: true },
   ]);
 });
+
+test("a round a Schedule started is an event line with its words, not the setter's bubble", () => {
+  const { items: result } = items([
+    row(1, "member.message", { text: "summarize the news", trigger: { kind: "schedule", id: "tr_1", at: 1000 } }),
+    row(2, "member.message", { text: "next piece", trigger: { kind: "idle", id: "tr_2", at: 2000, attended: true } }),
+    row(3, "member.message", { text: "typed" }),
+  ]);
+  expect(result.filter((item) => item.kind !== "time")).toEqual([
+    { key: "1", kind: "round", trigger: "schedule", at: 1000, attended: false, text: "summarize the news" },
+    { key: "2", kind: "round", trigger: "idle", at: 2000, attended: true, text: "next piece" },
+    { key: "3", kind: "member", text: "typed" },
+  ]);
+});

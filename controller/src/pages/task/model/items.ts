@@ -64,6 +64,8 @@ export type Approval = {
 /** What the Task screen draws, in order. Kinds this build does not know draw nothing (ADR 0023). */
 export type Item =
   | { key: string; kind: "member"; text: string }
+  /** A round a Trigger started (ADR 0067): its kind, when it was due, whether a Member pressed run now, and the words it was set with. */
+  | { key: string; kind: "round"; trigger: string; at: number; attended: boolean; text: string }
   | { key: string; kind: "agent"; text: string }
   | { key: string; kind: "error"; code: string; retryAt?: number }
   /** Commands run back to back, with no words of the Agent between them. */
@@ -143,6 +145,7 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       size?: number;
       hash?: string;
       path?: string;
+      trigger?: { kind?: string; at?: number; attended?: boolean };
     };
     try {
       body = JSON.parse(event.body) ?? {};
@@ -151,7 +154,9 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
     }
     const key = String(event.seq);
     const before = out.length;
-    if (event.kind === "member.message" && body.text) out.push({ key, kind: "member", text: body.text });
+    // A round nobody typed is an event line, not the setter's own bubble (issue #74).
+    if (event.kind === "member.message" && body.text && body.trigger) out.push({ key, kind: "round", trigger: String(body.trigger.kind ?? "schedule"), at: Number(body.trigger.at ?? 0), attended: !!body.trigger.attended, text: body.text });
+    else if (event.kind === "member.message" && body.text) out.push({ key, kind: "member", text: body.text });
     else if (event.kind === "llm.message") {
       const text = textOf(body.content);
       if (text) out.push({ key, kind: "agent", text });

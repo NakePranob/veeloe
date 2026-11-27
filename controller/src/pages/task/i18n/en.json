@@ -214,5 +214,17 @@
     "covered": "This Schedule may do it from the next round on",
     "domainBody": "For the next rounds to reach it, the domain has to be in the Agent's Egress.",
     "allow": "Let this Schedule do it"
+  },
+  "round": {
+    "due": {
+      "schedule": "A Schedule ran on its own at {{time}}",
+      "idle": "Idle Work started on its own at {{time}}",
+      "watch": "A Watch started on its own at {{time}}"
+    },
+    "ranNow": {
+      "schedule": "Someone ran this Schedule now",
+      "idle": "Someone started this Idle Work piece now",
+      "watch": "Someone started this Watch now"
+    }
   }
 }

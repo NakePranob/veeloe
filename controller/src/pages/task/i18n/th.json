@@ -214,5 +214,17 @@
     "covered": "Schedule นี้ทำได้แล้วตั้งแต่รอบหน้า",
     "domainBody": "โดเมนต้องอยู่ใน Egress ของ Agent ถ้าจะให้รอบถัดไปออกไปที่นี่ได้",
     "allow": "ให้ Schedule นี้ทำได้เลย"
+  },
+  "round": {
+    "due": {
+      "schedule": "Schedule รันเองตอน {{time}}",
+      "idle": "Idle Work เริ่มเองตอน {{time}}",
+      "watch": "Watch เริ่มเองตอน {{time}}"
+    },
+    "ranNow": {
+      "schedule": "มีคนกดรัน Schedule นี้เลย",
+      "idle": "มีคนกดเริ่ม Idle Work ชิ้นนี้เลย",
+      "watch": "มีคนกดเริ่ม Watch นี้เลย"
+    }
   }
 }
