@@ -4,7 +4,7 @@ import type React from "react";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines, type Machine } from "../../../entities/machine";
-import { latestEvents, titleOf, useTaskSummaries } from "../../../entities/task";
+import { latestEvents, titleOf, useLatestTasks, useTasksByIds } from "../../../entities/task";
 import { agentTotals, dailyTotals, useUsageDays, type UsageDayRow } from "../../../entities/usage";
 import { useMachineLink, useMachineStatuses, useUsageStatuses, type UsageStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
@@ -128,9 +128,6 @@ function tickOf(day: string, last: boolean, count: number, language: string, tod
 function TopTasks({ statuses, agents }: { statuses: Record<string, UsageStatus>; agents: AgentRow[] }) {
   const t = useT("usage");
   const language = useLanguage();
-  const summaries = useTaskSummaries() ?? [];
-  // A Task by its name, as its row on the Agent page reads: the title it was given, else what was asked.
-  const previews = new Map(summaries.map((task) => [task.id, titleOf(task)]));
   const names = new Map(agents.map((agent) => [agent.id, agent.name]));
   // Only an answer that is no longer loading belongs to the window on screen; a half-arrived window shows nothing.
   const fresh = Object.values(statuses).filter((status) => !status.loading && status.from !== null && status.to !== null);
@@ -138,12 +135,16 @@ function TopTasks({ statuses, agents }: { statuses: Record<string, UsageStatus>;
     .flatMap((status) => status.tasks)
     .filter((task) => names.has(task.agent))
     .sort((a, b) => b.tokens - a.tokens);
+  // Only the ten shown are read, by their name as their row on the Agent page reads: the title, else what was asked.
+  const shown = tasks.slice(0, 10);
+  const summaries = useTasksByIds(shown.map((task) => task.task)) ?? [];
+  const previews = new Map(summaries.map((task) => [task.id, titleOf(task)]));
   // What is left after the Machine's 20 biggest Tasks per Agent: never a row that pretends to know the names.
   const other = fresh.reduce((sum, status) => sum + Math.max(0, status.total - status.tasks.reduce((all, task) => all + task.tokens, 0)), 0);
   if (tasks.length === 0 && other === 0) return null;
   return (
     <Section title={t("tasks.heading")}>
-      {tasks.slice(0, 10).map((task) => {
+      {shown.map((task) => {
         const preview = previews.get(task.task);
         return (
           <Row
@@ -171,7 +172,7 @@ export function UsagePage() {
   const rows = useUsageDays() ?? [];
   const statuses = useUsageStatuses();
   // Newest first, so the first Task of an Agent's is the one its face shows, as the Inbox reads it.
-  const summaries = useTaskSummaries() ?? [];
+  const summaries = useLatestTasks() ?? [];
   const machineStatuses = useMachineStatuses();
   const days = useUsageWindow();
 

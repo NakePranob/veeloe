@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { FlatList, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
-import { STATUS_DOT, statusOf, threadsOf, titleOf, useAgentTaskSummaries, useHiddenThreads, useTaskSummaries } from "../../../entities/task";
+import { headsOf, STATUS_DOT, statusOf, titleOf, useAgentTaskSummaries, useThreadHeads } from "../../../entities/task";
 import { useMachineStatus } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
@@ -70,10 +70,9 @@ function Tasks({ agentId, online }: { agentId: string; online: boolean | null })
 
 function Threads({ agentId, online }: { agentId: string; online: boolean | null }) {
   const t = useT("agent");
-  const summaries = useTaskSummaries();
-  const hidden = useHiddenThreads();
-  if (!summaries || !hidden) return <Spinner />;
-  const threads = threadsOf(summaries, agentId, new Set(hidden.map((row) => row.trigger_id)), online);
+  const heads = useThreadHeads(agentId, true);
+  if (!heads) return <Spinner />;
+  const threads = headsOf(heads, online);
   return (
     <FlatList
       data={threads}
@@ -84,7 +83,7 @@ function Threads({ agentId, online }: { agentId: string; online: boolean | null 
         <Row
           icon="time"
           title={thread.text.split("\n")[0] || t("threads.untitled")}
-          value={t("threads.rounds", { count: thread.rounds.length })}
+          value={t("threads.rounds", { count: thread.rounds })}
           onPress={() => router.replace({ pathname: "/threads/[trigger]", params: { trigger: thread.id, agent: agentId } })}
         />
       )}

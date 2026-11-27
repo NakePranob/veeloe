@@ -27,7 +27,7 @@ export {
   titleOfEvents,
   type TaskSummary,
 } from "./model/tasks";
-export { useAgentTaskSummaries, useHiddenThreads, usePendingMessages, useTaskEvents, useTaskRow, useTaskSummaries } from "./model/use-tasks";
-export { originOf, threadsOf } from "./model/threads";
+export { useAgentTaskCount, useAgentTaskSummaries, useHiddenThreads, useLatestTasks, usePendingMessages, useTaskEvents, useTaskRow, useTasksByIds, useThreadHeads, useTriggerRounds } from "./model/use-tasks";
+export { headsOf, originOf, threadsOf } from "./model/threads";
 export { TaskStatusDot } from "./ui/TaskStatusDot";
 export { TaskStatusLabel } from "./ui/TaskStatusLabel";

@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { isSpent, useAgents, useTrashedAgents, type AgentTrashRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, RETIRED_COLOR } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { statusOf, TaskStatusDot, useTaskSummaries } from "../../../entities/task";
+import { statusOf, TaskStatusDot, useLatestTasks } from "../../../entities/task";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { useNow } from "../../../shared/lib";
@@ -20,7 +20,7 @@ export function AgentsPage() {
   const agents = useAgents();
   const trashed = useTrashedAgents();
   const machines = useMachines() ?? [];
-  const summaries = useTaskSummaries() ?? [];
+  const summaries = useLatestTasks() ?? [];
   const statuses = useMachineStatuses();
   const link = useMachineLink();
   // The row that was just asked for, until the Machine's answer moves it back.

@@ -5,7 +5,7 @@ import { Animated, FlatList, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { isBudgetOut, latestEvents, previewOf, TaskStatusDot, useTaskSummaries, type TaskStatus, type TaskSummary } from "../../../entities/task";
+import { isBudgetOut, latestEvents, previewOf, TaskStatusDot, useLatestTasks, type TaskStatus, type TaskSummary } from "../../../entities/task";
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
@@ -125,7 +125,7 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
   const t = useT("agent-inbox");
   const machines = useMachines();
   const agents = useAgents();
-  const tasks = useTaskSummaries();
+  const tasks = useLatestTasks();
   const statuses = useMachineStatuses();
   const now = useNow();
   // Kept while the app is open; a fresh launch starts on All so no Agent is out of sight.

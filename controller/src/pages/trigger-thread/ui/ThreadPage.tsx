@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useAgents } from "../../../entities/agent";
-import { hideThread, STATUS_DOT, threadsOf, useHiddenThreads, useTaskSummaries } from "../../../entities/task";
+import { hideThread, STATUS_DOT, threadsOf, useHiddenThreads, useTriggerRounds } from "../../../entities/task";
 import { useMachineStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
 import { useLanguage, useT } from "../../../shared/i18n";
@@ -16,7 +16,8 @@ export function ThreadPage() {
   const database = useDatabase();
   const { trigger, agent: agentId } = useLocalSearchParams<{ trigger: string; agent: string }>();
   const agent = useAgents()?.find((row) => row.id === agentId);
-  const summaries = useTaskSummaries();
+  // This Trigger's rounds only.
+  const summaries = useTriggerRounds(trigger);
   const hidden = useHiddenThreads();
   const online = useMachineStatus(agent?.machine_id ?? "").online;
   const thread = summaries && hidden ? threadsOf(summaries, agentId, new Set(hidden.map((row) => row.trigger_id)), online).find((found) => found.id === trigger) : undefined;

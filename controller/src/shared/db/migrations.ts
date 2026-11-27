@@ -97,4 +97,29 @@ export const MIGRATIONS = [
   // Threads of Trigger rounds deleted on this device (ADR 0061, issue #59): only the index goes,
   // the Tasks stay. Which Task belongs to which Trigger is read from its first message.
   `CREATE TABLE thread_hidden (trigger_id TEXT PRIMARY KEY NOT NULL)`,
+  // What lists show of a Task, kept on its row as events land, so a list reads one row per Task
+  // instead of searching each Task's events (task.ts, `REFRESH_SUMMARY`). Filled once here for the
+  // Tasks already on the device; the kinds are the ones this build knew when it was written.
+  `ALTER TABLE task ADD COLUMN events INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE task ADD COLUMN latest_kind TEXT;
+  ALTER TABLE task ADD COLUMN latest_body TEXT;
+  ALTER TABLE task ADD COLUMN last_kind TEXT;
+  ALTER TABLE task ADD COLUMN last_body TEXT;
+  ALTER TABLE task ADD COLUMN title_body TEXT;
+  ALTER TABLE task ADD COLUMN first_body TEXT;
+  ALTER TABLE task ADD COLUMN trigger_id TEXT;
+  ALTER TABLE task ADD COLUMN quiet INTEGER NOT NULL DEFAULT 0;
+  UPDATE task SET
+    events = (SELECT count(*) FROM task_event e WHERE e.task_id = task.id),
+    latest_kind = (SELECT kind FROM task_event e WHERE e.task_id = task.id AND kind IN ('member.message', 'turn.started', 'llm.message', 'tool.result', 'turn.ended', 'turn.stopped', 'turn.interrupted', 'turn.stalled', 'approval.requested', 'approval.answered') ORDER BY seq DESC LIMIT 1),
+    latest_body = (SELECT body FROM task_event e WHERE e.task_id = task.id AND kind IN ('member.message', 'turn.started', 'llm.message', 'tool.result', 'turn.ended', 'turn.stopped', 'turn.interrupted', 'turn.stalled', 'approval.requested', 'approval.answered') ORDER BY seq DESC LIMIT 1),
+    last_kind = (SELECT kind FROM task_event e WHERE e.task_id = task.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1),
+    last_body = (SELECT body FROM task_event e WHERE e.task_id = task.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1),
+    title_body = (SELECT body FROM task_event e WHERE e.task_id = task.id AND kind = 'task.titled' ORDER BY seq DESC LIMIT 1),
+    first_body = (SELECT body FROM task_event e WHERE e.task_id = task.id AND kind = 'member.message' ORDER BY seq LIMIT 1);
+  UPDATE task SET
+    trigger_id = json_extract(first_body, '$.trigger.id'),
+    quiet = coalesce(latest_kind = 'turn.ended' AND json_extract(latest_body, '$.reason') = 'quiet', 0);
+  CREATE INDEX task_by_agent_news ON task (agent_id, quiet, updated_at);
+  CREATE INDEX task_by_trigger ON task (trigger_id, updated_at);`,
 ] as const;

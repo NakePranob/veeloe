@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { isSpent, staleUsage, useAgents } from "../../../entities/agent";
 import { HeadStack, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { latestEvents, statusOf, useTaskSummaries } from "../../../entities/task";
+import { latestEvents, statusOf, useLatestTasks } from "../../../entities/task";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { formatNumber, formatTokens } from "../../../shared/lib";
@@ -26,7 +26,7 @@ export function MachinePage() {
   const machines = useMachines();
   const machine = machines?.find((m) => m.id === id);
   const agents = (useAgents() ?? []).filter((a) => a.machine_id === id);
-  const tasks = useTaskSummaries() ?? [];
+  const tasks = useLatestTasks() ?? [];
   const status = useMachineStatus(id);
   const link = useMachineLink();
   const [part, setPart] = useState<Part>("agent");

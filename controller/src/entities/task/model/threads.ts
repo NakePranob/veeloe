@@ -29,6 +29,15 @@ const textOf = (summary: Pick<TaskSummary, "first_body">) => {
   }
 };
 
+/** One row per Trigger from `useThreadHeads`: its id, words, how many rounds, and its newest round. */
+export function headsOf(rows: readonly (TaskSummary & { rounds: number })[], online: boolean | null) {
+  return rows.flatMap((row) => {
+    const origin = originOf(row);
+    if (!origin) return [];
+    return [{ id: origin.id, text: textOf(row), rounds: row.rounds, round: { task: row.id, at: origin.at || row.updated_at, title: titleOf(row), quiet: isQuiet(row), status: statusOf(row, online) } }];
+  });
+}
+
 /**
  * One thread per Trigger of this Agent, the newest round first in each and the thread with the newest
  * round first. `hidden` are threads deleted on this device; a quiet round stays in as "nothing" (ADR 0061).

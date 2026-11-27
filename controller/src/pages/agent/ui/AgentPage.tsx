@@ -6,7 +6,7 @@ import { APPROVAL_TIMEOUT_S_DEFAULT } from "@veeloe/protocol-ts";
 import { allowlistOf, approvalTimeoutOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
-import { STATUS_DOT, statusOf, threadsOf, titleOf, useHiddenThreads, useTaskSummaries } from "../../../entities/task";
+import { headsOf, STATUS_DOT, statusOf, titleOf, useAgentTaskCount, useAgentTaskSummaries, useThreadHeads } from "../../../entities/task";
 import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession, type Signed } from "../../../shared/keystore";
@@ -29,10 +29,10 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const machine = useMachines()?.find((m) => m.id === agent.machine_id);
   const machineStatus = useMachineStatus(agent.machine_id);
   const online = machineStatus.online;
-  const summaries = useTaskSummaries() ?? [];
-  const tasks = summaries.filter((task) => task.agent_id === agent.id);
-  const hiddenThreads = useHiddenThreads();
-  const threads = threadsOf(summaries, agent.id, new Set((hiddenThreads ?? []).map((row) => row.trigger_id)), online);
+  // Only what the page shows: the newest few Tasks and how many there are, and one row per Schedule thread.
+  const tasks = useAgentTaskSummaries(agent.id, SHOWN) ?? [];
+  const taskCount = useAgentTaskCount(agent.id) ?? tasks.length;
+  const threads = headsOf(useThreadHeads(agent.id, true) ?? [], online);
   const [name, setName] = useState(agent.name);
   // The page shows the Machine's values once a save lands (ADR 0006), and another device's change comes in the same way.
   // A Machine older than `daily-budget` never says a Budget: its answer settles the save rather than spinning forever.
@@ -155,7 +155,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
       {threads.length > 0 && (
         <Section title={t("threads.heading")}>
           {threads.slice(0, SHOWN).map((thread) => (
-            <Row key={thread.id} icon="time" title={thread.text.split("\n")[0] || t("threads.untitled")} value={t("threads.rounds", { count: thread.rounds.length })} href={`/threads/${thread.id}?agent=${agent.id}`} />
+            <Row key={thread.id} icon="time" title={thread.text.split("\n")[0] || t("threads.untitled")} value={t("threads.rounds", { count: thread.rounds })} href={`/threads/${thread.id}?agent=${agent.id}`} />
           ))}
           {threads.length > SHOWN && <Row title={t("all")} value={String(threads.length)} href={`/agents/${agent.id}/all?show=threads`} />}
         </Section>
@@ -164,7 +164,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
       {/* The newest few, by when they last moved; the rest are a sheet away, read a page at a time. */}
       {tasks.length > 0 && (
         <Section title={t("tasks.heading")} footer={t("tasks.footer")}>
-          {tasks.slice(0, SHOWN).map((task) => (
+          {tasks.map((task) => (
             <Row
               key={task.id}
               leading={<Dot color={STATUS_DOT[statusOf(task, online)]} size={9} />}
@@ -174,7 +174,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
               onLongPress={() => router.push({ pathname: "/tasks/[task]/details", params: { task: task.id, agent: agent.id, from: "agent" } })}
             />
           ))}
-          {tasks.length > SHOWN && <Row title={t("all")} value={String(tasks.length)} href={`/agents/${agent.id}/all?show=tasks`} />}
+          {taskCount > SHOWN && <Row title={t("all")} value={String(taskCount)} href={`/agents/${agent.id}/all?show=tasks`} />}
         </Section>
       )}
 

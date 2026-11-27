@@ -2,7 +2,7 @@ import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { useDevices } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
-import { needsYou, statusOf, useTaskSummaries } from "../../../entities/task";
+import { needsYou, statusOf, useLatestTasks } from "../../../entities/task";
 import { dailyTotals, useUsageDays } from "../../../entities/usage";
 import { PUSH_READY, savePushEnabled, useMachineStatuses, usePushEnabled } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
@@ -20,7 +20,7 @@ export function WorkspacePage() {
   const machines = useMachines();
   const statuses = useMachineStatuses();
   const agents = useAgents();
-  const tasks = useTaskSummaries();
+  const tasks = useLatestTasks();
   const rows = useUsageDays();
   const devices = useDevices();
   const live = devices?.filter((d) => d.revoked_at === null);

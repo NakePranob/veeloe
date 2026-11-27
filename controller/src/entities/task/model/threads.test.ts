@@ -15,6 +15,8 @@ const round = (id: string, trigger: string | null, at: number, ended: "done" | "
   last_body: null,
   title_body: ended === "done" ? JSON.stringify({ title: `CI on ${at}` }) : null,
   first_body: JSON.stringify({ member: "m_1", id, text: "check the CI", ...(trigger ? { trigger: { kind: "schedule", id: trigger, at } } : {}) }),
+  trigger_id: trigger,
+  quiet: ended === "quiet" ? 1 : 0,
 });
 
 test("rounds of one Trigger make one thread, newest first, and a Task a Member started is in none", () => {

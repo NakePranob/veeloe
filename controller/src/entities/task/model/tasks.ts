@@ -31,6 +31,9 @@ export function saveTaskEvents(database: Database, { task, agent, machine }: { t
       synced = seq;
     }
     await transaction.run("UPDATE task SET synced_seq = ?, updated_at = max(updated_at, ?) WHERE id = ?", [synced, latest, task]);
+    // Worked out again from all its events, so events that arrive out of order still leave it right.
+    await transaction.run(REFRESH_SUMMARY, [task]);
+    await transaction.run(REFRESH_FLAGS, [task]);
   });
 }
 
@@ -91,20 +94,48 @@ const KNOWN_SQL = KNOWN.map((kind) => `'${kind}'`).join(", ");
 export type Latest = { latest_kind: string | null; latest_body: string | null };
 
 /** A Task as lists show it: when it last moved, what it is doing, its latest words, its name and its first message. */
-export type TaskSummary = TaskRow & Latest & { events: number; last_kind: string | null; last_body: string | null; title_body: string | null; first_body: string | null };
+export type TaskSummary = TaskRow & Latest & { events: number; last_kind: string | null; last_body: string | null; title_body: string | null; first_body: string | null; trigger_id: string | null; quiet: number };
 
-export const LIST_TASK_SUMMARIES = `SELECT t.*,
-  (SELECT count(*) FROM task_event WHERE task_id = t.id) AS events,
-  (SELECT kind FROM task_event WHERE task_id = t.id AND kind IN (${KNOWN_SQL}) ORDER BY seq DESC LIMIT 1) AS latest_kind,
-  (SELECT body FROM task_event WHERE task_id = t.id AND kind IN (${KNOWN_SQL}) ORDER BY seq DESC LIMIT 1) AS latest_body,
-  (SELECT kind FROM task_event WHERE task_id = t.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1) AS last_kind,
-  (SELECT body FROM task_event WHERE task_id = t.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1) AS last_body,
-  (SELECT body FROM task_event WHERE task_id = t.id AND kind = '${TaskTitled}' ORDER BY seq DESC LIMIT 1) AS title_body,
-  (SELECT body FROM task_event WHERE task_id = t.id AND kind = 'member.message' ORDER BY seq LIMIT 1) AS first_body
-  FROM task t ORDER BY t.updated_at DESC`;
+/** What lists show of one Task, from its events, kept on its row (migration `task.events`). */
+const REFRESH_SUMMARY = `UPDATE task SET
+  events = (SELECT count(*) FROM task_event e WHERE e.task_id = task.id),
+  latest_kind = (SELECT kind FROM task_event e WHERE e.task_id = task.id AND kind IN (${KNOWN_SQL}) ORDER BY seq DESC LIMIT 1),
+  latest_body = (SELECT body FROM task_event e WHERE e.task_id = task.id AND kind IN (${KNOWN_SQL}) ORDER BY seq DESC LIMIT 1),
+  last_kind = (SELECT kind FROM task_event e WHERE e.task_id = task.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1),
+  last_body = (SELECT body FROM task_event e WHERE e.task_id = task.id AND kind IN ('member.message', 'llm.message') ORDER BY seq DESC LIMIT 1),
+  title_body = (SELECT body FROM task_event e WHERE e.task_id = task.id AND kind = '${TaskTitled}' ORDER BY seq DESC LIMIT 1),
+  first_body = (SELECT body FROM task_event e WHERE e.task_id = task.id AND kind = 'member.message' ORDER BY seq LIMIT 1)
+  WHERE id = ?`;
+
+/** Read from the columns above, so in a second step: the Trigger a round came from, and whether it ended quietly. */
+const REFRESH_FLAGS = `UPDATE task SET
+  trigger_id = json_extract(first_body, '$.trigger.id'),
+  quiet = coalesce(latest_kind = '${TaskEventKind.TurnEnded}' AND json_extract(latest_body, '$.reason') = 'quiet', 0)
+  WHERE id = ?`;
+
+/** Every Task, newest first: one row each, nothing searched. */
+export const LIST_TASK_SUMMARIES = "SELECT * FROM task ORDER BY updated_at DESC";
 
 /** One Agent's Tasks, newest first, at most `?` of them: a long list read a page at a time. */
-export const LIST_AGENT_TASK_SUMMARIES = LIST_TASK_SUMMARIES.replace("FROM task t ORDER BY t.updated_at DESC", "FROM task t WHERE t.agent_id = ? ORDER BY t.updated_at DESC LIMIT ?");
+export const LIST_AGENT_TASK_SUMMARIES = "SELECT * FROM task WHERE agent_id = ? ORDER BY updated_at DESC LIMIT ?";
+
+/** How many Tasks one Agent has. */
+export const COUNT_AGENT_TASKS = "SELECT count(*) AS count FROM task WHERE agent_id = ?";
+
+/** Each Agent's newest Task that is news: a round that ended quietly is not (the Inbox, the Agents and Machine pages). */
+export const LIST_LATEST_TASKS = `SELECT * FROM task t WHERE t.id = (
+  SELECT n.id FROM task n WHERE n.agent_id = t.agent_id AND n.quiet = 0 ORDER BY n.updated_at DESC LIMIT 1
+) ORDER BY t.updated_at DESC`;
+
+/** The newest round of each Trigger of one Agent, with how many rounds it has; `?` is 1 to leave out threads deleted on this device. */
+export const LIST_THREAD_HEADS = `SELECT t.*, (SELECT count(*) FROM task c WHERE c.trigger_id = t.trigger_id) AS rounds FROM task t
+  WHERE t.agent_id = ? AND t.trigger_id IS NOT NULL
+    AND (? = 0 OR t.trigger_id NOT IN (SELECT trigger_id FROM thread_hidden))
+    AND t.id = (SELECT l.id FROM task l WHERE l.trigger_id = t.trigger_id ORDER BY l.updated_at DESC LIMIT 1)
+  ORDER BY t.updated_at DESC`;
+
+/** Every round of one Trigger, newest first. */
+export const LIST_TRIGGER_ROUNDS = "SELECT * FROM task WHERE trigger_id = ? ORDER BY updated_at DESC";
 
 /** The latest words in a Task, as one plain line: the Member's, or the first line of the Agent's text. */
 export function previewOf(summary: Pick<TaskSummary, "last_kind" | "last_body">): string {

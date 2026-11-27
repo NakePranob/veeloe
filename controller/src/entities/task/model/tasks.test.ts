@@ -7,7 +7,9 @@ import {
   failPendingMessage,
   isBudgetOut,
   latestOf,
+  LIST_LATEST_TASKS,
   LIST_TASK_SUMMARIES,
+  LIST_THREAD_HEADS,
   markPendingSent,
   saveTaskEvents,
   statusOf,
@@ -162,4 +164,33 @@ test("only a Turn that ended on today's Budget counts as Budget out", () => {
   expect(isBudgetOut({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason: "error", code: "budget.exhausted" }) })).toBe(true);
   expect(isBudgetOut({ latest_kind: "turn.ended", latest_body: JSON.stringify({ reason: "error", code: "provider.failed" }) })).toBe(false);
   expect(isBudgetOut(undefined)).toBe(false);
+});
+
+test("a Task's summary lives on its row and stays right when events land out of order", async () => {
+  const database = await open();
+  const round = { trigger: { kind: "schedule", id: "tr_1", at: 5 } };
+  await saveTaskEvents(database, where, [event(3, "turn.ended", { reason: "quiet" })]);
+  await saveTaskEvents(database, where, [event(1, "member.message", { text: "check", ...round }), event(2, "llm.message", { content: [] })]);
+  const [row] = await database.query<TaskSummary>(LIST_TASK_SUMMARIES);
+  expect(row).toMatchObject({ events: 3, latest_kind: "turn.ended", last_kind: "llm.message", trigger_id: "tr_1", quiet: 1 });
+  expect(JSON.parse(row!.first_body!).text).toBe("check");
+});
+
+test("the Inbox's newest Task per Agent skips a quiet round, and a thread head counts its rounds", async () => {
+  const database = await open();
+  const round = (task: string, seq: number, reason: string) =>
+    saveTaskEvents(database, { ...where, task }, [event(1, "member.message", { text: "check", trigger: { kind: "schedule", id: "tr_1", at: seq } }), { ...event(2, "turn.ended", { reason }), at: 2000 + seq }]);
+  await saveTaskEvents(database, { ...where, task: "typed" }, [event(1, "member.message", { text: "hi" })]);
+  await round("r1", 1, "done");
+  await round("r2", 2, "quiet");
+  const latest = await database.query<TaskSummary>(LIST_LATEST_TASKS);
+  expect(latest.map((t) => t.id)).toEqual(["r1"]);
+  const heads = await database.query<TaskSummary & { rounds: number }>(LIST_THREAD_HEADS, ["a1", 1]);
+  expect(heads.map((h) => [h.id, h.rounds])).toEqual([["r2", 2]]);
+});
+
+test("a Task with no events yet still saves and is not quiet", async () => {
+  const database = await open();
+  await saveTaskEvents(database, where, [event(1, "task.titled", { title: "x" })]);
+  expect((await database.query<TaskSummary>(LIST_TASK_SUMMARIES))[0]?.quiet).toBe(0);
 });
