@@ -7,20 +7,12 @@ import { useMachines, type Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus, useTriggerStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, confirm, Dot, Empty, Note, Row, Screen, Section, Select, Spinner, Text, ToggleRow, type Colors, space } from "../../../shared/ui";
-import { piecesOf, SHARE_CHOICES } from "../model/idle";
+import { Button, confirm, Dot, Empty, Note, Row, Screen, Section, Select, Spinner, Text, ToggleRow, space } from "../../../shared/ui";
+import { ITEM_CHOICES, piecesOf, progressOf, QUIET_CHOICES, settingsOf, SHARE_CHOICES, type Settings } from "../model/idle";
+import { deleteList, signList, STATUS } from "./sign";
 
-/** How each piece reads, and the colour of its dot: orange is a person's turn, red did not finish. */
-const STATUS = {
-  pending: { words: "status.pending", dot: "tertiaryLabel" },
-  working: { words: "status.working", dot: "accent" },
-  done: { words: "status.done", dot: "green" },
-  timedOut: { words: "status.timedOut", dot: "red" },
-  needsApproval: { words: "status.needsApproval", dot: "orange" },
-} as const satisfies Record<string, { words: string; dot: keyof Colors }>;
-
-// An Agent's Idle Work list (ADR 0056, issue #57), drawn like the Schedule page: the pieces as rows with a dot for
-// where each stands, what the Agent proposed above them, and the list's own settings under them. It is changed in a sheet.
+// An Agent's Idle Work list (ADR 0056, issue #57), drawn like the Schedule page: each piece a row with a dot for where it
+// stands that opens its own sheet, what the Agent proposed above them, and the list's own settings under them.
 export function IdleWorkPage() {
   const t = useT("agent-idle-work");
   const { agent: id } = useLocalSearchParams<{ agent: string }>();
@@ -43,7 +35,8 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
   const offline = online === false || !link;
   const list = status.triggers?.find((trigger) => trigger.kind === "idle");
   const draft = status.draft ?? [];
-  const edit = (withDraft: boolean) => router.push({ pathname: "/agents/[agent]/idle/edit", params: { agent: agent.id, ...(withDraft && { draft: "1" }) } });
+  const open = (piece: string) => router.push({ pathname: "/agents/[agent]/idle/[piece]", params: { agent: agent.id, piece } });
+  const where = link && { link, machine, agentId: agent.id, agentName: agent.name, t };
 
   // Ask on open and again when the Machine comes back.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on ids, since a live query hands back a new Machine row on every write
@@ -51,11 +44,18 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
     if (link && online !== false) link.requestTriggers(machine, agent.id);
   }, [link, machine.id, agent.id, online]);
 
-  async function act(type: "trigger.pause" | "trigger.resume" | "trigger.run" | "trigger.delete", trigger: ListedTrigger) {
+  async function act(type: "trigger.pause" | "trigger.resume" | "trigger.run", trigger: ListedTrigger) {
     if (!link) return;
-    if (type === "trigger.delete" && !(await confirm({ title: t("delete.title"), message: t("delete.message", { name: agent.name }), action: t("delete.action"), cancel: t("cancel"), destructive: true }))) return;
-    await keySession.signed(t(`authenticate.${type.slice(8) as "pause" | "resume" | "run" | "delete"}`, { name: agent.name }), () => link.changeTrigger(machine, { type, body: { agent: agent.id, id: trigger.id } }));
+    await keySession.signed(t(`authenticate.${type.slice(8) as "pause" | "resume" | "run"}`, { name: agent.name }), () => link.changeTrigger(machine, { type, body: { agent: agent.id, id: trigger.id } }));
   }
+
+  async function remove(trigger: ListedTrigger) {
+    if (!where || !(await confirm({ title: t("delete.title"), message: t("delete.message", { name: agent.name }), action: t("delete.action"), cancel: t("cancel"), destructive: true }))) return;
+    await deleteList(where, trigger);
+  }
+
+  // A setting is the whole list signed again with that one setting changed.
+  const setting = (trigger: ListedTrigger, change: Partial<Settings>) => where && void signList(where, trigger, piecesOf(trigger), { ...settingsOf(trigger), ...change });
 
   async function share(percent: string) {
     if (!link) return;
@@ -63,8 +63,9 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
   }
 
   const locked = offline || status.sending;
+  const minutes = (choices: readonly number[], held: number) => [...new Set([...choices, held])].sort((x, y) => x - y).map((count) => ({ value: String(count), label: t("minutes", { count }) }));
   return (
-    <Screen title={t("title")} subtitle={agent.name} right={{ label: list ? t("edit") : t("create"), icon: list ? "edit" : "add", variant: "chip", onPress: () => edit(false), disabled: offline }}>
+    <Screen title={t("title")} subtitle={agent.name} right={{ label: t("add"), icon: "add", variant: "chip", onPress: () => open("new"), disabled: offline }}>
       {offline && <Note tone="offline">{t("offline")}</Note>}
       {status.loading && !status.triggers && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }}>
@@ -82,18 +83,44 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
       {draft.length > 0 && (
         <Section title={t("draft.heading")} footer={t("draft.footer")}>
           {draft.map((text) => (
-            <Row key={text} icon="agent" title={text} />
+            <Row key={text} icon="agent" title={text} disabled={offline} onPress={() => open("draft")} />
           ))}
-          <Row add title={t("draft.add")} disabled={offline} onPress={() => edit(true)} />
         </Section>
       )}
       {status.triggers && !list && draft.length === 0 && (
-        <Empty icon="refresh" title={t("empty.title")} detail={t("empty.body")} action={<Button label={t("create")} variant="primary" leading="add" disabled={offline} onPress={() => edit(false)} />} />
+        <Empty icon="refresh" title={t("empty.title")} detail={t("empty.body")} action={<Button label={t("add")} variant="primary" leading="add" disabled={offline} onPress={() => open("new")} />} />
       )}
-      {list && <Pieces list={list} agentId={agent.id} language={language} />}
+      {list && <Pieces list={list} language={language} open={open} />}
       {list && (
-        <Section footer={t("settings.footer", { quiet: list.idle?.quietMinutes ?? 15, item: list.idle?.itemMinutes ?? 15 })}>
+        <Section footer={t("settings.footer")}>
           <ToggleRow title={t("enabled")} value={!list.paused && !list.suspended} onChange={(on) => void act(on ? "trigger.resume" : "trigger.pause", list)} />
+          <Select<Settings["order"]>
+            label={t("settings.order")}
+            value={settingsOf(list).order}
+            cancel={t("cancel")}
+            disabled={locked}
+            onChange={(order) => setting(list, { order })}
+            options={[
+              { value: "ordered", label: t("order.ordered") },
+              { value: "oldest-first", label: t("order.oldestFirst") },
+            ]}
+          />
+          <Select<string>
+            label={t("settings.quiet")}
+            value={String(settingsOf(list).quietMinutes)}
+            cancel={t("cancel")}
+            disabled={locked}
+            onChange={(m) => setting(list, { quietMinutes: Number(m) })}
+            options={minutes(QUIET_CHOICES, settingsOf(list).quietMinutes)}
+          />
+          <Select<string>
+            label={t("settings.item")}
+            value={String(settingsOf(list).itemMinutes)}
+            cancel={t("cancel")}
+            disabled={locked}
+            onChange={(m) => setting(list, { itemMinutes: Number(m) })}
+            options={minutes(ITEM_CHOICES, settingsOf(list).itemMinutes)}
+          />
           <Select<string>
             label={t("share.label")}
             value={String(agent.background_share ?? 30)}
@@ -109,33 +136,29 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
       )}
       {list && (
         <Section>
-          <Row icon="trash" title={t("delete.row")} destructive disabled={locked} onPress={() => void act("trigger.delete", list)} />
+          <Row icon="trash" title={t("delete.row")} destructive disabled={locked} onPress={() => void remove(list)} />
         </Section>
       )}
     </Screen>
   );
 }
 
-function Pieces({ list, agentId, language }: { list: ListedTrigger; agentId: string; language: string }) {
+function Pieces({ list, language, open }: { list: ListedTrigger; language: string; open: (piece: string) => void }) {
   const t = useT("agent-idle-work");
-  const pieces = piecesOf(list);
+  const pieces = progressOf(list);
   const when = (at: number) => new Date(at).toLocaleString(language, { weekday: "short", hour: "2-digit", minute: "2-digit" });
   return (
     <Section title={t("pieces.heading")} footer={list.idle?.order === "oldest-first" ? t("pieces.oldestFirst") : t("pieces.ordered")}>
       {pieces.length === 0 && <Row title={t("pieces.allDone")} />}
-      {pieces.map((piece) => {
-        const task = piece.task;
-        const words = t(STATUS[piece.status].words);
-        return (
-          <Row
-            key={piece.id}
-            leading={<Dot color={STATUS[piece.status].dot} />}
-            title={piece.text}
-            detail={[words, piece.lastRunAt ? when(piece.lastRunAt) : null, piece.repeat ? t("pieces.repeat") : null].filter(Boolean).join(" · ")}
-            onPress={task ? () => router.push({ pathname: "/tasks/[task]", params: { task, agent: agentId } }) : undefined}
-          />
-        );
-      })}
+      {pieces.map((piece) => (
+        <Row
+          key={piece.id}
+          leading={<Dot color={STATUS[piece.status].dot} />}
+          title={piece.text}
+          detail={[t(STATUS[piece.status].words), piece.lastRunAt ? when(piece.lastRunAt) : null, piece.repeat ? t("pieces.repeat") : null].filter(Boolean).join(" · ")}
+          onPress={() => open(piece.id)}
+        />
+      ))}
     </Section>
   );
 }

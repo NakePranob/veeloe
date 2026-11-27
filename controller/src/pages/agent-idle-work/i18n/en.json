@@ -6,8 +6,6 @@
   },
   "offline": "The Machine is offline, so Idle Work can't change now",
   "loading": "Asking the Machine…",
-  "create": "Create list",
-  "edit": "Edit list",
   "cancel": "Cancel",
   "save": "Save",
   "saving": "Saving…",
@@ -19,8 +17,10 @@
   },
   "draft": {
     "heading": "The Agent proposes",
-    "footer": "Nothing runs until you read it and sign it into the list.",
-    "add": "Read and add to the list"
+    "footer": "Tap to read, change and choose which to keep. Nothing runs until you save.",
+    "sheetFooter": "Proposals you leave out are dropped when you save.",
+    "proposal": "Proposal {{n}}",
+    "take": "Add to the list"
   },
   "pieces": {
     "heading": "On the list",
@@ -37,7 +37,10 @@
     "needsApproval": "Needs an Approval"
   },
   "settings": {
-    "footer": "Starts once the Agent has been quiet for {{quiet}} minutes, one piece at a time, up to {{item}} minutes each. Messages that come in meanwhile wait their turn. Nobody watches these rounds, so they ask for no Approval."
+    "footer": "Starts once the Agent has been quiet this long, one piece at a time. A piece that runs out of time ends as if stopped. Messages that arrive meanwhile wait their turn. Nobody watches these rounds, so they ask for no Approval.",
+    "order": "Order",
+    "quiet": "Start after quiet",
+    "item": "Time per piece"
   },
   "share": {
     "label": "Budget it may use",
@@ -57,18 +60,6 @@
     "delete": "Delete Idle Work for {{name}}",
     "share": "Let background work for {{name}} use {{percent}}% of its Budget"
   },
-  "editor": {
-    "piece": "Piece {{n}}",
-    "placeholder": "Write the missing parser tests",
-    "repeat": "Repeat when done",
-    "remove": "Remove",
-    "add": "Add a piece",
-    "piecesFooter": "Each piece is one instruction the Agent carries out on its own, as one Task.",
-    "order": "Order",
-    "quiet": "Start after quiet for",
-    "item": "Time per piece",
-    "timesFooter": "A piece still going when its time is up ends as if stopped."
-  },
   "order": {
     "ordered": "In order",
     "oldestFirst": "Waiting longest first"
@@ -84,5 +75,29 @@
       "title": "Too long",
       "body": "A list holds up to 50 pieces."
     }
+  },
+  "add": "Add a piece",
+  "piece": {
+    "new": "New piece",
+    "edit": "Edit piece",
+    "text": "Piece",
+    "placeholder": "Write the missing tests for the parser",
+    "footer": "What the Agent does on its own, as one Task",
+    "repeat": "Repeat when done",
+    "repeatDetail": "Goes back to wait instead of leaving the list",
+    "position": "Position",
+    "positionValue": "{{n}} of {{count}}",
+    "positionOldestFirst": "This list runs the longest-waiting piece first, so the position counts once it runs in order.",
+    "last": "Last round",
+    "lastValue": "{{status}} · {{when}}",
+    "missing": "This piece is no longer on the list",
+    "remove": {
+      "row": "Remove this piece",
+      "title": "Remove this piece?",
+      "message": "Tasks it already ran stay. If it is the last piece, the list goes too.",
+      "action": "Remove"
+    },
+    "retry": "Try this piece again",
+    "retryFooter": "This piece waits for you. It goes back in line where it is."
   }
 }
