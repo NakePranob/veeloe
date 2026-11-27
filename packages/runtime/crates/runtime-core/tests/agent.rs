@@ -377,6 +377,12 @@ async fn a_message_starts_a_task_and_a_turn_and_every_event_reaches_the_member_w
         .map(|event| event.seq)
         .collect();
     assert_eq!(seqs, vec![1, 2, 4, 5]);
+    // Every Turn records the file level it ran at (ADR 0087).
+    let started = events
+        .iter()
+        .find(|event| event.kind == "turn.started")
+        .expect("started");
+    assert_eq!(started.body["files"], "folder");
     // Every event goes to the starter; the Turn's proxy token is for the supervisor alone.
     assert!(harness.link.take().iter().all(|message| matches!(
         message,
@@ -616,7 +622,7 @@ async fn a_trigger_round_says_where_it_came_from_and_who_set_it() {
         .expect("started");
     assert_eq!(
         started.body,
-        json!({ "member": "m_owner", "trigger": { "kind": "schedule", "id": "tr_1", "at": 1_000, "attended": false } })
+        json!({ "member": "m_owner", "files": "folder", "trigger": { "kind": "schedule", "id": "tr_1", "at": 1_000, "attended": false } })
     );
     let said = events
         .iter()

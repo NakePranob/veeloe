@@ -12,7 +12,8 @@
     "seq": 2,
     "kind": "turn.started",
     "body": {
-      "member": "m_owner"
+      "member": "m_owner",
+      "files": "folder"
     }
   },
   {

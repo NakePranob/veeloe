@@ -542,7 +542,10 @@ impl AgentCore {
             task,
             &owner,
             "turn.started",
-            with_trigger(json!({ "member": member }), trigger),
+            with_trigger(
+                json!({ "member": member, "files": turn_files(member, trigger).as_str() }),
+                trigger,
+            ),
             None,
         )?;
         let trigger = trigger.cloned();
@@ -1208,6 +1211,28 @@ fn nothing_to_report() -> ToolDefinition {
 }
 
 /// Adds the Trigger a round came from, when it came from one.
+/// How much of the Machine's files one Turn may reach (ADR 0087). Every Turn
+/// takes its level from `turn_files`, so a wider level is decided in one place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Files {
+    /// The Agent's Workdir, Projects and Library only (ADR 0068).
+    Folder,
+}
+
+impl Files {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Files::Folder => "folder",
+        }
+    }
+}
+
+/// The level a Turn runs at. ponytail: always `Folder` until an Agent can be
+/// set wider (#84); the starter and trigger are what the lock rules read (#87).
+pub fn turn_files(_member: &str, _trigger: Option<&TriggerRun>) -> Files {
+    Files::Folder
+}
+
 fn with_trigger(mut body: Value, trigger: Option<&TriggerRun>) -> Value {
     if let Some(trigger) = trigger {
         body["trigger"] = json!({
