@@ -93,7 +93,7 @@ _Avoid_: Plugin, tool, prompt template
 _Avoid_: Plugin, template, preset, package
 
 **Connector**:
-บริการภายนอกที่ต่อเข้ากับ Agent ผ่าน MCP ถ้าเป็นบริการบนเน็ต supervisor เป็นคนต่อและถือ credential ไว้เอง Agent เห็นแค่ tool และอ่าน credential ไม่ได้ ถ้าเป็นโปรแกรมบนเครื่อง จะรันใน sandbox ของ Agent และไม่ถือความลับ Connector หนึ่งตัวใช้บัญชีเดียว ซึ่งคนที่มี Manage เป็นคนผูก ใครที่มี Use ที่ Agent ก็ใช้บัญชีนั้นผ่าน Agent ได้ Member ผูกบัญชีของตัวเองเพิ่มได้ บัญชีนั้นใช้ได้เฉพาะ Turn ที่คนนั้นเป็นคนส่งข้อความ และใช้ใน Channel ไม่ได้ Connector หยุดทันทีเมื่อกุญแจที่เซ็นมันถูกถอน แบบเดียวกับ Schedule และ Channel ถ้าลบ Member แล้ว Owner ไม่ได้เซ็นใหม่ supervisor จะลบ credential ทิ้ง tool ของ Connector ถูกตรึงไว้ตั้งแต่ตอนติดตั้ง ถ้า server เปลี่ยนหรือเพิ่ม tool ต้องอนุมัติใหม่
+บริการภายนอกที่ต่อเข้ากับ Agent ผ่าน MCP ถ้าเป็นบริการที่ต่อด้วย URL supervisor เป็นคนต่อและถือ credential ไว้เอง Agent เห็นแค่ tool และอ่าน credential ไม่ได้ URL นั้นเป็นที่อยู่สาธารณะผ่าน https หรือเป็นบริการภายใน เช่น บนเครื่อง ในเครือข่ายบ้าน หรือใน Tailscale ซึ่งต้องให้ Owner เป็นคนเซ็น (ADR 0081) ถ้าเป็นโปรแกรมบนเครื่อง จะรันใน sandbox ของ Agent และไม่ถือความลับ Connector หนึ่งตัวใช้บัญชีเดียว ซึ่งคนที่มี Manage เป็นคนผูก ใครที่มี Use ที่ Agent ก็ใช้บัญชีนั้นผ่าน Agent ได้ Member ผูกบัญชีของตัวเองเพิ่มได้ บัญชีนั้นใช้ได้เฉพาะ Turn ที่คนนั้นเป็นคนส่งข้อความ และใช้ใน Channel ไม่ได้ Connector หยุดทันทีเมื่อกุญแจที่เซ็นมันถูกถอน แบบเดียวกับ Schedule และ Channel ถ้าลบ Member แล้ว Owner ไม่ได้เซ็นใหม่ supervisor จะลบ credential ทิ้ง tool ของ Connector ถูกตรึงไว้ตั้งแต่ตอนติดตั้ง ถ้า server เปลี่ยนหรือเพิ่ม tool ต้องอนุมัติใหม่
 _Avoid_: Integration, plugin, MCP server, borrowed account
 
 **Memory**:
