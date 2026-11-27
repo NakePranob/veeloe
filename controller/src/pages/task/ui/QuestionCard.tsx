@@ -88,7 +88,7 @@ export function QuestionCard({ question, look, me, online, onAnswer }: Props) {
               {question.options.map((option) => (
                 <Button key={option} size="large" variant="surface" label={option} disabled={!online} onPress={() => send(option)} />
               ))}
-              <Field label={t("question.other")} value={own} onChangeText={setOwn} />
+              <Field label={t("question.other")} value={own} onChangeText={(text) => setOwn(text.slice(0, 2000))} />
               {own.trim() !== "" && <Button size="large" variant="primary" label={t("question.send")} disabled={!online} onPress={() => send(own.trim())} />}
             </View>
           )}

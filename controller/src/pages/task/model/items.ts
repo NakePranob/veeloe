@@ -304,5 +304,6 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
   }
   // Nobody answered in time: it counts as denied (CONTEXT.md).
   for (const { item } of approvals.values()) if (item.approval.status === "open" && item.approval.expiresAt <= now) item.approval.status = "expired";
+  for (const question of questions.values()) if (question.status === "open" && question.expiresAt <= now) question.status = "expired";
   return { items: out, working: open };
 }
