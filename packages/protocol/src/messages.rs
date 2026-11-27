@@ -255,7 +255,9 @@ fn is_agent_update(object: &Map<String, Value>) -> bool {
         || object.contains_key("allowlist")
         || object.contains_key("approvalTimeoutS")
         || object.contains_key("gitRepos")
-        || object.contains_key("backgroundShare");
+        || object.contains_key("backgroundShare")
+        || object.contains_key("files")
+        || object.contains_key("folders");
     if !has_change {
         return false;
     }
@@ -307,7 +309,32 @@ fn is_agent_update(object: &Map<String, Value>) -> bool {
             return false;
         }
     }
+    if let Some(files) = object.get("files") {
+        if !matches!(files.as_str(), Some("folder" | "selected")) {
+            return false;
+        }
+    }
+    if let Some(folders) = object.get("folders") {
+        if !is_folders(folders) {
+            return false;
+        }
+    }
     true
+}
+
+/// The most folders one Agent may be given (ADR 0087).
+pub const FOLDERS_MAX: usize = 20;
+
+/// Folders on the Machine for an Agent: absolute paths, read only for now.
+fn is_folders(value: &Value) -> bool {
+    value.as_array().is_some_and(|folders| {
+        folders.len() <= FOLDERS_MAX
+            && folders.iter().all(|folder| {
+                text(folder.get("path"))
+                    .is_some_and(|path| path.starts_with('/') && (2..=4_096).contains(&chars(path)))
+                    && matches!(folder.get("mode").and_then(Value::as_str), Some("read"))
+            })
+    })
 }
 
 fn is_provider(value: &Value) -> bool {

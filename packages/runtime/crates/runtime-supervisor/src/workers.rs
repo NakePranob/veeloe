@@ -137,6 +137,28 @@ pub fn rules(
         .and_then(|ports| ports.range_avoiding(&agent.id, &|port| proxy_ports.contains(&port)))
         .map(|range| range.ports())
         .unwrap_or_default();
+    // Selected folders, checked again at every start: a folder that became a
+    // symlink into a secret since it was given is dropped, not followed
+    // (ADR 0087). The sandbox holds the real path from here on.
+    if agent.access.files == crate::agents::Level::Selected {
+        let forbidden = crate::folders::Forbidden::for_machine(
+            &PathBuf::from(std::env::var("HOME").unwrap_or_default()),
+            home,
+        );
+        for folder in &agent.access.folders {
+            match forbidden.check(&folder.path) {
+                Ok(real) => policy.read_folders.push(real.to_string_lossy().to_string()),
+                Err(code) => {
+                    let _ = crate::logs::record(
+                        home,
+                        "warn",
+                        "agent.folder_dropped",
+                        serde_json::json!({ "agent": agent.id, "folder": folder.path, "reason": code }),
+                    );
+                }
+            }
+        }
+    }
     Some(policy)
 }
 
@@ -552,6 +574,7 @@ async fn session(
                 "VEELOE_AGENT_ALLOWLIST",
                 serde_json::to_string(&agent.allowlist).unwrap_or_else(|_| "[]".into()),
             )
+            .env("VEELOE_AGENT_FILES", agent.access.files.as_str())
             .env(
                 "VEELOE_AGENT_APPROVAL_TIMEOUT_S",
                 agent.approval_timeout_s.to_string(),

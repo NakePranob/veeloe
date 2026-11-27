@@ -133,4 +133,7 @@ export const MIGRATIONS = [
   `ALTER TABLE task ADD COLUMN read_seq INTEGER NOT NULL DEFAULT 0`,
   // What is here already counts as read, so an update does not light up every old Task.
   `UPDATE task SET read_seq = coalesce((SELECT max(seq) FROM task_event e WHERE e.task_id = task.id), 0)`,
+  // Which of the Machine's files the Agent reaches (ADR 0087): null from a Machine older than it.
+  `ALTER TABLE agent ADD COLUMN files TEXT`,
+  `ALTER TABLE agent ADD COLUMN folders TEXT`,
 ] as const;

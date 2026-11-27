@@ -30,6 +30,7 @@ fn agent(id: &str) -> Agent {
         deleted_at: None,
         git_repos: Vec::new(),
         background_share: None,
+        access: Default::default(),
     }
 }
 

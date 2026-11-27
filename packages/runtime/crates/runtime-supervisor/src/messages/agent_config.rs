@@ -189,6 +189,7 @@ async fn save(
         deleted_at: None,
         git_repos: Vec::new(),
         background_share: None,
+        access: Default::default(),
     });
     let text = |name: &str, fallback: &str| {
         body.get(name)
@@ -196,6 +197,53 @@ async fn save(
             .map(str::to_string)
             .unwrap_or_else(|| fallback.to_string())
     };
+    // Which of the Machine's files an Agent reaches is the Owner's to set
+    // (ADR 0087): in v0.1 an Owner whose key signed. Every folder is checked
+    // against the forbidden list by its real path, and kept as that path.
+    let access = if body.get("files").is_none() && body.get("folders").is_none() {
+        base.access.clone()
+    } else {
+        if !machine
+            .trust
+            .is_some_and(|trust| trust.manages(&from.member, from.key.as_deref()))
+        {
+            return outbox.error(from, "files.forbidden");
+        }
+        let files = match body.get("files") {
+            None => base.access.files,
+            Some(level) => match serde_json::from_value(level.clone()) {
+                Ok(level) => level,
+                Err(_) => return outbox.error(from, "files.invalid"),
+            },
+        };
+        let folders: Vec<crate::agents::Folder> = match body.get("folders") {
+            None => base.access.folders.clone(),
+            Some(folders) => match serde_json::from_value(folders.clone()) {
+                Ok(folders) => folders,
+                Err(_) => return outbox.error(from, "files.invalid"),
+            },
+        };
+        let forbidden = crate::folders::Forbidden::for_machine(
+            &std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default()),
+            registry.home(),
+        );
+        let mut checked = Vec::new();
+        for folder in folders {
+            match forbidden.check(&folder.path) {
+                Ok(real) => checked.push(crate::agents::Folder {
+                    path: real.to_string_lossy().to_string(),
+                    mode: folder.mode,
+                }),
+                Err(code) => return outbox.error(from, code),
+            }
+        }
+        crate::agents::Access {
+            files,
+            folders: checked,
+        }
+    };
+    // New rules take a new worker: the sandbox is set when it starts (ADR 0087).
+    let access_changed = !create && base.access != access;
     let next = crate::agents::Agent {
         id: id.to_string(),
         name: text("name", &base.name),
@@ -226,6 +274,7 @@ async fn save(
             .get("backgroundShare")
             .and_then(Value::as_u64)
             .or(base.background_share),
+        access,
     };
     // A new Agent must name a Provider on this Machine and a model that
     // Provider lists; an update may move either, so both are checked again.
@@ -270,6 +319,11 @@ async fn save(
                 );
             }
         }
+        workers.start(&next);
+    } else if access_changed {
+        // ponytail: a Turn running now is interrupted, as a Stop is; wait for
+        // it to end first if changing access mid-Turn turns out to matter.
+        workers.stop(&next.id);
         workers.start(&next);
     } else {
         workers.rename(&next);

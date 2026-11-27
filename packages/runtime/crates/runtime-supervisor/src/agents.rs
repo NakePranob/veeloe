@@ -68,6 +68,54 @@ pub struct Agent {
         skip_serializing_if = "Option::is_none"
     )]
     pub background_share: Option<u64>,
+    /// How much of the Machine's files this Agent reaches (ADR 0087). A row
+    /// from before it reads as in-folder with no folders.
+    #[serde(flatten)]
+    pub access: Access,
+}
+
+/// One Agent's file access level and the folders it was given (ADR 0087).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Access {
+    #[serde(default, skip_serializing_if = "Level::is_folder")]
+    pub files: Level,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub folders: Vec<Folder>,
+}
+
+/// In-folder is the default; selected folders adds the ones in `folders`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Level {
+    #[default]
+    Folder,
+    Selected,
+}
+
+impl Level {
+    fn is_folder(&self) -> bool {
+        *self == Level::Folder
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Level::Folder => "folder",
+            Level::Selected => "selected",
+        }
+    }
+}
+
+/// A folder on the Machine, by its real path, read only for now (#84).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Folder {
+    pub path: String,
+    pub mode: Mode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Mode {
+    Read,
 }
 
 /// What Idle Work and Watch may use of a Budget a day when nobody set it (ADR 0056).

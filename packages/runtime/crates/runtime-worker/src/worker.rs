@@ -33,6 +33,8 @@ pub struct Config {
     pub dir: PathBuf,
     pub name: String,
     pub allowlist: Vec<String>,
+    /// The file level the supervisor started this worker's sandbox with (ADR 0087).
+    pub files: veeloe_runtime_core::Files,
     pub approval_timeout_ms: Option<u64>,
     /// What a command may see: the supervisor's environment, minus its own channels.
     pub env: HashMap<String, String>,
@@ -51,6 +53,7 @@ impl Config {
             dir: dir.into(),
             name: name.into(),
             allowlist: Vec::new(),
+            files: veeloe_runtime_core::Files::Folder,
             approval_timeout_ms: None,
             env: HashMap::new(),
             egress: Vec::new(),
@@ -368,6 +371,7 @@ impl Worker {
         if !config.allowlist.is_empty() {
             core.set_allowlist(config.allowlist);
         }
+        core.set_files(config.files);
         if let Some(ms) = config.approval_timeout_ms {
             core.set_approval_timeout_ms(ms);
         }

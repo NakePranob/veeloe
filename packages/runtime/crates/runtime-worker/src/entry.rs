@@ -59,6 +59,8 @@ pub async fn run_stdio() -> Result<(), Box<dyn std::error::Error>> {
         return Err("start me from the supervisor".into());
     };
     let allowlist = read_allowlist(std::env::var("VEELOE_AGENT_ALLOWLIST").ok().as_deref());
+    let files =
+        veeloe_runtime_core::Files::parse(&std::env::var("VEELOE_AGENT_FILES").unwrap_or_default());
     let approval_timeout_ms = read_timeout_s(
         std::env::var("VEELOE_AGENT_APPROVAL_TIMEOUT_S")
             .ok()
@@ -98,6 +100,7 @@ pub async fn run_stdio() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut config = Config::new(dir, name);
     config.allowlist = allowlist;
+    config.files = files;
     config.approval_timeout_ms = approval_timeout_ms;
     config.env = env;
     config.egress = egress;

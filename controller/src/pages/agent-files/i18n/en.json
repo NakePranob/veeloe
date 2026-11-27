@@ -1,0 +1,44 @@
+{
+  "title": "Files",
+  "subtitle": "{{name}} · its own folder",
+  "subtitleSelected_one": "{{name}} · {{count}} selected folder",
+  "subtitleSelected_other": "{{name}} · {{count}} selected folders",
+  "offline": "The Machine is offline. You can change this once it is back.",
+  "remove": "Remove",
+  "duplicate": "This folder is already there",
+  "missing": {
+    "title": "Agent not found",
+    "body": "The Machine may not have listed its Agents yet, or this Agent is gone."
+  },
+  "older": {
+    "title": "This Machine cannot give folders yet",
+    "body": "Update the Runtime on the Machine first, then the Agent can read folders you pick on it."
+  },
+  "selected": {
+    "title": "Read selected folders on the Machine",
+    "footer": "The Agent reads and writes only its own Workdir now. Turn this on to let it read a project already on the Machine, such as ~/code/shop, without cloning it again (ADR 0087).",
+    "warning": "The Agent reads every file in the folders you pick and can send them out through its Egress. The home folder, .ssh, browser data and system folders can never be picked."
+  },
+  "folders": {
+    "heading": "Folders it reads",
+    "footer": "Enter the full path of a folder on the Machine. The Machine checks that it exists and is not where secrets are kept.",
+    "empty": "No folders yet",
+    "emptyDetail": "The Agent still reads only its own Workdir.",
+    "readOnly": "Read only"
+  },
+  "add": {
+    "label": "Add a folder",
+    "placeholder": "e.g. /Users/me/code/shop",
+    "action": "Add"
+  },
+  "invalid": {
+    "title": "Not a full path",
+    "body": "Enter a full path starting with /, such as /Users/me/code/shop."
+  },
+  "authenticate": {
+    "add": "Let {{name}} read {{path}}",
+    "remove": "Remove {{path}} from {{name}}",
+    "open": "Let {{name}} read selected folders on the Machine",
+    "close": "Keep {{name}} to its own folder again"
+  }
+}

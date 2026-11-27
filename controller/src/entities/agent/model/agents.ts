@@ -25,6 +25,10 @@ export type AgentRow = {
   git_repos: string | null;
   /** The share of the Budget Idle Work and Watch may use a day, in percent; null from an older Machine. */
   background_share: number | null;
+  /** `folder` or `selected`, null from a Machine older than file levels (ADR 0087). */
+  files: string | null;
+  /** The folders it was given, as JSON; null from an older Machine. */
+  folders: string | null;
 };
 
 /** A deleted Agent's stand-in, so its Task still opens: the row keeps the Machine, and the log fills in from the event history. */
@@ -44,6 +48,8 @@ export function deletedAgent(id: string, machineId: string | undefined, name: st
     egress: "[]",
     git_repos: null,
     background_share: null,
+    files: null,
+    folders: null,
   };
 }
 
@@ -100,6 +106,21 @@ export function gitReposOf(row: Pick<AgentRow, "git_repos">): string[] | null {
   }
 }
 
+export type Access = { files: "folder" | "selected"; folders: { path: string; mode: "read" }[] };
+
+/** The file level and folders the Machine last sent, or null when its Runtime has no file levels yet (ADR 0087). */
+export function accessOf(row: Pick<AgentRow, "files" | "folders">): Access | null {
+  if (row.files === null) return null;
+  let folders: Access["folders"] = [];
+  try {
+    const parsed: unknown = JSON.parse(row.folders ?? "[]");
+    if (Array.isArray(parsed)) folders = parsed.filter((folder): folder is Access["folders"][number] => typeof folder?.path === "string").map((folder) => ({ path: folder.path, mode: "read" as const }));
+  } catch {
+    folders = [];
+  }
+  return { files: row.files === "selected" ? "selected" : "folder", folders };
+}
+
 export const LIST_AGENTS = "SELECT * FROM agent ORDER BY name, id";
 
 /** An Agent the Machine deleted but has not purged, as it last said (`agent-trash`). */
@@ -140,7 +161,7 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
       // Null when the Machine is older than per-Agent Egress, so what is kept stays.
       const egress = agent.egress ? JSON.stringify(agent.egress) : null;
       await transaction.run(
-        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress, git_repos, background_share) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress, git_repos, background_share, files, folders) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            machine_id = excluded.machine_id,
            name = excluded.name,
@@ -152,7 +173,9 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
            approval_timeout_s = COALESCE(excluded.approval_timeout_s, agent.approval_timeout_s),
            egress = COALESCE(?, agent.egress),
            git_repos = COALESCE(excluded.git_repos, agent.git_repos),
-           background_share = COALESCE(excluded.background_share, agent.background_share)`,
+           background_share = COALESCE(excluded.background_share, agent.background_share),
+           files = COALESCE(excluded.files, agent.files),
+           folders = COALESCE(excluded.folders, agent.folders)`,
         [
           agent.id,
           machineId,
@@ -166,6 +189,8 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
           egress ?? "[]",
           agent.gitRepos ? JSON.stringify(agent.gitRepos) : null,
           agent.backgroundShare ?? null,
+          agent.files ?? null,
+          agent.files ? JSON.stringify(agent.folders ?? []) : null,
           egress,
         ],
       );

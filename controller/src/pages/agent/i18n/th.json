@@ -97,5 +97,11 @@
   "egress": {
     "open": "ทั้งเน็ต",
     "count_other": "{{count}} โดเมน"
+  },
+  "files": {
+    "title": "ไฟล์",
+    "folder": "ในโฟลเดอร์",
+    "selected_one": "{{count}} โฟลเดอร์",
+    "selected_other": "{{count}} โฟลเดอร์"
   }
 }

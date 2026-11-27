@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Keyboard, View } from "react-native";
 import { APPROVAL_TIMEOUT_S_DEFAULT } from "@veeloe/protocol-ts";
-import { allowlistOf, approvalTimeoutOf, egressOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
+import { accessOf, allowlistOf, approvalTimeoutOf, egressOf, gitReposOf, staleUsage, useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, Stage } from "../../../entities/character";
 import { useMachines } from "../../../entities/machine";
 import { headsOf, STATUS_DOT, statusOf, titleOf, useAgentTaskCount, useAgentTaskSummaries, useThreadHeads } from "../../../entities/task";
@@ -219,6 +219,15 @@ function AgentView({ agent }: { agent: AgentRow }) {
         <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} disabled={away} />
         {/* Its own Egress beside its Allowlist (ADR 0029): `*` reads as the whole internet (issue #81). */}
         <Row icon="network" title="Egress" value={egressOf(agent).includes("*") ? t("egress.open") : t("egress.count", { count: egressOf(agent).length })} href={`/agents/${agent.id}/egress`} disabled={away} />
+        {accessOf(agent) && (
+          <Row
+            icon="folder"
+            title={t("files.title")}
+            value={accessOf(agent)?.files === "selected" ? t("files.selected", { count: accessOf(agent)?.folders.length ?? 0 }) : t("files.folder")}
+            href={`/agents/${agent.id}/files`}
+            disabled={away}
+          />
+        )}
         <Row icon="branch" title={t("git.row")} value={repos === null ? t("git.unsupported") : t("git.count", { count: repos.length })} href={`/agents/${agent.id}/git`} disabled={away} />
         <Row icon="time" title="Trigger" detail={t("trigger.detail")} href={`/agents/${agent.id}/schedule`} disabled={away} />
         {/* Not on the board, which has no way to set the Budget yet; it saves with the name. */}

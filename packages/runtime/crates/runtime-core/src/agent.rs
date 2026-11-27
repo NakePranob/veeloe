@@ -137,6 +137,8 @@ struct State {
     link: Arc<dyn SupervisorLink>,
     clock: RwLock<Arc<dyn Clock + Send + Sync>>,
     allowlist: RwLock<Vec<String>>,
+    /// The file level this worker's sandbox was started with (ADR 0087).
+    files: RwLock<Files>,
     approval_timeout_ms: AtomicU64,
     /// The Turns running now, one per Task at most.
     running: Mutex<HashMap<String, Arc<RunningTurn>>>,
@@ -240,6 +242,7 @@ impl AgentCore {
                 link,
                 clock: RwLock::new(Arc::new(SystemClock)),
                 allowlist: RwLock::new(Vec::new()),
+                files: RwLock::new(Files::Folder),
                 approval_timeout_ms: AtomicU64::new(APPROVAL_TIMEOUT_MS),
                 running: Mutex::new(HashMap::new()),
                 tasks: Mutex::new(Tasks::default()),
@@ -298,6 +301,11 @@ impl AgentCore {
 
     /// The Allowlist from the supervisor: the next tool call uses it, a running
     /// wait keeps its own.
+    /// The file level the supervisor started this worker's sandbox with.
+    pub fn set_files(&self, files: Files) {
+        *self.state.files.write().expect("files") = files;
+    }
+
     pub fn set_allowlist(&self, allowlist: Vec<String>) {
         *self.state.allowlist.write().expect("allowlist") = allowlist;
     }
@@ -543,7 +551,7 @@ impl AgentCore {
             &owner,
             "turn.started",
             with_trigger(
-                json!({ "member": member, "files": turn_files(member, trigger).as_str() }),
+                json!({ "member": member, "files": turn_files(*self.state.files.read().expect("files"), member, trigger).as_str() }),
                 trigger,
             ),
             None,
@@ -1217,20 +1225,32 @@ fn nothing_to_report() -> ToolDefinition {
 pub enum Files {
     /// The Agent's Workdir, Projects and Library only (ADR 0068).
     Folder,
+    /// Those, and folders on the Machine the Owner gave it (ADR 0087).
+    Selected,
 }
 
 impl Files {
     pub fn as_str(self) -> &'static str {
         match self {
             Files::Folder => "folder",
+            Files::Selected => "selected",
+        }
+    }
+
+    /// The level the supervisor names; anything else is in-folder.
+    pub fn parse(text: &str) -> Self {
+        match text {
+            "selected" => Files::Selected,
+            _ => Files::Folder,
         }
     }
 }
 
-/// The level a Turn runs at. ponytail: always `Folder` until an Agent can be
-/// set wider (#84); the starter and trigger are what the lock rules read (#87).
-pub fn turn_files(_member: &str, _trigger: Option<&TriggerRun>) -> Files {
-    Files::Folder
+/// The level a Turn runs at: the Agent's own, which its worker's sandbox was
+/// started with (ADR 0087). The starter and trigger are what the lock rules
+/// read (#87).
+pub fn turn_files(agent: Files, _member: &str, _trigger: Option<&TriggerRun>) -> Files {
+    agent
 }
 
 fn with_trigger(mut body: Value, trigger: Option<&TriggerRun>) -> Value {

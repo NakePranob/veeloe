@@ -100,6 +100,29 @@ mod running {
         panic!("no free range of ten loopback ports");
     }
 
+    #[test]
+    fn a_selected_folder_is_read_but_not_written_and_its_neighbours_stay_unseen() {
+        let mut home = home();
+        let shop = home.root.join("code/shop");
+        let other = home.root.join("code/other");
+        fs::create_dir_all(&shop).expect("shop");
+        fs::create_dir_all(&other).expect("other");
+        fs::write(shop.join("README.md"), "the shop").expect("readme");
+        fs::write(other.join("secret.txt"), "not given").expect("secret");
+        home.policy.read_folders = vec![shop.to_string_lossy().to_string()];
+
+        let read = run(&home, &format!("cat {}/README.md", shop.display()));
+        assert!(read.status.success(), "{read:?}");
+        assert_eq!(String::from_utf8_lossy(&read.stdout), "the shop");
+
+        let write = run(&home, &format!("touch {}/new.txt", shop.display()));
+        assert!(!write.status.success(), "a read-only folder was written");
+        assert!(!shop.join("new.txt").exists());
+
+        let neighbour = run(&home, &format!("cat {}/secret.txt", other.display()));
+        assert!(!neighbour.status.success(), "a folder not given was read");
+    }
+
     fn write_script(home: &Home, name: &str, text: &str) {
         fs::write(Path::new(&home.policy.workdir).join(name), text).expect("script");
     }

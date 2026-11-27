@@ -1,0 +1,44 @@
+{
+  "title": "ไฟล์",
+  "subtitle": "{{name}} · ในโฟลเดอร์ของตัวเอง",
+  "subtitleSelected_one": "{{name}} · {{count}} โฟลเดอร์ที่เลือก",
+  "subtitleSelected_other": "{{name}} · {{count}} โฟลเดอร์ที่เลือก",
+  "offline": "Machine ออฟไลน์อยู่ แก้ได้เมื่อเครื่องกลับมาออนไลน์",
+  "remove": "เอาออก",
+  "duplicate": "มีโฟลเดอร์นี้แล้ว",
+  "missing": {
+    "title": "ไม่พบ Agent นี้",
+    "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
+  },
+  "older": {
+    "title": "Machine นี้ยังให้โฟลเดอร์ไม่ได้",
+    "body": "อัปเดต Runtime บน Machine ก่อน แล้ว Agent จะอ่านโฟลเดอร์ที่คุณเลือกบนเครื่องได้"
+  },
+  "selected": {
+    "title": "อ่านโฟลเดอร์บนเครื่องที่เลือกได้",
+    "footer": "ตอนนี้ Agent อ่านและเขียนได้แค่ Workdir ของตัวเอง เปิดเพื่อให้อ่านโปรเจกต์ที่มีอยู่แล้วบนเครื่อง เช่น ~/code/shop โดยไม่ต้อง clone ใหม่ (ADR 0087)",
+    "warning": "Agent อ่านทุกไฟล์ในโฟลเดอร์ที่เลือกได้ และส่งออกได้ตาม Egress home, .ssh, ข้อมูล browser และโฟลเดอร์ของระบบเลือกไม่ได้เสมอ"
+  },
+  "folders": {
+    "heading": "โฟลเดอร์ที่อ่านได้",
+    "footer": "ใส่ path เต็มของโฟลเดอร์บน Machine Machine ตรวจเองว่าโฟลเดอร์มีอยู่และไม่ใช่ที่เก็บความลับ",
+    "empty": "ยังไม่มีโฟลเดอร์",
+    "emptyDetail": "Agent ยังอ่านได้แค่ Workdir ของตัวเอง",
+    "readOnly": "อ่านอย่างเดียว"
+  },
+  "add": {
+    "label": "เพิ่มโฟลเดอร์",
+    "placeholder": "เช่น /Users/me/code/shop",
+    "action": "เพิ่ม"
+  },
+  "invalid": {
+    "title": "path ไม่ถูกต้อง",
+    "body": "ใส่ path เต็มที่ขึ้นต้นด้วย / เช่น /Users/me/code/shop"
+  },
+  "authenticate": {
+    "add": "ให้ {{name}} อ่าน {{path}}",
+    "remove": "เอา {{path}} ออกจาก {{name}}",
+    "open": "ให้ {{name}} อ่านโฟลเดอร์ที่เลือกบนเครื่องได้",
+    "close": "ให้ {{name}} กลับไปอยู่แค่ในโฟลเดอร์ของตัวเอง"
+  }
+}

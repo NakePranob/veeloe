@@ -35,6 +35,9 @@ pub struct Policy {
     /// profile allows these ports in and out, and nothing else on the Machine
     /// (ADR 0069). Empty means the Agent may listen on nothing.
     pub ports: Vec<u16>,
+    /// Folders on the Machine the Owner gave this Agent to read (ADR 0087),
+    /// by their real paths, already checked against the forbidden list.
+    pub read_folders: Vec<String>,
 }
 
 /// Where the proxy's Unix socket appears inside a Linux worker's namespace: a
@@ -167,6 +170,7 @@ impl Policy {
             proxy: None,
             proxy_socket: None,
             ports: Vec::new(),
+            read_folders: Vec::new(),
         }
     }
 }
@@ -215,7 +219,10 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
     }
     // Xcode wherever it was dropped in /Applications, beta included.
     profile.push_str("(allow file-read* (regex #\"^/Applications/Xcode[^/]*\\.app/\"))\n");
-    for path in [&policy.folder, &policy.bin] {
+    for path in [&policy.folder, &policy.bin]
+        .into_iter()
+        .chain(&policy.read_folders)
+    {
         profile.push_str(&format!("(allow file-read* (subpath {}))\n", quote(path)));
     }
     // `deny default` already refuses every other write, so these two lines are
@@ -266,6 +273,11 @@ pub fn bwrap_args(policy: &Policy) -> Vec<String> {
         "--bind".into(),
         policy.folder.clone(),
         policy.folder.clone(),
+    ]);
+    for folder in &policy.read_folders {
+        args.extend(["--ro-bind".into(), folder.clone(), folder.clone()]);
+    }
+    args.extend([
         "--chdir".into(),
         policy.workdir.clone(),
         "--proc".into(),

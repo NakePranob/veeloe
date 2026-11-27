@@ -204,6 +204,67 @@
       "valid": false
     },
     {
+      "name": "give an Agent a folder to read",
+      "type": "agent.update",
+      "body": {
+        "id": "a1",
+        "files": "selected",
+        "folders": [
+          {
+            "path": "/Users/me/code/shop",
+            "mode": "read"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "keep an Agent in its folder",
+      "type": "agent.update",
+      "body": {
+        "id": "a1",
+        "files": "folder"
+      },
+      "valid": true
+    },
+    {
+      "name": "a folder that is not an absolute path",
+      "type": "agent.update",
+      "body": {
+        "id": "a1",
+        "folders": [
+          {
+            "path": "code/shop",
+            "mode": "read"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a folder to write is not taken yet",
+      "type": "agent.update",
+      "body": {
+        "id": "a1",
+        "folders": [
+          {
+            "path": "/Users/me/code/shop",
+            "mode": "write"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "a file level nobody knows",
+      "type": "agent.update",
+      "body": {
+        "id": "a1",
+        "files": "everything"
+      },
+      "valid": false
+    },
+    {
       "name": "a Budget share for background work",
       "type": "agent.update",
       "body": {

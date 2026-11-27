@@ -47,9 +47,15 @@ export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
  * Controller → Machine: change only the fields sent, all or none (`agent-settings`). A model
  * belongs to its Provider, so a new Provider comes with its model.
  */
+/** The most folders one Agent may be given (ADR 0087). */
+export const FOLDERS_MAX = 20;
+/** How much of the Machine's files an Agent reaches: its own folders, or those and the ones it was given (ADR 0087). */
+export const FilesSchema = z.enum(["folder", "selected"]);
+export const FoldersSchema = z.array(z.looseObject({ path: z.string().min(2).max(4096).startsWith("/"), mode: z.literal("read") })).max(FOLDERS_MAX);
+
 export const AgentUpdateBodySchema = z
-  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional(), allowlist: AllowlistSchema.optional(), approvalTimeoutS: approvalTimeoutS.optional(), gitRepos: GitReposSchema.optional(), backgroundShare: backgroundShare.optional() })
-  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined || b.allowlist !== undefined || b.approvalTimeoutS !== undefined || b.gitRepos !== undefined || b.backgroundShare !== undefined, "nothing to change")
+  .looseObject({ files: FilesSchema.optional(), folders: FoldersSchema.optional(), id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional(), allowlist: AllowlistSchema.optional(), approvalTimeoutS: approvalTimeoutS.optional(), gitRepos: GitReposSchema.optional(), backgroundShare: backgroundShare.optional() })
+  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined || b.allowlist !== undefined || b.approvalTimeoutS !== undefined || b.gitRepos !== undefined || b.backgroundShare !== undefined || b.files !== undefined || b.folders !== undefined, "nothing to change")
   .refine((b) => b.provider === undefined || b.model !== undefined, "a provider needs its model");
 export type AgentUpdateBody = z.infer<typeof AgentUpdateBodySchema>;
 
@@ -87,6 +93,9 @@ const AgentSchema = z.looseObject({
   usage: usage.optional(),
   /** The share of the Budget Idle Work and Watch may use a day, in percent; 30 when never set. */
   backgroundShare: backgroundShare.optional(),
+  /** The file level and the folders it was given (ADR 0087). Absent from an older Machine, or when in-folder with none. */
+  files: FilesSchema.optional(),
+  folders: FoldersSchema.optional(),
 });
 export type Agent = z.infer<typeof AgentSchema>;
 

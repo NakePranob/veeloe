@@ -247,6 +247,7 @@ async fn a_deleted_agent_waits_in_the_trash_and_can_be_restored() {
         deleted_at: None,
         git_repos: Vec::new(),
         background_share: None,
+        access: Default::default(),
     };
     registry.add(&agent).expect("add");
     let dir = agent_dir(home.path(), "a1").expect("workdir");
@@ -502,6 +503,7 @@ async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
         deleted_at: None,
         git_repos: Vec::new(),
         background_share: None,
+        access: Default::default(),
     };
     registry.add(&agent("live", 5_000_000)).expect("add");
     registry.add(&agent("gone", 7_000_000)).expect("add");
@@ -567,6 +569,7 @@ async fn a_counted_answer_tells_every_member_and_the_list_catches_up() {
         deleted_at: None,
         git_repos: Vec::new(),
         background_share: None,
+        access: Default::default(),
     };
     registry.add(&agent).expect("add");
     let budgets = Budgets::new(UsageStore::open(&home.path().join("usage.db")).expect("store"));
@@ -621,6 +624,7 @@ async fn egress_set_checks_manage_and_touches_only_the_agent_it_names() {
                 deleted_at: None,
                 git_repos: Vec::new(),
                 background_share: None,
+                access: Default::default(),
             })
             .expect("add");
     }
@@ -779,6 +783,7 @@ async fn a_malformed_egress_request_is_refused_and_changes_no_agent() {
                 deleted_at: None,
                 git_repos: Vec::new(),
                 background_share: None,
+                access: Default::default(),
             })
             .expect("add");
     }
@@ -866,6 +871,7 @@ async fn git_repos_change_only_by_an_owner_and_come_back_listed() {
             deleted_at: None,
             git_repos: Vec::new(),
             background_share: None,
+            access: Default::default(),
         })
         .expect("add");
     let workers = Workers::new(
@@ -947,5 +953,117 @@ async fn git_repos_change_only_by_an_owner_and_come_back_listed() {
     )
     .await;
     assert_eq!(repos(&registry), vec!["acme/api", "acme/shop"]);
+    workers.stop_all();
+}
+
+/// Issue #84: only an Owner gives an Agent folders to read; each is kept by
+/// its real path, and the home, a secret or a folder holding one is refused.
+#[tokio::test]
+async fn selected_folders_are_set_by_an_owner_and_never_reach_a_secret() {
+    let home = tempdir().expect("home");
+    // The owner's home apart from VEELOE_HOME: the Runtime's own folder is refused too.
+    let owner = tempdir().expect("owner");
+    let real = std::fs::canonicalize(owner.path()).expect("real");
+    let owner_home = real.join("me");
+    std::fs::create_dir_all(owner_home.join("code/shop")).expect("shop");
+    std::fs::create_dir_all(owner_home.join(".ssh")).expect("ssh");
+    // The supervisor reads HOME for the owner's home; no other test in this file reads it.
+    std::env::set_var("HOME", &owner_home);
+    let registry = AgentRegistry::open(home.path()).expect("registry");
+    registry
+        .add(&veeloe_runtime_supervisor::agents::Agent {
+            id: "a1".into(),
+            name: "a1".into(),
+            provider: "main".into(),
+            model: "model-a".into(),
+            character: None,
+            allowlist: Vec::new(),
+            egress: Vec::new(),
+            approval_timeout_s: 3_600,
+            budget: None,
+            deleted_at: None,
+            git_repos: Vec::new(),
+            background_share: None,
+            access: Default::default(),
+        })
+        .expect("add");
+    let workers = Workers::new(
+        home.path().to_path_buf(),
+        vec!["/bin/true".into()],
+        Arc::new(Silent) as Arc<dyn SupervisorLlm>,
+        Arc::new(|_agent: &str, _message: FromWorker| {}),
+        Arc::new(|_line: &str| {}),
+        Arc::new(|_agent, command| command),
+    );
+    let trust = owners();
+    let outbox = Recording::default();
+    let providers = providers();
+    let http = Models;
+    let machine = Machine {
+        registry: &registry,
+        workers: &workers,
+        routes: None,
+        secret_key: None,
+        uploads: None,
+        push_tokens: None,
+        triggers: None,
+        providers: &providers,
+        egress: None,
+        trust: Some(&trust),
+        proxies: None,
+        approvals: None,
+        budgets: None,
+        http: &http,
+    };
+    let access = |registry: &AgentRegistry| registry.get("a1").expect("get").expect("a1").access;
+    let folder = |path: &std::path::Path| json!({ "path": path, "mode": "read" });
+
+    dispatch(
+        &machine,
+        &outbox,
+        &from(),
+        "agent.update",
+        &json!({ "id": "a1", "files": "selected", "folders": [folder(&owner_home.join("code/shop"))] }),
+    )
+    .await;
+    let (type_, body) = outbox.last();
+    assert_eq!(type_, "agent.listed", "{body}");
+    assert_eq!(body["agents"][0]["files"], "selected");
+    assert_eq!(
+        body["agents"][0]["folders"][0]["path"],
+        owner_home.join("code/shop").to_string_lossy().as_ref()
+    );
+
+    // The home, a secret, and the folder that holds the home: refused, and nothing changes.
+    for refused in [owner_home.clone(), owner_home.join(".ssh"), real.clone()] {
+        dispatch(
+            &machine,
+            &outbox,
+            &from(),
+            "agent.update",
+            &json!({ "id": "a1", "folders": [folder(&refused)] }),
+        )
+        .await;
+        assert_eq!(outbox.last().1["code"], "folder.forbidden", "{refused:?}");
+    }
+    assert_eq!(access(&registry).folders.len(), 1);
+
+    // A Member who is not an Owner widens nothing.
+    dispatch(
+        &machine,
+        &outbox,
+        &Inbound {
+            member: "m_2".into(),
+            ..from()
+        },
+        "agent.update",
+        &json!({ "id": "a1", "files": "folder" }),
+    )
+    .await;
+    assert_eq!(outbox.last().1["code"], "files.forbidden");
+    assert_eq!(
+        access(&registry).files,
+        veeloe_runtime_supervisor::agents::Level::Selected
+    );
     workers.stop_all();
 }

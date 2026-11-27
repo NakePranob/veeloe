@@ -8,6 +8,7 @@ pub mod denials;
 pub mod direct;
 pub mod doctor;
 pub mod egress;
+pub mod folders;
 pub mod git_broker;
 pub mod help;
 pub mod hub_link;

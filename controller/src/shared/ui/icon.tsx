@@ -34,6 +34,7 @@ const SYMBOLS = {
   expand: { ios: "chevron.down", android: "expand_more" },
   collapse: { ios: "chevron.up", android: "expand_less" },
   network: { ios: "globe", android: "public" },
+  folder: { ios: "folder", android: "folder" },
   device: { ios: "iphone", android: "smartphone" },
   usage: { ios: "chart.bar", android: "bar_chart" },
   trash: { ios: "trash", android: "delete" },

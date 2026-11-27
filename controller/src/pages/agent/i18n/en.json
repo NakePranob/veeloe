@@ -98,5 +98,11 @@
     "open": "Whole internet",
     "count_one": "{{count}} domain",
     "count_other": "{{count}} domains"
+  },
+  "files": {
+    "title": "Files",
+    "folder": "Own folder",
+    "selected_one": "{{count}} folder",
+    "selected_other": "{{count}} folders"
   }
 }

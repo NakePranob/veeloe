@@ -197,6 +197,8 @@ pub fn agents_listed(
             "allowlist": agent.allowlist,
             "egress": agent.egress,
             "gitRepos": agent.git_repos,
+            "files": agent.access.files.as_str(),
+            "folders": agent.access.folders,
             "approvalTimeoutS": agent.approval_timeout_s,
             "backgroundShare": agent
                 .background_share
