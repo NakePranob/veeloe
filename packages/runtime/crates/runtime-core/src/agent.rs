@@ -848,6 +848,12 @@ async fn run_turn(
     if from_trigger {
         tools.push(nothing_to_report());
     }
+    // A Schedule with a goal carries its progress across rounds and ends itself (ADR 0085).
+    let goal = trigger.as_ref().is_some_and(|trigger| trigger.goal);
+    if goal {
+        tools.push(goal_note());
+        tools.push(goal_met());
+    }
     // A round nobody watches asks no one: its Schedule's scope is all it adds (ADR 0079).
     let unattended = trigger
         .as_ref()
@@ -967,6 +973,8 @@ async fn run_turn(
                 && (name == crate::cards::ASK_CHOICE || name == crate::cards::ASK_FORM)
             {
                 ask_card(&state, &task, &starter, &events, name, &input, &cancel).await
+            } else if goal && (name == GOAL_NOTE || name == GOAL_MET) {
+                goal_event(&state, &task, &starter, name, &input)
             } else if from_trigger && name == NOTHING_TO_REPORT {
                 quiet_at = Some(results.len());
                 Ok("This round ends quietly: nobody is told.".to_string())
@@ -1090,6 +1098,60 @@ fn release(state: Arc<State>, task: &str) {
 const NOTHING_TO_REPORT: &str = "nothing_to_report";
 
 const PROPOSE_IDLE_WORK: &str = "propose_idle_work";
+const GOAL_NOTE: &str = "goal_note";
+const GOAL_MET: &str = "goal_met";
+/// A progress note is at most this long; the next round reads it back (ADR 0085).
+const GOAL_NOTE_MAX: usize = 2000;
+
+fn goal_note() -> ToolDefinition {
+    ToolDefinition {
+        name: GOAL_NOTE.into(),
+        description: "Saves where this Schedule's goal stands, for its next round to read: what you checked, what changed, what is left. The new note replaces the old one; at most 2000 characters.".into(),
+        input_schema: json!({ "type": "object", "properties": { "note": { "type": "string" } }, "required": ["note"] }),
+    }
+}
+
+fn goal_met() -> ToolDefinition {
+    ToolDefinition {
+        name: GOAL_MET.into(),
+        description: "Says this Schedule's goal is met, with the reason the owner will read: the Schedule stops and no round runs again until they resume it. Call it only when the goal is plainly met.".into(),
+        input_schema: json!({ "type": "object", "properties": { "reason": { "type": "string" } }, "required": ["reason"] }),
+    }
+}
+
+/// `goal.noted` or `goal.met` in the round's Task: the supervisor keeps the note or stops the Schedule.
+fn goal_event(
+    state: &State,
+    task: &str,
+    starter: &str,
+    name: &str,
+    input: &Value,
+) -> Result<String, ToolError> {
+    let field = if name == GOAL_NOTE { "note" } else { "reason" };
+    let text = input
+        .get(field)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or_default();
+    if text.is_empty() || text.chars().count() > GOAL_NOTE_MAX {
+        return Err(ToolError::Failed(format!(
+            "{field}: 1 to {GOAL_NOTE_MAX} characters"
+        )));
+    }
+    let kind = if name == GOAL_NOTE {
+        "goal.noted"
+    } else {
+        "goal.met"
+    };
+    state
+        .append(task, starter, kind, json!({ field: text }), None)
+        .map_err(|error| ToolError::Failed(error.to_string()))?;
+    Ok(if name == GOAL_NOTE {
+        "Noted. The next round reads it.".into()
+    } else {
+        "The Schedule stops here; its owner is told why.".into()
+    })
+}
 
 fn propose_idle_work() -> ToolDefinition {
     ToolDefinition {

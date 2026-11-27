@@ -48,6 +48,15 @@ pub struct TriggerRecord {
     /// Why it is paused when the Machine paused it, not a Member: `failures` (ADR 0083).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paused_for: Option<String>,
+    /// What counts as done, as signed (ADR 0085); a Schedule without one runs as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal: Option<String>,
+    /// The latest progress note a round left (`goal_note`), at most 2000 characters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    /// Why a round said the goal is met; it is paused for `goal` until resumed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub met: Option<String>,
     /// Its key was revoked or its Member lost Use: it never runs again.
     #[serde(default)]
     pub suspended: bool,
@@ -131,6 +140,15 @@ impl TriggerRecord {
         }
         if let Some(why) = &self.paused_for {
             value["pausedFor"] = json!(why);
+        }
+        for (name, field) in [
+            ("goal", &self.goal),
+            ("note", &self.note),
+            ("met", &self.met),
+        ] {
+            if let Some(field) = field {
+                value[name] = json!(field);
+            }
         }
         if !self.paused && !self.suspended {
             if let Some(schedule) = Schedule::parse(&self.schedule) {
@@ -355,6 +373,38 @@ impl Triggers {
         Ok(Some((agent, id, member, paused_now)))
     }
 
+    /// A round of a Schedule with a goal saved its progress (ADR 0085).
+    pub fn noted(&self, task: &str, note: &str) -> Result<Option<(String, String)>, TriggerError> {
+        let Some((agent, id)) = self.rounds.lock().expect("rounds").get(task).cloned() else {
+            return Ok(None);
+        };
+        let mut member = None;
+        self.update(&agent, &id, |record| {
+            if record.goal.is_some() {
+                record.note = Some(note.chars().take(2000).collect());
+                member = Some(record.member.clone());
+            }
+        })?;
+        Ok(member.map(|member| (agent, member)))
+    }
+
+    /// A round said the goal is met: the Schedule stops until a Member resumes it (ADR 0085).
+    pub fn met(&self, task: &str, reason: &str) -> Result<Option<(String, String)>, TriggerError> {
+        let Some((agent, id)) = self.rounds.lock().expect("rounds").get(task).cloned() else {
+            return Ok(None);
+        };
+        let mut member = None;
+        self.update(&agent, &id, |record| {
+            if record.goal.is_some() && !record.paused {
+                record.paused = true;
+                record.paused_for = Some("goal".to_string());
+                record.met = Some(reason.chars().take(2000).collect());
+                member = Some(record.member.clone());
+            }
+        })?;
+        Ok(member.map(|member| (agent, member)))
+    }
+
     /// Keep this Trigger, replacing one with the same Agent and id whole.
     pub fn set(&self, record: TriggerRecord) -> Result<(), TriggerError> {
         let mut records = self.records.lock().expect("triggers");
@@ -503,8 +553,24 @@ pub fn start_round(
         at,
         attended,
         approves,
-        &record.text,
+        &round_text(record),
         Some(BACKGROUND_LIMIT_S),
+    )
+}
+
+/// A Schedule round's words: what was signed, then its goal and the latest
+/// progress note, the note as data since the Agent may have copied it from a page (ADR 0085).
+fn round_text(record: &TriggerRecord) -> String {
+    let Some(goal) = record.goal.as_deref().filter(|_| record.kind == "schedule") else {
+        return record.text.clone();
+    };
+    let note = record.note.as_deref().map_or_else(
+        || "No progress noted yet.".to_string(),
+        |note| veeloe_runtime_core::untrusted("progress", note),
+    );
+    format!(
+        "{}\n\nThis Schedule's goal: {goal}\nCall goal_note with where it stands before you end, and goal_met with the reason once it is met.\nLatest progress note:\n{note}",
+        record.text
     )
 }
 
@@ -573,6 +639,7 @@ fn send_round(
                     Vec::new()
                 },
                 limit_s,
+                goal: record.kind == "schedule" && record.goal.is_some(),
             },
         },
     );
@@ -876,6 +943,9 @@ mod tests {
             paused: false,
             failed_rounds: 0,
             paused_for: None,
+            goal: None,
+            note: None,
+            met: None,
             suspended: false,
             created_at: wednesday(0, 0),
             last_run_at: None,
@@ -929,6 +999,35 @@ mod tests {
                 .expect("finish"),
             None
         );
+    }
+
+    #[test]
+    fn a_goal_rides_each_round_its_note_is_kept_and_meeting_it_stops_the_schedule() {
+        let home = tempdir().expect("home");
+        let triggers = Triggers::open(home.path()).expect("open");
+        let mut plain = record(json!({ "every": "day" }));
+        assert_eq!(round_text(&plain), plain.text);
+        plain.goal = Some("PR #41 is merged".into());
+        triggers.set(plain).expect("set");
+        triggers
+            .rounds
+            .lock()
+            .expect("rounds")
+            .insert("t1".into(), ("a1".into(), "tr_1".into()));
+        let held = || triggers.get("a1", "tr_1").expect("held");
+        assert!(round_text(&held()).contains("No progress noted yet."));
+        triggers.noted("t1", "still open").expect("noted");
+        let text = round_text(&held());
+        assert!(text.contains("This Schedule's goal: PR #41 is merged"));
+        assert!(text.contains("<data source=\"progress\""), "{text}");
+        assert!(text.contains("still open"));
+        let met = triggers.met("t1", "merged at 10:02").expect("met");
+        assert_eq!(met, Some(("a1".into(), "m_1".into())));
+        assert!(held().paused);
+        assert_eq!(held().listed(&Utc)["pausedFor"], json!("goal"));
+        assert_eq!(held().listed(&Utc)["met"], json!("merged at 10:02"));
+        // Met once is enough: a second call says nothing new.
+        assert_eq!(triggers.met("t1", "again").expect("met"), None);
     }
 
     fn now(ms: u64) -> Now {

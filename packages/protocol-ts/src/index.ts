@@ -164,6 +164,7 @@ export {
   SCHEDULE_MIN_MINUTES,
   ScheduleSchema,
   TRIGGER_TEXT_MAX,
+  TRIGGER_GOAL_MAX,
   TriggerListedBodySchema,
   TriggerSchema,
   type IdleProgress,

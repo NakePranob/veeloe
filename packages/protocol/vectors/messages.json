@@ -1735,6 +1735,71 @@
       "valid": true
     },
     {
+      "name": "a Schedule with a goal",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "follow PR #41",
+          "schedule": {
+            "every": {
+              "minutes": 60
+            }
+          },
+          "goal": "PR #41 is merged"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "a Schedule with an empty goal",
+      "type": "trigger.set",
+      "body": {
+        "agent": "a1",
+        "trigger": {
+          "id": "tr_1",
+          "kind": "schedule",
+          "text": "follow PR #41",
+          "schedule": {
+            "every": {
+              "minutes": 60
+            }
+          },
+          "goal": ""
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "a listed Schedule that met its goal",
+      "type": "trigger.listed",
+      "body": {
+        "agent": "a1",
+        "triggers": [
+          {
+            "id": "tr_1",
+            "kind": "schedule",
+            "text": "follow PR #41",
+            "schedule": {
+              "every": {
+                "minutes": 60
+              }
+            },
+            "goal": "PR #41 is merged",
+            "member": "m_1",
+            "paused": true,
+            "suspended": false,
+            "pausedFor": "goal",
+            "note": "checked at 10:00",
+            "met": "merged at 10:02"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
       "name": "a weekly Schedule on Monday",
       "type": "trigger.set",
       "body": {

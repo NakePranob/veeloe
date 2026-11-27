@@ -101,6 +101,14 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
         paused: false,
         failed_rounds: 0,
         paused_for: None,
+        goal: trigger
+            .get("goal")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|goal| !goal.is_empty())
+            .map(str::to_string),
+        note: None,
+        met: None,
         suspended: false,
         created_at: now(),
         last_run_at: None,
@@ -118,6 +126,12 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
         record.last_run_at = held.last_run_at;
         record.last_skip = held.last_skip;
         record.paused = held.paused;
+        // The same goal keeps where it stood; a new one starts from nothing.
+        if held.goal == record.goal {
+            record.note = held.note;
+            record.met = held.met;
+            record.paused_for = held.paused_for;
+        }
     }
     // An Agent has one Idle Work list: a new one takes the old one's place, and
     // each piece still on it keeps where it stood (ADR 0056).
@@ -187,6 +201,7 @@ pub(crate) fn pause(
             record.last_run_at = Some(now());
             record.failed_rounds = 0;
             record.paused_for = None;
+            record.met = None;
         }
     }) {
         Ok(true) => listed(outbox, from, triggers, &agent),

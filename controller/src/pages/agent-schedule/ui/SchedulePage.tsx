@@ -67,13 +67,15 @@ function ScheduleList({ agentId, agentName, machine }: { agentId: string; agentN
             const round = lastRoundOf(trigger, last.get(trigger.id));
             const when = trigger.suspended
               ? t("state.suspended")
-              : trigger.pausedFor === "failures"
-                ? t("state.pausedFailures")
-                : trigger.paused
-                  ? t("state.paused")
-                  : trigger.nextRunAt
-                    ? t("state.next", { when: whenShort(trigger.nextRunAt, language) })
-                    : null;
+              : trigger.pausedFor === "goal"
+                ? t("state.met")
+                : trigger.pausedFor === "failures"
+                  ? t("state.pausedFailures")
+                  : trigger.paused
+                    ? t("state.paused")
+                    : trigger.nextRunAt
+                      ? t("state.next", { when: whenShort(trigger.nextRunAt, language) })
+                      : null;
             return (
               <Row
                 key={trigger.id}

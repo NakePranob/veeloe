@@ -242,6 +242,35 @@ impl Supervisor {
                 );
             }
             "approval.skipped" => self.triggers.skipped(task),
+            // A Schedule with a goal: its note is kept, and a goal met stops it (ADR 0085).
+            "goal.noted" | "goal.met" => {
+                let text = |field: &str| {
+                    event
+                        .body
+                        .get(field)
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                };
+                let met = event.kind == "goal.met";
+                let changed = if met {
+                    self.triggers.met(task, text("reason"))
+                } else {
+                    self.triggers.noted(task, text("note"))
+                };
+                if let Ok(Some((agent, member))) = changed {
+                    if let Some(outbox) = self.outbox.lock().expect("outbox").as_ref() {
+                        outbox.to_member(
+                            &member,
+                            "trigger.listed",
+                            self.triggers.listed_body(&agent),
+                            None,
+                        );
+                    }
+                    if met {
+                        self.push(PushKind::GoalMet, &agent, task, &member, None);
+                    }
+                }
+            }
             "turn.ended" => {
                 if self.person_turns.lock().expect("person turns").remove(&key) {
                     self.quiet_since.lock().expect("quiet").insert(

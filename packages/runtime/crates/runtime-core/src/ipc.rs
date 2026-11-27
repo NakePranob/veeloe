@@ -65,6 +65,9 @@ pub struct TriggerRun {
     /// Idle Work (ADR 0056). None runs as long as any Turn.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit_s: Option<u64>,
+    /// The Schedule has a goal (ADR 0085): the round may note progress and say it is met.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub goal: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

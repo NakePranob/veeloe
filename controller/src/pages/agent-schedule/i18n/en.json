@@ -23,7 +23,10 @@
     "day": "Day",
     "minutes": "How often",
     "hour": "Hour",
-    "minute": "Minute"
+    "minute": "Minute",
+    "goal": "Goal (optional)",
+    "goalPlaceholder": "e.g. PR #41 is merged",
+    "goalFooter": "With a goal, the Agent notes its progress across rounds and stops the Schedule once it is met"
   },
   "mode": {
     "every": "Every few minutes",
@@ -39,7 +42,8 @@
     "next": "Next round {{when}}",
     "paused": "Paused",
     "suspended": "Stopped for good: the key that set it was revoked",
-    "pausedFailures": "Paused itself after 3 failed rounds in a row; turn it on to try again"
+    "pausedFailures": "Paused itself after 3 failed rounds in a row; turn it on to try again",
+    "met": "Goal met"
   },
   "problem": {
     "empty": {
@@ -90,5 +94,9 @@
     "footer": "A round that comes due on its own has nobody watching, so it asks for no Approval: it does only what the Agent's Allowlist and this list cover. Run it once and approve in that round to add what it needs.",
     "remove": "Remove"
   },
-  "enabled": "On"
+  "enabled": "On",
+  "goal": {
+    "met": "Goal met: {{reason}} — turn it on again if it is not",
+    "note": "Latest progress"
+  }
 }

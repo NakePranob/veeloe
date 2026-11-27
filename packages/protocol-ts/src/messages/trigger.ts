@@ -7,6 +7,9 @@ export const SCHEDULE_MIN_MINUTES = 15;
 /** At most once a week, written in minutes. */
 export const SCHEDULE_MAX_MINUTES = 7 * 24 * 60;
 export const TRIGGER_TEXT_MAX = 10_000;
+export const TRIGGER_GOAL_MAX = 500;
+/** A progress note or a goal-met reason the Agent left (ADR 0085). */
+export const GOAL_NOTE_MAX = 2000;
 
 const TriggerIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 /** `HH:MM` on the Machine's own clock, 00:00 to 23:59. */
@@ -54,6 +57,8 @@ const TriggerFields = z.looseObject({
    * an Allowlist, for this Schedule's rounds only. Non-empty needs Approve.
    */
   allow: AllowlistSchema.optional(),
+  /** A Schedule's goal (ADR 0085): one sentence of what counts as done; its rounds stop themselves once it is met. */
+  goal: z.string().min(1).max(TRIGGER_GOAL_MAX).optional(),
 });
 
 /** Each kind carries its own part, and only that one. */
@@ -102,6 +107,10 @@ export const ListedTriggerSchema = TriggerFields.extend({
   failedRounds: z.number().int().nonnegative().optional(),
   /** Why the Machine paused it itself: `failures` after three failed rounds in a row (ADR 0083). Absent when a Member paused it. */
   pausedFor: z.string().min(1).max(32).optional(),
+  /** The latest progress note a round of a goal's Schedule left. */
+  note: z.string().min(1).max(GOAL_NOTE_MAX).optional(),
+  /** Why a round said the goal is met; the Schedule is paused for `goal` until resumed. */
+  met: z.string().min(1).max(GOAL_NOTE_MAX).optional(),
   /** An Idle Work list's pieces still on it, with where each stands; a finished one-off piece is gone. */
   progress: z.array(IdleProgressSchema).max(IDLE_ITEMS_MAX).optional(),
 }).refine(kindFits);

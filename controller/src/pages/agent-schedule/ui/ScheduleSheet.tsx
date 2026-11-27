@@ -8,7 +8,7 @@ import { useMachines, type Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus, useTriggerStatus, withScope } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, confirm, DotLabel, Field, HeaderAction, inform, Note, Row, Screen, Section, Select, ToggleRow, space } from "../../../shared/ui";
+import { Button, confirm, DotLabel, Field, HeaderAction, inform, Note, Row, Screen, Section, Select, space, Text, ToggleRow } from "../../../shared/ui";
 import { draftOf, EMPTY_DRAFT, everyChoices, lastRoundOf, minuteChoices, triggerOf, type Draft, type Mode, type Problem } from "../model/schedule";
 import { useLastRounds } from "../model/use-last-rounds";
 import { dayName, OUTCOME, whenShort } from "./words";
@@ -90,6 +90,18 @@ function ScheduleForm({ agentId, agentName, machine, triggerId }: { agentId: str
       )}
       {held?.suspended && <Note tone="warning">{t("state.suspended")}</Note>}
       {draft && <When draft={draft} set={set} />}
+      {held?.met && (
+        <Note icon="done" iconColor="green">
+          {t("goal.met", { reason: held.met })}
+        </Note>
+      )}
+      {held?.note && (
+        <Section title={t("goal.note")}>
+          <Text variant="body" selectable style={{ padding: space.inset }}>
+            {held.note}
+          </Text>
+        </Section>
+      )}
       {held && <Rounds trigger={held} agentId={agentId} agentName={agentName} last={lastRoundOf(held, last.get(held.id))} locked={locked} sign={sign} />}
       {held && !held.suspended && <Scope trigger={held} agentId={agentId} agentName={agentName} locked={locked} sign={sign} />}
       {held && (
@@ -114,6 +126,9 @@ function When({ draft, set }: { draft: Draft; set: (change: Partial<Draft>) => v
     <>
       <Section>
         <Field label={t("editor.text")} value={draft.text} onChangeText={(text) => set({ text })} placeholder={t("editor.textPlaceholder")} multiline />
+      </Section>
+      <Section footer={t("editor.goalFooter")}>
+        <Field label={t("editor.goal")} value={draft.goal} onChangeText={(goal) => set({ goal })} placeholder={t("editor.goalPlaceholder")} multiline />
       </Section>
       <Section footer={t("editor.footer")}>
         <Select<Mode>
@@ -167,7 +182,17 @@ function Rounds({ trigger, agentId, agentName, last, locked, sign }: { trigger: 
       {!trigger.suspended && (
         <ToggleRow
           title={t("enabled")}
-          detail={trigger.pausedFor === "failures" ? t("state.pausedFailures") : trigger.paused ? t("state.paused") : trigger.nextRunAt ? t("state.next", { when: whenShort(trigger.nextRunAt, language) }) : undefined}
+          detail={
+            trigger.pausedFor === "goal"
+              ? t("state.met")
+              : trigger.pausedFor === "failures"
+                ? t("state.pausedFailures")
+                : trigger.paused
+                  ? t("state.paused")
+                  : trigger.nextRunAt
+                    ? t("state.next", { when: whenShort(trigger.nextRunAt, language) })
+                    : undefined
+          }
           value={!trigger.paused}
           onChange={(on) => void sign(t(on ? "authenticate.resume" : "authenticate.pause", { name: agentName }), { type: on ? "trigger.resume" : "trigger.pause", body: { agent: agentId, id: trigger.id } })}
         />

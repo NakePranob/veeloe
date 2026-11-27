@@ -21,6 +21,7 @@ pub enum PushKind {
     Question,
     /// A Schedule paused itself after failing rounds in a row (ADR 0083): to whoever set it.
     SchedulePaused,
+    GoalMet,
 }
 
 impl PushKind {
@@ -34,6 +35,8 @@ impl PushKind {
             (Self::Question, _) => ("Veeloe", "An Agent is waiting on your answer"),
             (Self::SchedulePaused, "th") => ("Veeloe", "Schedule หยุดพักเองเพราะล้มติดกัน"),
             (Self::SchedulePaused, _) => ("Veeloe", "A Schedule paused itself after failing"),
+            (Self::GoalMet, "th") => ("Veeloe", "Schedule ทำสำเร็จตามเป้าแล้ว"),
+            (Self::GoalMet, _) => ("Veeloe", "A Schedule met its goal"),
         }
     }
 
@@ -42,6 +45,7 @@ impl PushKind {
             Self::Approval => "approval",
             Self::TurnEnded => "turn",
             Self::SchedulePaused => "schedule.paused",
+            Self::GoalMet => "schedule.met",
             Self::Question => "question",
         };
         let mut data = json!({ "kind": kind, "agent": agent, "task": task });
@@ -65,7 +69,10 @@ pub fn recipients(
         .iter()
         .filter(|held| match kind {
             PushKind::Approval => trust.approves(&held.member, Some(&held.device)),
-            PushKind::TurnEnded | PushKind::SchedulePaused | PushKind::Question => {
+            PushKind::TurnEnded
+            | PushKind::SchedulePaused
+            | PushKind::GoalMet
+            | PushKind::Question => {
                 held.member == starter && trust.manages(&held.member, Some(&held.device))
             }
         })

@@ -502,6 +502,7 @@ fn scheduled(task: &str) -> ToWorker {
             attended: false,
             allow: Vec::new(),
             limit_s: None,
+            goal: false,
         },
     }
 }
@@ -2938,4 +2939,55 @@ async fn a_round_nobody_watches_cannot_ask_a_question() {
     let names = tool_names(&harness.llm.requests()[0]);
     assert!(!names.contains(&"ask_choice".to_string()));
     assert!(!names.contains(&"ask_form".to_string()));
+}
+
+#[tokio::test]
+async fn a_schedule_with_a_goal_may_note_progress_and_say_it_is_met() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "g1",
+                "goal_note",
+                json!({ "note": "PR #41 still open" }),
+            )),
+            Ok(tool_use(
+                "g2",
+                "goal_met",
+                json!({ "reason": "PR #41 merged" }),
+            )),
+            Ok(text("done")),
+        ],
+        ..Setup::default()
+    });
+    let mut run = scheduled("t1");
+    if let ToWorker::Run { trigger, .. } = &mut run {
+        trigger.goal = true;
+    }
+    harness.core.receive(run).expect("receive");
+    harness.core.idle().await;
+    assert!(tool_names(&harness.llm.requests()[0]).contains(&"goal_met".to_string()));
+    let events = harness.core.events("t1").expect("events");
+    let body = |kind: &str| {
+        events
+            .iter()
+            .find(|event| event.kind == kind)
+            .map(|event| event.body.clone())
+    };
+    assert_eq!(
+        body("goal.noted"),
+        Some(json!({ "note": "PR #41 still open" }))
+    );
+    assert_eq!(body("goal.met"), Some(json!({ "reason": "PR #41 merged" })));
+}
+
+#[tokio::test]
+async fn a_schedule_without_a_goal_has_no_goal_tools() {
+    let harness = setup(Setup {
+        replies: vec![Ok(text("checked"))],
+        ..Setup::default()
+    });
+    harness.core.receive(scheduled("t1")).expect("receive");
+    harness.core.idle().await;
+    let names = tool_names(&harness.llm.requests()[0]);
+    assert!(!names.contains(&"goal_note".to_string()) && !names.contains(&"goal_met".to_string()));
 }

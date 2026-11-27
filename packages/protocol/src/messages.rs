@@ -516,6 +516,15 @@ fn is_trigger(object: &Map<String, Value>) -> bool {
             .map(|notify| matches!(notify.as_str(), Some("me" | "use")))
             .unwrap_or(true)
         && object.get("allow").map(is_allowlist).unwrap_or(true)
+        && optional_text(object, "goal", 500)
+}
+
+/// Absent, or a text of 1 to `max` characters.
+fn optional_text(object: &Map<String, Value>, name: &str, max: usize) -> bool {
+    object
+        .get(name)
+        .map(|value| text(Some(value)).is_some_and(|value| (1..=max).contains(&chars(value))))
+        .unwrap_or(true)
 }
 
 fn is_trigger_set(object: &Map<String, Value>) -> bool {
@@ -546,6 +555,8 @@ fn is_listed_trigger(value: &Value) -> bool {
         && object.get("suspended").is_some_and(Value::is_boolean)
         && optional_ms("lastRunAt")
         && optional_ms("nextRunAt")
+        && optional_text(object, "note", 2000)
+        && optional_text(object, "met", 2000)
         && object
             .get("title")
             .map(|title| text(Some(title)).is_some_and(|title| (1..=60).contains(&chars(title))))

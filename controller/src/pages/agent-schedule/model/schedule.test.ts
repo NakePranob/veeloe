@@ -33,3 +33,9 @@ test("the last round is the skip or the Task, whichever came later", () => {
   expect(lastRoundOf({}, { ...round, quiet: true })).toEqual({ at: 100, outcome: "quiet", task: "t1" });
   expect(lastRoundOf({}, undefined)).toBeNull();
 });
+
+test("a goal is signed with the Schedule, trimmed, and left out when empty (ADR 0085)", () => {
+  const draft = { ...EMPTY_DRAFT, text: "follow PR #41" };
+  expect(triggerOf({ ...draft, goal: "  PR #41 is merged " }, "tr_1")).toMatchObject({ goal: "PR #41 is merged" });
+  expect(triggerOf({ ...draft, goal: "  " }, "tr_1")).not.toHaveProperty("goal");
+});
