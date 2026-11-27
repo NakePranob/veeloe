@@ -94,11 +94,9 @@
   "trigger": {
     "detail": "Schedules and Idle Work: work the Agent starts itself"
   },
-  "openNet": {
-    "title": "Reach the whole public internet",
-    "detail": "No Approval for each domain",
-    "onPrompt": "Let {{name}} reach the whole public internet",
-    "offPrompt": "Let {{name}} reach only the domains in the list",
-    "warning": "Workdir data could be sent out"
+  "egress": {
+    "open": "Whole internet",
+    "count_one": "{{count}} domain",
+    "count_other": "{{count}} domains"
   }
 }

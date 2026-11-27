@@ -11,7 +11,7 @@ import { useAgentUpdate, useMachineLink, useMachineStatus } from "../../../featu
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession, type Signed } from "../../../shared/keystore";
 import { formatTokens, mark, splitMarks, useNow, when } from "../../../shared/lib";
-import { Button, Dot, DotLabel, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, TextLink, Tile, ToggleRow, confirm, inform, space } from "../../../shared/ui";
+import { Button, Dot, DotLabel, Empty, Field, Meter, Note, Row, Screen, Section, Spinner, Text, TextLink, Tile, confirm, inform, space } from "../../../shared/ui";
 import { providerProblem } from "../../../widgets/provider-models";
 import { budgetOf } from "../model/budget";
 import { ExpiryPicker } from "./ExpiryPicker";
@@ -216,20 +216,9 @@ function AgentView({ agent }: { agent: AgentRow }) {
             if (link && machine) link.updateAgent(machine, { id: agent.id, approvalTimeoutS: next });
           }}
         />
-        {/* \`*\` in this Agent's own Egress: the whole public internet, for an Agent that does research (ADR 0029, issue #81). */}
-        <ToggleRow
-          icon="network"
-          title={t("openNet.title")}
-          detail={t(egressOf(agent).includes("*") ? "openNet.warning" : "openNet.detail")}
-          value={egressOf(agent).includes("*")}
-          onChange={(on) => {
-            if (!link || !machine || away) return;
-            const egress = egressOf(agent);
-            const next = on ? [...egress, "*"] : egress.filter((domain) => domain !== "*");
-            void keySession.signed(t(on ? "openNet.onPrompt" : "openNet.offPrompt", { name: agent.name }), () => (link.setEgress(machine, next, agent.id) ? "sent" : null));
-          }}
-        />
         <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} disabled={away} />
+        {/* Its own Egress beside its Allowlist (ADR 0029): `*` reads as the whole internet (issue #81). */}
+        <Row icon="network" title="Egress" value={egressOf(agent).includes("*") ? t("egress.open") : t("egress.count", { count: egressOf(agent).length })} href={`/agents/${agent.id}/egress`} disabled={away} />
         <Row icon="branch" title={t("git.row")} value={repos === null ? t("git.unsupported") : t("git.count", { count: repos.length })} href={`/agents/${agent.id}/git`} disabled={away} />
         <Row icon="time" title="Trigger" detail={t("trigger.detail")} href={`/agents/${agent.id}/schedule`} disabled={away} />
         {/* Not on the board, which has no way to set the Budget yet; it saves with the name. */}

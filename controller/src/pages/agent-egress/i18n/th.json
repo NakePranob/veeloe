@@ -1,0 +1,40 @@
+{
+  "title": "Egress",
+  "subtitle_one": "{{name}} · {{count}} โดเมน",
+  "subtitle_other": "{{name}} · {{count}} โดเมน",
+  "subtitleOpen": "{{name}} · ทั้งเน็ต",
+  "offline": "Machine ออฟไลน์อยู่ แก้ Egress ได้เมื่อเครื่องกลับมาออนไลน์",
+  "remove": "เอาออก",
+  "duplicate": "มีโดเมนนี้แล้ว",
+  "missing": {
+    "title": "ไม่พบ Agent นี้",
+    "body": "Machine อาจยังไม่ได้บอกรายชื่อ Agent หรือ Agent นี้ไม่อยู่แล้ว"
+  },
+  "open": {
+    "title": "ออกเน็ตสาธารณะได้ทั้งหมด",
+    "footer": "สำหรับ Agent ที่ทำ research ไม่ต้องขอทีละโดเมน เครือข่ายภายในยังปิดอยู่เสมอ (ADR 0029)",
+    "warning": "หน้าเว็บไหนก็อาจหลอกให้ Agent ส่งข้อมูลใน Workdir ออกไปได้ ใช้กับ Agent ที่ไม่มี token หรือไฟล์สำคัญเท่านั้น"
+  },
+  "domains": {
+    "heading": "โดเมนที่ออกไปได้",
+    "footer": "ข้อมูลส่งออกไปโดเมนในรายการได้ จึงเพิ่มเฉพาะที่ไว้ใจ *.example.com ครอบทุก subdomain ระหว่างทำงาน Agent ขอโดเมนใหม่ได้ด้วย Approval",
+    "empty": "ยังไม่มีโดเมน",
+    "emptyDetail": "Agent ตัวนี้ออกเน็ตไม่ได้ ทุกโดเมนต้องขอ Approval",
+    "emptyOpen": "ไม่จำเป็นตอนเปิดทั้งเน็ต แต่จะใช้ต่อเมื่อปิดสวิตช์"
+  },
+  "add": {
+    "label": "เพิ่มโดเมน",
+    "placeholder": "เช่น pypi.org หรือ *.reuters.com",
+    "action": "เพิ่ม"
+  },
+  "invalid": {
+    "title": "โดเมนไม่ถูกต้อง",
+    "body": "ใส่ชื่อโดเมนอย่างเดียว เช่น github.com หรือ *.npmjs.org ไม่ต้องมี https:// หรือ path"
+  },
+  "authenticate": {
+    "add": "เพิ่ม {{domain}} ใน Egress ของ {{name}}",
+    "remove": "ลบ {{domain}} ออกจาก Egress ของ {{name}}",
+    "open": "ให้ {{name}} ออกเน็ตสาธารณะได้ทั้งหมด",
+    "close": "ให้ {{name}} กลับไปออกได้เฉพาะโดเมนในรายการ"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "title": "Egress",
+  "subtitle_one": "{{name}} · {{count}} domain",
+  "subtitle_other": "{{name}} · {{count}} domains",
+  "subtitleOpen": "{{name}} · whole internet",
+  "offline": "The Machine is offline. Egress can change once it is back.",
+  "remove": "Remove",
+  "duplicate": "Already in the list",
+  "missing": {
+    "title": "Agent not found",
+    "body": "The Machine may not have sent its Agents yet, or this Agent is gone"
+  },
+  "open": {
+    "title": "Reach the whole public internet",
+    "footer": "For an Agent that does research: no Approval for each domain. Private networks stay closed (ADR 0029).",
+    "warning": "Any page can try to trick the Agent into sending what is in its Workdir out. Use it only for an Agent that holds no tokens or important files."
+  },
+  "domains": {
+    "heading": "Domains it may reach",
+    "footer": "Data can go out to any domain here, so add only ones you trust. *.example.com covers every subdomain. While working, the Agent can ask for a new domain with an Approval.",
+    "empty": "No domains yet",
+    "emptyDetail": "This Agent cannot reach the internet: every domain asks for an Approval",
+    "emptyOpen": "Not needed while the whole internet is open; used once the switch is off"
+  },
+  "add": {
+    "label": "Add domain",
+    "placeholder": "e.g. pypi.org or *.reuters.com",
+    "action": "Add"
+  },
+  "invalid": {
+    "title": "Not a domain",
+    "body": "Enter a domain alone, like github.com or *.npmjs.org, without https:// or a path"
+  },
+  "authenticate": {
+    "add": "Add {{domain}} to {{name}}'s Egress",
+    "remove": "Remove {{domain}} from {{name}}'s Egress",
+    "open": "Let {{name}} reach the whole public internet",
+    "close": "Let {{name}} reach only the domains in the list"
+  }
+}

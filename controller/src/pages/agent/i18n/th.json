@@ -94,11 +94,8 @@
   "trigger": {
     "detail": "Schedule และ Idle Work: งานที่ Agent เริ่มเอง"
   },
-  "openNet": {
-    "title": "ออกเน็ตสาธารณะได้ทั้งหมด",
-    "detail": "ไม่ต้องขอทีละโดเมน",
-    "onPrompt": "ให้ {{name}} ออกเน็ตสาธารณะได้ทั้งหมด",
-    "offPrompt": "ให้ {{name}} กลับไปออกได้เฉพาะโดเมนในรายการ",
-    "warning": "ข้อมูลใน Workdir อาจถูกส่งออก"
+  "egress": {
+    "open": "ทั้งเน็ต",
+    "count_other": "{{count}} โดเมน"
   }
 }
