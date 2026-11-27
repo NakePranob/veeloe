@@ -154,16 +154,17 @@ function AgentView({ agent }: { agent: AgentRow }) {
       {/* Every round of one Schedule, gathered (ADR 0061); its Tasks are in the list below too. */}
       {threads.length > 0 && (
         <Section title={t("threads.heading")}>
-          {threads.map((thread) => (
+          {threads.slice(0, SHOWN).map((thread) => (
             <Row key={thread.id} icon="time" title={thread.text.split("\n")[0] || t("threads.untitled")} value={t("threads.rounds", { count: thread.rounds.length })} href={`/threads/${thread.id}?agent=${agent.id}`} />
           ))}
+          {threads.length > SHOWN && <Row title={t("all")} value={String(threads.length)} href={`/agents/${agent.id}/all?show=threads`} />}
         </Section>
       )}
 
-      {/* ponytail: every Task of this Agent shows; a "see all" page comes when lists get long. */}
+      {/* The newest few, by when they last moved; the rest are a sheet away, read a page at a time. */}
       {tasks.length > 0 && (
         <Section title={t("tasks.heading")} footer={t("tasks.footer")}>
-          {tasks.map((task) => (
+          {tasks.slice(0, SHOWN).map((task) => (
             <Row
               key={task.id}
               leading={<Dot color={STATUS_DOT[statusOf(task, online)]} size={9} />}
@@ -173,6 +174,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
               onLongPress={() => router.push({ pathname: "/tasks/[task]/details", params: { task: task.id, agent: agent.id, from: "agent" } })}
             />
           ))}
+          {tasks.length > SHOWN && <Row title={t("all")} value={String(tasks.length)} href={`/agents/${agent.id}/all?show=tasks`} />}
         </Section>
       )}
 
@@ -229,6 +231,9 @@ function AgentView({ agent }: { agent: AgentRow }) {
     </Screen>
   );
 }
+
+/** How many Tasks and Schedule threads the page shows before "See all". */
+const SHOWN = 4;
 
 export function AgentPage() {
   const t = useT("agent");

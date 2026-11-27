@@ -91,5 +91,8 @@
     "untitled": "Untitled Schedule",
     "rounds_one": "{{count}} round",
     "rounds_other": "{{count}} rounds"
-  }
+  },
+  "all": "See all",
+  "allTasks": "All Tasks",
+  "allThreads": "All Schedule threads"
 }

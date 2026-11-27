@@ -91,5 +91,8 @@
     "untitled": "Schedule ไม่มีชื่อ",
     "rounds_one": "{{count}} รอบ",
     "rounds_other": "{{count}} รอบ"
-  }
+  },
+  "all": "ดูทั้งหมด",
+  "allTasks": "Task ทั้งหมด",
+  "allThreads": "เส้นของ Schedule ทั้งหมด"
 }

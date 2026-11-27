@@ -103,6 +103,9 @@ export const LIST_TASK_SUMMARIES = `SELECT t.*,
   (SELECT body FROM task_event WHERE task_id = t.id AND kind = 'member.message' ORDER BY seq LIMIT 1) AS first_body
   FROM task t ORDER BY t.updated_at DESC`;
 
+/** One Agent's Tasks, newest first, at most `?` of them: a long list read a page at a time. */
+export const LIST_AGENT_TASK_SUMMARIES = LIST_TASK_SUMMARIES.replace("FROM task t ORDER BY t.updated_at DESC", "FROM task t WHERE t.agent_id = ? ORDER BY t.updated_at DESC LIMIT ?");
+
 /** The latest words in a Task, as one plain line: the Member's, or the first line of the Agent's text. */
 export function previewOf(summary: Pick<TaskSummary, "last_kind" | "last_body">): string {
   if (!summary.last_body) return "";

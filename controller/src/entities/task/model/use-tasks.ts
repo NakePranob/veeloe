@@ -1,11 +1,16 @@
 import { useLiveQuery } from "../../../shared/db";
-import { LIST_TASK_SUMMARIES, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskRow, type TaskSummary } from "./tasks";
+import { LIST_AGENT_TASK_SUMMARIES, LIST_TASK_SUMMARIES, TASK_TOPIC, type PendingRow, type TaskEventRow, type TaskRow, type TaskSummary } from "./tasks";
 
 const TOPICS = [TASK_TOPIC];
 
 /** Every Task, newest first. Null until the first read lands. */
 export function useTaskSummaries() {
   return useLiveQuery<TaskSummary>(LIST_TASK_SUMMARIES, [], TOPICS);
+}
+
+/** One Agent's newest `limit` Tasks: grow `limit` to read the next page. */
+export function useAgentTaskSummaries(agentId: string, limit: number) {
+  return useLiveQuery<TaskSummary>(LIST_AGENT_TASK_SUMMARIES, [agentId, limit], TOPICS);
 }
 
 export function useTaskEvents(taskId: string) {

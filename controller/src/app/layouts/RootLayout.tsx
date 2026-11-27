@@ -99,6 +99,7 @@ export function RootLayout() {
                   <Stack.Screen name="tasks/[task]/index" options={split ? { headerBackVisible: false, headerLeft: () => null } : {}} />
                   <Stack.Screen name="agents/[agent]/character" options={sheet} />
                   <Stack.Screen name="agents/[agent]/schedule/[trigger]" options={sheet} />
+                  <Stack.Screen name="agents/[agent]/all" options={{ ...sheet, sheetGrabberVisible: true }} />
                   {/* The Task details sheet has no header: the grabber and the swipe close it, as the board draws it. */}
                   <Stack.Screen name="tasks/[task]/details" options={{ ...sheet, headerShown: false, sheetGrabberVisible: true }} />
                 </Stack>
