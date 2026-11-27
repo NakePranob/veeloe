@@ -18,6 +18,7 @@
     "body": "It will trust this device's key and run what you send through this Hub. Only continue if you started veeloe pair yourself.",
     "hub": "Hub",
     "machine": "Machine key",
+    "otherHub": "This Hub isn't the one your other Machines are on ({{hubs}}), so it starts a new Workspace without their Members, Grants or linked devices. To keep them together, cancel and run veeloe pair --hub with that Hub.",
     "action": "Pair",
     "cancel": "Cancel",
     "prompt": "Confirm Pairing with this Machine"

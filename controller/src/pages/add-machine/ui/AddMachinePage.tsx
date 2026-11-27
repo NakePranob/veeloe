@@ -2,8 +2,10 @@ import { parsePairingLink, type PairingLink } from "@veeloe/protocol-ts";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
+import { useMachines } from "../../../entities/machine";
 import { describeError, useT } from "../../../shared/i18n";
 import { Button, Card, CenteredStep, Field, FooterBar, Icon, QrScanner, radius, Spinner, StepNumber, Text, column, space } from "../../../shared/ui";
+import { otherHubs } from "../model/pair";
 import { usePairMachine } from "../model/use-pair-machine";
 
 const linkProblem = { malformed: "pairing.link_malformed", "bad-signature": "pairing.link_bad_signature", expired: "pairing.link_expired" } as const;
@@ -34,6 +36,7 @@ export function AddMachinePage() {
   const [link, setLink] = useState<PairingLink | null>(start?.ok ? start.link : null);
   const [problem, setProblem] = useState<string | null>(start && !start.ok ? describeError({ code: linkProblem[start.reason] }) : null);
   const [pairing, setPairing] = useState(false);
+  const machines = useMachines();
 
   function accept(value: string) {
     const parsed = parsePairingLink(value, Date.now());
@@ -77,6 +80,7 @@ export function AddMachinePage() {
   }
 
   if (link) {
+    const elsewhere = otherHubs(link.hub, machines ?? []);
     return (
       <View style={{ flex: 1 }}>
         {title}
@@ -101,6 +105,14 @@ export function AddMachinePage() {
               {link.machine}
             </Text>
           </Card>
+          {elsewhere.length > 0 && (
+            <View style={{ flexDirection: "row", gap: space.sm }}>
+              <Icon name="warning" color="orange" />
+              <Text selectable variant="subheadline" style={{ flex: 1 }}>
+                {t("confirm.otherHub", { hubs: elsewhere.join(", ") })}
+              </Text>
+            </View>
+          )}
           {problemText}
         </ScrollView>
         <FooterBar>

@@ -18,6 +18,7 @@
     "body": "Machine จะเชื่อกุญแจของอุปกรณ์นี้ และทำตามคำสั่งที่คุณส่งผ่าน Hub นี้ ทำต่อเมื่อคุณเป็นคนรัน veeloe pair เองเท่านั้น",
     "hub": "Hub",
     "machine": "กุญแจของ Machine",
+    "otherHub": "Hub นี้ไม่ใช่ Hub ของ Machine ที่คุณมีอยู่ ({{hubs}}) จึงจะได้ Workspace ใหม่ที่ไม่เห็น Member, Grant และเครื่องที่ Link ไว้ของเดิม ถ้าตั้งใจให้อยู่ด้วยกัน ให้ยกเลิก แล้วรัน veeloe pair --hub กับ Hub เดิม",
     "action": "ผูก",
     "cancel": "ยกเลิก",
     "prompt": "ยืนยันการ Pairing กับ Machine เครื่องนี้"

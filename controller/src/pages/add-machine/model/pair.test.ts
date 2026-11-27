@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { buildPairingLink, createSigner, fromBase64url, handshakeBytes, parsePairingLink, publicKeyOf, toBase64url, verifySignature, type PairingLink } from "@veeloe/protocol-ts";
 import { createKeySession, type Vault } from "../../../shared/keystore/session";
-import { pairAfterAuthentication, pairMachine } from "./pair";
+import { otherHubs, pairAfterAuthentication, pairMachine } from "./pair";
 
 // TEST-ONLY KEYS.
 const machineSeed = new Uint8Array(32).fill(0x33);
@@ -148,4 +148,12 @@ test("cancelling the authentication sends nothing and leaves the app unlocked", 
   expect(result).toBeNull();
   expect(hub.requests).toEqual([]);
   expect(session.status()).toBe("unlocked");
+});
+
+test("a Hub with none of the Machines starts a Workspace of its own, so it names the Hubs they are on", () => {
+  const onA = { hub_url: "wss://a.test" };
+  const onB = { hub_url: "wss://b.test" };
+  expect(otherHubs("wss://a.test", [])).toEqual([]);
+  expect(otherHubs("wss://a.test", [onA, onB])).toEqual([]);
+  expect(otherHubs("wss://c.test", [onA, onA, onB])).toEqual(["wss://a.test", "wss://b.test"]);
 });

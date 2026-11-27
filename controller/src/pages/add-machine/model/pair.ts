@@ -81,3 +81,14 @@ export async function pairAfterAuthentication(authenticate: (use: (key: Uint8Arr
   });
   return result;
 }
+
+/**
+ * The Hubs of the Machines already paired, when none of them is on `hub`. A Hub that has
+ * no Machine of this device does not know its key, so Pairing there starts a Workspace of
+ * its own, with none of the Members, Grants or linked devices of the others. Empty when
+ * `hub` joins one already here, or when this is the first Machine.
+ */
+export function otherHubs(hub: string, machines: readonly { hub_url: string }[]): string[] {
+  if (machines.some((m) => m.hub_url === hub)) return [];
+  return [...new Set(machines.map((m) => m.hub_url))];
+}
