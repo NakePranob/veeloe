@@ -1,5 +1,7 @@
 # งานเชิงรุกเข้า harness ผ่าน trigger ภายในที่ supervisor สร้าง ไม่ใช่การ replay ซองที่เซ็นแล้ว
 
+> **ADR 0080 เพิ่มเติม** เรื่องที่ยังไม่ได้ตัดสิน "การข้ามรอบเมื่อ Agent ไม่ว่าง" ตัดสินแล้ว รอบไม่ถูกข้ามเพราะมี Turn อื่น ข้ามเฉพาะเมื่อรอบก่อนของ Schedule เดียวกันยังไม่จบ
+
 Schedule, Idle Work และ Watch (ADR 0027, 0056, 0057) ต้องเปิด Turn โดยไม่มี Member พิมพ์ข้อความใหม่ แต่ `ToWorker::Message` ของ harness วันนี้ต้องมี `member`, `id`, `text` และ `reference` ของซองที่เซ็นแล้ว พร้อม seen-sequence กัน replay (ADR 0012, 0019) การเอา envelope เดิมที่เซ็นครั้งเดียวมา replay ทุกรอบจึงชนกับกลไกนั้นและเปิดช่อง replay
 
 เราจึงให้ **supervisor แปลง trigger ที่เซ็นและเก็บไว้บน Machine เป็น trigger ภายในชนิดใหม่** (แนว `ToWorker::Run`) ที่มี `{ task, member, trigger: { kind: "schedule" | "idle" | "watch", id, at }, text }` แล้วส่งให้ worker ตามลูปเดิม worker ไม่ตรวจ signature ของ trigger ต่อรอบ เพราะถือ supervisor ที่ตรวจตอนรับ/โหลดและตรวจการถอนกุญแจแล้ว แต่ `turn.started` ต้องบันทึก `trigger`, `member` และ `at` ไว้ เพื่อให้ย้อนดูได้ว่ารอบนั้นมาจากอะไร และเพื่อให้ยกเลิก/ระงับ trigger เมื่อกุญแจที่เซ็นถูกถอน (ADR 0031) ได้ก่อนรอบถัดไป
