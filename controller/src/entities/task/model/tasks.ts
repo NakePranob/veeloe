@@ -267,7 +267,7 @@ export function isQuiet(latest: Latest | undefined) {
 export function statusOf(latest: Latest | undefined, online: boolean | null): TaskStatus {
   if (online === false) return "offline";
   if (!latest?.latest_kind) return "new";
-  if (latest.latest_kind === TaskEventKind.ApprovalRequested) return "waiting";
+  if (latest.latest_kind === TaskEventKind.ApprovalRequested || latest.latest_kind === TaskEventKind.CardShown) return "waiting";
   // A restart cut this Turn off (ADR 0033): the files are there, and a word carries it on.
   if (latest.latest_kind === TaskEventKind.TurnInterrupted) return "interrupted";
   // The Runtime saw the Turn go quiet past its stall time (ADR 0073); the next event clears it.

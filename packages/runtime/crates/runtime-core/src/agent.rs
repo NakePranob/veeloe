@@ -111,6 +111,15 @@ struct Waiter {
     answer: oneshot::Sender<Answer>,
 }
 
+/// One Question a Card asked: only `member`, who sent the Turn's message, may answer it.
+#[derive(Debug)]
+struct Question {
+    task: String,
+    starter: String,
+    member: String,
+    answer: oneshot::Sender<Value>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Answer {
     request: String,
@@ -139,6 +148,8 @@ struct State {
     memory_lock: tokio::sync::Mutex<()>,
     stopped_ids: Mutex<VecDeque<String>>,
     waiting: Mutex<HashMap<String, Waiter>>,
+    /// Questions a Card asked, waiting for the Turn's Member to answer (ADR 0082).
+    questions: Mutex<HashMap<String, Question>>,
     approvals: AtomicU64,
     max_rounds: AtomicUsize,
     context_window: AtomicUsize,
@@ -236,6 +247,7 @@ impl AgentCore {
                 memory_lock: tokio::sync::Mutex::new(()),
                 stopped_ids: Mutex::new(VecDeque::new()),
                 waiting: Mutex::new(HashMap::new()),
+                questions: Mutex::new(HashMap::new()),
                 approvals: AtomicU64::new(0),
                 max_rounds: AtomicUsize::new(MAX_ROUNDS),
                 context_window: AtomicUsize::new(128_000),
@@ -338,6 +350,13 @@ impl AgentCore {
                 &reference,
                 task.as_deref(),
             ),
+            ToWorker::CardAnswer {
+                task,
+                id,
+                answer,
+                member,
+                reference,
+            } => self.answer_card(&task, &id, answer, &member, &reference),
             ToWorker::Agent {
                 name,
                 allowlist,
@@ -662,6 +681,37 @@ impl AgentCore {
         Ok(())
     }
 
+    /// A Member answered a Question (ADR 0082): written to the Task, then handed to
+    /// the waiting tool. Only the Turn's own Member may answer, and only while it waits.
+    fn answer_card(
+        &self,
+        task: &str,
+        id: &str,
+        answer: Value,
+        member: &str,
+        reference: &str,
+    ) -> Result<(), AgentError> {
+        let mut questions = self.state.questions.lock().expect("questions");
+        let fits = questions
+            .get(id)
+            .is_some_and(|question| question.task == task && question.member == member);
+        if !fits {
+            drop(questions);
+            return self.refuse(member, reference, "card.unknown", Some(task));
+        }
+        let question = questions.remove(id).expect("checked above");
+        drop(questions);
+        self.state.append(
+            &question.task,
+            &question.starter,
+            "card.answered",
+            json!({ "id": id, "member": member, "answer": answer }),
+            None,
+        )?;
+        let _ = question.answer.send(answer);
+        Ok(())
+    }
+
     fn answer_approval(
         &self,
         request: &str,
@@ -803,6 +853,11 @@ async fn run_turn(
         .as_ref()
         .filter(|trigger| !trigger.attended)
         .map(|trigger| trigger.allow.clone());
+    // Somebody is there to answer: the Agent may ask a Question with a Card (ADR 0082).
+    if unattended.is_none() {
+        tools.push(crate::cards::ask_choice());
+        tools.push(crate::cards::ask_form());
+    }
     for _ in 0..rounds {
         let mut events = state.log().events(&task, 0)?;
         if let Some(summary) = compact_if_needed(&state, &task, &starter, &events).await {
@@ -908,6 +963,10 @@ async fn run_turn(
             let input = use_block.get("input").cloned().unwrap_or(Value::Null);
             let result = if name == PROPOSE_IDLE_WORK {
                 propose(&state, &input)
+            } else if unattended.is_none()
+                && (name == crate::cards::ASK_CHOICE || name == crate::cards::ASK_FORM)
+            {
+                ask_card(&state, &task, &starter, &events, name, &input, &cancel).await
             } else if from_trigger && name == NOTHING_TO_REPORT {
                 quiet_at = Some(results.len());
                 Ok("This round ends quietly: nobody is told.".to_string())
@@ -1692,6 +1751,84 @@ impl Drop for Waiting {
             turn.touch();
         }
     }
+}
+
+/// Shows a Question Card and waits for the Turn's Member, as an Approval waits
+/// (ADR 0082): the same time limit, and a Stop ends the wait. The answer, or that
+/// nobody answered, is what the model reads back.
+async fn ask_card(
+    state: &Arc<State>,
+    task: &str,
+    starter: &str,
+    events: &[TaskEvent],
+    tool: &str,
+    input: &Value,
+    cancel: &Cancel,
+) -> Result<String, ToolError> {
+    let checked = crate::cards::check(tool, input).map_err(ToolError::Failed)?;
+    // The Member who sent this Turn's message, as `turn.started` wrote it.
+    let member = events
+        .iter()
+        .rev()
+        .find(|event| event.kind == "turn.started")
+        .and_then(|event| event.body.get("member"))
+        .and_then(Value::as_str)
+        .unwrap_or(starter)
+        .to_string();
+    let _waiting = Waiting::on(state, task);
+    let id = request_id(state).replacen("ap_", "cd_", 1);
+    let timeout = state.approval_timeout();
+    let expires_at = state.now_ms() + timeout.as_millis() as i64;
+    let (answer, answered) = oneshot::channel();
+    state.questions.lock().expect("questions").insert(
+        id.clone(),
+        Question {
+            task: task.to_string(),
+            starter: starter.to_string(),
+            member: member.clone(),
+            answer,
+        },
+    );
+    let _ = state.append(
+        task,
+        starter,
+        "card.shown",
+        json!({
+            "id": id,
+            "card": tool,
+            "version": crate::cards::CARD_VERSION,
+            "value": checked.value,
+            "fallback": checked.fallback,
+            "member": member,
+            "expiresAt": expires_at,
+        }),
+        None,
+    );
+    let settled = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => None,
+        answer = answered => answer.ok(),
+        _ = tokio::time::sleep(timeout) => None,
+    };
+    let still_waiting = state
+        .questions
+        .lock()
+        .expect("questions")
+        .remove(&id)
+        .is_some();
+    if cancel.is_cancelled() {
+        return Err(ToolError::Stopped);
+    }
+    if settled.is_none() && still_waiting {
+        let _ = state.append(
+            task,
+            starter,
+            "card.answered",
+            json!({ "id": id, "expired": true }),
+            None,
+        );
+    }
+    Ok(crate::cards::result(settled.as_ref()))
 }
 
 async fn ask_approval(

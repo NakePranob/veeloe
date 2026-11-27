@@ -250,3 +250,11 @@ test("a round a Schedule started is an event line with its words, not the setter
     { key: "3", kind: "member", text: "typed" },
   ]);
 });
+
+test("a Question waits as a card, settles with its answer, and closes when its Turn ends unanswered (ADR 0082)", () => {
+  const shown = (seq: number, id: string) => row(seq, "card.shown", { id, card: "ask_choice", version: 1, value: { question: "Where?", options: ["staging", "prod"] }, member: "m1", expiresAt: 10 });
+  const answered = items([row(1, "turn.started", {}), shown(2, "cd_1"), row(3, "card.answered", { id: "cd_1", member: "m1", answer: "staging" })], 0).items;
+  expect(answered.find((item) => item.kind === "question")).toMatchObject({ question: { id: "cd_1", options: ["staging", "prod"], status: "answered", answer: "staging" } });
+  const closed = items([row(1, "turn.started", {}), shown(2, "cd_2"), row(3, "turn.ended", { reason: "stopped" })], 0).items;
+  expect(closed.find((item) => item.kind === "question")).toMatchObject({ question: { status: "closed" } });
+});

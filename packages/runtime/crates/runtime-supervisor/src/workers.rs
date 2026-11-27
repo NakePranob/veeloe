@@ -874,6 +874,12 @@ fn failed(message: &ToWorker) -> Option<(String, String, Option<String>)> {
         ToWorker::Approval {
             member, reference, ..
         } => Some((member.clone(), reference.clone(), None)),
+        ToWorker::CardAnswer {
+            task,
+            member,
+            reference,
+            ..
+        } => Some((member.clone(), reference.clone(), Some(task.clone()))),
         _ => None,
     }
 }

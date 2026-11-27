@@ -17,6 +17,8 @@ const EXPO_PUSH: &str = "https://exp.host/--/api/v2/push/send";
 pub enum PushKind {
     Approval,
     TurnEnded,
+    /// The Agent asked a Question and waits (ADR 0082): to whoever sent the Turn's message.
+    Question,
     /// A Schedule paused itself after failing rounds in a row (ADR 0083): to whoever set it.
     SchedulePaused,
 }
@@ -28,6 +30,8 @@ impl PushKind {
             (Self::Approval, _) => ("Veeloe", "An Approval is waiting"),
             (Self::TurnEnded, "th") => ("Veeloe", "งานเสร็จแล้ว"),
             (Self::TurnEnded, _) => ("Veeloe", "A Turn has finished"),
+            (Self::Question, "th") => ("Veeloe", "Agent มีคำถามรอคุณตอบ"),
+            (Self::Question, _) => ("Veeloe", "An Agent is waiting on your answer"),
             (Self::SchedulePaused, "th") => ("Veeloe", "Schedule หยุดพักเองเพราะล้มติดกัน"),
             (Self::SchedulePaused, _) => ("Veeloe", "A Schedule paused itself after failing"),
         }
@@ -38,6 +42,7 @@ impl PushKind {
             Self::Approval => "approval",
             Self::TurnEnded => "turn",
             Self::SchedulePaused => "schedule.paused",
+            Self::Question => "question",
         };
         let mut data = json!({ "kind": kind, "agent": agent, "task": task });
         if let Some(approval) = approval {
@@ -60,7 +65,7 @@ pub fn recipients(
         .iter()
         .filter(|held| match kind {
             PushKind::Approval => trust.approves(&held.member, Some(&held.device)),
-            PushKind::TurnEnded | PushKind::SchedulePaused => {
+            PushKind::TurnEnded | PushKind::SchedulePaused | PushKind::Question => {
                 held.member == starter && trust.manages(&held.member, Some(&held.device))
             }
         })

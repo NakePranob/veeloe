@@ -246,5 +246,15 @@
       "idle": "Someone started this Idle Work piece now",
       "watch": "Someone started this Watch now"
     }
+  },
+  "question": {
+    "other": "Type your own answer",
+    "send": "Send",
+    "sent": "Answer sent",
+    "answered": "You answered: {{answer}}",
+    "answeredBy": "Answered: {{answer}}",
+    "expired": "Nobody answered in time; the Agent chose itself",
+    "closed": "The Turn ended before anyone answered",
+    "notYours": "Waiting for whoever asked for this"
   }
 }

@@ -67,6 +67,7 @@ export {
   TaskMessageBodySchema,
   TaskRenameBodySchema,
   TaskStopBodySchema,
+  CardAnswerBodySchema,
   TASK_TITLE_MAX,
   TaskTitled,
   ApprovalSkipped,
@@ -79,6 +80,7 @@ export {
   type TaskMessageBody,
   type TaskRenameBody,
   type TaskStopBody,
+  type CardAnswerBody,
   type TaskSyncBody,
 } from "./messages/task";
 export { GIT_REPOS_MAX, GitRepoSchema, GitReposSchema } from "./messages/git-repos";

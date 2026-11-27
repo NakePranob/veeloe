@@ -2,6 +2,7 @@
 //! the Stop and Approval rules around them.
 
 pub mod agent;
+pub mod cards;
 pub mod conversation;
 pub mod event_store;
 pub mod ipc;

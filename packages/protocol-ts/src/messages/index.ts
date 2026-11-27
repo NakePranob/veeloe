@@ -10,7 +10,7 @@ import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
 import { ProviderAddBodySchema } from "./provider";
 import { PushRegisterBodySchema, PushRegisteredBodySchema, PushUnregisterBodySchema, PushUnregisteredBodySchema } from "./push";
 import { TriggerListBodySchema, TriggerListedBodySchema, TriggerSetBodySchema, TriggerTargetBodySchema } from "./trigger";
-import { FileChunkBodySchema, FileGetBodySchema, TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskRenameBodySchema, TaskStopBodySchema, TaskSyncBodySchema, ToolOutputBodySchema } from "./task";
+import { CardAnswerBodySchema, FileChunkBodySchema, FileGetBodySchema, TaskEventBodySchema, TaskEventsBodySchema, TaskListBodySchema, TaskListedBodySchema, TaskMessageBodySchema, TaskRenameBodySchema, TaskStopBodySchema, TaskSyncBodySchema, ToolOutputBodySchema } from "./task";
 import { UsageGetBodySchema, UsageListedBodySchema } from "./usage";
 
 const known = {
@@ -31,6 +31,7 @@ const known = {
   "file.chunk": FileChunkBodySchema,
   "file.get": FileGetBodySchema,
   "task.stop": TaskStopBodySchema,
+  "card.answer": CardAnswerBodySchema,
   "task.rename": TaskRenameBodySchema,
   "task.event": TaskEventBodySchema,
   "tool.output": ToolOutputBodySchema,

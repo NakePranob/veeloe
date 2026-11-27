@@ -20,6 +20,7 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "approval.answer" => object.map(is_approval_answer).unwrap_or(false),
         "task.message" => object.map(is_task_message).unwrap_or(false),
         "task.stop" => object.map(is_task_stop).unwrap_or(false),
+        "card.answer" => object.map(is_card_answer).unwrap_or(false),
         "task.rename" => object.map(is_task_rename).unwrap_or(false),
         "task.event" => object.map(is_task_event_body).unwrap_or(false),
         "tool.output" => object.map(is_tool_output).unwrap_or(false),
@@ -716,6 +717,25 @@ fn is_task_stop(object: &Map<String, Value>) -> bool {
         && text(object.get("id"))
             .map(|id| (1..=64).contains(&chars(id)))
             .unwrap_or(false)
+}
+
+/// The answer to a Question Card (ADR 0082): one text, or a form's values by name.
+fn is_card_answer(object: &Map<String, Value>) -> bool {
+    let short = |value: Option<&Value>, max: usize| {
+        text(value)
+            .map(|value| (1..=max).contains(&chars(value)))
+            .unwrap_or(false)
+    };
+    let answer = match object.get("answer") {
+        Some(Value::Object(fields)) => fields.iter().all(|(name, value)| {
+            (1..=64).contains(&chars(name))
+                && (value.is_number() || value.as_str().is_some_and(|v| chars(v) <= 2000))
+        }),
+        value => short(value, 2000),
+    };
+    text(object.get("agent")).map(is_agent_id).unwrap_or(false)
+        && short(object.get("id"), 64)
+        && answer
 }
 
 /// One line of 1 to 60 characters, not only spaces.

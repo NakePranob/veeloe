@@ -395,6 +395,21 @@ impl Supervisor {
                     .map(str::to_string),
             ),
             "turn.ended" => (PushKind::TurnEnded, None),
+            // A Question waits on the Member who sent the Turn's message (ADR 0082).
+            "card.shown"
+                if event
+                    .body
+                    .get("card")
+                    .and_then(Value::as_str)
+                    .is_some_and(|card| card.starts_with("ask_")) =>
+            {
+                let member = event
+                    .body
+                    .get("member")
+                    .and_then(Value::as_str)
+                    .unwrap_or(starter);
+                return self.push(PushKind::Question, agent, task, member, None);
+            }
             _ => return,
         };
         self.push(kind, agent, task, starter, approval);

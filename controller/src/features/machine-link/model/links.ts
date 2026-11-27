@@ -464,6 +464,11 @@ export function createMachineLinks({
       return sendTo(machine, "other", { type: "approval.answer", task, body: { agent, request, decision, ...(message !== undefined && { message }), ...(allowAlways !== undefined && { allowAlways }) } });
     },
 
+    /** The answer to a Question Card (ADR 0082); the card folds once the Machine's `card.answered` lands. */
+    answerCard(machine: Machine, { agent, task, id, answer }: { agent: string; task: string; id: string; answer: string | Record<string, string | number> }) {
+      return sendTo(machine, "other", { type: "card.answer", task, body: { agent, id, answer } });
+    },
+
     async sendMessage(machine: Machine, { agent, task, text, attachments }: { agent: string; task: string; text: string; attachments?: { name: string; size: number; hash: string }[] }) {
       // A new message means the Member moved on from whatever a Stop said (ADR 0017).
       setStatus(machine.id, { stopError: null });

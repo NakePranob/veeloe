@@ -163,6 +163,17 @@ pub enum ToWorker {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         task: Option<String>,
     },
+    /// A Member's answer to a Question the Agent asked with a Card (ADR 0082). The
+    /// worker checks it is the Turn's own Member and that the Question still waits.
+    #[serde(rename = "card.answer")]
+    CardAnswer {
+        task: String,
+        id: String,
+        answer: Value,
+        member: String,
+        #[serde(rename = "ref")]
+        reference: String,
+    },
     /// The Task log's answer to one [`FromWorker::LogRead`].
     #[serde(rename = "log.answer")]
     LogAnswer { id: String, answer: LogAnswer },

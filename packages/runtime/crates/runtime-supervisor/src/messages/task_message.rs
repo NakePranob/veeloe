@@ -195,6 +195,36 @@ pub(crate) fn rename(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound,
 }
 
 /// A domain Approval goes to the proxy waiting on it; a command's to the worker.
+/// A Member's answer to a Question Card (ADR 0082). The worker holds the Question,
+/// and checks the answer comes from the Turn's own Member while it still waits.
+pub(crate) fn card_answer(
+    machine: &Machine<'_>,
+    outbox: &dyn Outbox,
+    from: &Inbound,
+    body: &Value,
+) {
+    let Some((agent, task)) = target(machine, outbox, from, body) else {
+        return;
+    };
+    let (Some(id), Some(answer)) = (body.get("id").and_then(Value::as_str), body.get("answer"))
+    else {
+        return outbox.error(from, "card.unknown");
+    };
+    let sent = machine.workers.send(
+        &agent.id,
+        ToWorker::CardAnswer {
+            task,
+            id: id.to_string(),
+            answer: answer.clone(),
+            member: from.member.clone(),
+            reference: from.reference.clone(),
+        },
+    );
+    if !sent {
+        outbox.error(from, "agent.unavailable");
+    }
+}
+
 pub(crate) fn approval_answer(
     machine: &Machine<'_>,
     outbox: &dyn Outbox,

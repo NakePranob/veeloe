@@ -17,6 +17,7 @@ import { scopeNeeds, useScheduleScope } from "../model/use-schedule-scope";
 import { useComposer } from "../model/use-composer";
 import { AgentText } from "./AgentText";
 import { ApprovalCard } from "./ApprovalCard";
+import { QuestionCard } from "./QuestionCard";
 import { Composer } from "./Composer";
 import { BudgetCard, CompactedCard, FailedCard, FileCard, InterruptedCard, RoundLine, Separator, SkippedCard, StoppedLine } from "./LogCards";
 import { PendingBubble } from "./PendingBubble";
@@ -61,7 +62,7 @@ export function TaskPage() {
   };
   // The log only changes with its events; the clock matters only while an Approval is open and can still time out.
   const settled = useMemo(() => (events ? items(events, Date.now()) : null), [events]);
-  const ticking = !!settled?.items.some((item) => item.kind === "approval" && item.approval.status === "open");
+  const ticking = !!settled?.items.some((item) => (item.kind === "approval" && item.approval.status === "open") || (item.kind === "question" && item.question.status === "open"));
   // biome-ignore lint/correctness/useExhaustiveDependencies: `ticking && now` makes the clock a dependency only while it can change the log
   const log = useMemo(() => (events && ticking ? items(events, now) : settled), [events, ticking, ticking && now, settled]);
   // A quiet Schedule round this device let the log of go (pruneQuietRounds): it had events, and has none here now.
@@ -125,6 +126,14 @@ export function TaskPage() {
           input.current?.focus();
         }}
         scope={item.approval.kind !== "domain" && schedule.trigger && !schedule.sending ? { entries: scopeFor(item.approval.command) ?? [], add: schedule.add } : undefined}
+      />
+    ) : item.kind === "question" ? (
+      <QuestionCard
+        question={item.question}
+        look={lookOfJson(agent.character)}
+        me={machine?.member_id}
+        online={status.online !== false && !!link && !readOnly}
+        onAnswer={(answer) => (link && machine ? link.answerCard(machine, { agent: agent.id, task, id: item.question.id, answer }) : null)}
       />
     ) : item.kind === "skipped" ? (
       <SkippedCard

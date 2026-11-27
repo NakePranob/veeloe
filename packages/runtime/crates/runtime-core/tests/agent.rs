@@ -2804,3 +2804,138 @@ async fn each_turn_tells_the_supervisor_its_proxy_token_and_its_tools_carry_it()
         .unwrap()
         .contains(&tokens[0].1));
 }
+
+fn card_id(harness: &Harness) -> String {
+    harness
+        .core
+        .events("t1")
+        .expect("events")
+        .iter()
+        .find(|event| event.kind == "card.shown")
+        .and_then(|event| event.body["id"].as_str().map(str::to_string))
+        .expect("a card")
+}
+
+fn card_answer(id: &str, member: &str, answer: Value) -> ToWorker {
+    ToWorker::CardAnswer {
+        task: "t1".into(),
+        id: id.into(),
+        answer,
+        member: member.into(),
+        reference: format!("sig-{id}-{member}"),
+    }
+}
+
+#[tokio::test]
+async fn a_question_waits_for_the_turns_own_member_and_their_answer_is_the_tool_result() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "tu-ask",
+                "ask_choice",
+                json!({ "question": "Where to deploy?", "options": ["staging", "production"] }),
+            )),
+            Ok(text("deploying to staging")),
+        ],
+        ..Setup::default()
+    });
+    harness.core.receive(message("deploy")).expect("receive");
+    wait_for_kind(&harness, "t1", "card.shown").await;
+    let id = card_id(&harness);
+    let shown = harness.core.events("t1").expect("events");
+    let card = shown
+        .iter()
+        .find(|event| event.kind == "card.shown")
+        .expect("shown");
+    assert_eq!(card.body["card"], "ask_choice");
+    assert_eq!(card.body["member"], "m_owner");
+    assert_eq!(
+        card.body["fallback"],
+        "Where to deploy?\n1. staging\n2. production"
+    );
+
+    // Somebody else cannot answer it; the Question still waits.
+    harness
+        .core
+        .receive(card_answer(&id, "m_other", json!("production")))
+        .expect("other");
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    assert!(
+        !kinds(&harness.core.events("t1").expect("events")).contains(&"card.answered".to_string())
+    );
+
+    harness
+        .core
+        .receive(card_answer(&id, "m_owner", json!("staging")))
+        .expect("answer");
+    harness.core.idle().await;
+    let events = harness.core.events("t1").expect("events");
+    let answered = events
+        .iter()
+        .find(|event| event.kind == "card.answered")
+        .expect("answered");
+    assert_eq!(
+        answered.body,
+        json!({ "id": id, "member": "m_owner", "answer": "staging" })
+    );
+    let requests = harness.llm.requests();
+    let content = requests[1].messages.last().expect("last").content[0]["content"]
+        .as_str()
+        .expect("content")
+        .to_string();
+    assert!(content.contains("\"staging\""));
+}
+
+#[tokio::test]
+async fn a_question_nobody_answers_lets_the_agent_carry_on_and_a_bad_one_names_its_field() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "tu-bad",
+                "ask_choice",
+                json!({ "options": ["a"] }),
+            )),
+            Ok(tool_use(
+                "tu-ask",
+                "ask_choice",
+                json!({ "question": "Which?" }),
+            )),
+            Ok(text("went with my own pick")),
+        ],
+        timeout_ms: Some(30),
+        ..Setup::default()
+    });
+    harness.core.receive(message("go")).expect("receive");
+    harness.core.idle().await;
+    let requests = harness.llm.requests();
+    let bad = requests[1].messages.last().expect("last").content[0].clone();
+    assert_eq!(bad["is_error"], true);
+    assert!(bad["content"]
+        .as_str()
+        .expect("content")
+        .contains("question: required"));
+    let late = requests[2].messages.last().expect("last").content[0]["content"]
+        .as_str()
+        .expect("content")
+        .to_string();
+    assert!(late.contains("Nobody answered in time"));
+    let events = harness.core.events("t1").expect("events");
+    let answered = events
+        .iter()
+        .find(|event| event.kind == "card.answered")
+        .expect("answered");
+    assert_eq!(answered.body["expired"], true);
+}
+
+#[tokio::test]
+async fn a_round_nobody_watches_cannot_ask_a_question() {
+    let harness = setup(Setup {
+        replies: vec![Ok(tool_use("u3", "nothing_to_report", json!({})))],
+        ..Setup::default()
+    });
+    harness.core.receive(round(false, &[])).expect("receive");
+    harness.core.idle().await;
+    let names = tool_names(&harness.llm.requests()[0]);
+    assert!(!names.contains(&"ask_choice".to_string()));
+    assert!(!names.contains(&"ask_form".to_string()));
+}

@@ -832,6 +832,48 @@
       "valid": false
     },
     {
+      "name": "pick an option",
+      "type": "card.answer",
+      "body": {
+        "agent": "agent-1",
+        "id": "cd_1",
+        "answer": "staging"
+      },
+      "valid": true
+    },
+    {
+      "name": "fill a form",
+      "type": "card.answer",
+      "body": {
+        "agent": "agent-1",
+        "id": "cd_1",
+        "answer": {
+          "env": "staging",
+          "count": 2
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "an empty Card answer",
+      "type": "card.answer",
+      "body": {
+        "agent": "agent-1",
+        "id": "cd_1",
+        "answer": ""
+      },
+      "valid": false
+    },
+    {
+      "name": "a Card answer with no Card",
+      "type": "card.answer",
+      "body": {
+        "agent": "agent-1",
+        "answer": "staging"
+      },
+      "valid": false
+    },
+    {
       "name": "sync from the start",
       "type": "task.sync",
       "body": {

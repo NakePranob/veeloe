@@ -68,6 +68,26 @@ export type Approval = {
   answeredBy?: { member: string; decision: string; message?: string };
 };
 
+/** One field of an `ask_form` Question (ADR 0082). */
+type QuestionField = { name: string; label: string; kind: "text" | "number" | "choice" | "date"; options: string[] };
+
+/**
+ * A Question the Agent asked the Turn's Member (`card.shown` of `ask_choice` or `ask_form`).
+ * `open` until answered; `expired` when nobody answered in time; `closed` when its Turn ended first.
+ */
+export type Question = {
+  id: string;
+  question: string;
+  options: string[];
+  /** Present for a form; absent for a choice. */
+  fields?: QuestionField[];
+  /** Who may answer: the Member whose message started the Turn. */
+  member: string;
+  expiresAt: number;
+  status: "open" | "answered" | "expired" | "closed";
+  answer?: unknown;
+};
+
 /** What the Task screen draws, in order. Kinds this build does not know draw nothing (ADR 0023). */
 export type Item =
   | { key: string; kind: "member"; text: string }
@@ -78,6 +98,7 @@ export type Item =
   /** Commands run back to back, with no words of the Agent between them. */
   | { key: string; kind: "tools"; calls: ToolCall[] }
   | { key: string; kind: "approval"; approval: Approval }
+  | { key: string; kind: "question"; question: Question }
   /** A round nobody watched did not ask and did not do this (ADR 0079): a command and its parts, or a domain. */
   | { key: string; kind: "skipped"; target: string; parts: string[]; domain: boolean }
   /** A Member stopped the Turn that was running (ADR 0017). */
@@ -122,6 +143,7 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
   const out: Item[] = [];
   const calls = new Map<string, ToolCall>();
   const approvals = new Map<string, { item: Extract<Item, { kind: "approval" }>; index: number }>();
+  const questions = new Map<string, Question>();
   let open = false;
   // The calls of the Turn under way, for the files it changed when it ends.
   let turnCalls: ToolCall[] = [];
@@ -153,6 +175,11 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       hash?: string;
       path?: string;
       trigger?: { kind?: string; at?: number; attended?: boolean };
+      id?: unknown;
+      card?: unknown;
+      value?: { question?: unknown; options?: unknown; fields?: unknown };
+      expired?: unknown;
+      answer?: unknown;
     };
     try {
       body = JSON.parse(event.body) ?? {};
@@ -214,6 +241,30 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
         found.item.approval.status = expired ? "expired" : body.decision === "approve" || body.decision === "always" ? "approved" : "denied";
         if (typeof body.member === "string") found.item.approval.answeredBy = { member: body.member, decision: body.decision, ...(typeof body.message === "string" && { message: body.message }) };
       }
+    } else if (event.kind === "card.shown" && typeof body.id === "string" && (body.card === "ask_choice" || body.card === "ask_form") && typeof body.value?.question === "string") {
+      const value = body.value as { question: string; options?: unknown; fields?: unknown };
+      const strings = (list: unknown) => (Array.isArray(list) ? list.filter((item): item is string => typeof item === "string") : []);
+      const question: Question = {
+        id: body.id,
+        question: value.question,
+        options: strings(value.options),
+        ...(body.card === "ask_form" && {
+          fields: (Array.isArray(value.fields) ? value.fields : [])
+            .filter((field): field is Record<string, unknown> => typeof field?.name === "string" && typeof field.label === "string")
+            .map((field) => ({ name: String(field.name), label: String(field.label), kind: (["number", "choice", "date"].includes(String(field.kind)) ? field.kind : "text") as QuestionField["kind"], options: strings(field.options) })),
+        }),
+        member: typeof body.member === "string" ? body.member : "",
+        expiresAt: typeof body.expiresAt === "number" ? body.expiresAt : now,
+        status: "open",
+      };
+      questions.set(body.id, question);
+      out.push({ key, kind: "question", question });
+    } else if (event.kind === "card.answered" && typeof body.id === "string") {
+      const question = questions.get(body.id);
+      if (question) {
+        question.status = body.expired === true ? "expired" : "answered";
+        if (body.answer !== undefined) question.answer = body.answer;
+      }
     } else if (event.kind === "turn.stopped" && typeof body.member === "string") {
       out.push({ key, kind: "stopped", member: body.member, at: atOf(event) });
     } else if (event.kind === "turn.interrupted") {
@@ -238,6 +289,7 @@ export function items(events: EventRow[], now = Date.now()): { items: Item[]; wo
       for (const call of calls.values()) if (call.state === "running") call.state = "unfinished";
       // An Approval its Turn ended before anyone answered is closed, as the prototype's `approvals` does.
       for (const { item } of approvals.values()) if (item.approval.status === "open") item.approval.status = "closed";
+      for (const question of questions.values()) if (question.status === "open") question.status = "closed";
       // The Provider's `Retry-After`, in seconds from when the Turn ended (issue #55).
       if (body.reason === "error") out.push({ key, kind: "error", code: body.code ?? "provider.failed", ...(typeof body.retryAfter === "number" && event.at !== undefined && { retryAt: event.at + body.retryAfter * 1000 }) });
       // Only edit and write count: a file bash changed cannot be told from the log, and the row says so.

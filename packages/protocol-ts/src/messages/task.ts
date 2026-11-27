@@ -39,6 +39,19 @@ export const TaskStopBodySchema = z.looseObject({
 });
 export type TaskStopBody = z.infer<typeof TaskStopBodySchema>;
 
+/**
+ * Controller → Machine: the answer to a Question Card (`card.shown` of `ask_choice`
+ * or `ask_form`, ADR 0082). `answer` is the option or text chosen, or the form's
+ * values by field name. Only the Member whose message started the Turn may answer.
+ */
+const cardValue = z.union([z.string().max(2000), z.number()]);
+export const CardAnswerBodySchema = z.looseObject({
+  agent,
+  id: z.string().min(1).max(64),
+  answer: z.union([z.string().min(1).max(2000), z.record(z.string().min(1).max(64), cardValue)]),
+});
+export type CardAnswerBody = z.infer<typeof CardAnswerBodySchema>;
+
 /** A Task's name: one line of 1 to 60 characters (code points, as the Rust side counts them), not only spaces. */
 export const TASK_TITLE_MAX = 60;
 const title = z.string().refine((text) => !text.includes("\n") && text.trim() !== "" && [...text].length <= TASK_TITLE_MAX, "one line of 1 to 60 characters");
@@ -124,6 +137,10 @@ export const TaskEventKind = {
   ApprovalRequested: "approval.requested",
   /** `{ request, member, decision, message? }`: who answered and how. */
   ApprovalAnswered: "approval.answered",
+  /** `{ id, card, version, value, fallback, member, expiresAt }`: the Agent asks the Turn's Member a Question and waits (ADR 0082). */
+  CardShown: "card.shown",
+  /** `{ id, member, answer } | { id, expired: true }`: the Question was answered or nobody answered in time. */
+  CardAnswered: "card.answered",
 } as const;
 
 /**
