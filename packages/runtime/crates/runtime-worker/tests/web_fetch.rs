@@ -95,7 +95,9 @@ async fn a_page_in_the_egress_comes_back_as_text() {
         .await
         .expect("page");
     assert!(text.starts_with("HTTP 200"), "{text}");
-    assert!(text.ends_with("Hello & welcome"), "{text}");
+    // The page is data, not instructions (issue #67).
+    assert!(text.contains("<data source=\"web\""), "{text}");
+    assert!(text.contains("\nHello & welcome\n</data id="), "{text}");
 }
 
 #[tokio::test]
