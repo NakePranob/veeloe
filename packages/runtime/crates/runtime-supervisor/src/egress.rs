@@ -173,6 +173,27 @@ impl Egress {
         self.write_agent(&mut current, agent, next)
     }
 
+    /// A domain and every subdomain of the site it belongs to, from one
+    /// Approval (issue #80): `www.reuters.com` adds `reuters.com` and
+    /// `*.reuters.com`. None when the site would be a public suffix (`co.uk`).
+    pub fn add_site(&self, agent: &str, domain: &str) -> Result<Option<Vec<String>>, EgressError> {
+        let Some(site) = site_of(domain) else {
+            return Ok(None);
+        };
+        let wildcard = format!("*.{site}");
+        if !is_valid_egress(&[site.clone(), wildcard.clone()]) {
+            return Ok(None);
+        }
+        let mut current = self.current.lock().expect("egress");
+        let mut next = current.get(agent).cloned().unwrap_or_default();
+        for entry in [site, wildcard] {
+            if !next.contains(&entry) {
+                next.push(entry);
+            }
+        }
+        self.write_agent(&mut current, agent, next)
+    }
+
     /// The whole new list for every Agent: the legacy `egress.set` without an
     /// Agent, until the Controller has a per-Agent screen. Also how the
     /// migration brings the old Machine list across. Holds the same lock as the
@@ -265,4 +286,47 @@ fn dedupe(domains: Vec<String>) -> Vec<String> {
         }
     }
     out
+}
+
+/// The site a host belongs to: the host less its first label when it has
+/// more than two, refused when that is a public suffix.
+// ponytail: a short list of second-level suffixes, not the Public Suffix List;
+// a wildcard over another shared suffix is still one the owner chose to sign.
+pub fn site_of(host: &str) -> Option<String> {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    let labels: Vec<&str> = host.split('.').collect();
+    if labels.len() < 2 || labels.iter().any(|label| label.is_empty()) {
+        return None;
+    }
+    let site = if labels.len() > 2 {
+        labels[1..].join(".")
+    } else {
+        host.clone()
+    };
+    let parts: Vec<&str> = site.split('.').collect();
+    const SHARED: [&str; 12] = [
+        "co", "com", "net", "org", "ac", "go", "or", "in", "gov", "edu", "ne", "mi",
+    ];
+    if parts.len() == 2 && parts[1].len() == 2 && SHARED.contains(&parts[0]) {
+        return None;
+    }
+    Some(site)
+}
+
+#[cfg(test)]
+mod site_tests {
+    use super::site_of;
+
+    #[test]
+    fn a_site_is_the_host_less_its_first_label_and_never_a_public_suffix() {
+        assert_eq!(site_of("www.reuters.com").as_deref(), Some("reuters.com"));
+        assert_eq!(site_of("reuters.com").as_deref(), Some("reuters.com"));
+        assert_eq!(site_of("news.bbc.co.uk").as_deref(), Some("bbc.co.uk"));
+        assert_eq!(
+            site_of("www.example.co.th").as_deref(),
+            Some("example.co.th")
+        );
+        assert_eq!(site_of("shop.co.uk"), None);
+        assert_eq!(site_of("localhost"), None);
+    }
 }

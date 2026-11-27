@@ -803,6 +803,28 @@
       "valid": true
     },
     {
+      "name": "allow a whole site for good",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "always",
+        "subdomains": true
+      },
+      "valid": true
+    },
+    {
+      "name": "a whole-site answer that is not a yes or no",
+      "type": "approval.answer",
+      "body": {
+        "agent": "agent-1",
+        "request": "ap_1",
+        "decision": "always",
+        "subdomains": "yes"
+      },
+      "valid": false
+    },
+    {
       "name": "allow a domain for good",
       "type": "approval.answer",
       "body": {
@@ -1076,6 +1098,28 @@
         ]
       },
       "valid": true
+    },
+    {
+      "name": "let one Agent reach the whole public internet",
+      "type": "egress.set",
+      "body": {
+        "agent": "agent-1",
+        "egress": [
+          "*"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a bare wildcard over a top-level domain",
+      "type": "egress.set",
+      "body": {
+        "agent": "agent-1",
+        "egress": [
+          "*.com"
+        ]
+      },
+      "valid": false
     },
     {
       "name": "set one Agent's Egress",

@@ -27,7 +27,8 @@ pub const OUTPUT_LIMIT: usize = 30_000;
 const DESCRIPTION: &str = "Runs a bash command on the owner's machine, in your working folder, and returns what it printed (stdout and stderr together) and its exit code.
 Every command starts fresh in the working folder: cd, exported variables and shell functions do not carry over to the next command, so chain steps with && in one command.
 There is no input: a command that waits for input gets none. A command that runs longer than its timeout is stopped with everything it started.
-You can write only inside your own folder, and reach only the domains the owner allowed.";
+You can write only inside your own folder, and reach only the domains the owner allowed.
+To read a web page, use web_fetch, not curl or wget: it returns the page as text, and the owner is asked only about the domain, not a long command.";
 
 /// The end of a command's output, and how much of the start was dropped.
 #[derive(Default)]

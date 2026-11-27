@@ -102,7 +102,10 @@
     "outcomeAlways": "{{outcome}} · เพิ่ม {{target}} เข้า Egress",
     "outcomeByYou": "{{outcome}} โดยคุณ · {{target}}",
     "redirected": "บอกให้ทำอย่างอื่นแทน",
-    "forSchedule": "อนุมัติ และให้ Schedule นี้ทำได้เลย"
+    "forSchedule": "อนุมัติ และให้ Schedule นี้ทำได้เลย",
+    "fetchTitle": "ขอเปิดเว็บ {{site}} ได้ไหม?",
+    "showCommand": "ดูคำสั่งเต็ม",
+    "allowSite": "อนุญาตทั้ง *.{{site}}"
   },
   "openAgent": "เปิดหน้า {{name}}",
   "stopped": "{{member}} หยุด Turn นี้ · {{when}}",

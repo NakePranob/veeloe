@@ -8,7 +8,7 @@ import { formatList, fromNow } from "../../../shared/lib";
 import { AgentCard, Character, type Look } from "../../../entities/character";
 import { Button, Field, Inset, Label, space, Text, TextLink } from "../../../shared/ui";
 import { canAllowAlways } from "../model/allow-always";
-import { promptFor, respond, type Answer, type Decision } from "../model/approval";
+import { fetchedHost, promptFor, respond, siteOf, type Answer, type Decision } from "../model/approval";
 import type { Approval } from "../model/items";
 import { ApprovalOutcome } from "./ApprovalOutcome";
 
@@ -54,14 +54,15 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   const [busy, setBusy] = useState(false);
   // The rarer answers wait behind the board's one "Other options" link.
   const [more, setMore] = useState(false);
+  const [showCommand, setShowCommand] = useState(false);
 
   // Answering takes a fresh unlock, so a phone left open cannot approve (ADR 0012).
-  async function answer(decision: Decision, allowAlways?: string[]) {
+  async function answer(decision: Decision, allowAlways?: string[], subdomains?: boolean) {
     if (sent || busy) return;
-    const prompt = promptFor({ decision, domain: domain ? (approval.domain ?? "") : undefined, agentName, allowAlways, language });
+    const prompt = promptFor({ decision, domain: domain ? (subdomains && wholeSite ? `*.${wholeSite}` : (approval.domain ?? "")) : undefined, agentName, allowAlways, language });
     setBusy(true);
     try {
-      if (await respond({ decision, allowAlways, prompt: prompt && t(prompt.key, prompt.values), onAnswer, sign: (words, send) => keySession.signed(words, send) })) setSent(true);
+      if (await respond({ decision, allowAlways, subdomains, prompt: prompt && t(prompt.key, prompt.values), onAnswer, sign: (words, send) => keySession.signed(words, send) })) setSent(true);
     } finally {
       setBusy(false);
     }
@@ -110,23 +111,31 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
   }
 
   const target = (domain ? approval.domain : approval.command) ?? "";
+  // A command that only downloads a page reads as its site; the command itself waits behind a link (issue #79).
+  const site = domain ? null : fetchedHost(approval.command);
+  // The whole site behind a domain, when it is wider than the domain itself (issue #80).
+  const wholeSite = domain && approval.domain ? siteOf(approval.domain) : null;
   if (!open) return <ApprovalOutcome approval={approval} target={target} me={me} />;
   const left = fromNow(approval.expiresAt, now);
   const body = (
     <>
       <Text variant="title" style={{ textAlign: "center" }}>
-        {domain ? t("approval.domainTitle", { name: agentName }) : t("approval.title", { name: agentName })}
+        {domain ? t("approval.domainTitle", { name: agentName }) : site ? t("approval.fetchTitle", { site }) : t("approval.title", { name: agentName })}
       </Text>
       {approval.reason && (
         <Text variant="footnote" selectable style={{ textAlign: "center" }}>
           {approval.reason}
         </Text>
       )}
-      <Inset chip>
-        <Text variant="callout" mono selectable>
-          {target}
-        </Text>
-      </Inset>
+      {site && !showCommand ? (
+        <TextLink role="button" label={t("approval.showCommand")} onPress={() => setShowCommand(true)} />
+      ) : (
+        <Inset chip>
+          <Text variant="callout" mono selectable>
+            {target}
+          </Text>
+        </Inset>
+      )}
       {domain && (
         <Text variant="footnote" style={{ textAlign: "center" }}>
           {t("approval.domainBody", { name: agentName })}
@@ -159,6 +168,12 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
               <>
                 <Dot />
                 <TextLink role="button" strong label={t("approval.allowAlways")} disabled={!online || busy} onPress={() => void answer("always")} />
+              </>
+            )}
+            {domain && canManage && wholeSite && (
+              <>
+                <Dot />
+                <TextLink role="button" strong label={t("approval.allowSite", { site: wholeSite })} disabled={!online || busy} onPress={() => void answer("always", undefined, true)} />
               </>
             )}
             {!domain && !more && (

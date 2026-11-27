@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { promptFor, redirectOf, respond, steeringOf } from "./approval";
+import { fetchedHost, promptFor, siteOf, redirectOf, respond, steeringOf } from "./approval";
 import type { Item } from "./items";
 
 test("the unlock names what it approves: the domain, the Allowlist entries, or the command", () => {
@@ -41,4 +41,17 @@ test("steering holds only while its Approval is still open", () => {
 test("a redirect is the typed words, and empty words send nothing", () => {
   expect(redirectOf("  run the tests first  ")).toEqual({ decision: "redirect", message: "run the tests first" });
   expect(redirectOf("   ")).toBeNull();
+});
+
+test("a command that downloads a page is summed up by its site", () => {
+  expect(fetchedHost(`curl -s -A "Mozilla/5.0" "https://www.reuters.com/technology/" | sed 's/<[^>]*>//g' | head -60`)).toBe("www.reuters.com");
+  expect(fetchedHost("wget -qO- http://example.com/a")).toBe("example.com");
+  expect(fetchedHost("ls && curl https://x.dev")).toBeNull();
+  expect(fetchedHost("curl --help")).toBeNull();
+});
+
+test("a whole site is offered as the host less its first label, never a public suffix", () => {
+  expect(siteOf("www.reuters.com")).toBe("reuters.com");
+  expect(siteOf("news.bbc.co.uk")).toBe("bbc.co.uk");
+  expect(siteOf("shop.co.uk")).toBeNull();
 });

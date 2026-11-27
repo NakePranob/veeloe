@@ -12,7 +12,8 @@ export const EGRESS_MAX = 100;
 export const EgressDomainSchema = z
   .string()
   .max(253)
-  .regex(/^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/);
+  // \`*\` alone is the whole public internet for one Agent (ADR 0029, issue #81); the proxy still refuses private addresses.
+  .regex(/^(\*|(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})$/);
 
 /** The whole list, as one Agent keeps it: the same list sent twice changes nothing. */
 export const EgressSchema = z.array(EgressDomainSchema).max(EGRESS_MAX);

@@ -426,7 +426,13 @@ impl Approvals {
                 outbox.error(from, "approval.forbidden");
                 return true;
             }
-            match self.egress.add_domain(&agent, &domain) {
+            // The whole site, `site.com` and `*.site.com`, when the answer asks for it (issue #80).
+            let added = if body.get("subdomains").and_then(Value::as_bool) == Some(true) {
+                self.egress.add_site(&agent, &domain)
+            } else {
+                self.egress.add_domain(&agent, &domain)
+            };
+            match added {
                 Ok(Some(_)) => {}
                 // Not written is not a permanent yes: refuse and keep waiting
                 // rather than open the domain for one connection only.
@@ -803,6 +809,29 @@ mod tests {
         assert_eq!(
             answered_events(&fixture.logs, "a1", "t1")[0]["decision"],
             "always"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_yes_for_the_whole_site_adds_it_and_its_subdomains() {
+        let fixture = fixture();
+        start_turn(&fixture.approvals, "a1", "t1", "m_1");
+        let approvals = Arc::clone(&fixture.approvals);
+        let asking =
+            tokio::spawn(
+                async move { approvals.ask("a1", Some("tok-t1"), "www.reuters.com").await },
+            );
+        let request = wait_for_request(&fixture).await;
+        assert!(fixture.approvals.answer(
+            &inbound("m_1", Some("t1")),
+            &json!({ "agent": "a1", "request": request, "decision": "always", "subdomains": true }),
+            Some(&trust()),
+            &Seen::new(),
+        ));
+        assert!(asking.await.expect("join"));
+        assert_eq!(
+            fixture.egress.current("a1"),
+            vec!["reuters.com".to_string(), "*.reuters.com".to_string()]
         );
     }
 

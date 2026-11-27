@@ -25,6 +25,8 @@ export const ApprovalAnswerBodySchema = z.looseObject({
   decision: ApprovalDecisionSchema,
   message: z.string().min(1).max(10_000).optional(),
   allowAlways: AllowAlwaysSchema.optional(),
+  /** With \`always\` on a domain: the whole site, \`site.com\` and \`*.site.com\`, goes into the Egress (issue #80). */
+  subdomains: z.boolean().optional(),
 });
 export type ApprovalAnswerBody = z.infer<typeof ApprovalAnswerBodySchema>;
 

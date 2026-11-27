@@ -113,7 +113,10 @@
     "outcomeAlways": "{{outcome}} · added {{target}} to Egress",
     "outcomeByYou": "{{outcome}} by you · {{target}}",
     "redirected": "Told to do something else",
-    "forSchedule": "Approve, and let this Schedule do it"
+    "forSchedule": "Approve, and let this Schedule do it",
+    "fetchTitle": "Open {{site}}?",
+    "showCommand": "Show the full command",
+    "allowSite": "Allow all of *.{{site}}"
   },
   "openAgent": "Open {{name}}",
   "stopped": "{{member}} stopped this Turn · {{when}}",

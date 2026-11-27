@@ -460,8 +460,12 @@ export function createMachineLinks({
      * Machine's `approval.answered` event says so (ADR 0006). The sig, or null
      * when the Hub is not connected and nothing went.
      */
-    answerApproval(machine: Machine, { agent, task, request, decision, message, allowAlways }: Omit<ApprovalAnswerBody, "agent"> & { agent: string; task: string }) {
-      return sendTo(machine, "other", { type: "approval.answer", task, body: { agent, request, decision, ...(message !== undefined && { message }), ...(allowAlways !== undefined && { allowAlways }) } });
+    answerApproval(machine: Machine, { agent, task, request, decision, message, allowAlways, subdomains }: Omit<ApprovalAnswerBody, "agent"> & { agent: string; task: string }) {
+      return sendTo(machine, "other", {
+        type: "approval.answer",
+        task,
+        body: { agent, request, decision, ...(message !== undefined && { message }), ...(allowAlways !== undefined && { allowAlways }), ...(subdomains === true && { subdomains }) },
+      });
     },
 
     /** The answer to a Question Card (ADR 0082); the card folds once the Machine's `card.answered` lands. */

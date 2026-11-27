@@ -798,6 +798,10 @@ fn is_task_listed(object: &Map<String, Value>) -> bool {
 }
 
 fn is_egress_domain(value: &str) -> bool {
+    // The whole public internet for one Agent (ADR 0029, issue #81).
+    if value == "*" {
+        return true;
+    }
     if chars(value) > 253 {
         return false;
     }
@@ -1116,6 +1120,12 @@ fn is_approval_answer(object: &Map<String, Value>) -> bool {
         {
             return false;
         }
+    }
+    if object
+        .get("subdomains")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        return false;
     }
     if let Some(allow_always) = object.get("allowAlways") {
         let valid_entry = |entry: &Value| {

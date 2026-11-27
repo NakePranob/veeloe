@@ -7,7 +7,7 @@ import { keySession } from "../../../shared/keystore";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { formatList } from "../../../shared/lib";
 import { View } from "react-native";
-import { Button, Field, inform, Note, Row, Section, Select, space } from "../../../shared/ui";
+import { Button, Field, inform, Note, Row, Section, Select, space, ToggleRow } from "../../../shared/ui";
 
 // The Machine board's Egress tab: the domains every Agent on this Machine
 // may reach, or the ones one Agent may (`agent-egress-ui`). Every change is signed
@@ -24,6 +24,9 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
   const agent = agents.find((entry) => entry.id === scope);
   const egress = agent ? agentEgressOf(agent) : machineEgressOf(machine);
   const agentNames = agents.map((entry) => entry.name);
+  // \`*\` is the whole public internet for this one Agent (ADR 0029, issue #81): a switch, not a row.
+  const open = egress.includes("*");
+  const domains = egress.filter((domain) => domain !== "*");
   const who = agent
     ? t("egress.whoOne", { machine: machine.name, agent: agent.name })
     : agentNames.length
@@ -61,8 +64,9 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
             options={[{ value: "", label: t("egress.allAgents") }, ...agents.map((entry) => ({ value: entry.id, label: entry.name }))]}
           />
         )}
+        {agent && <ToggleRow title={t("egress.open.title")} detail={t("egress.open.detail")} value={open} onChange={(on) => void change(on ? [...egress, "*"] : domains, t(on ? "egress.open.onPrompt" : "egress.open.offPrompt", { who }))} />}
         {egress.length === 0 && <Row title={t("egress.none.title")} detail={agent ? t("egress.none.detailOne") : t("egress.none.detail")} />}
-        {egress.map((domain) => (
+        {domains.map((domain) => (
           <Row
             key={domain}
             icon="network"
@@ -86,6 +90,11 @@ export function EgressSection({ machine, agents }: { machine: Machine; agents: A
         ))}
         <Field bare label={t("egress.add")} value={draft} onChangeText={setDraft} placeholder={t("egress.placeholder")} mono action={{ label: t("egress.add"), onPress: () => void add(), disabled: !draft.trim() }} />
       </Section>
+      {open && (
+        <Note icon="warning" iconColor="orange">
+          {t("egress.open.warning")}
+        </Note>
+      )}
     </View>
   );
 }
