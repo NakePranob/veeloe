@@ -69,3 +69,9 @@ export const everyChoices = (minutes: string) => [...new Set([...EVERY_CHOICES.m
 
 /** The minute choices with this time's own minute among them, in order. */
 export const minuteChoices = (at: string) => [...new Set([...MINUTE_CHOICES, at.slice(3, 5)])].sort();
+
+/** Paused by failures or done by goal first, as they want a look; then by when each runs next, paused last. */
+export function sortTriggers<T extends { pausedFor?: string; nextRunAt?: number }>(triggers: T[]): T[] {
+  const rank = (trigger: T) => (trigger.pausedFor ? 0 : trigger.nextRunAt !== undefined ? 1 : 2);
+  return [...triggers].sort((a, b) => rank(a) - rank(b) || (a.nextRunAt ?? 0) - (b.nextRunAt ?? 0));
+}

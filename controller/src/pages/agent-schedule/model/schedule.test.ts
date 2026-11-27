@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { draftOf, EMPTY_DRAFT, lastRoundOf, scheduleOf, triggerOf } from "./schedule";
+import { draftOf, EMPTY_DRAFT, lastRoundOf, scheduleOf, sortTriggers, triggerOf } from "./schedule";
 
 test("each kind of round becomes the structure the Protocol signs", () => {
   expect(scheduleOf({ ...EMPTY_DRAFT, mode: "every", minutes: "30" })).toEqual({ every: { minutes: 30 } });
@@ -38,4 +38,9 @@ test("a goal is signed with the Schedule, trimmed, and left out when empty (ADR 
   const draft = { ...EMPTY_DRAFT, text: "follow PR #41" };
   expect(triggerOf({ ...draft, goal: "  PR #41 is merged " }, "tr_1")).toMatchObject({ goal: "PR #41 is merged" });
   expect(triggerOf({ ...draft, goal: "  " }, "tr_1")).not.toHaveProperty("goal");
+});
+
+test("Triggers that want a look come first, then the soonest, paused last (issue #77)", () => {
+  const order = sortTriggers([{ id: "paused" }, { id: "later", nextRunAt: 20 }, { id: "met", pausedFor: "goal" }, { id: "soon", nextRunAt: 10 }]).map((t) => t.id);
+  expect(order).toEqual(["met", "soon", "later", "paused"]);
 });

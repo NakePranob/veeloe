@@ -1,5 +1,5 @@
 {
-  "title": "Schedule",
+  "title": "Triggers",
   "note": "A Schedule starts a new Task on the Machine at the times you set, in your name, even while your phone is off. A round with nothing to report stays out of the Inbox.",
   "offline": "The Machine is offline, so Schedules can't be changed right now.",
   "loading": "Asking the Machine…",
@@ -10,8 +10,8 @@
     "schedule": "The Machine no longer has this Schedule"
   },
   "empty": {
-    "title": "No Schedules yet",
-    "body": "Add one to have the Agent start work on its own, every few minutes, every day or every week."
+    "title": "No Triggers yet",
+    "body": "Add a Trigger so the Agent starts work on its own, on a schedule or when idle"
   },
   "editor": {
     "new": "New Schedule",
@@ -98,5 +98,20 @@
   "goal": {
     "met": "Goal met: {{reason}} — turn it on again if it is not",
     "note": "Latest progress"
+  },
+  "start": {
+    "title": "Starts when…",
+    "schedule": "On a schedule",
+    "scheduleDetail": "Schedule: every few minutes, daily or weekly",
+    "idle": "When idle",
+    "idleDetail": "Idle Work: pieces the Agent does when nobody is asking"
+  },
+  "until": {
+    "always": "no end",
+    "goal": "until its goal"
+  },
+  "idle": {
+    "waiting_one": "{{count}} piece waiting",
+    "waiting_other": "{{count}} pieces waiting"
   }
 }

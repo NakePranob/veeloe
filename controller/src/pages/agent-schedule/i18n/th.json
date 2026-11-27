@@ -1,5 +1,5 @@
 {
-  "title": "Schedule",
+  "title": "Trigger",
   "note": "Schedule เริ่ม Task ใหม่บน Machine ตามเวลาที่ตั้งในนามของคุณ แม้มือถือจะปิดอยู่ ถ้ารอบไหนไม่มีอะไรต้องบอก Task นั้นจะไม่ขึ้นใน Inbox",
   "offline": "Machine ออฟไลน์อยู่ ตอนนี้จึงแก้ Schedule ไม่ได้",
   "loading": "กำลังถาม Machine…",
@@ -10,8 +10,8 @@
     "schedule": "Machine ไม่มี Schedule นี้แล้ว"
   },
   "empty": {
-    "title": "ยังไม่มี Schedule",
-    "body": "เพิ่ม Schedule เพื่อให้ Agent เริ่มทำงานเองทุกกี่นาที ทุกวัน หรือทุกสัปดาห์"
+    "title": "ยังไม่มี Trigger",
+    "body": "เพิ่ม Trigger ให้ Agent เริ่มทำงานเองตามเวลา หรือตอนว่าง"
   },
   "editor": {
     "new": "Schedule ใหม่",
@@ -98,5 +98,19 @@
   "goal": {
     "met": "สำเร็จแล้ว: {{reason}} — เปิดต่อได้ถ้ายังไม่ใช่",
     "note": "ความคืบหน้าล่าสุด"
+  },
+  "start": {
+    "title": "เริ่มเมื่อ…",
+    "schedule": "ตามเวลา",
+    "scheduleDetail": "Schedule: ทุกกี่นาที ทุกวัน หรือทุกสัปดาห์",
+    "idle": "ตอนว่าง",
+    "idleDetail": "Idle Work: ชิ้นงานที่ Agent ทำเองเมื่อไม่มีใครสั่ง"
+  },
+  "until": {
+    "always": "ตลอด",
+    "goal": "ถึงเป้าหมาย"
+  },
+  "idle": {
+    "waiting_other": "{{count}} ชิ้นรอ"
   }
 }

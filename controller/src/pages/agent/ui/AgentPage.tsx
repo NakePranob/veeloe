@@ -218,8 +218,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
         />
         <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} disabled={away} />
         <Row icon="branch" title={t("git.row")} value={repos === null ? t("git.unsupported") : t("git.count", { count: repos.length })} href={`/agents/${agent.id}/git`} disabled={away} />
-        <Row icon="time" title={t("schedule.row")} detail={t("schedule.detail")} href={`/agents/${agent.id}/schedule`} disabled={away} />
-        <Row icon="refresh" title={t("idle.row")} detail={t("idle.detail")} href={`/agents/${agent.id}/idle`} disabled={away} />
+        <Row icon="time" title="Trigger" detail={t("trigger.detail")} href={`/agents/${agent.id}/schedule`} disabled={away} />
         {/* Not on the board, which has no way to set the Budget yet; it saves with the name. */}
         <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" footer={t("budget.footer")} disabled={away} />
       </Section>
