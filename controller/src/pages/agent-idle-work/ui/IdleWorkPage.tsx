@@ -1,15 +1,16 @@
 import type { ListedTrigger } from "@veeloe/protocol-ts";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { useMachines, type Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus, useTriggerStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, confirm, Dot, Empty, Note, Row, Screen, Section, Select, Spinner, Text, ToggleRow, space } from "../../../shared/ui";
-import { ITEM_CHOICES, piecesOf, progressOf, QUIET_CHOICES, settingsOf, SHARE_CHOICES, type Settings } from "../model/idle";
-import { deleteList, signList, STATUS } from "./sign";
+import { Button, confirm, Empty, Note, Row, Screen, Section, Select, Spinner, Text, ToggleRow, space } from "../../../shared/ui";
+import { ITEM_CHOICES, piecesOf, QUIET_CHOICES, settingsOf, SHARE_CHOICES, withPiece, type Settings } from "../model/idle";
+import { Pieces } from "./pieces";
+import { deleteList, signList } from "./sign";
 
 // An Agent's Idle Work list (ADR 0056, issue #57), drawn like the Schedule page: each piece a row with a dot for where it
 // stands that opens its own sheet, what the Agent proposed above them, and the list's own settings under them.
@@ -57,15 +58,24 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
   // A setting is the whole list signed again with that one setting changed.
   const setting = (trigger: ListedTrigger, change: Partial<Settings>) => where && void signList(where, trigger, piecesOf(trigger), { ...settingsOf(trigger), ...change });
 
+  // A drop signs the list with the piece in its new place.
+  async function move(piece: string, to: number) {
+    const now = piecesOf(list);
+    const held = now.find((one) => one.id === piece);
+    if (!where || !list || !held) return false;
+    return signList(where, list, withPiece(now, held, to), settingsOf(list));
+  }
+
   async function share(percent: string) {
     if (!link) return;
     await keySession.signed(t("authenticate.share", { name: agent.name, percent }), () => link.updateAgent(machine, { id: agent.id, backgroundShare: Number(percent) }));
   }
 
   const locked = offline || status.sending;
+  const [dragging, setDragging] = useState(false);
   const minutes = (choices: readonly number[], held: number) => [...new Set([...choices, held])].sort((x, y) => x - y).map((count) => ({ value: String(count), label: t("minutes", { count }) }));
   return (
-    <Screen title={t("title")} subtitle={agent.name} right={{ label: t("add"), icon: "add", variant: "chip", onPress: () => open("new"), disabled: offline }}>
+    <Screen title={t("title")} subtitle={agent.name} scrollEnabled={!dragging} right={{ label: t("add"), icon: "add", variant: "chip", onPress: () => open("new"), disabled: offline }}>
       {offline && <Note tone="offline">{t("offline")}</Note>}
       {status.loading && !status.triggers && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }}>
@@ -90,7 +100,7 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
       {status.triggers && !list && draft.length === 0 && (
         <Empty icon="refresh" title={t("empty.title")} detail={t("empty.body")} action={<Button label={t("add")} variant="primary" leading="add" disabled={offline} onPress={() => open("new")} />} />
       )}
-      {list && <Pieces list={list} language={language} open={open} />}
+      {list && <Pieces list={list} language={language} open={open} move={move} locked={locked} onDragging={setDragging} />}
       {list && (
         <Section footer={t("settings.footer")}>
           <ToggleRow title={t("enabled")} value={!list.paused && !list.suspended} onChange={(on) => void act(on ? "trigger.resume" : "trigger.pause", list)} />
@@ -140,25 +150,5 @@ function IdleWork({ agent, machine }: { agent: AgentRow; machine: Machine }) {
         </Section>
       )}
     </Screen>
-  );
-}
-
-function Pieces({ list, language, open }: { list: ListedTrigger; language: string; open: (piece: string) => void }) {
-  const t = useT("agent-idle-work");
-  const pieces = progressOf(list);
-  const when = (at: number) => new Date(at).toLocaleString(language, { weekday: "short", hour: "2-digit", minute: "2-digit" });
-  return (
-    <Section title={t("pieces.heading")} footer={list.idle?.order === "oldest-first" ? t("pieces.oldestFirst") : t("pieces.ordered")}>
-      {pieces.length === 0 && <Row title={t("pieces.allDone")} />}
-      {pieces.map((piece) => (
-        <Row
-          key={piece.id}
-          leading={<Dot color={STATUS[piece.status].dot} />}
-          title={piece.text}
-          detail={[t(STATUS[piece.status].words), piece.lastRunAt ? when(piece.lastRunAt) : null, piece.repeat ? t("pieces.repeat") : null].filter(Boolean).join(" · ")}
-          onPress={() => open(piece.id)}
-        />
-      ))}
-    </Section>
   );
 }

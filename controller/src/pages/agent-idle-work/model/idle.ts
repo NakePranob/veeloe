@@ -57,3 +57,16 @@ export function progressOf(list: ListedTrigger): (IdleProgress & Piece)[] {
     return piece ? [{ ...progress, ...piece }] : [];
   });
 }
+
+/** Where a row dragged `dy` points from `from`, past half of each row it crosses. */
+export function dropIndex(heights: readonly number[], from: number, dy: number) {
+  let to = from;
+  let crossed = 0;
+  const step = dy > 0 ? 1 : -1;
+  for (let i = from + step; i >= 0 && i < heights.length; i += step) {
+    if (Math.abs(dy) <= crossed + heights[i] / 2) break;
+    crossed += heights[i];
+    to = i;
+  }
+  return to;
+}

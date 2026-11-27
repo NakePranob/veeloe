@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { ListedTrigger } from "@veeloe/protocol-ts";
-import { listOf, piecesOf, progressOf, settingsOf, withPiece } from "./idle";
+import { dropIndex, listOf, piecesOf, progressOf, settingsOf, withPiece } from "./idle";
 
 const listed: ListedTrigger = {
   id: "idle",
@@ -58,4 +58,15 @@ test("the rows shown are the pieces still on the list, with their words", () => 
     ["b", "deps", "pending"],
     ["c", "docs", "needsApproval"],
   ]);
+});
+
+test("a dragged row lands past half of each row it crosses, and stays inside the list", () => {
+  const heights = [60, 40, 80];
+  expect(dropIndex(heights, 0, 19)).toBe(0);
+  expect(dropIndex(heights, 0, 21)).toBe(1);
+  expect(dropIndex(heights, 0, 81)).toBe(2);
+  expect(dropIndex(heights, 0, 500)).toBe(2);
+  expect(dropIndex(heights, 2, -21)).toBe(1);
+  expect(dropIndex(heights, 2, -71)).toBe(0);
+  expect(dropIndex(heights, 1, -500)).toBe(0);
 });

@@ -18,16 +18,19 @@ interface ScreenProps {
   right?: { label: string; onPress: () => void; disabled?: boolean; icon?: IconName; variant?: "primary" | "chip" | "ghost" };
   // The one action the screen is for, pinned under the content, clear of the home indicator.
   bottom?: ReactNode;
+  // False while something on the page follows the finger, such as a row being dragged, so the page holds still.
+  scrollEnabled?: boolean;
   children: ReactNode;
 }
 
 // A settings-style screen: the platform's header over a scrolling column of sections.
-export function Screen({ title, subtitle, right, bottom, children }: ScreenProps) {
+export function Screen({ title, subtitle, right, bottom, scrollEnabled = true, children }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const scroll = (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
+      scrollEnabled={scrollEnabled}
       // Room for the keyboard on iOS, so a field near the end of a screen can scroll above it. Only while this page is
       // on top: a keyboard in a sheet over it would scroll it too, and leave it under its header once the sheet goes.
       automaticallyAdjustKeyboardInsets={focused}

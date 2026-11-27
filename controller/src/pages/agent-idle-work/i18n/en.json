@@ -26,8 +26,9 @@
     "heading": "On the list",
     "allDone": "All done",
     "repeat": "Repeats",
-    "ordered": "Done in this order. A finished piece leaves the list; a repeating one waits again.",
-    "oldestFirst": "The piece waiting longest goes first. A finished piece leaves the list; a repeating one waits again."
+    "ordered": "Runs top to bottom; drag the handle on the right to reorder. A done piece leaves the list; a repeating one waits again.",
+    "oldestFirst": "The piece waiting longest goes first. A finished piece leaves the list; a repeating one waits again.",
+    "drag": "Drag {{text}} to reorder"
   },
   "status": {
     "pending": "Waiting",
@@ -85,9 +86,6 @@
     "footer": "What the Agent does on its own, as one Task",
     "repeat": "Repeat when done",
     "repeatDetail": "Goes back to wait instead of leaving the list",
-    "position": "Position",
-    "positionValue": "{{n}} of {{count}}",
-    "positionOldestFirst": "This list runs the longest-waiting piece first, so the position counts once it runs in order.",
     "last": "Last round",
     "lastValue": "{{status}} · {{when}}",
     "missing": "This piece is no longer on the list",

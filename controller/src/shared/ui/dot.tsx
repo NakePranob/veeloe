@@ -9,6 +9,21 @@ export function Dot({ color = "green", size = 8 }: { color?: keyof Colors; size?
   return <View aria-hidden style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors[color] }} />;
 }
 
+// Six dots in two columns: the handle a row is dragged by (three lines would read as a menu).
+export function Grip() {
+  return (
+    <View aria-hidden style={{ flexDirection: "row", gap: 4 }}>
+      {[0, 1].map((column) => (
+        <View key={column} style={{ gap: 4 }}>
+          <Dot color="tertiaryLabel" size={4} />
+          <Dot color="tertiaryLabel" size={4} />
+          <Dot color="tertiaryLabel" size={4} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // A dot and the caption that says the same thing: a tile's last line, an Agent's state under its name.
 // The words stay readable ink or grey; the dot carries the colour. Words are one caption line; anything
 // else (words with a link in them) is laid out after the dot as it is.

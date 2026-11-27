@@ -6,7 +6,7 @@ import { useAgents } from "../../../entities/agent";
 import { useMachines, type Machine } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus, useTriggerStatus } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
-import { Button, confirm, DotLabel, Field, HeaderAction, Note, Row, Screen, Section, Select, ToggleRow, space } from "../../../shared/ui";
+import { Button, confirm, DotLabel, Field, HeaderAction, Note, Row, Screen, Section, ToggleRow, space } from "../../../shared/ui";
 import { piecesOf, progressOf, settingsOf, withPiece, type Piece } from "../model/idle";
 import { deleteList, signList, STATUS } from "./sign";
 
@@ -47,6 +47,7 @@ function useList({ agentId, agentName, machine }: Props) {
   return { t, status, list, offline, where: link && { link, machine, agentId, agentName, t } };
 }
 
+// Where the piece sits: its place in the list, or last for a new one. It is moved by dragging its row.
 type Form = Piece & { position: number };
 
 function PieceForm({ pieceId, ...props }: Props & { pieceId: string }) {
@@ -122,7 +123,6 @@ function PieceForm({ pieceId, ...props }: Props & { pieceId: string }) {
 
   const locked = offline || status.sending || saving;
   const stuck = progress?.status === "timedOut" || progress?.status === "needsApproval";
-  const count = pieces.length + (held ? 0 : 1);
   const task = progress?.task;
   const when = (at: number) => new Date(at).toLocaleString(language, { weekday: "short", hour: "2-digit", minute: "2-digit" });
   return (
@@ -140,17 +140,8 @@ function PieceForm({ pieceId, ...props }: Props & { pieceId: string }) {
           <Section footer={t("piece.footer")}>
             <Field label={t("piece.text")} value={form.text} onChangeText={(text) => set({ text })} placeholder={t("piece.placeholder")} multiline />
           </Section>
-          <Section footer={settingsOf(list).order === "oldest-first" && count > 1 ? t("piece.positionOldestFirst") : undefined}>
+          <Section>
             <ToggleRow title={t("piece.repeat")} detail={t("piece.repeatDetail")} value={form.repeat} onChange={(repeat) => set({ repeat })} />
-            {count > 1 && (
-              <Select<string>
-                label={t("piece.position")}
-                value={String(form.position)}
-                cancel={t("cancel")}
-                onChange={(position) => set({ position: Number(position) })}
-                options={Array.from({ length: count }, (_, at) => ({ value: String(at), label: t("piece.positionValue", { n: at + 1, count }) }))}
-              />
-            )}
           </Section>
         </>
       )}
