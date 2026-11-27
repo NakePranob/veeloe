@@ -4,7 +4,7 @@ import type React from "react";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useMachines, type Machine } from "../../../entities/machine";
-import { latestEvents, previewOf, useTaskSummaries } from "../../../entities/task";
+import { latestEvents, titleOf, useTaskSummaries } from "../../../entities/task";
 import { agentTotals, dailyTotals, useUsageDays, type UsageDayRow } from "../../../entities/usage";
 import { useMachineLink, useMachineStatuses, useUsageStatuses, type UsageStatus } from "../../../features/machine-link";
 import { useDatabase } from "../../../shared/db";
@@ -129,7 +129,8 @@ function TopTasks({ statuses, agents }: { statuses: Record<string, UsageStatus>;
   const t = useT("usage");
   const language = useLanguage();
   const summaries = useTaskSummaries() ?? [];
-  const previews = new Map(summaries.map((task) => [task.id, previewOf(task)]));
+  // A Task by its name, as its row on the Agent page reads: the title it was given, else what was asked.
+  const previews = new Map(summaries.map((task) => [task.id, titleOf(task)]));
   const names = new Map(agents.map((agent) => [agent.id, agent.name]));
   // Only an answer that is no longer loading belongs to the window on screen; a half-arrived window shows nothing.
   const fresh = Object.values(statuses).filter((status) => !status.loading && status.from !== null && status.to !== null);
