@@ -1,4 +1,4 @@
-import { Link, Stack, type Href } from "expo-router";
+import { Link, Stack, useIsFocused, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, Switch, TextInput, View, type KeyboardTypeOptions } from "react-native";
@@ -24,11 +24,13 @@ interface ScreenProps {
 // A settings-style screen: the platform's header over a scrolling column of sections.
 export function Screen({ title, subtitle, right, bottom, children }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const scroll = (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
-      // Room for the keyboard on iOS, so a field near the end of a screen can scroll above it.
-      automaticallyAdjustKeyboardInsets
+      // Room for the keyboard on iOS, so a field near the end of a screen can scroll above it. Only while this page is
+      // on top: a keyboard in a sheet over it would scroll it too, and leave it under its header once the sheet goes.
+      automaticallyAdjustKeyboardInsets={focused}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
       contentContainerStyle={[column, { flexGrow: 1, paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.xl, paddingBottom: space.xl * 2 }]}
