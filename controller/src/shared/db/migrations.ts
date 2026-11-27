@@ -122,4 +122,7 @@ export const MIGRATIONS = [
     quiet = coalesce(latest_kind = 'turn.ended' AND json_extract(latest_body, '$.reason') = 'quiet', 0);
   CREATE INDEX task_by_agent_news ON task (agent_id, quiet, updated_at);
   CREATE INDEX task_by_trigger ON task (trigger_id, updated_at);`,
+  // The Machine's "last moved" for this Task when this device last asked for its events
+  // (\`task.listed\`): a Task that has not moved since is not asked for again on every connect.
+  `ALTER TABLE task ADD COLUMN listed_updated INTEGER NOT NULL DEFAULT 0`,
 ] as const;

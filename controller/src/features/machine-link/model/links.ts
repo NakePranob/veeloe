@@ -17,7 +17,7 @@ import {
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, type Machine } from "../../../entities/machine";
-import { addListedTasks, addPendingMessage, failPendingMessage, listTasks, markPendingSent, saveTaskEvents } from "../../../entities/task";
+import { addListedTasks, addPendingMessage, failPendingMessage, markPendingSent, saveTaskEvents } from "../../../entities/task";
 import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
 import { createSeenSequences, startHubClient } from "../../../shared/hub-client";
@@ -95,13 +95,13 @@ export function createMachineLinks({
     return sig;
   }
 
-  /** Its Agents, and every Task's events after the last one kept. */
+  /**
+   * Its Agents, and what this Member started there (ADR 0021, 0060). The answer, `task.listed`, says when
+   * each Task last moved, and only the ones that moved since are synced (`addListedTasks`).
+   */
   async function hello(machine: Machine) {
-    const tasks = await listTasks(database);
     sendTo(machine, "hello", { type: "agent.list", body: {} });
-    // What this Member started there, for a device that has not seen it all (ADR 0021, 0060).
     sendTo(machine, "other", { type: "task.list", body: {} });
-    for (const task of tasks.filter((t) => t.machine_id === machine.id)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent_id, after: task.synced_seq } });
   }
 
   function helloLater(machine: Machine) {
@@ -173,7 +173,7 @@ export function createMachineLinks({
       const events = message.type === "task.event" ? [message.body] : message.body.events;
       await saveTaskEvents(database, { task: signed.task, agent: message.body.agent, machine: machine.id }, events);
     } else if (message.type === "task.listed") {
-      for (const task of await addListedTasks(database, machine.id, message.body.tasks)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent, after: 0 } });
+      for (const task of await addListedTasks(database, machine.id, message.body.tasks)) sendTo(machine, "other", { type: "task.sync", task: task.id, body: { agent: task.agent, after: task.after } });
     } else if (message.type === "error" && message.body.ref) {
       const about = sentTo.get(message.body.ref);
       if (about && about.kind !== "hello") await failSent(about, message.body.ref, message.body.code);

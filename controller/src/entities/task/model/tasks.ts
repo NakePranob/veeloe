@@ -78,25 +78,26 @@ export function dismissPendingMessage(database: Database, id: string) {
 }
 
 /**
- * Tasks a Machine says this Member started, which this device may not have yet
- * (a linked device, or a browser whose storage was cleared). A row already here
- * is left as it is; the new ones come back so their events can be synced from 0.
+ * The Tasks a Machine says this Member started, and which of them to sync: one this device does not
+ * have yet (a linked device, a cleared store) from 0, and one that moved on the Machine since it was last
+ * asked for from where this device's log ends. A Task that has not moved is not asked for: a Member with
+ * thousands of Tasks sends a handful of syncs on connect, not thousands.
  */
 export function addListedTasks(database: Database, machine: string, tasks: { id: string; agent: string; updated: number }[]) {
   return database.write([TASK_TOPIC], async (transaction) => {
-    const added: { id: string; agent: string }[] = [];
+    const toSync: { id: string; agent: string; after: number }[] = [];
     for (const task of tasks) {
-      const [known] = await transaction.all("SELECT 1 FROM task WHERE id = ?", [task.id]);
-      if (known) continue;
-      await transaction.run("INSERT INTO task (id, agent_id, machine_id, synced_seq, updated_at) VALUES (?, ?, ?, 0, ?)", [task.id, task.agent, machine, task.updated]);
-      added.push(task);
+      const [known] = await transaction.all<{ synced_seq: number; listed_updated: number }>("SELECT synced_seq, listed_updated FROM task WHERE id = ?", [task.id]);
+      if (!known) {
+        await transaction.run("INSERT INTO task (id, agent_id, machine_id, synced_seq, updated_at, listed_updated) VALUES (?, ?, ?, 0, ?, ?)", [task.id, task.agent, machine, task.updated, task.updated]);
+        toSync.push({ id: task.id, agent: task.agent, after: 0 });
+      } else if (task.updated > known.listed_updated) {
+        await transaction.run("UPDATE task SET listed_updated = ? WHERE id = ?", [task.updated, task.id]);
+        toSync.push({ id: task.id, agent: task.agent, after: known.synced_seq });
+      }
     }
-    return added;
+    return toSync;
   });
-}
-
-export function listTasks(database: Database) {
-  return database.query<TaskRow>("SELECT * FROM task");
 }
 
 /** Kinds this build knows; a newer Runtime's kind is skipped when working out what a Task is doing. */

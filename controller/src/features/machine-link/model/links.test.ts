@@ -242,13 +242,17 @@ test("an answer with a trash keeps deleted Agents here, and one without it clear
   expect(await database.query("SELECT * FROM agent_trash")).toEqual([]);
 });
 
-test("after a dropped connection it asks for each Task's events after the last one kept", async () => {
+test("after a dropped connection it asks for the events of only the Tasks that moved, after the last one kept", async () => {
   const { database, fake } = await setup();
   fake.push(signed("task.event", { agent: "a1", seq: 1, kind: "member.message", at: 1, body: {} }, { seq: 2, task: "t1" }));
   fake.push(signed("task.event", { agent: "a1", seq: 2, kind: "turn.started", at: 2, body: {} }, { seq: 3, task: "t1" }));
   await until(async () => (await database.query("SELECT * FROM task_event")).length === 2);
   fake.hub.frames.length = 0;
   fake.drop();
+  // Reconnected, it asks what moved; the Machine says t1 did, and only t1 is synced, from where the log ends.
+  await until(() => fake.hub.frames.some((f) => JSON.parse(f.signed).type === "task.list"));
+  expect(sentTypes(fake.hub.frames).some((m) => m.type === "task.sync")).toBe(false);
+  fake.push(signed("task.listed", { tasks: [{ id: "t1", agent: "a1", updated: 5 }] }, { seq: 4 }));
   await until(() => fake.hub.frames.some((f) => JSON.parse(f.signed).type === "task.sync"));
   expect(sentTypes(fake.hub.frames).find((m) => m.type === "task.sync")).toMatchObject({ task: "t1", body: { agent: "a1", after: 2 } });
 });
@@ -387,8 +391,9 @@ test("Tasks the Machine lists are added and synced from the start, without touch
       { seq: 3 },
     ),
   );
-  await until(() => fake.hub.frames.length === 1);
-  expect(sentTypes(fake.hub.frames)).toEqual([expect.objectContaining({ type: "task.sync", task: "new", body: { agent: "a2", after: 0 } })]);
+  // "known" moved on the Machine since this device last asked (never), so it is synced from where it is; "new" from 0.
+  await until(() => fake.hub.frames.length === 2);
+  expect(sentTypes(fake.hub.frames)).toEqual([expect.objectContaining({ type: "task.sync", task: "known", body: { agent: "a1", after: 1 } }), expect.objectContaining({ type: "task.sync", task: "new", body: { agent: "a2", after: 0 } })]);
   expect(await database.query("SELECT id, synced_seq, updated_at FROM task ORDER BY id")).toEqual([
     { id: "known", synced_seq: 1, updated_at: 1 },
     { id: "new", synced_seq: 0, updated_at: 50 },

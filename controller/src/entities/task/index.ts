@@ -12,7 +12,6 @@ export {
   isQuiet,
   latestEvents,
   latestOf,
-  listTasks,
   markPendingSent,
   needsYou,
   previewOf,

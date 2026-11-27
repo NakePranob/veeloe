@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import { createDatabase, migrate, type Connection } from "../../../shared/db/database";
 import { MIGRATIONS } from "../../../shared/db/migrations";
 import {
+  addListedTasks,
   addPendingMessage,
   failPendingMessage,
   isBudgetOut,
@@ -212,4 +213,14 @@ test("an old quiet Schedule round gives its log back and keeps its row; a new on
   expect(left.map((r) => r.task_id)).toEqual(["new-quiet", "old-told"]);
   const rows = await database.query<TaskSummary>("SELECT * FROM task WHERE id = 'old-quiet'");
   expect(rows[0]).toMatchObject({ quiet: 1, synced_seq: 2, events: 2 });
+});
+
+test("a listed Task is synced when it is new or moved on the Machine, and not again until it moves", async () => {
+  const database = await open();
+  const list = (updated: number) => addListedTasks(database, "mac", [{ id: "t1", agent: "a1", updated }]);
+  expect(await list(10)).toEqual([{ id: "t1", agent: "a1", after: 0 }]);
+  expect(await list(10)).toEqual([]);
+  await saveTaskEvents(database, where, [event(1), event(2)]);
+  expect(await list(20)).toEqual([{ id: "t1", agent: "a1", after: 2 }]);
+  expect(await list(20)).toEqual([]);
 });
