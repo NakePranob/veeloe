@@ -18,6 +18,8 @@ const CharacterSchema = z.looseObject({ color: z.string().regex(/^#[0-9a-fA-F]{6
 
 /** Tokens per day: a whole number, never zero, up to a trillion (`daily-budget`, ADR 0043). */
 const budget = z.number().int().min(1).max(1_000_000_000_000);
+/** The share of the Budget Idle Work and Watch may use a day, in percent (ADR 0056, 0066). */
+const backgroundShare = z.number().int().min(0).max(100);
 
 /** How long one Approval waits, in whole seconds: a minute to a day (`approval-and-allowlist`). */
 export const APPROVAL_TIMEOUT_S_MIN = 60;
@@ -46,8 +48,8 @@ export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
  * belongs to its Provider, so a new Provider comes with its model.
  */
 export const AgentUpdateBodySchema = z
-  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional(), allowlist: AllowlistSchema.optional(), approvalTimeoutS: approvalTimeoutS.optional(), gitRepos: GitReposSchema.optional() })
-  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined || b.allowlist !== undefined || b.approvalTimeoutS !== undefined || b.gitRepos !== undefined, "nothing to change")
+  .looseObject({ id, name: name.optional(), provider: z.string().min(1).optional(), model: z.string().min(1).optional(), character: CharacterSchema.optional(), budget: budget.optional(), allowlist: AllowlistSchema.optional(), approvalTimeoutS: approvalTimeoutS.optional(), gitRepos: GitReposSchema.optional(), backgroundShare: backgroundShare.optional() })
+  .refine((b) => b.name !== undefined || b.provider !== undefined || b.model !== undefined || b.character !== undefined || b.budget !== undefined || b.allowlist !== undefined || b.approvalTimeoutS !== undefined || b.gitRepos !== undefined || b.backgroundShare !== undefined, "nothing to change")
   .refine((b) => b.provider === undefined || b.model !== undefined, "a provider needs its model");
 export type AgentUpdateBody = z.infer<typeof AgentUpdateBodySchema>;
 
@@ -83,6 +85,8 @@ const AgentSchema = z.looseObject({
   gitRepos: GitReposSchema.optional(),
   /** Today's tokens, as of this answer. Absent from a Machine older than `daily-budget`. */
   usage: usage.optional(),
+  /** The share of the Budget Idle Work and Watch may use a day, in percent; 30 when never set. */
+  backgroundShare: backgroundShare.optional(),
 });
 export type Agent = z.infer<typeof AgentSchema>;
 

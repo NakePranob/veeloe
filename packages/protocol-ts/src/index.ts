@@ -157,12 +157,14 @@ export {
   type ParsedLinkingLink,
 } from "./messages/linking";
 export {
+  IDLE_ITEMS_MAX,
   SCHEDULE_MAX_MINUTES,
   SCHEDULE_MIN_MINUTES,
   ScheduleSchema,
   TRIGGER_TEXT_MAX,
   TriggerListedBodySchema,
   TriggerSchema,
+  type IdleProgress,
   type ListedTrigger,
   type Schedule,
   type Trigger,

@@ -166,7 +166,7 @@ export function createMachineLinks({
         fetchedAt: Date.now(),
       });
     } else if (message.type === "trigger.listed") {
-      setTriggers(memoryKey(machine.id, message.body.agent), { loading: false, sending: false, error: null, triggers: message.body.triggers });
+      setTriggers(memoryKey(machine.id, message.body.agent), { loading: false, sending: false, error: null, triggers: message.body.triggers, draft: message.body.draft ?? [] });
     } else if (message.type === "tool.output") {
       outputs.set(message.body.toolUseId, { tail: message.body.tail, bytes: message.body.bytes, elapsedMs: message.body.elapsedMs, at: Date.now() });
     } else if ((message.type === "task.event" || message.type === "task.events") && signed.task) {

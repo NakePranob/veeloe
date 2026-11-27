@@ -34,7 +34,8 @@ function ScheduleList({ agentId, agentName, machine }: { agentId: string; agentN
   const last = useLastRounds(agentId, online);
   const rhythm = useRhythm();
   const offline = online === false || !link;
-  const triggers = status.triggers ?? [];
+  // An Idle Work list is a Trigger too, with its own page.
+  const triggers = (status.triggers ?? []).filter((trigger) => trigger.kind === "schedule");
   const open = (trigger: string) => router.push({ pathname: "/agents/[agent]/schedule/[trigger]", params: { agent: agentId, trigger } });
 
   // Ask on open and again when the Machine comes back.
@@ -70,7 +71,7 @@ function ScheduleList({ agentId, agentName, machine }: { agentId: string; agentN
                 key={trigger.id}
                 // The name the Agent gave it, as a Task's; its words until the name comes.
                 title={trigger.title ?? trigger.text}
-                detail={[rhythm(trigger.schedule), when].filter(Boolean).join(" · ")}
+                detail={[rhythm(trigger.schedule ?? {}), when].filter(Boolean).join(" · ")}
                 leading={<Dot color={trigger.suspended ? "red" : round ? OUTCOME[round.outcome].dot : "tertiaryLabel"} />}
                 onPress={() => open(trigger.id)}
               />

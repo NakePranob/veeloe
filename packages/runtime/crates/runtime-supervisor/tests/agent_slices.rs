@@ -246,6 +246,7 @@ async fn a_deleted_agent_waits_in_the_trash_and_can_be_restored() {
         budget: None,
         deleted_at: None,
         git_repos: Vec::new(),
+        background_share: None,
     };
     registry.add(&agent).expect("add");
     let dir = agent_dir(home.path(), "a1").expect("workdir");
@@ -500,6 +501,7 @@ async fn the_machines_todays_budget_leaves_out_agents_in_the_trash() {
         budget: Some(budget),
         deleted_at: None,
         git_repos: Vec::new(),
+        background_share: None,
     };
     registry.add(&agent("live", 5_000_000)).expect("add");
     registry.add(&agent("gone", 7_000_000)).expect("add");
@@ -564,6 +566,7 @@ async fn a_counted_answer_tells_every_member_and_the_list_catches_up() {
         budget: Some(1_000),
         deleted_at: None,
         git_repos: Vec::new(),
+        background_share: None,
     };
     registry.add(&agent).expect("add");
     let budgets = Budgets::new(UsageStore::open(&home.path().join("usage.db")).expect("store"));
@@ -617,6 +620,7 @@ async fn egress_set_checks_manage_and_touches_only_the_agent_it_names() {
                 budget: None,
                 deleted_at: None,
                 git_repos: Vec::new(),
+                background_share: None,
             })
             .expect("add");
     }
@@ -774,6 +778,7 @@ async fn a_malformed_egress_request_is_refused_and_changes_no_agent() {
                 budget: None,
                 deleted_at: None,
                 git_repos: Vec::new(),
+                background_share: None,
             })
             .expect("add");
     }
@@ -860,6 +865,7 @@ async fn git_repos_change_only_by_an_owner_and_come_back_listed() {
             budget: None,
             deleted_at: None,
             git_repos: Vec::new(),
+            background_share: None,
         })
         .expect("add");
     let workers = Workers::new(

@@ -94,5 +94,9 @@
   },
   "all": "ดูทั้งหมด",
   "allTasks": "Task ทั้งหมด",
-  "allThreads": "เส้นของ Schedule ทั้งหมด"
+  "allThreads": "เส้นของ Schedule ทั้งหมด",
+  "idle": {
+    "row": "Idle Work",
+    "detail": "งานที่ Agent ทำเองตอนว่าง"
+  }
 }

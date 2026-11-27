@@ -127,4 +127,6 @@ export const MIGRATIONS = [
   `ALTER TABLE task ADD COLUMN listed_updated INTEGER NOT NULL DEFAULT 0`,
   // A Task already here is caught up to the newest event it holds, so it is not asked for again on every connect.
   `UPDATE task SET listed_updated = coalesce((SELECT max(at) FROM task_event e WHERE e.task_id = task.id), 0) WHERE listed_updated = 0`,
+  // The share of the Budget Idle Work and Watch may use a day, as the Machine last said (ADR 0056).
+  `ALTER TABLE agent ADD COLUMN background_share INTEGER`,
 ] as const;

@@ -221,6 +221,20 @@ impl UsageStore {
         Ok(total.max(0) as u64)
     }
 
+    /// One day's tokens from these sources only.
+    pub fn total_from(&self, agent: &str, day: &str, sources: &[&str]) -> Result<u64, UsageError> {
+        let conn = self.conn.lock().expect("usage");
+        let mut total: i64 = 0;
+        for source in sources {
+            total += conn.query_row(
+                "SELECT coalesce(sum(tokens), 0) FROM usage WHERE agent = ?1 AND day = ?2 AND source = ?3",
+                params![agent, day, source],
+                |row| row.get::<_, i64>(0),
+            )?;
+        }
+        Ok(total.max(0) as u64)
+    }
+
     /// Drops days older than `before`, so the tally stays the last 30 days.
     pub fn prune(&self, before: &str) -> Result<(), UsageError> {
         let conn = self.conn.lock().expect("usage");
@@ -365,6 +379,17 @@ impl Budgets {
         // The oldest day leaves when a new one is written (ADR 0043).
         self.store.prune(&shift_day(&usage.day, -29))?;
         self.usage_of(agent, now_ms)
+    }
+
+    /// True when Idle Work and Watch together used their share of today's
+    /// Budget (ADR 0056): no new piece starts, and one running is stopped.
+    pub fn background_spent(&self, agent: &Agent, now_ms: i64) -> Result<bool, UsageError> {
+        let day = budget_day(now_ms);
+        let used = self.store.total_from(&agent.id, &day, &["idle", "watch"])?;
+        let share = agent
+            .background_share
+            .unwrap_or(crate::agents::BACKGROUND_SHARE_DEFAULT);
+        Ok(used.saturating_mul(100) >= Self::limit_of(agent).saturating_mul(share))
     }
 
     /// True when today's tokens have reached the Agent's Budget.

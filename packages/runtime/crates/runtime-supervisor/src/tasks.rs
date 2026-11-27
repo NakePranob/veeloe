@@ -135,6 +135,9 @@ pub fn agents_listed(
             "egress": agent.egress,
             "gitRepos": agent.git_repos,
             "approvalTimeoutS": agent.approval_timeout_s,
+            "backgroundShare": agent
+                .background_share
+                .unwrap_or(crate::agents::BACKGROUND_SHARE_DEFAULT),
         });
         if let Some(character) = &agent.character {
             value["character"] = character.clone();
@@ -340,7 +343,8 @@ pub fn forward(outbox: &dyn Outbox, agent: &str, message: FromWorker) {
         | FromWorker::LogAppend { .. }
         | FromWorker::LogRead { .. }
         // The supervisor keeps a Schedule's name before it says anything (`triggers::titled`).
-        | FromWorker::TriggerTitled { .. } => {}
+        | FromWorker::TriggerTitled { .. }
+        | FromWorker::IdleProposed { .. } => {}
     }
 }
 

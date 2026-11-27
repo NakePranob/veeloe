@@ -61,6 +61,10 @@ pub struct TriggerRun {
     /// Schedule's signed scope, sent only while its signer still has Approve.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allow: Vec<String>,
+    /// How long this round may run before it ends as if stopped: one piece of
+    /// Idle Work (ADR 0056). None runs as long as any Turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit_s: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -224,6 +228,10 @@ pub enum FromWorker {
         member: String,
         events: Vec<TaskEvent>,
     },
+    /// What the Agent proposed for its Idle Work list (`propose_idle_work`):
+    /// a draft only, until a Member signs a list with it (ADR 0056).
+    #[serde(rename = "idle.proposed")]
+    IdleProposed { items: Vec<String> },
     /// The name for a Schedule asked for with `trigger.title`.
     #[serde(rename = "trigger.titled")]
     TriggerTitled { id: String, title: String },

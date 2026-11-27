@@ -188,6 +188,7 @@ async fn save(
         budget: None,
         deleted_at: None,
         git_repos: Vec::new(),
+        background_share: None,
     });
     let text = |name: &str, fallback: &str| {
         body.get(name)
@@ -221,6 +222,10 @@ async fn save(
         budget: body.get("budget").and_then(Value::as_u64).or(base.budget),
         deleted_at: base.deleted_at,
         git_repos: git_repos.unwrap_or(base.git_repos),
+        background_share: body
+            .get("backgroundShare")
+            .and_then(Value::as_u64)
+            .or(base.background_share),
     };
     // A new Agent must name a Provider on this Machine and a model that
     // Provider lists; an update may move either, so both are checked again.

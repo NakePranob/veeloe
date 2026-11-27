@@ -1,0 +1,88 @@
+{
+  "title": "Idle Work",
+  "missing": {
+    "title": "Agent not found",
+    "body": "This device no longer has this Agent"
+  },
+  "offline": "The Machine is offline, so Idle Work can't change now",
+  "loading": "Asking the Machine…",
+  "create": "Create list",
+  "edit": "Edit list",
+  "cancel": "Cancel",
+  "save": "Save",
+  "saving": "Saving…",
+  "enabled": "On",
+  "run": "Do the next piece now",
+  "empty": {
+    "title": "No Idle Work yet",
+    "body": "Write what the Agent should do on its own when nobody needs it, or wait for it to propose some."
+  },
+  "draft": {
+    "heading": "The Agent proposes",
+    "footer": "Nothing runs until you read it and sign it into the list.",
+    "add": "Read and add to the list"
+  },
+  "pieces": {
+    "heading": "On the list",
+    "allDone": "All done",
+    "repeat": "Repeats",
+    "ordered": "Done in this order. A finished piece leaves the list; a repeating one waits again.",
+    "oldestFirst": "The piece waiting longest goes first. A finished piece leaves the list; a repeating one waits again."
+  },
+  "status": {
+    "pending": "Waiting",
+    "working": "Working",
+    "done": "Done",
+    "timedOut": "Didn't finish",
+    "needsApproval": "Needs an Approval"
+  },
+  "settings": {
+    "footer": "Starts once the Agent has been quiet for {{quiet}} minutes, one piece at a time, up to {{item}} minutes each. Messages that come in meanwhile wait their turn. Nobody watches these rounds, so they ask for no Approval."
+  },
+  "share": {
+    "label": "Budget it may use",
+    "value": "{{percent}}% a day"
+  },
+  "delete": {
+    "row": "Delete this list",
+    "title": "Delete this list?",
+    "message": "{{name}} won't work on its own anymore. Tasks it already did stay.",
+    "action": "Delete"
+  },
+  "authenticate": {
+    "save": "Save Idle Work for {{name}}",
+    "pause": "Pause Idle Work for {{name}}",
+    "resume": "Resume Idle Work for {{name}}",
+    "run": "Have {{name}} do the next piece now",
+    "delete": "Delete Idle Work for {{name}}",
+    "share": "Let background work for {{name}} use {{percent}}% of its Budget"
+  },
+  "editor": {
+    "piece": "Piece {{n}}",
+    "placeholder": "Write the missing parser tests",
+    "repeat": "Repeat when done",
+    "remove": "Remove",
+    "add": "Add a piece",
+    "piecesFooter": "Each piece is one instruction the Agent carries out on its own, as one Task.",
+    "order": "Order",
+    "quiet": "Start after quiet for",
+    "item": "Time per piece",
+    "timesFooter": "A piece still going when its time is up ends as if stopped."
+  },
+  "order": {
+    "ordered": "In order",
+    "oldestFirst": "Waiting longest first"
+  },
+  "minutes_one": "{{count}} minute",
+  "minutes_other": "{{count}} minutes",
+  "problem": {
+    "empty": {
+      "title": "No pieces yet",
+      "body": "Write at least one piece."
+    },
+    "tooMany": {
+      "title": "Too long",
+      "body": "A list holds up to 50 pieces."
+    }
+  }
+}

@@ -6,7 +6,7 @@
 //! Machine's own clock; whether it may run (busy, Budget, trash, a revoked key)
 //! is [`decide`], so the loop in `main.rs` only acts on the answer.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -29,7 +29,15 @@ pub struct TriggerRecord {
     /// The base64url Controller key that signed it.
     pub key: String,
     pub text: String,
+    /// A Schedule's times; null for another kind.
+    #[serde(default)]
     pub schedule: Value,
+    /// An Idle Work list as signed (ADR 0056); absent for another kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idle: Option<Value>,
+    /// Where each piece of an Idle Work list stands, by piece id.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub progress: BTreeMap<String, crate::idle::Progress>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notify: Option<String>,
     #[serde(default)]
@@ -79,11 +87,19 @@ impl TriggerRecord {
             "id": self.id,
             "kind": self.kind,
             "text": self.text,
-            "schedule": self.schedule,
             "member": self.member,
             "paused": self.paused,
             "suspended": self.suspended,
         });
+        if !self.schedule.is_null() {
+            value["schedule"] = self.schedule.clone();
+        }
+        if let Some(idle) = &self.idle {
+            value["idle"] = idle.clone();
+            if let Some(list) = crate::idle::IdleList::parse(idle) {
+                value["progress"] = json!(list.listed_progress(&self.progress));
+            }
+        }
         if let Some(notify) = &self.notify {
             value["notify"] = json!(notify);
         }
@@ -132,22 +148,150 @@ pub struct Triggers {
     /// The Tasks this process started from a Trigger, and its kind, so usage
     /// can say where tokens went (`schedule`, ADR 0043).
     started: Mutex<HashMap<String, String>>,
+    /// What each Agent proposed for its Idle Work list, not signed (ADR 0056).
+    drafts_file: PathBuf,
+    drafts: Mutex<HashMap<String, Vec<String>>>,
+    /// Tasks that were refused something nobody could be asked about (ADR 0079).
+    skipped: Mutex<HashSet<String>>,
 }
+
+/// The most an Agent's Idle Work draft holds.
+pub const DRAFT_MAX: usize = 50;
 
 impl Triggers {
     pub fn open(home: &Path) -> Result<Self, TriggerError> {
         let file = supervisor_dir(home)?.join("triggers.json");
-        let records = read_json_file(&file)?
+        let mut records: Vec<TriggerRecord> = read_json_file(&file)?
             .and_then(|value| value.as_array().cloned())
             .unwrap_or_default()
             .into_iter()
             // A row this build cannot read is dropped, not fatal.
             .filter_map(|record| serde_json::from_value(record).ok())
             .collect();
+        // A piece working when the Runtime went down had its Turn closed as
+        // interrupted (ADR 0033): it did not finish.
+        for record in records.iter_mut() {
+            for held in record.progress.values_mut() {
+                if held.status == crate::idle::Status::Working {
+                    held.status = crate::idle::Status::TimedOut;
+                }
+            }
+        }
+        let drafts_file = supervisor_dir(home)?.join("idle-drafts.json");
+        let drafts = read_json_file(&drafts_file)?
+            .and_then(|value| serde_json::from_value(value).ok())
+            .unwrap_or_default();
         Ok(Self {
             file,
             records: Mutex::new(records),
             started: Mutex::new(HashMap::new()),
+            drafts_file,
+            drafts: Mutex::new(drafts),
+            skipped: Mutex::new(HashSet::new()),
+        })
+    }
+
+    /// What `trigger.listed` says of one Agent: its Triggers, and its Idle Work draft.
+    pub fn listed_body(&self, agent: &str) -> Value {
+        let held: Vec<Value> = self
+            .for_agent(agent)
+            .iter()
+            .map(|record| record.listed(&MachineTime))
+            .collect();
+        let mut body = json!({ "agent": agent, "triggers": held });
+        if let Some(draft) = self.drafts.lock().expect("drafts").get(agent) {
+            if !draft.is_empty() {
+                body["draft"] = json!(draft);
+            }
+        }
+        body
+    }
+
+    /// Adds what the Agent proposed to its draft, up to DRAFT_MAX; the same words twice are kept once.
+    pub fn propose(&self, agent: &str, items: &[String]) -> Result<(), TriggerError> {
+        let mut drafts = self.drafts.lock().expect("drafts");
+        let draft = drafts.entry(agent.to_string()).or_default();
+        for item in items {
+            if draft.len() < DRAFT_MAX && !draft.contains(item) {
+                draft.push(item.clone());
+            }
+        }
+        let value = serde_json::to_value(&*drafts).unwrap_or(Value::Null);
+        drop(drafts);
+        write_json_file(&self.drafts_file, &value)?;
+        Ok(())
+    }
+
+    /// A signed list replaces the draft: the Member has read it.
+    pub fn clear_draft(&self, agent: &str) -> Result<(), TriggerError> {
+        let mut drafts = self.drafts.lock().expect("drafts");
+        if drafts.remove(agent).is_none() {
+            return Ok(());
+        }
+        let value = serde_json::to_value(&*drafts).unwrap_or(Value::Null);
+        drop(drafts);
+        write_json_file(&self.drafts_file, &value)?;
+        Ok(())
+    }
+
+    /// The Agent's Idle Work list, if it has one.
+    pub fn idle_of(&self, agent: &str) -> Option<TriggerRecord> {
+        self.records
+            .lock()
+            .expect("triggers")
+            .iter()
+            .find(|held| held.agent == agent && held.kind == "idle")
+            .cloned()
+    }
+
+    /// Notes that a Task was refused something nobody could be asked about.
+    pub fn skipped(&self, task: &str) {
+        self.skipped
+            .lock()
+            .expect("skipped")
+            .insert(task.to_string());
+    }
+
+    /// The Idle Work piece a Task is the round of: its Agent, list, piece and signer.
+    pub fn piece_of(&self, task: &str) -> Option<(String, String, String, String)> {
+        self.records
+            .lock()
+            .expect("triggers")
+            .iter()
+            .find_map(|record| {
+                record.progress.iter().find_map(|(item, held)| {
+                    (held.task.as_deref() == Some(task)).then(|| {
+                        (
+                            record.agent.clone(),
+                            record.id.clone(),
+                            item.clone(),
+                            record.member.clone(),
+                        )
+                    })
+                })
+            })
+    }
+
+    /// A piece's Turn ended: its piece is done, waits again, or is marked. True when it was one.
+    pub fn finish_piece(&self, task: &str, ended: &Value) -> Result<bool, TriggerError> {
+        let Some((agent, id, item, _)) = self.piece_of(task) else {
+            return Ok(false);
+        };
+        let skipped = self.skipped.lock().expect("skipped").remove(task);
+        let outcome = crate::idle::Outcome::of(ended, skipped);
+        self.update(&agent, &id, |record| {
+            let repeat = record
+                .idle
+                .as_ref()
+                .and_then(crate::idle::IdleList::parse)
+                .and_then(|list| list.items.into_iter().find(|piece| piece.id == item))
+                .is_some_and(|piece| piece.repeat);
+            if let Some(held) = record.progress.get(&item) {
+                if held.status == crate::idle::Status::Working {
+                    let next = crate::idle::finished(held, outcome, repeat);
+                    record.progress.insert(item.clone(), next);
+                }
+            }
         })
     }
 
@@ -292,13 +436,72 @@ pub fn start_round(
     attended: bool,
     approves: bool,
 ) -> Option<String> {
+    send_round(
+        workers,
+        triggers,
+        record,
+        at,
+        attended,
+        approves,
+        &record.text,
+        None,
+    )
+}
+
+/// Starts the next piece of an Agent's Idle Work list, with its time limit, and
+/// marks it working (ADR 0056). The Task id, or None when nothing went.
+pub fn start_piece(
+    workers: &crate::workers::Workers,
+    triggers: &Triggers,
+    record: &TriggerRecord,
+    now: u64,
+    attended: bool,
+    approves: bool,
+) -> Option<String> {
+    let list = crate::idle::IdleList::parse(record.idle.as_ref()?)?;
+    let piece = list.next(&record.progress)?.clone();
+    let task = send_round(
+        workers,
+        triggers,
+        record,
+        now,
+        attended,
+        approves,
+        &piece.text,
+        Some(list.item_minutes * 60),
+    )?;
+    let _ = triggers.update(&record.agent, &record.id, |held| {
+        held.last_run_at = Some(now);
+        held.progress.insert(
+            piece.id.clone(),
+            crate::idle::Progress {
+                status: crate::idle::Status::Working,
+                last_run_at: Some(now),
+                task: Some(task.clone()),
+            },
+        );
+    });
+    Some(task)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn send_round(
+    workers: &crate::workers::Workers,
+    triggers: &Triggers,
+    record: &TriggerRecord,
+    at: u64,
+    attended: bool,
+    approves: bool,
+    text: &str,
+    limit_s: Option<u64>,
+) -> Option<String> {
     let task = new_task_id();
     let sent = workers.send(
         &record.agent,
         veeloe_runtime_core::ToWorker::Run {
             task: task.clone(),
             member: record.member.clone(),
-            text: record.text.clone(),
+            text: text.to_string(),
             trigger: veeloe_runtime_core::TriggerRun {
                 kind: record.kind.clone(),
                 id: record.id.clone(),
@@ -309,6 +512,7 @@ pub fn start_round(
                 } else {
                     Vec::new()
                 },
+                limit_s,
             },
         },
     );
@@ -336,17 +540,7 @@ pub fn titled(
     let Some(member) = member else {
         return;
     };
-    let held: Vec<Value> = triggers
-        .for_agent(agent)
-        .iter()
-        .map(|record| record.listed(&MachineTime))
-        .collect();
-    outbox.to_member(
-        &member,
-        "trigger.listed",
-        json!({ "agent": agent, "triggers": held }),
-        None,
-    );
+    outbox.to_member(&member, "trigger.listed", triggers.listed_body(agent), None);
 }
 
 /// A wall-clock moment on the Machine, in its own time zone.
@@ -609,6 +803,8 @@ mod tests {
             key: "k1".into(),
             text: "check".into(),
             schedule,
+            idle: None,
+            progress: Default::default(),
             notify: None,
             paused: false,
             suspended: false,

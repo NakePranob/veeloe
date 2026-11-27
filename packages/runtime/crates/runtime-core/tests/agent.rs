@@ -497,6 +497,7 @@ fn scheduled(task: &str) -> ToWorker {
             at: 1_000,
             attended: false,
             allow: Vec::new(),
+            limit_s: None,
         },
     }
 }
@@ -2261,4 +2262,59 @@ async fn a_schedule_is_named_from_its_words_as_a_task_is() {
             title: "Check MEMORY.md daily".into(),
         })
     );
+}
+
+#[tokio::test]
+async fn a_round_past_its_time_limit_ends_as_a_stop_that_says_why() {
+    let harness = setup(Setup {
+        gated: true,
+        ..Setup::default()
+    });
+    let ToWorker::Run {
+        task,
+        member,
+        text,
+        mut trigger,
+    } = round(false, &[])
+    else {
+        unreachable!()
+    };
+    trigger.limit_s = Some(1);
+    harness
+        .core
+        .receive(ToWorker::Run {
+            task,
+            member,
+            text,
+            trigger,
+        })
+        .expect("receive");
+    harness.core.idle().await;
+    let events = harness.core.events("t9").expect("events");
+    assert_eq!(
+        events.last().expect("last").body,
+        json!({ "reason": "stopped", "code": "trigger.time_limit" })
+    );
+}
+
+#[tokio::test]
+async fn any_turn_may_propose_idle_work_and_the_supervisor_hears_it() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "u1",
+                "propose_idle_work",
+                json!({ "items": ["write the parser tests", " "] }),
+            )),
+            Ok(text("noted")),
+        ],
+        ..Setup::default()
+    });
+    harness.core.receive(message("hi")).expect("receive");
+    harness.core.idle().await;
+    assert!(harness.link.take().iter().any(|sent| matches!(
+        sent,
+        FromWorker::IdleProposed { items } if items == &vec!["write the parser tests".to_string()]
+    )));
+    assert!(tool_names(&harness.llm.requests()[0]).contains(&"propose_idle_work".to_string()));
 }

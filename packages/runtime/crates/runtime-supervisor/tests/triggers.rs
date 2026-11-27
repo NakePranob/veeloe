@@ -81,6 +81,7 @@ fn agent(id: &str) -> Agent {
         budget: None,
         deleted_at: None,
         git_repos: Vec::new(),
+        background_share: None,
     }
 }
 
@@ -314,4 +315,121 @@ async fn a_schedule_keeps_its_name_while_its_words_do_and_loses_it_when_they_cha
     reworded["trigger"]["text"] = json!("check the deploy");
     let (_, body) = fixture.send(&owner, "trigger.set", reworded).await;
     assert!(body["triggers"][0].get("title").is_none());
+}
+
+fn idle_list(id: &str, items: Value) -> Value {
+    json!({
+        "agent": "a1",
+        "trigger": { "id": id, "kind": "idle", "text": "when quiet", "idle": { "items": items, "order": "ordered", "quietMinutes": 15, "itemMinutes": 15 } },
+    })
+}
+
+#[tokio::test]
+async fn an_idle_list_replaces_the_agents_last_one_keeps_progress_and_clears_the_draft() {
+    use veeloe_runtime_supervisor::idle::{Progress, Status};
+    let fixture = Fixture::new();
+    let owner = from("member-1", "controller-1");
+    fixture
+        .send(
+            &owner,
+            "trigger.set",
+            idle_list(
+                "idle-1",
+                json!([{ "id": "a", "text": "tests" }, { "id": "b", "text": "deps" }]),
+            ),
+        )
+        .await;
+    fixture
+        .triggers
+        .update("a1", "idle-1", |held| {
+            held.progress.insert(
+                "a".into(),
+                Progress {
+                    status: Status::NeedsApproval,
+                    last_run_at: Some(5),
+                    task: Some("tr-a".into()),
+                },
+            );
+        })
+        .expect("update");
+    fixture
+        .triggers
+        .propose("a1", &["write docs".to_string()])
+        .expect("propose");
+    assert_eq!(
+        fixture.triggers.listed_body("a1")["draft"],
+        json!(["write docs"])
+    );
+
+    // A new list under another id: the old one goes, "a" keeps where it stood, "b" is gone, the draft is read.
+    let (_, body) = fixture
+        .send(
+            &owner,
+            "trigger.set",
+            idle_list(
+                "idle-2",
+                json!([{ "id": "a", "text": "tests" }, { "id": "c", "text": "write docs" }]),
+            ),
+        )
+        .await;
+    let lists: Vec<&Value> = body["triggers"]
+        .as_array()
+        .expect("triggers")
+        .iter()
+        .filter(|t| t["kind"] == "idle")
+        .collect();
+    assert_eq!(lists.len(), 1);
+    assert_eq!(lists[0]["id"], "idle-2");
+    assert_eq!(
+        lists[0]["progress"],
+        json!([{ "id": "a", "status": "needsApproval", "lastRunAt": 5, "task": "tr-a" }, { "id": "c", "status": "pending" }])
+    );
+    assert!(body.get("draft").is_none());
+}
+
+#[tokio::test]
+async fn a_piece_finishes_done_and_leaves_or_is_marked_by_how_its_turn_ended() {
+    use veeloe_runtime_supervisor::idle::{Progress, Status};
+    let fixture = Fixture::new();
+    let owner = from("member-1", "controller-1");
+    fixture
+        .send(&owner, "trigger.set", idle_list("idle", json!([{ "id": "a", "text": "one" }, { "id": "b", "text": "two", "repeat": true }, { "id": "c", "text": "three" }])))
+        .await;
+    let working = |task: &str| Progress {
+        status: Status::Working,
+        last_run_at: Some(1),
+        task: Some(task.into()),
+    };
+    fixture
+        .triggers
+        .update("a1", "idle", |held| {
+            held.progress.insert("a".into(), working("t-a"));
+            held.progress.insert("b".into(), working("t-b"));
+            held.progress.insert("c".into(), working("t-c"));
+        })
+        .expect("update");
+    fixture
+        .triggers
+        .finish_piece("t-a", &json!({ "reason": "done" }))
+        .expect("a");
+    fixture
+        .triggers
+        .finish_piece("t-b", &json!({ "reason": "quiet" }))
+        .expect("b");
+    fixture.triggers.skipped("t-c");
+    fixture
+        .triggers
+        .finish_piece("t-c", &json!({ "reason": "done" }))
+        .expect("c");
+    let listed = fixture.triggers.listed_body("a1");
+    let progress = &listed["triggers"][0]["progress"];
+    assert_eq!(progress[0]["id"], "b");
+    assert_eq!(progress[0]["status"], "pending");
+    assert_eq!(progress[1]["id"], "c");
+    assert_eq!(progress[1]["status"], "needsApproval");
+    // A Turn of no piece finishes nothing.
+    assert!(!fixture
+        .triggers
+        .finish_piece("someone-else", &json!({ "reason": "done" }))
+        .expect("other"));
 }

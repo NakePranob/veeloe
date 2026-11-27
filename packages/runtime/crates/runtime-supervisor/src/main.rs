@@ -12,8 +12,10 @@ mod cli {
     pub mod provider;
 }
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
+use veeloe_runtime_supervisor::tasks::Outbox;
 
 use serde_json::{json, Value};
 use veeloe_protocol::envelope::{verify, Route};
@@ -155,6 +157,10 @@ struct Supervisor {
     machine: Mutex<Option<String>>,
     outbox: Mutex<Option<Arc<MachineOutbox>>>,
     workers: OnceLock<Workers>,
+    /// When each Agent last started or ended a Turn, for Idle Work's quiet time
+    /// (ADR 0056). An Agent not here has been quiet since this process started.
+    quiet_since: Mutex<HashMap<String, u64>>,
+    started_at: u64,
 }
 
 /// The counters a connection reads before it trusts anything.
@@ -167,7 +173,25 @@ impl Supervisor {
         self.approvals.observe(agent, &message);
         self.log_turn(agent, &message);
         self.notify(agent, &message);
+        self.follow_idle(agent, &message);
         let outbox = self.outbox.lock().expect("outbox");
+        // What the Agent proposed for its Idle Work list is kept, not forwarded;
+        // whoever is talking to it hears the new draft (ADR 0056).
+        if let FromWorker::IdleProposed { items } = &message {
+            if self.triggers.propose(agent, items).is_ok() {
+                if let (Some(outbox), Some(turn)) =
+                    (outbox.as_ref(), self.approvals.current_turn(agent))
+                {
+                    outbox.to_member(
+                        &turn.member,
+                        "trigger.listed",
+                        self.triggers.listed_body(agent),
+                        None,
+                    );
+                }
+            }
+            return;
+        }
         if let FromWorker::TriggerTitled { id, title } = &message {
             if let Some(outbox) = outbox.as_ref() {
                 veeloe_runtime_supervisor::triggers::titled(
@@ -182,6 +206,126 @@ impl Supervisor {
         }
         if let Some(outbox) = outbox.as_ref() {
             forward(outbox.as_ref(), agent, message);
+        }
+    }
+
+    /// What Idle Work needs to know of a worker's events: when the Agent was
+    /// last busy, what a round was refused, and how a piece's Turn ended.
+    fn follow_idle(&self, agent: &str, message: &FromWorker) {
+        let FromWorker::Event { task, event, .. } = message else {
+            return;
+        };
+        match event.kind.as_str() {
+            "turn.started" => {
+                self.quiet_since.lock().expect("quiet").insert(
+                    agent.to_string(),
+                    veeloe_runtime_supervisor::usage::now_ms() as u64,
+                );
+            }
+            "approval.skipped" => self.triggers.skipped(task),
+            "turn.ended" => {
+                self.quiet_since.lock().expect("quiet").insert(
+                    agent.to_string(),
+                    veeloe_runtime_supervisor::usage::now_ms() as u64,
+                );
+                let piece = self.triggers.piece_of(task);
+                if self
+                    .triggers
+                    .finish_piece(task, &event.body)
+                    .unwrap_or(false)
+                {
+                    if let (Some(outbox), Some((_, _, _, member))) =
+                        (self.outbox.lock().expect("outbox").as_ref(), piece)
+                    {
+                        outbox.to_member(
+                            &member,
+                            "trigger.listed",
+                            self.triggers.listed_body(agent),
+                            None,
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Starts the next piece of an Agent's Idle Work list when the Agent has
+    /// been quiet long enough (ADR 0056): no Turn, the quiet time passed since
+    /// its last one, its key and Use still good, and its Budget and background
+    /// share not spent. A Machine that was off owes nothing.
+    fn tick_idle(
+        &self,
+        workers: &Workers,
+        trust: &veeloe_runtime_supervisor::trust::Trust,
+        record: &veeloe_runtime_supervisor::triggers::TriggerRecord,
+        now_ms: i64,
+    ) {
+        if record.paused || record.suspended {
+            return;
+        }
+        let Some(agent) = self.registry.get(&record.agent).ok().flatten() else {
+            return;
+        };
+        if agent.deleted() {
+            return;
+        }
+        if !trust.uses(&record.member, Some(&record.key)) {
+            let _ = self
+                .triggers
+                .update(&record.agent, &record.id, |held| held.suspended = true);
+            return;
+        }
+        let Some(list) = record
+            .idle
+            .as_ref()
+            .and_then(veeloe_runtime_supervisor::idle::IdleList::parse)
+        else {
+            return;
+        };
+        let since = self
+            .quiet_since
+            .lock()
+            .expect("quiet")
+            .get(&record.agent)
+            .copied()
+            .unwrap_or(self.started_at);
+        if self.approvals.current_turn(&record.agent).is_some()
+            || !list.quiet_enough(now_ms as u64, since)
+            || list.next(&record.progress).is_none()
+            || self.budgets.exhausted(&agent, now_ms).unwrap_or(true)
+            || self
+                .budgets
+                .background_spent(&agent, now_ms)
+                .unwrap_or(true)
+        {
+            return;
+        }
+        let approves = trust.approves(&record.member, Some(&record.key));
+        let start = || {
+            veeloe_runtime_supervisor::triggers::start_piece(
+                workers,
+                &self.triggers,
+                record,
+                now_ms as u64,
+                false,
+                approves,
+            )
+        };
+        // No worker yet (the Hub was down at boot): start one, as a Schedule does.
+        if start()
+            .or_else(|| {
+                workers.start(&agent);
+                start()
+            })
+            .is_some()
+        {
+            let _ = logs::record(
+                &self.home,
+                "info",
+                "trigger.run",
+                json!({ "agent": record.agent, "trigger": record.id, "at": now_ms }),
+            );
         }
     }
 
@@ -261,6 +405,10 @@ impl Supervisor {
         let trust = self.trust.lock().expect("trust").clone();
         let now_ms = veeloe_runtime_supervisor::usage::now_ms();
         for record in self.triggers.all() {
+            if record.kind == "idle" {
+                self.tick_idle(workers, &trust, &record, now_ms);
+                continue;
+            }
             let agent = self.registry.get(&record.agent).ok().flatten();
             let now = veeloe_runtime_supervisor::triggers::Now {
                 ms: now_ms as u64,
@@ -701,6 +849,8 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         machine: Mutex::new(None),
         outbox: Mutex::new(None),
         workers: OnceLock::new(),
+        quiet_since: Mutex::new(HashMap::new()),
+        started_at: veeloe_runtime_supervisor::usage::now_ms() as u64,
     });
 
     let routing = Arc::clone(&supervisor);
@@ -725,15 +875,38 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
                 return;
             };
             let task = task.unwrap_or("");
+            let source = usage_routing.triggers.source_of(task);
             let Ok(usage) = usage_budgets.add_from(
                 &agent,
                 veeloe_runtime_supervisor::usage::now_ms(),
-                &usage_routing.triggers.source_of(task),
+                &source,
                 task,
                 tokens,
             ) else {
                 return;
             };
+            // A piece of Idle Work that took the background share over stops here;
+            // a person's Turn goes on (ADR 0056).
+            if source == "idle"
+                && usage_budgets
+                    .background_spent(&agent, veeloe_runtime_supervisor::usage::now_ms())
+                    .unwrap_or(false)
+            {
+                if let (Some(workers), Some((_, _, _, member))) = (
+                    usage_routing.workers.get(),
+                    usage_routing.triggers.piece_of(task),
+                ) {
+                    workers.send(
+                        &agent.id,
+                        veeloe_runtime_core::ToWorker::Stop {
+                            task: task.to_string(),
+                            id: format!("idle-share:{task}"),
+                            member,
+                            reference: String::new(),
+                        },
+                    );
+                }
+            }
             let members: Vec<String> = usage_routing
                 .trust
                 .lock()

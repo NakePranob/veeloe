@@ -791,6 +791,7 @@ mod tests {
                     budget: None,
                     deleted_at: None,
                     git_repos: Vec::new(),
+                    background_share: None,
                 })
                 .expect("add");
         }

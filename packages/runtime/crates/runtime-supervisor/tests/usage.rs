@@ -21,6 +21,7 @@ fn agent(budget: Option<u64>) -> Agent {
         budget,
         deleted_at: None,
         git_repos: Vec::new(),
+        background_share: None,
     }
 }
 
@@ -180,4 +181,28 @@ fn a_schedules_tokens_are_their_own_source_in_the_same_budget() {
         sources,
         vec![("schedule".to_string(), 4), ("task".to_string(), 10)]
     );
+}
+
+#[test]
+fn idle_work_and_watch_stop_at_their_share_of_the_budget_while_a_persons_tokens_do_not_count() {
+    let home = tempdir().expect("home");
+    let budgets = Budgets::new(UsageStore::open(&home.path().join("usage.db")).expect("store"));
+    let agent = agent(Some(1_000));
+    budgets.add(&agent, MORNING, "typed", 900).expect("add");
+    assert!(!budgets.background_spent(&agent, MORNING).expect("spent"));
+    budgets
+        .add_from(&agent, MORNING, "idle", "piece", 200)
+        .expect("add");
+    assert!(!budgets.background_spent(&agent, MORNING).expect("spent"));
+    budgets
+        .add_from(&agent, MORNING, "watch", "w", 100)
+        .expect("add");
+    // 300 of 1,000 is the default 30%.
+    assert!(budgets.background_spent(&agent, MORNING).expect("spent"));
+    let off = Agent {
+        background_share: Some(0),
+        ..agent
+    };
+    let fresh = Budgets::new(UsageStore::open(&home.path().join("other.db")).expect("store"));
+    assert!(fresh.background_spent(&off, MORNING).expect("spent"));
 }

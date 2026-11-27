@@ -38,7 +38,7 @@ export function triggerOf(draft: Draft, id: string, allow: readonly string[] = [
 
 /** An existing Schedule opened for editing. */
 export function draftOf(trigger: Trigger): Draft {
-  const { every, daily, weekly } = trigger.schedule;
+  const { every, daily, weekly } = trigger.schedule ?? {};
   const kept = { ...EMPTY_DRAFT, text: trigger.text };
   if (every) return { ...kept, mode: "every", minutes: String(every.minutes) };
   if (weekly) return { ...kept, mode: "weekly", day: weekly.day, at: weekly.at };

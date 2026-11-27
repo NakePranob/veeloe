@@ -229,7 +229,7 @@ test("a listed Task is synced until its events land, and again only when it move
 test("after the update, a Task already caught up is not asked for again", async () => {
   const sqlite = new Sqlite(":memory:");
   const c = connection(sqlite);
-  const before = MIGRATIONS.length - 1;
+  const before = MIGRATIONS.findIndex((sql) => sql.startsWith("UPDATE task SET listed_updated"));
   await migrate(c, MIGRATIONS.slice(0, before));
   const old = createDatabase(c);
   await saveTaskEvents(old, where, [event(1), event(2)]);

@@ -10,6 +10,7 @@ pub mod egress;
 pub mod git_broker;
 pub mod help;
 pub mod hub_link;
+pub mod idle;
 pub mod json_file;
 pub mod limits;
 pub mod llm;

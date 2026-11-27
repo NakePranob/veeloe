@@ -94,5 +94,9 @@
   },
   "all": "See all",
   "allTasks": "All Tasks",
-  "allThreads": "All Schedule threads"
+  "allThreads": "All Schedule threads",
+  "idle": {
+    "row": "Idle Work",
+    "detail": "What the Agent does on its own when quiet"
+  }
 }

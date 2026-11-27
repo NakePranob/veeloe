@@ -2,10 +2,10 @@
 //! Triggers a Member signs for an Agent (issue #56). Every one answers with the
 //! Agent's `trigger.listed`, so the Controller always draws what the Machine holds.
 
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::tasks::{agent_of, Inbound, Machine, Outbox};
-use crate::triggers::{start_round, MachineTime, TriggerRecord, Triggers};
+use crate::triggers::{start_round, TriggerRecord, Triggers};
 
 /// The Triggers and the Agent this message is about, once it may touch them;
 /// otherwise the error has been sent.
@@ -39,15 +39,10 @@ fn checked<'a>(
 }
 
 fn listed(outbox: &dyn Outbox, from: &Inbound, triggers: &Triggers, agent: &str) {
-    let held: Vec<Value> = triggers
-        .for_agent(agent)
-        .iter()
-        .map(|record| record.listed(&MachineTime))
-        .collect();
     outbox.to_member(
         &from.member,
         "trigger.listed",
-        json!({ "agent": agent, "triggers": held }),
+        triggers.listed_body(agent),
         None,
     );
 }
@@ -97,6 +92,8 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
         key: key.to_string(),
         text: text("text"),
         schedule: trigger.get("schedule").cloned().unwrap_or(Value::Null),
+        idle: trigger.get("idle").cloned(),
+        progress: Default::default(),
         notify: trigger
             .get("notify")
             .and_then(Value::as_str)
@@ -120,6 +117,32 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
         record.last_skip = held.last_skip;
         record.paused = held.paused;
     }
+    // An Agent has one Idle Work list: a new one takes the old one's place, and
+    // each piece still on it keeps where it stood (ADR 0056).
+    if record.kind == "idle" {
+        if let Some(old) = triggers.idle_of(&agent) {
+            let ids: Vec<String> = record
+                .idle
+                .as_ref()
+                .and_then(crate::idle::IdleList::parse)
+                .map(|list| list.items.into_iter().map(|item| item.id).collect())
+                .unwrap_or_default();
+            record.progress = old
+                .progress
+                .into_iter()
+                .filter(|(item, _)| ids.contains(item))
+                .collect();
+            if old.id != record.id {
+                let _ = triggers.delete(&agent, &old.id);
+            } else {
+                record.created_at = old.created_at;
+                record.last_run_at = old.last_run_at;
+                record.paused = old.paused;
+            }
+        }
+        // The Member has read the draft: what they signed replaces it.
+        let _ = triggers.clear_draft(&agent);
+    }
     // The same words keep their name; new words are named again by the Agent's model.
     let held_title = triggers
         .get(&agent, &record.id)
@@ -127,14 +150,14 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
         .and_then(|held| held.title);
     let name_it = held_title.is_none();
     record.title = held_title;
-    let (id, text) = (record.id.clone(), record.text.clone());
+    let (id, text, kind) = (record.id.clone(), record.text.clone(), record.kind.clone());
     if triggers.set(record).is_err() {
         return outbox.error(from, "trigger.unavailable");
     }
     listed(outbox, from, triggers, &agent);
     if name_it {
-        // Counted as the Schedule's own tokens; with no worker running it stays unnamed.
-        triggers.started(&format!("trigger:{id}"), "schedule");
+        // Counted as the Trigger's own tokens; with no worker running it stays unnamed.
+        triggers.started(&format!("trigger:{id}"), &kind);
         machine.workers.send(
             &agent,
             veeloe_runtime_core::ToWorker::TitleTrigger { id, text },
@@ -203,7 +226,13 @@ pub(crate) fn run(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     let approves = machine
         .trust
         .is_some_and(|trust| trust.approves(&record.member, Some(&record.key)));
-    if start_round(machine.workers, triggers, &record, now(), true, approves).is_none() {
+    // An Idle Work list's run now is its next piece, with its time limit.
+    let started = if record.kind == "idle" {
+        crate::triggers::start_piece(machine.workers, triggers, &record, now(), true, approves)
+    } else {
+        start_round(machine.workers, triggers, &record, now(), true, approves)
+    };
+    if started.is_none() {
         return outbox.error(from, "agent.unavailable");
     }
     listed(outbox, from, triggers, &agent);

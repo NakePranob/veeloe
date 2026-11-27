@@ -88,9 +88,11 @@ export type TriggerStatus = {
   /** A code from the Hub or the Machine, such as `trigger.forbidden`. */
   error: string | null;
   triggers: ListedTrigger[] | null;
+  /** What the Agent proposed for its Idle Work list, not signed yet (ADR 0056). */
+  draft: string[] | null;
 };
 
-export const UNKNOWN_TRIGGERS: TriggerStatus = { loading: false, sending: false, error: null, triggers: null };
+export const UNKNOWN_TRIGGERS: TriggerStatus = { loading: false, sending: false, error: null, triggers: null, draft: null };
 
 /** One Agent's Memory belongs to one Machine, so the key carries both. */
 export const memoryKey = (machine: string, agent: string) => `${machine}:${agent}`;

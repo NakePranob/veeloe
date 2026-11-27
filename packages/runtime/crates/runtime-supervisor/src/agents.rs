@@ -60,7 +60,18 @@ pub struct Agent {
     /// through the git broker; empty lets it reach none (issue #32).
     #[serde(rename = "gitRepos", default, skip_serializing_if = "Vec::is_empty")]
     pub git_repos: Vec<String>,
+    /// The share of the Budget Idle Work and Watch may use a day, in percent
+    /// (ADR 0056); None is the default, BACKGROUND_SHARE_DEFAULT.
+    #[serde(
+        rename = "backgroundShare",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub background_share: Option<u64>,
 }
+
+/// What Idle Work and Watch may use of a Budget a day when nobody set it (ADR 0056).
+pub const BACKGROUND_SHARE_DEFAULT: u64 = 30;
 
 fn default_timeout() -> u64 {
     3_600

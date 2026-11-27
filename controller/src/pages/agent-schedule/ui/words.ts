@@ -28,7 +28,7 @@ export const whenShort = (at: number, language: string) => new Date(at).toLocale
 export function useRhythm() {
   const t = useT("agent-schedule");
   const language = useLanguage();
-  return ({ every, daily, weekly }: ListedTrigger["schedule"]) => {
+  return ({ every, daily, weekly }: NonNullable<ListedTrigger["schedule"]>) => {
     if (every) return t("rhythm.every", { minutes: every.minutes });
     if (weekly) return t("rhythm.weekly", { day: dayName(weekly.day, language), at: weekly.at });
     return t("rhythm.daily", { at: daily?.at ?? "" });

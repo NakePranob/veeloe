@@ -249,7 +249,8 @@ fn is_agent_update(object: &Map<String, Value>) -> bool {
         || object.contains_key("budget")
         || object.contains_key("allowlist")
         || object.contains_key("approvalTimeoutS")
-        || object.contains_key("gitRepos");
+        || object.contains_key("gitRepos")
+        || object.contains_key("backgroundShare");
     if !has_change {
         return false;
     }
@@ -293,6 +294,11 @@ fn is_agent_update(object: &Map<String, Value>) -> bool {
     }
     if let Some(repos) = object.get("gitRepos") {
         if !is_git_repos(repos) {
+            return false;
+        }
+    }
+    if let Some(share) = object.get("backgroundShare") {
+        if !int_in(Some(share), 0, 100) {
             return false;
         }
     }
@@ -472,12 +478,41 @@ pub fn is_schedule(value: &Value) -> bool {
         })
 }
 
+/// An Idle Work list (ADR 0056): 1 to 50 pieces, an order, and its two times.
+pub fn is_idle(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    let items = object.get("items").and_then(Value::as_array);
+    items.is_some_and(|items| {
+        (1..=50).contains(&items.len())
+            && items.iter().all(|item| {
+                item.as_object().is_some_and(|item| {
+                    text(item.get("id")).is_some_and(is_trigger_id)
+                        && text(item.get("text"))
+                            .is_some_and(|text| (1..=TRIGGER_TEXT_MAX).contains(&chars(text)))
+                        && item.get("repeat").map(Value::is_boolean).unwrap_or(true)
+                })
+            })
+    }) && matches!(
+        object.get("order").and_then(Value::as_str),
+        Some("ordered" | "oldest-first")
+    ) && int_in(object.get("quietMinutes"), 5, 1440)
+        && int_in(object.get("itemMinutes"), 1, 120)
+}
+
 fn is_trigger(object: &Map<String, Value>) -> bool {
+    let present = |name: &str| object.get(name).is_some_and(|part| !part.is_null());
+    // Each kind carries its own part, and only that one.
+    let kind_fits = match text(object.get("kind")) {
+        Some("schedule") => object.get("schedule").is_some_and(is_schedule) && !present("idle"),
+        Some("idle") => object.get("idle").is_some_and(is_idle) && !present("schedule"),
+        _ => false,
+    };
     text(object.get("id")).is_some_and(is_trigger_id)
-        && text(object.get("kind")) == Some("schedule")
+        && kind_fits
         && text(object.get("text"))
             .is_some_and(|text| (1..=TRIGGER_TEXT_MAX).contains(&chars(text)))
-        && object.get("schedule").is_some_and(is_schedule)
         && object
             .get("notify")
             .map(|notify| matches!(notify.as_str(), Some("me" | "use")))
@@ -518,6 +553,38 @@ fn is_listed_trigger(value: &Value) -> bool {
             .map(|title| text(Some(title)).is_some_and(|title| (1..=60).contains(&chars(title))))
             .unwrap_or(true)
         && object
+            .get("progress")
+            .map(|progress| {
+                progress.as_array().is_some_and(|items| {
+                    items.len() <= 50
+                        && items.iter().all(|item| {
+                            text(item.get("id")).is_some_and(is_trigger_id)
+                                && matches!(
+                                    item.get("status").and_then(Value::as_str),
+                                    Some(
+                                        "pending"
+                                            | "working"
+                                            | "done"
+                                            | "timedOut"
+                                            | "needsApproval"
+                                    )
+                                )
+                                && item
+                                    .get("lastRunAt")
+                                    .map(|at| at.as_u64().is_some())
+                                    .unwrap_or(true)
+                                && item
+                                    .get("task")
+                                    .map(|task| {
+                                        text(Some(task))
+                                            .is_some_and(|task| (1..=128).contains(&chars(task)))
+                                    })
+                                    .unwrap_or(true)
+                        })
+                })
+            })
+            .unwrap_or(true)
+        && object
             .get("lastSkip")
             .map(|skip| {
                 skip.get("at").is_some_and(|at| at.as_u64().is_some())
@@ -535,6 +602,18 @@ fn is_trigger_listed(object: &Map<String, Value>) -> bool {
             .get("triggers")
             .and_then(Value::as_array)
             .is_some_and(|triggers| triggers.len() <= 256 && triggers.iter().all(is_listed_trigger))
+        && object
+            .get("draft")
+            .map(|draft| {
+                draft.as_array().is_some_and(|items| {
+                    items.len() <= 50
+                        && items.iter().all(|item| {
+                            text(Some(item))
+                                .is_some_and(|text| (1..=TRIGGER_TEXT_MAX).contains(&chars(text)))
+                        })
+                })
+            })
+            .unwrap_or(true)
 }
 
 fn is_agent_listed(object: &Map<String, Value>) -> bool {

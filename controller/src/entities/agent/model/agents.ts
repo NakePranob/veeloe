@@ -23,11 +23,28 @@ export type AgentRow = {
   egress: string;
   /** The GitHub repos this Agent may use through the git broker, as JSON; null from a Machine older than the broker (issue #32). */
   git_repos: string | null;
+  /** The share of the Budget Idle Work and Watch may use a day, in percent; null from an older Machine. */
+  background_share: number | null;
 };
 
 /** A deleted Agent's stand-in, so its Task still opens: the row keeps the Machine, and the log fills in from the event history. */
 export function deletedAgent(id: string, machineId: string | undefined, name: string): AgentRow {
-  return { id, machine_id: machineId ?? "", name, provider: "", model: "", character: null, budget: null, usage_day: null, usage_tokens: null, allowlist: null, approval_timeout_s: null, egress: "[]", git_repos: null };
+  return {
+    id,
+    machine_id: machineId ?? "",
+    name,
+    provider: "",
+    model: "",
+    character: null,
+    budget: null,
+    usage_day: null,
+    usage_tokens: null,
+    allowlist: null,
+    approval_timeout_s: null,
+    egress: "[]",
+    git_repos: null,
+    background_share: null,
+  };
 }
 
 /**
@@ -123,7 +140,7 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
       // Null when the Machine is older than per-Agent Egress, so what is kept stays.
       const egress = agent.egress ? JSON.stringify(agent.egress) : null;
       await transaction.run(
-        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress, git_repos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress, git_repos, background_share) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            machine_id = excluded.machine_id,
            name = excluded.name,
@@ -134,7 +151,8 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
            allowlist = COALESCE(excluded.allowlist, agent.allowlist),
            approval_timeout_s = COALESCE(excluded.approval_timeout_s, agent.approval_timeout_s),
            egress = COALESCE(?, agent.egress),
-           git_repos = COALESCE(excluded.git_repos, agent.git_repos)`,
+           git_repos = COALESCE(excluded.git_repos, agent.git_repos),
+           background_share = COALESCE(excluded.background_share, agent.background_share)`,
         [
           agent.id,
           machineId,
@@ -147,6 +165,7 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
           agent.approvalTimeoutS ?? null,
           egress ?? "[]",
           agent.gitRepos ? JSON.stringify(agent.gitRepos) : null,
+          agent.backgroundShare ?? null,
           egress,
         ],
       );

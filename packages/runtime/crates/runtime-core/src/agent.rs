@@ -704,7 +704,21 @@ async fn run_turn(
 ) -> Result<(), AgentError> {
     let rounds = state.max_rounds.load(Ordering::SeqCst);
     let mut tools = state.tools.definitions();
+    // Any Turn may put a piece of work on its Agent's Idle Work draft (ADR 0056).
+    tools.push(propose_idle_work());
     let from_trigger = trigger.is_some();
+    // One piece of Idle Work has a time limit: past it the Turn ends as a Stop would.
+    let timed_out = Arc::new(AtomicBool::new(false));
+    if let Some(limit) = trigger.as_ref().and_then(|trigger| trigger.limit_s) {
+        let (cancel, timed_out) = (cancel.clone(), Arc::clone(&timed_out));
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(limit)).await;
+            if !cancel.is_cancelled() {
+                timed_out.store(true, Ordering::SeqCst);
+                cancel.cancel();
+            }
+        });
+    }
     // Only a round nobody asked for may end with nothing to say (issue #56).
     if from_trigger {
         tools.push(nothing_to_report());
@@ -761,13 +775,13 @@ async fn run_turn(
             reply = state.llm.send(request, &cancel) => Some(reply),
         };
         let Some(reply) = reply else {
-            return end(&state, &task, &starter, "stopped", None);
+            return end(&state, &task, &starter, "stopped", time_limit(&timed_out));
         };
         let reply = match reply {
             Ok(reply) => reply,
             Err(error) => {
                 if cancel.is_cancelled() {
-                    return end(&state, &task, &starter, "stopped", None);
+                    return end(&state, &task, &starter, "stopped", time_limit(&timed_out));
                 }
                 let code = if error.code().is_empty() {
                     "provider.failed"
@@ -785,7 +799,7 @@ async fn run_turn(
         // An answer that arrived after the Stop is not the Turn's answer: it is
         // dropped, not written.
         if cancel.is_cancelled() {
-            return end(&state, &task, &starter, "stopped", None);
+            return end(&state, &task, &starter, "stopped", time_limit(&timed_out));
         }
         state.append(
             &task,
@@ -817,7 +831,9 @@ async fn run_turn(
                 .and_then(Value::as_str)
                 .unwrap_or_default();
             let input = use_block.get("input").cloned().unwrap_or(Value::Null);
-            let result = if from_trigger && name == NOTHING_TO_REPORT {
+            let result = if name == PROPOSE_IDLE_WORK {
+                propose(&state, &input)
+            } else if from_trigger && name == NOTHING_TO_REPORT {
                 quiet_at = Some(results.len());
                 Ok("This round ends quietly: nobody is told.".to_string())
             } else if !state.tools.has(name) {
@@ -853,7 +869,7 @@ async fn run_turn(
         // What the Stop cut off has no result to report; the screen shows those
         // commands as unfinished.
         if cancel.is_cancelled() {
-            return end(&state, &task, &starter, "stopped", None);
+            return end(&state, &task, &starter, "stopped", time_limit(&timed_out));
         }
         // Decided once every call of the reply has run: a command refused after
         // `nothing_to_report`, or a domain the proxy refused, is news too (ADR 0079).
@@ -938,6 +954,54 @@ fn drain_queued(state: Arc<State>) {
 }
 
 const NOTHING_TO_REPORT: &str = "nothing_to_report";
+
+const PROPOSE_IDLE_WORK: &str = "propose_idle_work";
+
+fn propose_idle_work() -> ToolDefinition {
+    ToolDefinition {
+        name: PROPOSE_IDLE_WORK.into(),
+        description: "Suggests work for your Idle Work list: things worth doing when nobody is asking for anything, such as tests that are missing or dependencies that are out of date. Each item is one instruction you would follow later on your own. Nothing runs until your owner reads the suggestions and signs them into the list.".into(),
+        input_schema: json!({
+            "type": "object",
+            "properties": { "items": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 10 } },
+            "required": ["items"],
+        }),
+    }
+}
+
+/// Sends what the Agent proposed to the supervisor, which keeps the draft.
+fn propose(state: &State, input: &Value) -> Result<String, ToolError> {
+    let items: Vec<String> = input
+        .get("items")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .map(|item| item.chars().take(10_000).collect())
+                .collect()
+        })
+        .unwrap_or_default();
+    if items.is_empty() || items.len() > 10 {
+        return Err(ToolError::Failed(
+            "give 1 to 10 items, each a non-empty instruction".into(),
+        ));
+    }
+    let count = items.len();
+    state.link.send(FromWorker::IdleProposed { items });
+    Ok(format!(
+        "{count} item(s) proposed. Your owner reads them before anything runs."
+    ))
+}
+
+/// The code a Stop carries when it was the round's time limit that stopped it.
+fn time_limit(timed_out: &AtomicBool) -> Option<&'static str> {
+    timed_out
+        .load(Ordering::SeqCst)
+        .then_some("trigger.time_limit")
+}
 
 fn nothing_to_report() -> ToolDefinition {
     ToolDefinition {

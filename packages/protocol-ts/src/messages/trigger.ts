@@ -25,12 +25,30 @@ export const ScheduleSchema = z
   .refine((schedule) => [schedule.every, schedule.daily, schedule.weekly].filter((part) => part !== undefined).length === 1);
 export type Schedule = z.infer<typeof ScheduleSchema>;
 
-/** One Trigger as the Controller signs it. Only `schedule` exists yet; Idle Work and Watch come next (ADR 0067). */
-export const TriggerSchema = z.looseObject({
+export const IDLE_ITEMS_MAX = 50;
+export const IDLE_DRAFT_MAX = 50;
+const IdleItemIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+
+/**
+ * An Idle Work list (ADR 0056, issue #57): what the Agent works through when quiet, in the order given or the
+ * one waiting longest first; how long it must be quiet before it starts, and how long one piece may take.
+ * A finished piece leaves the list; one marked `repeat` goes back to wait again.
+ */
+export const IdleSchema = z.looseObject({
+  items: z.array(z.looseObject({ id: IdleItemIdSchema, text: z.string().min(1).max(TRIGGER_TEXT_MAX), repeat: z.boolean().optional() })).min(1).max(IDLE_ITEMS_MAX),
+  order: z.enum(["ordered", "oldest-first"]),
+  quietMinutes: z.number().int().min(5).max(1440),
+  itemMinutes: z.number().int().min(1).max(120),
+});
+export type Idle = z.infer<typeof IdleSchema>;
+
+/** One Trigger as the Controller signs it: a Schedule, or an Idle Work list (ADR 0067). Watch comes next. */
+const TriggerFields = z.looseObject({
   id: TriggerIdSchema,
-  kind: z.enum(["schedule"]),
+  kind: z.enum(["schedule", "idle"]),
   text: z.string().min(1).max(TRIGGER_TEXT_MAX),
-  schedule: ScheduleSchema,
+  schedule: ScheduleSchema.optional(),
+  idle: IdleSchema.optional(),
   /** Who a finished round tells once pushes come (ADR 0076): the one who set it, or everyone with Use. */
   notify: z.enum(["me", "use"]).optional(),
   /**
@@ -39,6 +57,12 @@ export const TriggerSchema = z.looseObject({
    */
   allow: AllowlistSchema.optional(),
 });
+
+/** Each kind carries its own part, and only that one. */
+const kindFits = (trigger: { kind: string; schedule?: unknown; idle?: unknown }) =>
+  trigger.kind === "schedule" ? trigger.schedule !== undefined && trigger.idle === undefined : trigger.idle !== undefined && trigger.schedule === undefined;
+
+export const TriggerSchema = TriggerFields.refine(kindFits);
 export type Trigger = z.infer<typeof TriggerSchema>;
 
 /** Controller → Machine: create or replace one Trigger whole. */
@@ -54,7 +78,17 @@ export const TriggerListBodySchema = z.looseObject({ agent: AgentIdSchema });
 export type TriggerListBody = z.infer<typeof TriggerListBodySchema>;
 
 /** One Trigger as the Machine holds it: who set it, whether it is paused or suspended, and its rounds. */
-export const ListedTriggerSchema = TriggerSchema.extend({
+/** Where one piece of an Idle Work list stands, kept by the Machine. */
+export const IdleProgressSchema = z.looseObject({
+  id: IdleItemIdSchema,
+  status: z.enum(["pending", "working", "done", "timedOut", "needsApproval"]),
+  lastRunAt: z.number().int().nonnegative().optional(),
+  /** The Task of its latest round. */
+  task: z.string().min(1).max(128).optional(),
+});
+export type IdleProgress = z.infer<typeof IdleProgressSchema>;
+
+export const ListedTriggerSchema = TriggerFields.extend({
   member: z.string().min(1).max(64),
   paused: z.boolean(),
   /** The key that signed it was revoked, or its Member lost Use: it never runs again. */
@@ -66,9 +100,16 @@ export const ListedTriggerSchema = TriggerSchema.extend({
   title: z.string().min(1).max(60).optional(),
   /** The last round that did not start: the Agent was busy or its Budget spent. */
   lastSkip: z.looseObject({ at: z.number().int().nonnegative(), why: z.enum(["busy", "budget"]) }).optional(),
-});
+  /** An Idle Work list's pieces still on it, with where each stands; a finished one-off piece is gone. */
+  progress: z.array(IdleProgressSchema).max(IDLE_ITEMS_MAX).optional(),
+}).refine(kindFits);
 export type ListedTrigger = z.infer<typeof ListedTriggerSchema>;
 
 /** Machine → Controller: the answer to every `trigger.*` message. */
-export const TriggerListedBodySchema = z.looseObject({ agent: AgentIdSchema, triggers: z.array(ListedTriggerSchema).max(256) });
+export const TriggerListedBodySchema = z.looseObject({
+  agent: AgentIdSchema,
+  triggers: z.array(ListedTriggerSchema).max(256),
+  /** What the Agent proposed for its Idle Work list (`propose_idle_work`): nothing runs until a Member signs it in. */
+  draft: z.array(z.string().min(1).max(TRIGGER_TEXT_MAX)).max(IDLE_DRAFT_MAX).optional(),
+});
 export type TriggerListedBody = z.infer<typeof TriggerListedBodySchema>;

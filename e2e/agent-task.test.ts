@@ -355,3 +355,22 @@ test("a signed Schedule is kept by the Machine and a run-now round starts a Task
   await owner.waitFor((m) => m.type === "task.event" && m.task === started.task && m.body.kind === "turn.ended");
   owner.client.stop();
 }, 60_000);
+
+test("a signed Idle Work list is kept with each piece waiting, and a run-now round starts a Task for its first piece", async () => {
+  const owner = controller();
+  await owner.ready;
+  owner.send("agent.create", { id: "agent-idle", name: "Idler", provider: "main", model: "model-a" });
+  await owner.waitFor((m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "agent-idle"));
+
+  const idle = { items: [{ id: "p1", text: "tidy the README" }, { id: "p2", text: "check the links", repeat: true }], order: "ordered", quietMinutes: 15, itemMinutes: 15 };
+  owner.send("trigger.set", { agent: "agent-idle", trigger: { id: "idle", kind: "idle", text: "Idle Work", idle } });
+  const listed = await owner.waitFor((m) => m.type === "trigger.listed" && m.body.triggers.some((t) => t.kind === "idle"));
+  const list = listed.type === "trigger.listed" ? listed.body.triggers.find((t) => t.kind === "idle") : undefined;
+  expect(list?.progress?.map((p) => [p.id, p.status])).toEqual([["p1", "pending"], ["p2", "pending"]]);
+
+  owner.send("trigger.run", { agent: "agent-idle", id: "idle" });
+  const started = await owner.waitFor((m) => m.type === "task.event" && m.body.kind === "turn.started" && (m.body.body as { trigger?: { id?: string } }).trigger?.id === "idle");
+  expect(started.type === "task.event" && started.body.body).toMatchObject({ trigger: { kind: "idle", id: "idle" } });
+  await owner.waitFor((m) => m.type === "task.event" && m.task === started.task && m.body.kind === "turn.ended");
+  owner.client.stop();
+}, 60_000);
