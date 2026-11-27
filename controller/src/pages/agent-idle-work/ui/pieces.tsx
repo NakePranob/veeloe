@@ -171,7 +171,7 @@ function Handle({ label, onStart, onMove, onEnd, onStep }: { label: string; onSt
       accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
       onAccessibilityAction={(event) => onStep(event.nativeEvent.actionName === "increment" ? -1 : 1)}
       hitSlop={space.sm}
-      style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
+      style={{ width: 44, height: 44, alignItems: "flex-end", justifyContent: "center" }}
     >
       <Grip />
     </View>
