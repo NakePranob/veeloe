@@ -40,6 +40,12 @@ pub struct Policy {
     pub read_folders: Vec<String>,
     /// Folders it may also write, as one Agent at a time (ADR 0087).
     pub write_folders: Vec<String>,
+    /// Every file the Runtime's user reaches, except `runtime_home` (ADR 0087).
+    /// The network stays as narrow as ever: out only through the proxy.
+    pub whole_machine: bool,
+    /// The Runtime's own folder (`VEELOE_HOME`): never readable to a whole
+    /// Machine Agent, except its own folder inside it.
+    pub runtime_home: Option<String>,
 }
 
 /// Where the proxy's Unix socket appears inside a Linux worker's namespace: a
@@ -174,6 +180,8 @@ impl Policy {
             ports: Vec::new(),
             read_folders: Vec::new(),
             write_folders: Vec::new(),
+            whole_machine: false,
+            runtime_home: None,
         }
     }
 }
@@ -238,6 +246,26 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
     for path in &policy.write_folders {
         profile.push_str(&format!("(allow file-write* (subpath {}))\n", quote(path)));
     }
+    // The whole Machine: everything, then the Runtime's own folder taken away,
+    // then the Agent's own folder and the program given back. A later rule
+    // wins in a profile, so the order is the rule (ADR 0087).
+    if policy.whole_machine {
+        profile.push_str("(allow file-read* file-write*)\n");
+        if let Some(runtime) = &policy.runtime_home {
+            profile.push_str(&format!(
+                "(deny file-read* file-write* (subpath {}))\n",
+                quote(runtime)
+            ));
+        }
+        profile.push_str(&format!(
+            "(allow file-read* file-write* (subpath {}))\n",
+            quote(&policy.folder)
+        ));
+        profile.push_str(&format!(
+            "(allow file-read* (subpath {}))\n",
+            quote(&policy.bin)
+        ));
+    }
     // Every command needs to be able to throw output away.
     profile.push_str("(allow file-write* (literal \"/dev/null\"))\n");
     profile.push_str("(deny network*)\n");
@@ -270,8 +298,17 @@ pub fn sandbox_exec_profile(policy: &Policy) -> String {
 /// The arguments `bwrap` takes on Linux for the same Policy.
 pub fn bwrap_args(policy: &Policy) -> Vec<String> {
     let mut args: Vec<String> = vec!["--unshare-all".into(), "--die-with-parent".into()];
-    for path in LINUX_READ {
-        args.extend(["--ro-bind-try".into(), path.to_string(), path.to_string()]);
+    if policy.whole_machine {
+        // The whole Machine, then the Runtime's folder hidden under an empty
+        // one; the Agent's own folder is bound back in below (ADR 0087).
+        args.extend(["--bind".into(), "/".into(), "/".into()]);
+        if let Some(runtime) = &policy.runtime_home {
+            args.extend(["--tmpfs".into(), runtime.clone()]);
+        }
+    } else {
+        for path in LINUX_READ {
+            args.extend(["--ro-bind-try".into(), path.to_string(), path.to_string()]);
+        }
     }
     args.extend([
         "--ro-bind".into(),

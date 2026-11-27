@@ -50,7 +50,7 @@ export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;
 /** The most folders one Agent may be given (ADR 0087). */
 export const FOLDERS_MAX = 20;
 /** How much of the Machine's files an Agent reaches: its own folders, or those and the ones it was given (ADR 0087). */
-export const FilesSchema = z.enum(["folder", "selected"]);
+export const FilesSchema = z.enum(["folder", "selected", "machine"]);
 export const FoldersSchema = z.array(z.looseObject({ path: z.string().min(2).max(4096).startsWith("/"), mode: z.enum(["read", "write"]) })).max(FOLDERS_MAX);
 
 export const AgentUpdateBodySchema = z

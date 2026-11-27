@@ -228,6 +228,15 @@
       "valid": true
     },
     {
+      "name": "give an Agent the whole Machine",
+      "type": "agent.update",
+      "body": {
+        "id": "a1",
+        "files": "machine"
+      },
+      "valid": true
+    },
+    {
       "name": "a folder that is not an absolute path",
       "type": "agent.update",
       "body": {

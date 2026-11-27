@@ -140,6 +140,15 @@ pub fn rules(
     // Selected folders, checked again at every start: a folder that became a
     // symlink into a secret since it was given is dropped, not followed
     // (ADR 0087). The sandbox holds the real path from here on.
+    if agent.access.files == crate::agents::Level::Machine {
+        policy.whole_machine = true;
+        policy.runtime_home = Some(
+            std::fs::canonicalize(home)
+                .unwrap_or_else(|_| home.to_path_buf())
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
     if agent.access.files == crate::agents::Level::Selected {
         let forbidden = crate::folders::Forbidden::for_machine(
             &PathBuf::from(std::env::var("HOME").unwrap_or_default()),

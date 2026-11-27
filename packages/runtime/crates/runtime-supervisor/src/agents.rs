@@ -90,6 +90,8 @@ pub enum Level {
     #[default]
     Folder,
     Selected,
+    /// Every file the Runtime's user reaches but the Runtime's own (ADR 0087).
+    Machine,
 }
 
 impl Level {
@@ -101,6 +103,7 @@ impl Level {
         match self {
             Level::Folder => "folder",
             Level::Selected => "selected",
+            Level::Machine => "machine",
         }
     }
 }

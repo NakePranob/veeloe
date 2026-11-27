@@ -103,6 +103,7 @@
     "title": "Files",
     "folder": "Own folder",
     "selected_one": "{{count}} folder",
-    "selected_other": "{{count}} folders"
+    "selected_other": "{{count}} folders",
+    "machine": "Whole Machine"
   }
 }

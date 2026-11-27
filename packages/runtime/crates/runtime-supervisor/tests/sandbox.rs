@@ -147,6 +147,40 @@ mod running {
         );
     }
 
+    #[test]
+    fn the_whole_machine_reaches_everything_but_the_runtime_and_other_agents() {
+        let mut home = home();
+        let elsewhere = tempdir().expect("elsewhere");
+        let outside = fs::canonicalize(elsewhere.path()).expect("real");
+        fs::write(outside.join("notes.md"), "on the Machine").expect("notes");
+        home.policy.whole_machine = true;
+        home.policy.runtime_home = Some(home.root.to_string_lossy().to_string());
+
+        let read = run(&home, &format!("cat {}/notes.md", outside.display()));
+        assert!(read.status.success(), "{read:?}");
+        assert_eq!(String::from_utf8_lossy(&read.stdout), "on the Machine");
+        let write = run(
+            &home,
+            &format!("echo more >> {}/notes.md", outside.display()),
+        );
+        assert!(write.status.success(), "{write:?}");
+
+        // The Runtime's own folder stays out of reach, and so do other Agents in it.
+        let secret = run(
+            &home,
+            &format!("cat {}/runtime/providers.json", home.root.display()),
+        );
+        assert!(!secret.status.success(), "the Runtime's folder was read");
+        let theirs = run(
+            &home,
+            &format!("cat {}/agents/a2/workdir/notes.md", home.root.display()),
+        );
+        assert!(!theirs.status.success(), "another Agent's folder was read");
+        // Its own folder is still its own.
+        let own = run(&home, "echo mine > own.txt && cat own.txt");
+        assert!(own.status.success(), "{own:?}");
+    }
+
     fn write_script(home: &Home, name: &str, text: &str) {
         fs::write(Path::new(&home.policy.workdir).join(name), text).expect("script");
     }

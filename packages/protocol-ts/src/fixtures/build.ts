@@ -235,6 +235,7 @@ export function messageVectors() {
     { name: "output with a negative byte count", type: "tool.output", body: { agent: "agent-1", toolUseId: "toolu_1", tail: "x", bytes: -1, elapsedMs: 0 }, valid: false },
     { name: "give an Agent a folder to read", type: "agent.update", body: { id: "a1", files: "selected", folders: [{ path: "/Users/me/code/shop", mode: "read" }] }, valid: true },
     { name: "keep an Agent in its folder", type: "agent.update", body: { id: "a1", files: "folder" }, valid: true },
+    { name: "give an Agent the whole Machine", type: "agent.update", body: { id: "a1", files: "machine" }, valid: true },
     { name: "a folder that is not an absolute path", type: "agent.update", body: { id: "a1", folders: [{ path: "code/shop", mode: "read" }] }, valid: false },
     { name: "give an Agent a folder to write", type: "agent.update", body: { id: "a1", files: "selected", folders: [{ path: "/Users/me/code/shop", mode: "write" }] }, valid: true },
     { name: "a folder mode nobody knows", type: "agent.update", body: { id: "a1", folders: [{ path: "/Users/me/code/shop", mode: "delete" }] }, valid: false },

@@ -102,6 +102,7 @@
     "title": "ไฟล์",
     "folder": "ในโฟลเดอร์",
     "selected_one": "{{count}} โฟลเดอร์",
-    "selected_other": "{{count}} โฟลเดอร์"
+    "selected_other": "{{count}} โฟลเดอร์",
+    "machine": "ทั้งเครื่อง"
   }
 }

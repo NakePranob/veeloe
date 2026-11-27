@@ -1227,6 +1227,8 @@ pub enum Files {
     Folder,
     /// Those, and folders on the Machine the Owner gave it (ADR 0087).
     Selected,
+    /// Every file but the Runtime's own (ADR 0087).
+    Machine,
 }
 
 impl Files {
@@ -1234,6 +1236,7 @@ impl Files {
         match self {
             Files::Folder => "folder",
             Files::Selected => "selected",
+            Files::Machine => "machine",
         }
     }
 
@@ -1241,6 +1244,7 @@ impl Files {
     pub fn parse(text: &str) -> Self {
         match text {
             "selected" => Files::Selected,
+            "machine" => Files::Machine,
             _ => Files::Folder,
         }
     }

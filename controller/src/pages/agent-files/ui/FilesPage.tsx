@@ -6,7 +6,7 @@ import { useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatus } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, Empty, Field, inform, Note, Row, Screen, Section, ToggleRow } from "../../../shared/ui";
+import { Button, confirm, Empty, Field, inform, Note, Row, Screen, Section, Select } from "../../../shared/ui";
 
 // Which of the Machine's files one Agent reaches (ADR 0087): its own folders, or those and folders
 // on the Machine given one at a time, read only. Every change is signed after a fresh
@@ -49,6 +49,12 @@ function FilesView({ agentId, agentName, machineId, stored }: { agentId: string;
     return (await keySession.signed(prompt, () => (link.updateAgent(machine, { id: agentId, files: next.files, folders: next.folders }) ? "sent" : null))).status === "sent";
   }
 
+  async function choose(level: Access["files"]) {
+    // The whole Machine is the one level that reaches past what the Owner named, so it is said in full first (ADR 0087).
+    if (level === "machine" && !(await confirm({ title: t("machine.title", { name: agentName }), message: t("machine.body"), action: t("machine.action"), cancel: t("level.cancel"), destructive: true }))) return;
+    await save({ files: level, folders: stored.folders }, t(`authenticate.${level}`, { name: agentName }));
+  }
+
   async function add() {
     const path = draft.trim().replace(/\/+$/, "");
     // The Machine checks the folder itself (it must exist there and stay clear of the home and secrets); here only the shape.
@@ -58,15 +64,17 @@ function FilesView({ agentId, agentName, machineId, stored }: { agentId: string;
   }
 
   return (
-    <Screen title={t("title")} subtitle={selected ? t("subtitleSelected", { name: agentName, count: stored.folders.length }) : t("subtitle", { name: agentName })}>
+    <Screen title={t("title")} subtitle={stored.files === "machine" ? t("subtitleMachine", { name: agentName }) : selected ? t("subtitleSelected", { name: agentName, count: stored.folders.length }) : t("subtitle", { name: agentName })}>
       {offline && <Note tone="offline">{t("offline")}</Note>}
       {status.updateError && <Note tone="warning">{describeError({ code: status.updateError, params: status.updateErrorParams ?? undefined })}</Note>}
-      <Section footer={t(selected ? "selected.warning" : "selected.footer")}>
-        <ToggleRow
-          icon="folder"
-          title={t("selected.title")}
-          value={selected}
-          onChange={(on) => void save({ files: on ? "selected" : "folder", folders: stored.folders }, t(on ? "authenticate.open" : "authenticate.close", { name: agentName }))}
+      <Section footer={t(`level.${stored.files}.footer`)}>
+        <Select
+          label={t("level.title")}
+          value={stored.files}
+          cancel={t("level.cancel")}
+          disabled={offline}
+          options={(["folder", "selected", "machine"] as const).map((level) => ({ value: level, label: t(`level.${level}.label`) }))}
+          onChange={(level) => void choose(level)}
         />
       </Section>
       {selected && (

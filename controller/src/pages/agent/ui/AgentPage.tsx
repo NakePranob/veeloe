@@ -223,7 +223,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
           <Row
             icon="folder"
             title={t("files.title")}
-            value={accessOf(agent)?.files === "selected" ? t("files.selected", { count: accessOf(agent)?.folders.length ?? 0 }) : t("files.folder")}
+            value={accessOf(agent)?.files === "machine" ? t("files.machine") : accessOf(agent)?.files === "selected" ? t("files.selected", { count: accessOf(agent)?.folders.length ?? 0 }) : t("files.folder")}
             href={`/agents/${agent.id}/files`}
             disabled={away}
           />

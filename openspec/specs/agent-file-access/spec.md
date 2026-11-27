@@ -45,3 +45,14 @@ worker ของ Agent ระดับ `selected` SHALL อ่านโฟลเ
 #### Scenario: คำสั่งเขียนในโฟลเดอร์อ่านเขียน
 - **WHEN** คำสั่งเขียนไฟล์ในโฟลเดอร์ที่ให้แบบอ่านเขียน
 - **THEN** ไฟล์ถูกเขียน ส่วนโฟลเดอร์อ่านอย่างเดียวข้างๆ ยังเขียนไม่ได้
+
+### Requirement: ทั้งเครื่องยกเว้น Runtime
+Agent ระดับ `machine` SHALL อ่านและเขียนได้ทุกไฟล์ที่ user ของ Runtime เข้าถึง ยกเว้นโฟลเดอร์ของ Runtime (`VEELOE_HOME`) ซึ่งรวมโฟลเดอร์ของ Agent อื่นและ Task log แต่ SHALL ยังเข้าโฟลเดอร์ของตัวเองได้ เครือข่าย SHALL ยังออกได้แค่ผ่าน proxy ของ Egress และ Approval SHALL ทำงานเหมือนเดิม Controller SHALL ให้ยืนยันด้วยข้อความที่บอกว่า Agent จะอ่าน แก้ และลบอะไรได้ก่อนเซ็น
+
+#### Scenario: อ่านไฟล์นอก Workdir
+- **WHEN** คำสั่งของ Agent ระดับ `machine` อ่านและเขียนไฟล์นอกโฟลเดอร์ของมัน
+- **THEN** ทำได้
+
+#### Scenario: แตะโฟลเดอร์ของ Runtime
+- **WHEN** คำสั่งเดียวกันอ่าน `providers.json` ของ Runtime หรือ Workdir ของ Agent อื่น
+- **THEN** ถูกปฏิเสธ

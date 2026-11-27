@@ -106,7 +106,7 @@ export function gitReposOf(row: Pick<AgentRow, "git_repos">): string[] | null {
   }
 }
 
-export type Access = { files: "folder" | "selected"; folders: { path: string; mode: "read" | "write" }[] };
+export type Access = { files: "folder" | "selected" | "machine"; folders: { path: string; mode: "read" | "write" }[] };
 
 /** The file level and folders the Machine last sent, or null when its Runtime has no file levels yet (ADR 0087). */
 export function accessOf(row: Pick<AgentRow, "files" | "folders">): Access | null {
@@ -119,7 +119,7 @@ export function accessOf(row: Pick<AgentRow, "files" | "folders">): Access | nul
   } catch {
     folders = [];
   }
-  return { files: row.files === "selected" ? "selected" : "folder", folders };
+  return { files: row.files === "selected" || row.files === "machine" ? row.files : "folder", folders };
 }
 
 export const LIST_AGENTS = "SELECT * FROM agent ORDER BY name, id";

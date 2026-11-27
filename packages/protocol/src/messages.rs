@@ -310,7 +310,7 @@ fn is_agent_update(object: &Map<String, Value>) -> bool {
         }
     }
     if let Some(files) = object.get("files") {
-        if !matches!(files.as_str(), Some("folder" | "selected")) {
+        if !matches!(files.as_str(), Some("folder" | "selected" | "machine")) {
             return false;
         }
     }

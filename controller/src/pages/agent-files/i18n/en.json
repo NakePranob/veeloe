@@ -14,11 +14,6 @@
     "title": "This Machine cannot give folders yet",
     "body": "Update the Runtime on the Machine first, then the Agent can read folders you pick on it."
   },
-  "selected": {
-    "title": "Read selected folders on the Machine",
-    "footer": "The Agent reads and writes only its own Workdir now. Turn this on to let it read a project already on the Machine, such as ~/code/shop, without cloning it again (ADR 0087).",
-    "warning": "The Agent reads every file in the folders you pick and can send them out through its Egress. The home folder, .ssh, browser data and system folders can never be picked."
-  },
   "folders": {
     "heading": "Selected folders",
     "footer": "Enter the full path of a folder on the Machine. The Machine checks that it exists and is not where secrets are kept. One Agent at a time may write a folder.",
@@ -39,9 +34,32 @@
   "authenticate": {
     "add": "Let {{name}} read {{path}}",
     "remove": "Remove {{path}} from {{name}}",
-    "open": "Let {{name}} read selected folders on the Machine",
-    "close": "Keep {{name}} to its own folder again",
     "write": "Let {{name}} write in {{path}}",
-    "readOnly": "Let {{name}} only read {{path}}"
+    "readOnly": "Let {{name}} only read {{path}}",
+    "folder": "Keep {{name}} to its own folder again",
+    "selected": "Let {{name}} reach the selected folders",
+    "machine": "Give {{name}} the whole Machine"
+  },
+  "level": {
+    "title": "File access",
+    "cancel": "Cancel",
+    "folder": {
+      "label": "Its own folder",
+      "footer": "The Agent reads and writes only its own Workdir. Pick selected folders to let it work in a project already on the Machine, such as ~/code/shop, without cloning it again (ADR 0087)."
+    },
+    "selected": {
+      "label": "Selected folders",
+      "footer": "The Agent reads every file in the folders you pick and can send them out through its Egress. The home folder, .ssh, browser data and system folders can never be picked."
+    },
+    "machine": {
+      "label": "Whole Machine",
+      "footer": "The Agent reads, changes and deletes every file the Runtime's user reaches, .ssh and browser data included, except the Runtime's own folder. It still goes out only through its Egress and asks for Approvals. Use it only for an Agent you instruct yourself."
+    }
+  },
+  "subtitleMachine": "{{name}} · whole Machine",
+  "machine": {
+    "title": "Give {{name}} the whole Machine?",
+    "body": "The Agent will read, change and delete every file on the Machine, .ssh, tokens and browser data included, except the Runtime's own folder. A page it reads could trick it into sending data out through its Egress.",
+    "action": "Give the whole Machine"
   }
 }
