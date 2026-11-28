@@ -253,5 +253,11 @@
     "expired": "ไม่มีคนตอบทัน Agent ตัดสินใจเอง",
     "closed": "Turn จบก่อนมีคนตอบ",
     "notYours": "รอคนที่สั่งงานนี้ตอบ"
+  },
+  "answerSheet": {
+    "title": "ตอบ Approval",
+    "conversation": "ดูบทสนทนา",
+    "next": "รายการถัดไป",
+    "close": "ปิด"
   }
 }

@@ -264,5 +264,11 @@
     "expired": "Nobody answered in time; the Agent chose itself",
     "closed": "The Turn ended before anyone answered",
     "notYours": "Waiting for whoever asked for this"
+  },
+  "answerSheet": {
+    "title": "Answer an Approval",
+    "conversation": "See the conversation",
+    "next": "Next",
+    "close": "Close"
   }
 }

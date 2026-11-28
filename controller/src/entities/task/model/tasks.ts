@@ -233,6 +233,12 @@ export const latestEvents = ({ latest_kind, latest_body }: Latest) => (latest_ki
 /** What a Task is doing, in the prototype's words for it. `failed`: its latest Turn ended in an error. */
 export type TaskStatus = "waiting" | "working" | "stuck" | "interrupted" | "failed" | "done" | "offline" | "new";
 
+/**
+ * An Approval this Member can answer from the Inbox's sheet (ADR 0092): the Task waits on an Approval, not a Question,
+ * and the Member holds Approve there. Use only sees it wait, so the row opens the chat instead.
+ */
+export const answersFromInbox = (latest: Latest | undefined, level: string | null | undefined) => latest?.latest_kind === TaskEventKind.ApprovalRequested && level !== "use";
+
 /** An Approval waiting, a Turn that went quiet, failed or was cut off: the Owner has to look (the Inbox's needs-you tab). */
 export const needsYou = (status: TaskStatus) => status === "waiting" || status === "stuck" || status === "failed" || status === "interrupted";
 

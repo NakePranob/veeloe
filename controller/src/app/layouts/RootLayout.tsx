@@ -109,6 +109,8 @@ export function RootLayout() {
                   <Stack.Screen name="agents/[agent]/all" options={{ ...sheet, sheetGrabberVisible: true }} />
                   {/* The Task details sheet has no header: the grabber and the swipe close it, as the board draws it. */}
                   <Stack.Screen name="tasks/[task]/details" options={{ ...sheet, headerShown: false, sheetGrabberVisible: true }} />
+                  {/* An Approval answered from the Inbox (ADR 0092): the Task's own card in a sheet, closed by the grabber or a swipe. */}
+                  <Stack.Screen name="tasks/[task]/answer" options={{ ...sheet, headerShown: false, sheetGrabberVisible: true }} />
                 </Stack>
               </View>
             </View>

@@ -5,7 +5,7 @@ import { FlatList, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { ownsAny, useMachines } from "../../../entities/machine";
-import { isBudgetOut, latestEvents, previewOf, STATUS_DOT, titleOf, useLatestTasks, useOpenTasks, type TaskStatus, type TaskSummary } from "../../../entities/task";
+import { answersFromInbox, isBudgetOut, latestEvents, previewOf, STATUS_DOT, titleOf, useLatestTasks, useOpenTasks, type TaskStatus, type TaskSummary } from "../../../entities/task";
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
@@ -40,6 +40,8 @@ function InboxRow({ agent, machine, online, task, status, open: others, now, sel
     else router.push(href);
   };
   const open = () => go(task?.id ?? randomUUID());
+  // An Approval this Member can answer goes to the answer sheet (ADR 0092); a Question, or Use, opens the chat.
+  const answer = (id: string) => router.push({ pathname: "/tasks/[task]/answer", params: { task: id, agent: agent.id } });
   // Today's Budget ran out: the state says so in red and the row offers the way out, the Agent's page.
   const budgetOut = status === "failed" && isBudgetOut(task);
   // An offline row names the Machine that is away; the state above it already says offline.
@@ -71,8 +73,10 @@ function InboxRow({ agent, machine, online, task, status, open: others, now, sel
                 {line}
               </Text>
             </View>
-            {/* Waiting on an Approval: the answer is one tap away, as the board's pill says; the row opens the chat. */}
-            {status === "waiting" ? (
+            {/* Waiting on an Approval: the pill answers it in a sheet, the row still opens the chat (ADR 0092). */}
+            {status === "waiting" && task && answersFromInbox(task, agent.level) ? (
+              <Button label={t("answer")} variant="primary" size="small" onPress={() => answer(task.id)} />
+            ) : status === "waiting" ? (
               <View pointerEvents="none">
                 <Button label={t("answer")} variant="primary" size="small" onPress={open} />
               </View>
@@ -87,7 +91,16 @@ function InboxRow({ agent, machine, online, task, status, open: others, now, sel
         )}
       </Tap>
       {others.map((other, index) => (
-        <OpenTask key={other.task.id} task={other.task} status={other.status} first={index === 0} last={index === others.length - 1} selected={other.task.id === selectedTaskId} onPress={() => go(other.task.id)} />
+        <OpenTask
+          key={other.task.id}
+          task={other.task}
+          status={other.status}
+          first={index === 0}
+          last={index === others.length - 1}
+          selected={other.task.id === selectedTaskId}
+          onPress={() => go(other.task.id)}
+          onAnswer={answersFromInbox(other.task, agent.level) ? () => answer(other.task.id) : undefined}
+        />
       ))}
     </View>
   );
@@ -99,7 +112,7 @@ function InboxRow({ agent, machine, online, task, status, open: others, now, sel
 // above's bottom padding, so it meets the head.
 const TRUNK = space.md + AVATAR / 2;
 
-function OpenTask({ task, status, first, last, selected, onPress }: { task: TaskSummary; status: TaskStatus; first: boolean; last: boolean; selected: boolean; onPress: () => void }) {
+function OpenTask({ task, status, first, last, selected, onPress, onAnswer }: { task: TaskSummary; status: TaskStatus; first: boolean; last: boolean; selected: boolean; onPress: () => void; onAnswer?: () => void }) {
   const t = useT("agent-inbox");
   const tStatus = useT("task-status");
   const unread = !!task.unread;
@@ -115,7 +128,7 @@ function OpenTask({ task, status, first, last, selected, onPress }: { task: Task
       </Tap>
       <View style={{ flex: 1 }} />
       {status === "waiting" ? (
-        <Button label={t("answer")} variant="primary" size="small" onPress={onPress} />
+        <Button label={t("answer")} variant="primary" size="small" onPress={onAnswer ?? onPress} />
       ) : (
         // The state as a dot alone, as on the Agent's row; its word is for VoiceOver.
         <View accessible aria-label={tStatus(status)}>
