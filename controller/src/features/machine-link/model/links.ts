@@ -59,8 +59,8 @@ export function createMachineLinks({
   /** The Hub closed with 4403: this key was revoked. */
   onRevoked?: () => void;
   start?: typeof startHubClient;
-  /** A WebRTC peer for direct links (ADR 0090); without one, everything goes through the Hub. */
-  createPeer?: () => Peer;
+  /** A WebRTC peer for direct links to a Machine on this Hub (ADR 0090); without one, everything goes through the Hub. */
+  createPeer?: (hubUrl: string) => Peer;
 }) {
   const ownKey = toBase64url(publicKeyOf(secretKey));
   const clients = new Map<string, { client: Client; machines: Machine[] }>();
@@ -93,7 +93,7 @@ export function createMachineLinks({
     if (!createPeer || !active || stopped || !entry || directs.has(machine.id)) return;
     const { client } = entry;
     const link = openDirect({
-      createPeer,
+      createPeer: () => createPeer(machine.hub_url),
       newId,
       offer: (body) => {
         if (!sendTo(machine, "direct", { type: "direct.offer", body })) link.close();

@@ -1,14 +1,14 @@
 import { RTCPeerConnection } from "react-native-webrtc";
-import type { Channel, Peer } from "./direct";
+import { type Channel, type Peer, stunOf } from "./direct";
 
 /**
  * A react-native-webrtc peer for a direct link (ADR 0090): a data channel only, so the app asks
- * for no camera or microphone. No ICE servers yet, so the link comes up on the same network.
- *
- * ponytail: host candidates only. Add the Hub's STUN address when a phone on mobile data must reach its Machine.
+ * for no camera or microphone. The Hub at `hubUrl` answers STUN, so a phone behind NAT offers the
+ * address the internet sees it at too.
  */
-export function rtcPeer(): Peer {
-  const connection = new RTCPeerConnection({ iceServers: [] });
+export function rtcPeer(hubUrl: string): Peer {
+  const stun = stunOf(hubUrl);
+  const connection = new RTCPeerConnection({ iceServers: stun ? [{ urls: stun }] : [] });
   return {
     get iceGatheringState() {
       return connection.iceGatheringState;

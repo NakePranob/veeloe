@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +19,7 @@ import (
 	"hub/internal/app/relay"
 	"hub/internal/composition"
 	"hub/internal/platform/database"
+	"hub/internal/platform/stun"
 	"hub/internal/shared/config"
 	"hub/internal/shared/middleware"
 	// go-scaffold:imports
@@ -135,6 +137,16 @@ func run() error {
 	// graceful shutdown: catch SIGINT/SIGTERM, let in-flight requests finish before closing
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// STUN for the direct link (ADR 0090): a port that cannot be had fails the
+	// boot, as the HTTP port does, because a Hub without it leaves every
+	// Controller off the Machine's network on the relay.
+	stunConn, err := net.ListenPacket("udp", cfg.STUNAddr)
+	if err != nil {
+		return fmt.Errorf("stun %s: %w", cfg.STUNAddr, err)
+	}
+	logger.Info("stun listening", "addr", stunConn.LocalAddr().String())
+	go stun.Serve(ctx, stunConn)
 
 	// Buffered: if ListenAndServe fails before anything reads this, the
 	// goroutine still exits instead of blocking forever on an unread channel.

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { DIRECT_MAX_BYTES, openDirect, type Channel, type Peer } from "./direct";
+import { DIRECT_MAX_BYTES, openDirect, stunOf, type Channel, type Peer } from "./direct";
 
 type Handlers = Record<string, (() => void)[]>;
 
@@ -94,4 +94,12 @@ test("a link that fails says so once, and writes nothing after", async () => {
   expect(closes).toBe(1);
   expect(fake.peer.closed).toBe(true);
   expect(send?.("{}")).toBe(false);
+});
+
+test("the Hub's STUN is its own host on port 3478, as the Machine asks", () => {
+  expect(stunOf("wss://hub.example.com")).toBe("stun:hub.example.com:3478");
+  expect(stunOf("ws://127.0.0.1:8080/ws?x=1")).toBe("stun:127.0.0.1:3478");
+  expect(stunOf("wss://[2001:db8::1]:443")).toBe("stun:[2001:db8::1]:3478");
+  expect(stunOf("hub.example.com")).toBeUndefined();
+  expect(stunOf("wss://")).toBeUndefined();
 });

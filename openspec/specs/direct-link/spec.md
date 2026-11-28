@@ -17,6 +17,17 @@ Controller SHALL ขอต่อตรงด้วย `direct.offer` ที่�
 - **WHEN** `direct.answer` มี `id` ที่ไม่ใช่ของ offer ที่รออยู่
 - **THEN** Controller ไม่ใช้คำตอบนั้น
 
+### Requirement: ที่อยู่ข้ามเน็ตจาก STUN ของ Hub
+Hub SHALL ตอบ STUN Binding request บน UDP port 3478 ด้วยที่อยู่และ port ที่เห็นผู้ถาม และ SHALL ไม่ตอบสิ่งที่ไม่ใช่ Binding request Runtime และ Controller SHALL ถาม STUN ที่ host เดียวกับ URL ของ Hub port 3478 ตอนสร้าง offer และ answer
+
+#### Scenario: มือถืออยู่หลังเราเตอร์อีกวง
+- **WHEN** Controller ที่อยู่หลัง NAT สร้าง offer
+- **THEN** offer มีที่อยู่แบบ `srflx` ที่ Hub เห็น นอกจากที่อยู่ภายในของเครื่อง
+
+#### Scenario: ซองที่ไม่ใช่ STUN
+- **WHEN** มีคนส่ง UDP ที่ไม่ใช่ Binding request มาที่ port 3478
+- **THEN** Hub ไม่ตอบ
+
 ### Requirement: ซองบนทางตรงถูกตรวจเหมือนผ่าน Hub
 ซองที่มาทางตรง SHALL ผ่านการตรวจลายเซ็น, ปลายทาง, เลขลำดับ และ Grant ชุดเดียวกับซองที่มาจาก Hub ช่องทางที่เข้ารหัส SHALL NOT ถือเป็นการยืนยันตัว (ADR 0006)
 

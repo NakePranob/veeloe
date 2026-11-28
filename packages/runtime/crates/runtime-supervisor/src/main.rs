@@ -24,7 +24,7 @@ use veeloe_runtime_core::ipc::LlmHttpRequest;
 use veeloe_runtime_core::{FromWorker, LlmHttpResponse};
 use veeloe_runtime_supervisor::agents::AgentRegistry;
 use veeloe_runtime_supervisor::approval::Approvals;
-use veeloe_runtime_supervisor::direct::DirectLinks;
+use veeloe_runtime_supervisor::direct::{stun_of, DirectLinks};
 use veeloe_runtime_supervisor::doctor;
 use veeloe_runtime_supervisor::egress::Egress;
 use veeloe_runtime_supervisor::help::{help_for, USAGE};
@@ -1138,7 +1138,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         triggers: Arc::clone(&triggers),
         machine: Mutex::new(None),
         outbox: Mutex::new(None),
-        direct: DirectLinks::new().ok(),
+        direct: DirectLinks::new(stun_of(&hub)).ok(),
         workers: OnceLock::new(),
         quiet_since: Mutex::new(HashMap::new()),
         person_turns: Mutex::new(std::collections::HashSet::new()),

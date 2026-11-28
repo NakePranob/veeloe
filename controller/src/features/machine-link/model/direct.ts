@@ -12,6 +12,17 @@ export const DIRECT_MAX_BYTES = 64 * 1024;
 const GATHER_TIMEOUT_MS = 5000;
 const encoder = new TextEncoder();
 
+/**
+ * The STUN address of the Hub at `hubUrl`: its own host, port 3478 (ADR 0090), as the Machine asks.
+ *
+ * ponytail: STUN only, no TURN: two NATs that pick a new port per peer never meet, and stay on the Hub.
+ */
+export function stunOf(hubUrl: string): string | undefined {
+  const authority = hubUrl.split("://")[1]?.split(/[/?#]/)[0]?.split("@").pop() ?? "";
+  const host = authority.startsWith("[") ? authority.slice(0, authority.indexOf("]") + 1) : authority.split(":")[0];
+  return host ? `stun:${host}:3478` : undefined;
+}
+
 type Listener = (event: { data?: unknown }) => void;
 
 export interface Channel {

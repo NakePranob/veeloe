@@ -17,7 +17,7 @@ use serde_json::Value;
 use webrtc::data_channel::{DataChannel, DataChannelEvent};
 use webrtc::peer_connection::{
     PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler, RTCConfigurationBuilder,
-    RTCIceGatheringState, RTCPeerConnectionState, RTCSessionDescription,
+    RTCIceGatheringState, RTCIceServer, RTCPeerConnectionState, RTCSessionDescription,
 };
 use webrtc::runtime::{channel, default_runtime, Runtime, Sender};
 
@@ -49,6 +49,38 @@ type Links = Arc<Mutex<HashMap<String, Link>>>;
 pub struct DirectLinks {
     links: Links,
     runtime: Arc<dyn Runtime>,
+    /// The Hub's STUN address, so a Machine behind NAT offers the address the
+    /// internet sees it at, not only its own.
+    stun: Option<String>,
+}
+
+/// The STUN address of the Hub at `hub_url`: the Hub's own host, port 3478
+/// (ADR 0090). None for a URL with no host.
+pub fn stun_of(hub_url: &str) -> Option<String> {
+    let rest = hub_url.split_once("://")?.1;
+    let authority = rest.split(['/', '?', '#']).next()?;
+    let authority = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let host = if authority.starts_with('[') {
+        &authority[..=authority.find(']')?]
+    } else {
+        authority.split(':').next()?
+    };
+    (!host.is_empty()).then(|| format!("stun:{host}:3478"))
+}
+
+fn configuration(stun: &Option<String>) -> webrtc::peer_connection::RTCConfiguration {
+    let servers = stun
+        .iter()
+        .map(|url| RTCIceServer {
+            urls: vec![url.clone()],
+            ..Default::default()
+        })
+        .collect();
+    RTCConfigurationBuilder::new()
+        .with_ice_servers(servers)
+        .build()
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -64,10 +96,11 @@ fn webrtc(error: impl std::fmt::Display) -> DirectError {
 }
 
 impl DirectLinks {
-    pub fn new() -> Result<Self, DirectError> {
+    pub fn new(stun: Option<String>) -> Result<Self, DirectError> {
         Ok(Self {
             links: Arc::new(Mutex::new(HashMap::new())),
             runtime: default_runtime().ok_or(DirectError::Runtime)?,
+            stun,
         })
     }
 
@@ -75,9 +108,9 @@ impl DirectLinks {
     /// a key of `member`. Frames read from the channel go to `on_frame`. A link
     /// this key had before is closed: one device holds one link.
     ///
-    /// ponytail: no ICE servers, so only host candidates are offered and the
-    /// link comes up on the same network (or a Simulator on this Mac). Add the
-    /// Hub's own STUN address when a phone on mobile data must reach it.
+    /// ponytail: STUN only, no TURN: two NATs that both pick a new port per
+    /// peer (some mobile carriers) never meet, and those envelopes stay on the
+    /// Hub, which is the fallback anyway.
     pub async fn answer(
         &self,
         key: &str,
@@ -98,7 +131,7 @@ impl DirectLinks {
         });
         let connection: Arc<dyn PeerConnection> = Arc::new(
             PeerConnectionBuilder::new()
-                .with_configuration(RTCConfigurationBuilder::new().build())
+                .with_configuration(configuration(&self.stun))
                 .with_handler(handler.clone())
                 .with_runtime(self.runtime.clone())
                 .with_udp_addrs(vec!["0.0.0.0:0"])
@@ -297,6 +330,24 @@ mod tests {
     }
 
     #[test]
+    fn stun_is_the_hubs_own_host_on_3478() {
+        assert_eq!(
+            super::stun_of("wss://hub.example.com").as_deref(),
+            Some("stun:hub.example.com:3478")
+        );
+        assert_eq!(
+            super::stun_of("ws://127.0.0.1:8080/ws?x=1").as_deref(),
+            Some("stun:127.0.0.1:3478")
+        );
+        assert_eq!(
+            super::stun_of("wss://[2001:db8::1]:443").as_deref(),
+            Some("stun:[2001:db8::1]:3478")
+        );
+        assert_eq!(super::stun_of("hub.example.com"), None);
+        assert_eq!(super::stun_of("wss://"), None);
+    }
+
+    #[test]
     fn the_hub_is_skipped_only_when_every_device_is_direct() {
         let keys = |keys: &[&str]| keys.iter().map(|key| key.to_string()).collect::<Vec<_>>();
         assert!(!super::hub_too(&keys(&["a", "b"]), &keys(&["a", "b"])));
@@ -360,7 +411,7 @@ mod tests {
 
     #[tokio::test]
     async fn an_envelope_crosses_the_direct_link_both_ways() {
-        let links = DirectLinks::new().expect("links");
+        let links = DirectLinks::new(None).expect("links");
         let (heard, mut hearing) = tokio::sync::mpsc::unbounded_channel();
         let (connection, data, sdp) = offer().await;
         let answer = links
@@ -413,7 +464,7 @@ mod tests {
 
     #[tokio::test]
     async fn an_offer_that_is_not_sdp_is_refused() {
-        let links = DirectLinks::new().expect("links");
+        let links = DirectLinks::new(None).expect("links");
         let refused = links
             .answer("key-1", "m_owner", "not sdp", Arc::new(|_| {}))
             .await;

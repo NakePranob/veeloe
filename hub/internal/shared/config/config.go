@@ -34,6 +34,9 @@ type Config struct {
 	// HubMaxQueueBytes is how much unsent data one connection may hold before
 	// its receiver is cut off.
 	HubMaxQueueBytes int
+	// STUNAddr is the UDP address the Hub answers STUN on (ADR 0090). Clients
+	// ask the Hub's own host on port 3478, so move it only behind a forwarder.
+	STUNAddr string
 	// go-scaffold:config-fields
 }
 
@@ -60,6 +63,7 @@ func Load() Config {
 		HandshakeTimeout:  envDuration("HUB_HANDSHAKE_TIMEOUT", 10*time.Second),
 		HeartbeatInterval: envDuration("HUB_HEARTBEAT_INTERVAL", 15*time.Second),
 		HubMaxQueueBytes:  envInt("HUB_MAX_QUEUE_BYTES", 4<<20),
+		STUNAddr:          env("HUB_STUN_ADDR", ":3478"),
 		// go-scaffold:config-load
 	}
 

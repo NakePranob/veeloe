@@ -41,4 +41,6 @@ COPY --from=build /out/api /app/api
 # copy for CheckMigrationVersion. docs/ is only served outside production.
 USER nonroot:nonroot
 EXPOSE 8080
+# STUN for the direct link (ADR 0090); publish it as UDP: -p 3478:3478/udp
+EXPOSE 3478/udp
 ENTRYPOINT ["/app/api"]
