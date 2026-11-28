@@ -48,6 +48,30 @@ export function Fade() {
   );
 }
 
+/**
+ * A solid band of the screen's colour behind a header of `height`, fading out FADE below it, so scrolling content
+ * never shows through the title. Absolute, over the top of a screen that runs under its header.
+ */
+export function TopFade({ height }: { height: number }) {
+  const colors = useColors();
+  // Solid behind the bar's top part, then an eased fade over its last quarter and twice FADE below it.
+  const solid = height * 0.75;
+  const total = height + 2 * FADE;
+  const eased = [1, 0.85, 0.6, 0.35, 0.15, 0];
+  return (
+    <Svg width="100%" height={total} style={{ position: "absolute", top: 0, left: 0, right: 0, pointerEvents: "none" }}>
+      <Defs>
+        <LinearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
+          {[0, ...eased.map((_, i) => (solid + ((total - solid) * i) / (eased.length - 1)) / total)].map((offset, i) => (
+            <Stop key={offset} offset={offset} stopColor={colors.background} stopOpacity={i === 0 ? 1 : eased[i - 1]} />
+          ))}
+        </LinearGradient>
+      </Defs>
+      <Rect width="100%" height="100%" fill="url(#topFade)" />
+    </Svg>
+  );
+}
+
 const RING = 32;
 const STROKE = 3;
 const R = (RING - STROKE) / 2;

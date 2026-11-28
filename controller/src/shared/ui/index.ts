@@ -2,7 +2,7 @@ export { Branch } from "./branch";
 export { Button } from "./button";
 export { Bars } from "./bars";
 export { Card } from "./card";
-export { Bubble, Fade, FADE, Inset, Input, Ring } from "./chat";
+export { Bubble, Fade, FADE, Inset, Input, Ring, TopFade } from "./chat";
 export { Chip } from "./chip";
 export { Dot, DotLabel, Grip, StepNumber } from "./dot";
 export { Empty, Field, Note, OnTint, Row, Screen, Section, ToggleRow } from "./forms";

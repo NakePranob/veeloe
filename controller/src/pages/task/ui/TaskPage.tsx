@@ -1,4 +1,5 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlatList, KeyboardAvoidingView, View, type TextInputInstance } from "react-native";
@@ -10,7 +11,7 @@ import { useDatabase } from "../../../shared/db";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { formatList, useNow } from "../../../shared/lib";
-import { Bubble, Card, column, Fade, FADE, HeaderAction, radius, space, Spinner, Text, useSplit } from "../../../shared/ui";
+import { Bubble, Card, column, Fade, FADE, HeaderAction, radius, space, Spinner, Text, TopFade, useSplit } from "../../../shared/ui";
 import { contextUsageOf, items, type Item, type ToolCall } from "../model/items";
 import { useTaskScreen } from "../model/use-task-screen";
 import { scopeNeeds, useScheduleScope } from "../model/use-schedule-scope";
@@ -33,6 +34,7 @@ const PAGE = 200;
 // Agent's replies have no bubble, because they run long and carry code.
 export function TaskPage() {
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const t = useT("task");
   const language = useLanguage();
   const { task, agent: agentId } = useLocalSearchParams<{ task: string; agent: string }>();
@@ -170,8 +172,9 @@ export function TaskPage() {
   return (
     <KeyboardAvoidingView behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={-insets.bottom} style={{ flex: 1 }}>
       {/* The Character doing what this Task does, beside the back button, with the Agent's name and what the Task is
-          about, so both stay in view however far the log scrolls. A deleted Agent keeps a centred title. */}
-      <Stack.Screen options={readOnly ? { title: agent.name, headerTitle: () => title } : { title: "", headerBackVisible: !split, ...leftTitle }} />
+          about, so both stay in view however far the log scrolls. A deleted Agent keeps a centred title. iOS 26's soft
+          edge is too short for this tall bar and left the log readable through the title: TopFade replaces it. */}
+      <Stack.Screen options={{ scrollEdgeEffects: { top: "hidden" }, ...(readOnly ? { title: agent.name, headerTitle: () => title } : { title: "", headerBackVisible: !split, ...leftTitle }) }} />
       {/* Other Tasks, a new Task and the settings all live on the Agent's page. */}
       {!readOnly && <HeaderAction label={t("agent")} icon="sliders" onPress={openAgent} />}
       <FlatList
@@ -260,6 +263,7 @@ export function TaskPage() {
         }
         ListFooterComponentStyle={{ gap: space.inset }}
       />
+      {process.env.EXPO_OS === "ios" && <TopFade height={headerHeight} />}
       <Fade />
       <Composer composer={composer} agentName={agent.name} readOnly={readOnly} online={status.online} canSend={!!link && !!machine} contextUsage={contextUsageOf(events)} stopError={status.stopError} inputRef={input} />
     </KeyboardAvoidingView>
