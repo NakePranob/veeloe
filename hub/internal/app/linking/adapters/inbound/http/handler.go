@@ -37,6 +37,13 @@ func (h *Handler) Register(rg gin.IRouter) {
 	// A new device's request, before the Hub knows its key: the HMAC inside is
 	// checked by the device it goes to, not here.
 	rg.POST("/link-requests", h.request)
+	// Invitations (ADR 0059): opened and closed by a Controller's signature, asked
+	// to join by a key the Hub does not know yet, and a new Member let in by the
+	// inviter's member.add.
+	rg.POST("/invitations", h.serve(h.svc.OpenInvitation, domain.ErrInvitationInvalid))
+	rg.POST("/invitations/close", h.serve(h.svc.CloseInvitation, domain.ErrInvitationInvalid))
+	rg.POST("/invitation-requests", h.ask)
+	rg.POST("/members", h.addMember)
 	// go-scaffold:handler-routes
 }
 
@@ -48,6 +55,42 @@ func (h *Handler) request(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Request(c.Request.Context(), r); err != nil {
+		c.Error(appError(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+func (h *Handler) ask(c *gin.Context) {
+	var r protocol.InvitationRequest
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4<<10)
+	if err := json.NewDecoder(c.Request.Body).Decode(&r); err != nil {
+		c.Error(appError(domain.ErrInvitationInvalid))
+		return
+	}
+	handoff, err := h.svc.AskToJoin(c.Request.Context(), r)
+	if err != nil {
+		c.Error(appError(err))
+		return
+	}
+	if handoff == nil {
+		c.JSON(http.StatusOK, gin.H{"waiting": true})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"handoff": handoff})
+}
+
+func (h *Handler) addMember(c *gin.Context) {
+	var body struct {
+		Certificate protocol.Certificate `json:"certificate"`
+		Handoff     domain.Handoff       `json:"handoff"`
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 256<<10)
+	if err := json.NewDecoder(c.Request.Body).Decode(&body); err != nil || body.Certificate.Signed == "" {
+		c.Error(appError(domain.ErrInvitationInvalid))
+		return
+	}
+	if err := h.svc.AddMember(c.Request.Context(), body.Certificate, body.Handoff); err != nil {
 		c.Error(appError(err))
 		return
 	}
@@ -84,6 +127,10 @@ func appError(err error) error {
 		return apperror.New(http.StatusConflict, protocol.CodeLastDevice, "the member would have no device left")
 	case errors.Is(err, domain.ErrLinkRequestInvalid):
 		return apperror.New(http.StatusBadRequest, protocol.CodeLinkRequestInvalid, "link request is not valid")
+	case errors.Is(err, domain.ErrInvitationInvalid):
+		return apperror.New(http.StatusBadRequest, protocol.CodeInvitationInvalid, "invitation is not valid")
+	case errors.Is(err, domain.ErrInvitationClosed):
+		return apperror.New(http.StatusGone, protocol.CodeInvitationClosed, "invitation is closed")
 	case errors.Is(err, domain.ErrDeviceOffline):
 		return apperror.New(http.StatusNotFound, protocol.CodeDeviceOffline, "that device is not connected")
 	default:

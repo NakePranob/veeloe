@@ -13,6 +13,8 @@ import { agentModelI18n } from "../../pages/agent-model";
 import { newAgentI18n } from "../../pages/new-agent";
 import { createKeyI18n } from "../../pages/create-key";
 import { devicesI18n } from "../../pages/devices";
+import { inviteI18n } from "../../pages/invite";
+import { joinI18n } from "../../pages/join";
 import { linkDeviceI18n } from "../../pages/link-device";
 import { linkThisDeviceI18n } from "../../pages/link-this-device";
 import { homeI18n } from "../../pages/home";
@@ -50,6 +52,8 @@ const slices = {
   "new-agent": newAgentI18n,
   "create-key": createKeyI18n,
   devices: devicesI18n,
+  invite: inviteI18n,
+  join: joinI18n,
   "link-device": linkDeviceI18n,
   "link-this-device": linkThisDeviceI18n,
   home: homeI18n,

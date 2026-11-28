@@ -208,3 +208,162 @@ func (s *Store) Revoked(ctx context.Context, key []byte) (bool, error) {
 		Count(&n).Error
 	return n > 0, err
 }
+
+type invitationRow struct {
+	ID          []byte    `gorm:"primaryKey"`
+	WorkspaceID uuid.UUID `gorm:"type:uuid"`
+	ByKey       []byte
+	MaxMembers  int
+	Joined      int
+	ExpiresAt   time.Time
+	ClosedAt    *time.Time
+}
+
+func (invitationRow) TableName() string { return "controller_svc.invitations" }
+
+type handoffRow struct {
+	InvitationID []byte `gorm:"primaryKey"`
+	Key          []byte `gorm:"primaryKey"`
+	Data         string
+	Proof        string
+}
+
+func (handoffRow) TableName() string { return "controller_svc.invitation_handoffs" }
+
+func (r invitationRow) domain() domain.Invitation {
+	return domain.Invitation{ID: r.ID, Workspace: r.WorkspaceID, By: r.ByKey, Max: r.MaxMembers, Joined: r.Joined, Expires: r.ExpiresAt, Closed: r.ClosedAt != nil}
+}
+
+// signer is c.By's row when it is a Controller of c.Member in c's Workspace.
+func signer(db *gorm.DB, c domain.Certificate) (bool, error) {
+	var by controllerRow
+	err := db.Take(&by, "public_key = ?", c.By).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return err == nil && by.WorkspaceID == c.Workspace && by.MemberID == c.Member, err
+}
+
+func (s *Store) Open(ctx context.Context, c domain.Certificate, inv domain.Invitation) error {
+	db := s.db.WithContext(ctx)
+	ok, err := signer(db, c)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return domain.ErrInvitationInvalid
+	}
+	var existing invitationRow
+	err = db.Take(&existing, "id = ?", inv.ID).Error
+	if err == nil {
+		if !slices.Equal(existing.ByKey, c.By) {
+			return domain.ErrInvitationInvalid
+		}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	err = db.Create(&invitationRow{ID: inv.ID, WorkspaceID: c.Workspace, ByKey: c.By, MaxMembers: inv.Max, ExpiresAt: inv.Expires}).Error
+	if err != nil && dberr.IsDuplicate(err) {
+		return domain.ErrInvitationInvalid
+	}
+	return err
+}
+
+func (s *Store) Close(ctx context.Context, c domain.Certificate, invitation []byte) error {
+	res := s.db.WithContext(ctx).Model(&invitationRow{}).
+		Where("id = ? AND by_key = ? AND workspace_id = ? AND closed_at IS NULL", invitation, c.By, c.Workspace).
+		Update("closed_at", time.Now())
+	return res.Error
+}
+
+func (s *Store) Invitation(ctx context.Context, id []byte) (domain.Invitation, bool, error) {
+	var r invitationRow
+	err := s.db.WithContext(ctx).Take(&r, "id = ?", id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return domain.Invitation{}, false, nil
+	}
+	if err != nil {
+		return domain.Invitation{}, false, err
+	}
+	return r.domain(), true, nil
+}
+
+func (s *Store) Handoff(ctx context.Context, invitation, key []byte) (domain.Handoff, bool, error) {
+	var r handoffRow
+	err := s.db.WithContext(ctx).Take(&r, "invitation_id = ? AND key = ?", invitation, key).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return domain.Handoff{}, false, nil
+	}
+	if err != nil {
+		return domain.Handoff{}, false, err
+	}
+	return domain.Handoff{Data: r.Data, Proof: r.Proof}, true, nil
+}
+
+// AddMember locks the Invitation, so two people let in at once cannot both take
+// its last seat.
+func (s *Store) AddMember(ctx context.Context, c domain.Certificate, invitation []byte, handoff domain.Handoff, now time.Time) (created bool, err error) {
+	err = tx.Do(ctx, s.db, func(ctx context.Context) error {
+		db := tx.From(ctx, s.db).WithContext(ctx)
+		var inv invitationRow
+		err := db.Clauses(clause.Locking{Strength: "UPDATE"}).Take(&inv, "id = ?", invitation).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.ErrInvitationInvalid
+		}
+		if err != nil {
+			return err
+		}
+		if !slices.Equal(inv.ByKey, c.By) || inv.WorkspaceID != c.Workspace {
+			return domain.ErrInvitationInvalid
+		}
+		// The opener must still be a Controller here: a device revoked after it
+		// opened the link lets no one in.
+		var signers int64
+		if err := db.Model(&controllerRow{}).Where("public_key = ? AND workspace_id = ?", c.By, c.Workspace).Count(&signers).Error; err != nil {
+			return err
+		}
+		if signers == 0 {
+			return domain.ErrInvitationInvalid
+		}
+		// The same certificate again, for a key it still holds, is done already.
+		var same int64
+		if err := db.Model(&certificateRow{}).Where("type = ? AND key = ? AND signed = ?", protocol.MemberAdd, c.Key, c.Signed).Count(&same).Error; err != nil {
+			return err
+		}
+		if same > 0 {
+			return nil
+		}
+		if !inv.domain().Open(now) {
+			return domain.ErrInvitationClosed
+		}
+		var taken int64
+		if err := db.Model(&controllerRow{}).Where("public_key = ? OR (workspace_id = ? AND member_id = ?)", c.Key, c.Workspace, c.Member).Count(&taken).Error; err != nil {
+			return err
+		}
+		var used int64
+		if err := db.Model(&certificateRow{}).Where("key = ?", c.Key).Count(&used).Error; err != nil {
+			return err
+		}
+		if taken > 0 || used > 0 {
+			return domain.ErrKeyTaken
+		}
+		if err := db.Create(&controllerRow{ID: id.New(), WorkspaceID: c.Workspace, MemberID: c.Member, PublicKey: c.Key}).Error; err != nil {
+			return err
+		}
+		cert := row(c)
+		if err := db.Create(&cert).Error; err != nil {
+			return err
+		}
+		if err := db.Create(&handoffRow{InvitationID: invitation, Key: c.Key, Data: handoff.Data, Proof: handoff.Proof}).Error; err != nil {
+			return err
+		}
+		if err := db.Model(&inv).Where("id = ?", invitation).Update("joined", inv.Joined+1).Error; err != nil {
+			return err
+		}
+		created = true
+		return nil
+	})
+	return created, err
+}

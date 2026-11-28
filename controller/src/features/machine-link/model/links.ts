@@ -10,6 +10,8 @@ import {
   type AgentUpdateBody,
   type ApprovalAnswerBody,
   type DeviceLink,
+  type GrantLevel,
+  type HubInvitationRequest,
   type HubLinkRequest,
   type SignedPart,
   type TriggerSetBody,
@@ -68,6 +70,7 @@ export function createMachineLinks({
   const watchers = new Map<string, (signed: SignedPart) => void>();
   const linkListeners = new Set<(links: DeviceLink[]) => void>();
   const requestListeners = new Set<(hubUrl: string, request: HubLinkRequest) => void>();
+  const invitationListeners = new Set<(hubUrl: string, request: HubInvitationRequest) => void>();
   const statuses = createStatusStore(UNKNOWN_MACHINE_STATUS);
   const usage = createStatusStore(UNKNOWN_USAGE);
   const memory = createStatusStore(UNKNOWN_MEMORY);
@@ -283,6 +286,9 @@ export function createMachineLinks({
           if (news.length) for (const listener of [...linkListeners]) listener(news);
         });
       },
+      onInvitationRequest: (request) => {
+        for (const listener of [...invitationListeners]) listener(hubUrl, request);
+      },
       onLinkRequest: (request) => {
         for (const listener of [...requestListeners]) listener(hubUrl, request);
       },
@@ -492,6 +498,11 @@ export function createMachineLinks({
      * (ADR 0012); the Machine answers with `agent.listed`, which is what changes
      * the list shown. False when the Hub is not connected and nothing went.
      */
+    /** A Member's level at one Agent, or `none` (ADR 0010). False when nothing went. */
+    setGrant(machine: Machine, body: { agent: string; member: string; level: GrantLevel | "none" }) {
+      return sendTo(machine, "other", { type: "grant.set", body }) !== null;
+    },
+
     setEgress(machine: Machine, egress: string[], agent?: string) {
       return sendTo(machine, "other", { type: "egress.set", body: agent ? { egress, agent } : { egress } }) !== null;
     },
@@ -565,6 +576,12 @@ export function createMachineLinks({
     onLinked(listener: (links: DeviceLink[]) => void) {
       linkListeners.add(listener);
       return () => void linkListeners.delete(listener);
+    },
+
+    /** Hears someone asking in through an Invitation this device opened (ADR 0059), until the returned function is called. */
+    onInvitationRequest(listener: (hubUrl: string, request: HubInvitationRequest) => void) {
+      invitationListeners.add(listener);
+      return () => void invitationListeners.delete(listener);
     },
 
     /** Hears the link requests a Hub hands this device, unchecked: the page showing the QR checks them against its secret. */

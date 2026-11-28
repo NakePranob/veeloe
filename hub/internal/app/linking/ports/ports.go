@@ -3,6 +3,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"hub/internal/app/linking/domain"
 	"hub/internal/shared/protocol"
@@ -23,6 +24,20 @@ type Store interface {
 	ForWorkspace(ctx context.Context, workspace uuid.UUID) ([]protocol.Certificate, error)
 	// Revoked says whether a device.revoke certificate names this key.
 	Revoked(ctx context.Context, key []byte) (bool, error)
+
+	// Open keeps an Invitation c.By opened, when c.By is a Controller of
+	// c.Member in that Workspace. The same Invitation again is done already.
+	Open(ctx context.Context, c domain.Certificate, inv domain.Invitation) error
+	// Close closes an Invitation, when c.By opened it.
+	Close(ctx context.Context, c domain.Certificate, invitation []byte) error
+	// Invitation answers one Invitation, and found false for one never opened.
+	Invitation(ctx context.Context, id []byte) (inv domain.Invitation, found bool, err error)
+	// Handoff answers what the inviter left for key, if anything yet.
+	Handoff(ctx context.Context, invitation, key []byte) (domain.Handoff, bool, error)
+	// AddMember registers c.Key as the first Controller of a new Member c.Member,
+	// keeps c and handoff, and counts one more in the Invitation, all at once, while
+	// it is open and c.By opened it. created is false for the same c again.
+	AddMember(ctx context.Context, c domain.Certificate, invitation []byte, handoff domain.Handoff, now time.Time) (created bool, err error)
 }
 
 // Notifier reaches the live connections. The relay module answers it, through

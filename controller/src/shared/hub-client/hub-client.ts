@@ -1,4 +1,4 @@
-import { answerChallenge, createBackoff, createSigner, HubCloseCode, MemorySeenSequences, parseFrame, verify, type HubError, type HubLinkRequest, type Outgoing, type Verified } from "@veeloe/protocol-ts";
+import { answerChallenge, createBackoff, createSigner, HubCloseCode, MemorySeenSequences, parseFrame, verify, type HubError, type HubInvitationRequest, type HubLinkRequest, type Outgoing, type Verified } from "@veeloe/protocol-ts";
 import type { SeenSequences } from "@veeloe/protocol-ts";
 import { clockSequence } from "./sequence";
 
@@ -16,6 +16,8 @@ export type HubClientOptions = {
   onCertificates?: (certificates: unknown[]) => void;
   /** A new device read this device's Linking QR. Unsigned, and possibly made up by the Hub: only its proof makes it worth reading. */
   onLinkRequest?: (request: HubLinkRequest) => void;
+  /** Someone asking in through an Invitation this device opened (ADR 0059); only its proof makes it worth reading. */
+  onInvitationRequest?: (request: HubInvitationRequest) => void;
   /** The Hub closed with 4403: this key was revoked. The client stops for good. */
   onRevoked?: () => void;
   /** The connection closed or never opened; it retries on its own. Nothing behind this Hub can be reached until `onReady`. */
@@ -35,7 +37,22 @@ export type HubClientOptions = {
  * (`protocol-envelope`): a Controller that forgot after a restart would accept
  * one replayed envelope.
  */
-export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnvelope, onHubError, onCertificates, onLinkRequest, onRevoked, onDisconnected, seen: kept, seenReady, backoff = createBackoff() }: HubClientOptions) {
+export function startHubClient({
+  hubUrl,
+  secretKey,
+  trustedKeys,
+  onReady,
+  onEnvelope,
+  onHubError,
+  onCertificates,
+  onLinkRequest,
+  onInvitationRequest,
+  onRevoked,
+  onDisconnected,
+  seen: kept,
+  seenReady,
+  backoff = createBackoff(),
+}: HubClientOptions) {
   const url = `${hubUrl.replace(/\/+$/, "")}/connect`;
   const signEnvelope = createSigner(secretKey, clockSequence());
   const seen = kept ?? new MemorySeenSequences();
@@ -85,6 +102,8 @@ export function startHubClient({ hubUrl, secretKey, trustedKeys, onReady, onEnve
           onCertificates?.(message.certificates);
         } else if (message.type === "hub.link_request" && member !== undefined) {
           onLinkRequest?.(message);
+        } else if (message.type === "hub.invitation_request" && member !== undefined) {
+          onInvitationRequest?.(message);
         }
       } else if (frame.kind === "unknown") {
         receive(text);

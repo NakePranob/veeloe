@@ -18,4 +18,11 @@ var (
 	// ErrDeviceOffline is a link request for a key with no live Controller
 	// connection: nobody is showing that QR any more.
 	ErrDeviceOffline = errors.New("device is not connected")
+	// ErrInvitationInvalid is an invitation.* or member.add the Hub will not
+	// take: not signed by a Controller of the Workspace, opened by someone else,
+	// or shaped wrong (ADR 0059).
+	ErrInvitationInvalid = errors.New("invitation is not valid")
+	// ErrInvitationClosed is an Invitation that takes no one now: closed, run
+	// out of time, or full.
+	ErrInvitationClosed = errors.New("invitation is closed")
 )

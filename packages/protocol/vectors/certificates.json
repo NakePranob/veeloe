@@ -72,6 +72,54 @@
         "sig": "VlJCLWZYBuSdQmWiib4INkpe4235BH4Y8IW6JkAxehwsHmy5pycdpEvIZAAGanzQRy0WiEs2Dnv7Y3dTysufAQ"
       },
       "valid": false
+    },
+    {
+      "name": "a new Member let in through an Invitation",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_new\",\"at\":1800000000000,\"type\":\"member.add\",\"key\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\",\"name\":\"Kai\",\"invitation\":\"IiIiIiIiIiIiIiIiIiIiIg\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "-TvwBsoQcen5bKHy6LF6rlCDClBG46sgMwR8eeNPlTJPatmuWxTNF15mBjMvJHr9JbkoHsM5UAyXmGmQwj4gBA"
+      },
+      "valid": true
+    },
+    {
+      "name": "a new Member with no Invitation",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_new\",\"at\":1800000000000,\"type\":\"member.add\",\"key\":\"NLTZBDFWy23PC-sKKUm3VZyUDSvLbb6MU6mzAnjjp0Y\",\"name\":\"Kai\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "jA_lTvESbNnmOTkZfou0_qFQ1CdnAFAQNQ4X_81_uewut2Q84OOII5gl_j3L7TorLaIZ3zjHa39ZPt8S0kDHCA"
+      },
+      "valid": false
+    },
+    {
+      "name": "an Invitation opened to five people",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"invitation.open\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"invitation\":\"IiIiIiIiIiIiIiIiIiIiIg\",\"max\":5,\"expires\":1800086400000,\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "YIyTwI50rQwT5tXZoOT6PqDvty55qo-_JTbG09t7mxZqrKpL0KbH6HIGqh1D5cHOqRf9FIAJs9MZ2ldFnGsBCw"
+      },
+      "valid": true
+    },
+    {
+      "name": "an Invitation opened to no one",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"invitation.open\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"invitation\":\"IiIiIiIiIiIiIiIiIiIiIg\",\"max\":0,\"expires\":1800086400000,\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "qILvy73y1QiKj-jswlbxDzERv23HfGLhfJaoMs6s8woeiSC_Kd8kdgFvLYlndb9wA2rTo8bNnf8_8z6rY-fnAg"
+      },
+      "valid": false
+    },
+    {
+      "name": "an Invitation opened to more than 100",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"invitation.open\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"invitation\":\"IiIiIiIiIiIiIiIiIiIiIg\",\"max\":101,\"expires\":1800086400000,\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "A2NZ-cN_Vjib8b-_xUTJQpMSiLWx8-7ViG9MYkdxvgW8_hQ4sg89hRlca4XX-hjzvvAtqE76u7j5-4t3hMdhDw"
+      },
+      "valid": false
+    },
+    {
+      "name": "an Invitation closed",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"invitation.close\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"invitation\":\"IiIiIiIiIiIiIiIiIiIiIg\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "pZ7Q6RO1U7X_UA6ZEi62kiCbD77kPKHfns7604jtCcbig_IZECJsZjDX7ukxAJQyiswiEP8Vqzw5AgPolweZAw"
+      },
+      "valid": true
     }
   ],
   "fallout": {

@@ -1,0 +1,82 @@
+{
+  "title": "Invite people",
+  "subtitle": "{{joined}} of {{count}} joined",
+  "none": {
+    "title": "No Machine yet",
+    "body": "Pair a Machine and create an Agent first, then invite people to use it"
+  },
+  "agents": {
+    "footer": "Everyone who joins with this link gets these. Use gives work; Approve also answers Approvals; Manage changes the Agent and invites others.",
+    "empty": "No Agent on this Machine yet"
+  },
+  "level": {
+    "none": "None",
+    "use": "Use",
+    "approve": "Approve",
+    "manage": "Manage"
+  },
+  "link": {
+    "heading": "Link",
+    "footer": "The link takes this many people, but everyone who opens it waits for you to compare their code and let them in one by one."
+  },
+  "people": {
+    "label": "Takes",
+    "count_one": "{{count}} person",
+    "count_other": "{{count}} people"
+  },
+  "hours": {
+    "label": "Expires in",
+    "1": "1 hour",
+    "24": "1 day",
+    "168": "7 days"
+  },
+  "from": {
+    "label": "Name they see",
+    "empty": "Enter the name people will see first",
+    "footer": "Whoever opens the link sees this name as who invited them"
+  },
+  "create": "Create link",
+  "cannot": "Cannot invite",
+  "cancel": "Cancel",
+  "prompt": {
+    "open": "Open an invitation for {{count}} people",
+    "admit": "Let {{name}} into the Workspace",
+    "close": "Close the invitation"
+  },
+  "share": {
+    "heading": "Send this link to the people you invite",
+    "action": "Share link",
+    "footer": "Expires {{when}}. The link holds a secret: send it only to the people you mean."
+  },
+  "asks": {
+    "heading": "Asking to join",
+    "footer": "Ask them for their code. Let them in only if it matches the one here; refuse if it does not or you do not know the name.",
+    "empty": "Nobody has asked yet",
+    "emptyDetail": "Keep this page open; requests show here when someone opens the link",
+    "code": "Code {{code}}",
+    "refuse": "Refuse",
+    "admit": "Let in"
+  },
+  "compare": {
+    "title": "Does {{name}}'s code match?",
+    "body": "{{name}}'s device must show {{code}}. Let them in only if it does.",
+    "action": "It matches"
+  },
+  "grants": {
+    "heading": "What they get"
+  },
+  "joined": {
+    "heading": "Joined"
+  },
+  "unsent": {
+    "title": "Not every Grant went",
+    "body": "{{name}} joined, but the Machine of {{count}} Agents is not connected, so they have nothing there yet"
+  },
+  "again": "New invitation",
+  "close": {
+    "title": "Close this link",
+    "body": "Nobody else can join with it. Those who joined stay.",
+    "action": "Close link"
+  },
+  "full": "Everyone has joined. This link takes no one else."
+}

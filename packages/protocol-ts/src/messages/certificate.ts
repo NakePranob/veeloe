@@ -17,11 +17,25 @@ const common = { v: z.literal(1), workspace: z.string().min(1), member: z.string
 export const DeviceLinkSchema = z.looseObject({ ...common, type: z.literal("device.link"), name: z.string().trim().min(1).max(80) });
 /** `key` is no longer one, nor anything it linked except the keys in `keep`. */
 export const DeviceRevokeSchema = z.looseObject({ ...common, type: z.literal("device.revoke"), keep: z.array(key).max(100) });
+/** An Invitation's id: random 128 bits, base64url. */
+const invitation = z.string().regex(/^[A-Za-z0-9_-]{22}$/);
+/**
+ * `key` is a new Member's first Controller, named `name`, let in through `invitation` by `by`, who compared
+ * its short code (ADR 0059). A Runtime believes it only from a key that may add Members there.
+ */
+export const MemberAddSchema = z.looseObject({ ...common, type: z.literal("member.add"), name: z.string().trim().min(1).max(80), invitation });
+/** For the Hub alone: `by` (`key` is the same) opens `invitation` to at most `max` people until `expires` (Unix ms). */
+export const InvitationOpenSchema = z.looseObject({ ...common, type: z.literal("invitation.open"), invitation, max: z.number().int().min(1).max(100), expires: z.number().int().nonnegative() });
+/** For the Hub alone: `invitation` takes no one else. */
+export const InvitationCloseSchema = z.looseObject({ ...common, type: z.literal("invitation.close"), invitation });
 export type DeviceLink = z.infer<typeof DeviceLinkSchema>;
 export type DeviceRevoke = z.infer<typeof DeviceRevokeSchema>;
-export type Certified = DeviceLink | DeviceRevoke;
+export type MemberAdd = z.infer<typeof MemberAddSchema>;
+export type InvitationOpen = z.infer<typeof InvitationOpenSchema>;
+export type InvitationClose = z.infer<typeof InvitationCloseSchema>;
+export type Certified = DeviceLink | DeviceRevoke | MemberAdd | InvitationOpen | InvitationClose;
 
-const CertifiedSchema = z.discriminatedUnion("type", [DeviceLinkSchema, DeviceRevokeSchema]);
+const CertifiedSchema = z.discriminatedUnion("type", [DeviceLinkSchema, DeviceRevokeSchema, MemberAddSchema, InvitationOpenSchema, InvitationCloseSchema]);
 
 /** The frame the Hub sends after `hub.ready`, and again with each new certificate. In the order they were made. */
 export const HubCertificatesSchema = z.looseObject({ type: z.literal("hub.certificates"), certificates: z.array(CertificateSchema) });
@@ -29,7 +43,9 @@ export type HubCertificates = z.infer<typeof HubCertificatesSchema>;
 
 const encoder = new TextEncoder();
 
-export function signCertificate(body: Omit<DeviceLink, "v" | "by"> | Omit<DeviceRevoke, "v" | "by">, secretKey: Uint8Array): Certificate {
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+export function signCertificate(body: DistributiveOmit<Certified, "v" | "by">, secretKey: Uint8Array): Certificate {
   const signed = JSON.stringify({ v: 1, ...body, by: toBase64url(publicKeyOf(secretKey)) });
   return { signed, sig: toBase64url(sign(encoder.encode(signed), secretKey)) };
 }

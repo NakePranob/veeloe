@@ -23,7 +23,7 @@ beforeAll(async () => {
   const built = Bun.spawnSync(["go", "build", "-o", join(work, "hub"), "./cmd/api"], { cwd: `${repo}/hub`, stderr: "inherit" });
   if (!built.success) throw new Error("could not build the Hub");
   runtimeBinary = buildRuntime();
-  running.push(Bun.spawn([join(work, "hub")], { env: { ...process.env, PORT: String(port), DB_DSN: dsn, HUB_PUBLIC_URL: hubUrl, APP_ENV: "development" }, stdout: "ignore", stderr: "ignore" }));
+  running.push(Bun.spawn([join(work, "hub")], { env: { ...process.env, PORT: String(port), DB_DSN: dsn, HUB_PUBLIC_URL: hubUrl, HUB_STUN_ADDR: "127.0.0.1:0", APP_ENV: "development" }, stdout: "ignore", stderr: "ignore" }));
   const end = Date.now() + 15_000;
   while (true) {
     const up = await fetch(`http://127.0.0.1:${port}/readyz`).then((r) => r.ok, () => false);

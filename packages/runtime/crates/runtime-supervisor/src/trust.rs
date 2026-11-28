@@ -311,12 +311,6 @@ impl Trust {
         };
         let mut value = json!({
             "owners": people(&self.owners),
-            "members": people(&self.members),
-            "grants": self
-                .grants
-                .iter()
-                .map(|grant| json!({ "agent": grant.agent, "member": grant.member, "level": grant.level.as_str() }))
-                .collect::<Vec<_>>(),
             "links": self
                 .links
                 .iter()
@@ -326,6 +320,18 @@ impl Trust {
         });
         if let Some(workspace) = &self.workspace {
             value["workspace"] = json!(workspace);
+        }
+        // Only a Machine with Members other than Owners writes them, so a
+        // one-person Machine's file stays as it was.
+        if !self.members.is_empty() {
+            value["members"] = json!(people(&self.members));
+        }
+        if !self.grants.is_empty() {
+            value["grants"] = self
+                .grants
+                .iter()
+                .map(|grant| json!({ "agent": grant.agent, "member": grant.member, "level": grant.level.as_str() }))
+                .collect();
         }
         value
     }
@@ -469,6 +475,13 @@ pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&s
             log("ignored a certificate: other-workspace");
             continue;
         }
+        // A new Member through an Invitation (ADR 0059): believed from an Owner's
+        // key, or from a Member who manages an Agent here. Their Grants come
+        // after, each signed on its own (`grant.set`).
+        if body.get("type").and_then(Value::as_str) == Some("member.add") {
+            add_member(&mut next, &body, log);
+            continue;
+        }
         let (Some(member), Some(key), Some(by), Some(type_)) = (
             body.get("member").and_then(Value::as_str),
             body.get("key").and_then(Value::as_str),
@@ -538,6 +551,45 @@ pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&s
         }
     }
     next
+}
+
+fn add_member(next: &mut Trust, body: &Value, log: &dyn Fn(&str)) {
+    let text = |name: &str| body.get(name).and_then(Value::as_str).unwrap_or_default();
+    let (member, key, by) = (text("member"), text("key"), text("by"));
+    let owner_key = next
+        .owners
+        .iter()
+        .any(|owner| owner.keys.iter().any(|known| known == by));
+    let manager_key = next.members.iter().any(|person| {
+        person.keys.iter().any(|known| known == by)
+            && next
+                .grants
+                .iter()
+                .any(|grant| grant.member == person.member && grant.level == GrantLevel::Manage)
+    });
+    if !owner_key && !manager_key {
+        log("ignored a certificate: untrusted-signer");
+        return;
+    }
+    let known_key = next
+        .owners
+        .iter()
+        .chain(&next.members)
+        .any(|person| person.keys.iter().any(|known| known == key));
+    let known_member = next
+        .owners
+        .iter()
+        .chain(&next.members)
+        .any(|person| person.member == member);
+    // The same certificate again changes nothing; a key or Member id already
+    // here, or a revoked key, is never taken over.
+    if known_key || known_member || next.revoked.iter().any(|revoked| revoked == key) {
+        return;
+    }
+    next.members.push(Owner {
+        member: member.to_string(),
+        keys: vec![key.to_string()],
+    });
 }
 
 /// The numbers a connection takes in memory, with a window so an envelope that
@@ -878,6 +930,61 @@ mod tests {
         assert_eq!(
             taken.grants_listed("a_1"),
             json!({ "agent": "a_1", "grants": [{ "member": "m_2", "level": "manage" }] })
+        );
+    }
+
+    fn added(by: u8, member: &str, key_seed: u8) -> Value {
+        certificate(
+            &[
+                ("type", json!("member.add")),
+                ("workspace", json!("w_1")),
+                ("member", json!(member)),
+                ("key", json!(key(key_seed))),
+                ("name", json!("Kai")),
+                ("invitation", json!("AAAAAAAAAAAAAAAAAAAAAA")),
+                ("at", json!(1)),
+            ],
+            by,
+        )
+    }
+
+    #[test]
+    fn a_member_is_added_only_by_an_owner_or_a_manager_and_never_over_someone() {
+        let after = apply_certificates(&paired(), &[added(0x41, "m_kai", 0x71)], &quiet);
+        assert_eq!(
+            after.members,
+            vec![Owner {
+                member: "m_kai".into(),
+                keys: vec![key(0x71)]
+            }]
+        );
+        // Again: nothing more.
+        assert_eq!(
+            apply_certificates(&after, &[added(0x41, "m_kai", 0x71)], &quiet),
+            after
+        );
+        // Not from a stranger, nor a Member who manages nothing.
+        assert_eq!(
+            apply_certificates(&paired(), &[added(0x44, "m_x", 0x72)], &quiet),
+            paired()
+        );
+        assert_eq!(
+            apply_certificates(&after, &[added(0x71, "m_x", 0x72)], &quiet),
+            after
+        );
+        // A Member who manages an Agent here may.
+        let mut managing = after.clone();
+        managing.set_grant("a_1", "m_kai", Some(GrantLevel::Manage));
+        let by_manager = apply_certificates(&managing, &[added(0x71, "m_lee", 0x72)], &quiet);
+        assert_eq!(by_manager.members.len(), 2);
+        // Never an Owner's id, nor a key someone holds.
+        assert_eq!(
+            apply_certificates(&paired(), &[added(0x41, "m_1", 0x73)], &quiet),
+            paired()
+        );
+        assert_eq!(
+            apply_certificates(&after, &[added(0x41, "m_new", 0x71)], &quiet),
+            after
         );
     }
 

@@ -8,7 +8,7 @@ import { PUSH_READY, savePushEnabled, useMachineStatuses, usePushEnabled } from 
 import { useDatabase } from "../../../shared/db";
 import { saveLanguage, useLanguage, useT } from "../../../shared/i18n";
 import { formatTokens, shiftDay, type Bar } from "../../../shared/lib";
-import { Bars, DotLabel, Screen, Section, space, Tile, ToggleRow } from "../../../shared/ui";
+import { Bars, DotLabel, Row, Screen, Section, space, Tile, ToggleRow } from "../../../shared/ui";
 
 const TILE = 156;
 
@@ -91,6 +91,9 @@ export function WorkspacePage() {
           />
         </View>
       </View>
+      <Section title={t("people.heading")} footer={t("people.footer")}>
+        <Row icon="share" title={t("people.invite")} href="/invite" />
+      </Section>
       {/* The board's switch, hidden while push is dormant, so it never promises a banner that will not come. */}
       {PUSH_READY && (
         <Section title={t("thisDevice")} footer={t("note")}>

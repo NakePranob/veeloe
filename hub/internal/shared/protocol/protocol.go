@@ -131,6 +131,10 @@ const (
 	CodeLinkRequestInvalid = "hub.link_request_invalid"
 	// The device a link request is for is not connected as a Controller.
 	CodeDeviceOffline = "hub.device_offline"
+	// CodeInvitationInvalid is an Invitation or member.add the Hub will not take (ADR 0059).
+	CodeInvitationInvalid = "hub.invitation_invalid"
+	// CodeInvitationClosed is an Invitation that takes no one now: closed, expired or full.
+	CodeInvitationClosed = "hub.invitation_closed"
 )
 
 // Close codes the Hub ends a connection with.

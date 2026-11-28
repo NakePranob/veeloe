@@ -35,7 +35,7 @@ export function saveCertificates(database: Database, { member, own, ownName, now
           body.at,
         ]);
         if (body.by !== own && body.key !== own && body.at > now - NEWS_MS) news.push(body);
-      } else {
+      } else if (body.type === "device.revoke") {
         const links = await transaction.all<{ key: string; by: string }>("SELECT key, linked_by AS by FROM device WHERE linked_by IS NOT NULL");
         for (const key of revokedWith(body.key, links, body.keep)) await transaction.run("UPDATE device SET revoked_at = ? WHERE key = ? AND revoked_at IS NULL", [body.at, key]);
       }

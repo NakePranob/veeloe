@@ -436,6 +436,9 @@ export function certificateVectors() {
   const link = signCertificate({ ...common, type: "device.link", key: keyOf(TEST_NEW_DEVICE), name: "Chrome บน Mac" }, TEST_CONTROLLER);
   const revoke = signCertificate({ ...common, type: "device.revoke", key: keyOf(TEST_CONTROLLER), keep: [keyOf(TEST_NEW_DEVICE)] }, TEST_NEW_DEVICE);
   const resigned = (signed: string, secret: Uint8Array) => ({ signed, sig: sigOver(signed, secret) });
+  const invitationId = toBase64url(new Uint8Array(16).fill(0x22));
+  const memberAdd = signCertificate({ ...common, member: "m_new", type: "member.add", key: keyOf(TEST_NEW_DEVICE), name: "Kai", invitation: invitationId }, TEST_CONTROLLER);
+  const open = signCertificate({ ...common, type: "invitation.open", key: keyOf(TEST_CONTROLLER), invitation: invitationId, max: 5, expires: 1_800_086_400_000 }, TEST_CONTROLLER);
   const cases = [
     { name: "a link", certificate: link },
     { name: "a revocation that keeps one key", certificate: revoke },
@@ -446,6 +449,12 @@ export function certificateVectors() {
     { name: "a link with no name", certificate: resigned(link.signed.replace(/"name":"[^"]*",?/, ""), TEST_CONTROLLER) },
     { name: "a revocation with no keep list", certificate: resigned(revoke.signed.replace(/,?"keep":\[[^\]]*\]/, ""), TEST_NEW_DEVICE) },
     { name: "a type this build does not know", certificate: resigned(link.signed.replace("device.link", "device.rename"), TEST_CONTROLLER) },
+    { name: "a new Member let in through an Invitation", certificate: memberAdd },
+    { name: "a new Member with no Invitation", certificate: resigned(memberAdd.signed.replace(/,?"invitation":"[^"]*"/, ""), TEST_CONTROLLER) },
+    { name: "an Invitation opened to five people", certificate: open },
+    { name: "an Invitation opened to no one", certificate: resigned(open.signed.replace('"max":5', '"max":0'), TEST_CONTROLLER) },
+    { name: "an Invitation opened to more than 100", certificate: resigned(open.signed.replace('"max":5', '"max":101'), TEST_CONTROLLER) },
+    { name: "an Invitation closed", certificate: signCertificate({ ...common, type: "invitation.close", key: keyOf(TEST_CONTROLLER), invitation: invitationId }, TEST_CONTROLLER) },
   ];
   // A tree: A linked B and C, B linked D. Revoking A and keeping C drops A, B and D.
   const links = [

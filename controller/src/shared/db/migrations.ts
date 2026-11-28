@@ -136,4 +136,19 @@ export const MIGRATIONS = [
   // Which of the Machine's files the Agent reaches (ADR 0087): null from a Machine older than it.
   `ALTER TABLE agent ADD COLUMN files TEXT`,
   `ALTER TABLE agent ADD COLUMN folders TEXT`,
+  // Invitations this device opened (ADR 0059): the secret checks who asks, and the Grants go to whoever is let in.
+  `CREATE TABLE invitation (
+    id TEXT PRIMARY KEY NOT NULL,
+    hub_url TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    member_id TEXT NOT NULL,
+    secret TEXT NOT NULL,
+    link TEXT NOT NULL,
+    max_members INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    grants TEXT NOT NULL,
+    joined TEXT NOT NULL DEFAULT '[]',
+    closed_at INTEGER,
+    created_at INTEGER NOT NULL
+  )`,
 ] as const;

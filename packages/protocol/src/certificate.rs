@@ -58,6 +58,29 @@ pub fn verify_certificate(certificate: &Value) -> Option<Value> {
                 return None;
             }
         }
+        // A new Member let in through an Invitation (ADR 0059).
+        "member.add" => {
+            let name = object.get("name")?.as_str()?.trim();
+            if name.is_empty()
+                || name.chars().count() > 80
+                || !is_invitation(object.get("invitation"))
+            {
+                return None;
+            }
+        }
+        // For the Hub alone, but every side agrees on what is one.
+        "invitation.open" => {
+            let max = object.get("max")?.as_u64()?;
+            object.get("expires")?.as_u64()?;
+            if !(1..=100).contains(&max) || !is_invitation(object.get("invitation")) {
+                return None;
+            }
+        }
+        "invitation.close" => {
+            if !is_invitation(object.get("invitation")) {
+                return None;
+            }
+        }
         _ => return None,
     }
 
@@ -65,6 +88,16 @@ pub fn verify_certificate(certificate: &Value) -> Option<Value> {
         return None;
     }
     Some(body)
+}
+
+/// An Invitation's id: 128 bits, base64url, so 22 characters.
+fn is_invitation(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_str).is_some_and(|id| {
+        id.len() == 22
+            && id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+    })
 }
 
 /// Every key that stops being trusted when `revoked` is: it, and whatever it

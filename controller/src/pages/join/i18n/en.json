@@ -1,0 +1,24 @@
+{
+  "title": "Join a Workspace",
+  "enter": {
+    "heading": "Paste the invitation link you got",
+    "paste": "Invitation link",
+    "continue": "Continue",
+    "footer": "An invitation link starts with veeloe://invite"
+  },
+  "name": {
+    "heading": "{{from}} invited you",
+    "label": "Your name",
+    "footer": "{{from}} sees this name and this device's code before letting you in",
+    "empty": "Enter your name first"
+  },
+  "hub": "Hub",
+  "send": "Ask to join",
+  "back": "Back",
+  "cannot": "Cannot join",
+  "waiting": {
+    "heading": "Tell {{from}} this code",
+    "body": "{{from}} compares it before letting you in. Keep this page open until you are in.",
+    "footer": "The link expires {{when}}"
+  }
+}

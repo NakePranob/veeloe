@@ -20,8 +20,11 @@ type Certificate struct {
 
 // The certificate types.
 const (
-	DeviceLink   = "device.link"
-	DeviceRevoke = "device.revoke"
+	DeviceLink      = "device.link"
+	DeviceRevoke    = "device.revoke"
+	MemberAdd       = "member.add"
+	InvitationOpen  = "invitation.open"
+	InvitationClose = "invitation.close"
 )
 
 // Certified is what a certificate says. Keys are base64url text, as signed.
@@ -31,9 +34,14 @@ type Certified struct {
 	Member    string
 	Key       string
 	By        string
-	// Name is set on a device.link, Keep on a device.revoke.
+	// Name is set on a device.link and a member.add, Keep on a device.revoke.
 	Name string
 	Keep []string
+	// Invitation is set on a member.add and an invitation.*, Max and Expires
+	// (Unix ms) on an invitation.open (ADR 0059).
+	Invitation string
+	Max        int
+	Expires    int64
 }
 
 // Certificates is the frame the Hub sends after hub.ready, and again with each
@@ -74,12 +82,27 @@ func VerifyCertificate(c Certificate) (Certified, bool) {
 		return out, false
 	}
 	switch out.Type {
-	case DeviceLink:
+	case DeviceLink, MemberAdd:
 		if json.Unmarshal(fields["name"], &out.Name) != nil {
 			return out, false
 		}
 		out.Name = strings.TrimFunc(out.Name, isJSSpace)
 		if n := utf16Len(out.Name); n < 1 || n > 80 {
+			return out, false
+		}
+		if out.Type == MemberAdd && !readInvitation(fields, &out) {
+			return out, false
+		}
+	case InvitationOpen:
+		var max, expires float64
+		if !readInvitation(fields, &out) ||
+			json.Unmarshal(fields["max"], &max) != nil || max != math.Trunc(max) || max < 1 || max > 100 ||
+			json.Unmarshal(fields["expires"], &expires) != nil || expires != math.Trunc(expires) || expires < 0 {
+			return out, false
+		}
+		out.Max, out.Expires = int(max), int64(expires)
+	case InvitationClose:
+		if !readInvitation(fields, &out) {
 			return out, false
 		}
 	case DeviceRevoke:
@@ -100,6 +123,11 @@ func VerifyCertificate(c Certificate) (Certified, bool) {
 		return out, false
 	}
 	return out, true
+}
+
+// readInvitation reads an Invitation id: 128 bits, base64url.
+func readInvitation(fields map[string]json.RawMessage, out *Certified) bool {
+	return json.Unmarshal(fields["invitation"], &out.Invitation) == nil && decodedLen(out.Invitation) == 16
 }
 
 // DecodeKey reads a public key from its base64url text, and only from its one

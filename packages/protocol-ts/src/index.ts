@@ -138,6 +138,7 @@ export {
   type DeviceLink,
   type DeviceRevoke,
   type HubCertificates,
+  type MemberAdd,
 } from "./messages/certificate";
 export {
   buildLinkingLink,
@@ -159,6 +160,20 @@ export {
   type LinkRequest,
   type ParsedLinkingLink,
 } from "./messages/linking";
+export {
+  buildInvitationLink,
+  HubInvitationRequestSchema,
+  InvitationAnswerSchema,
+  InvitationRequestSchema,
+  parseInvitationLink,
+  shortCode,
+  type HubInvitationRequest,
+  type InvitationAnswer,
+  type InvitationLink,
+  type InvitationRequest,
+  type ParsedInvitationLink,
+} from "./messages/invitation";
+export { GrantLevelSchema, type GrantLevel } from "./messages/grant";
 export {
   IDLE_ITEMS_MAX,
   SCHEDULE_MAX_MINUTES,
