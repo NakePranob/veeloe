@@ -109,7 +109,6 @@
     "reason": "{{name}} บอกว่า “{{reason}}”",
     "noReason": "{{name}} ไม่ได้บอกว่าทำไปเพื่ออะไร"
   },
-  "openAgent": "เปิดหน้า {{name}}",
   "stopped": "{{member}} หยุด Turn นี้ · {{when}}",
   "interrupted": {
     "title": "{{machine}} เริ่มใหม่กลาง Turn",
@@ -140,8 +139,6 @@
   "emptyTitle": "ให้ {{name}} ช่วยอะไรดี?",
   "waitingHeader": "รอคุณตอบ",
   "budgetHeader": "Budget วันนี้หมด",
-  "newTitle": "Task ใหม่",
-  "newSubtitle": "{{name}} · {{machine}}",
   "deletedSubtitle": "อ่านได้อย่างเดียว",
   "failedBody": "ไฟล์ที่แก้ไปแล้วยังอยู่ ส่งข้อความเพื่อให้ {{name}} ทำต่อได้",
   "runningCommand": "กำลังรัน {{target}}",

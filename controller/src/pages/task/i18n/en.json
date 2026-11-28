@@ -120,7 +120,6 @@
     "reason": "{{name}} says: “{{reason}}”",
     "noReason": "{{name}} did not say what this is for"
   },
-  "openAgent": "Open {{name}}",
   "stopped": "{{member}} stopped this Turn · {{when}}",
   "interrupted": {
     "title": "{{machine}} started again mid-Turn",
@@ -151,8 +150,6 @@
   "emptyTitle": "What should {{name}} help with?",
   "waitingHeader": "Waiting for your answer",
   "budgetHeader": "Today's Budget is used up",
-  "newTitle": "New Task",
-  "newSubtitle": "{{name}} · {{machine}}",
   "deletedSubtitle": "Read only",
   "failedBody": "Files it already changed are still there. Send a message and {{name}} can carry on.",
   "runningCommand": "Running {{target}}",

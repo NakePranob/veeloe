@@ -164,14 +164,14 @@ export function TaskPage() {
     );
 
   const tail = pending.length > 0 || working;
-  const title = <TaskTitle readOnly={readOnly} agent={agent} machineName={machineName} status={taskStatus} latest={latest} events={events} online={status.online} title={titleOfEvents(events)} task={task} />;
+  const title = <TaskTitle readOnly={readOnly} agent={agent} status={taskStatus} latest={latest} events={events} online={status.online} title={titleOfEvents(events)} task={task} />;
   // iOS 26 would wrap a custom left item in a glass capsule of its own; the head and name sit on the bar instead.
   const leftTitle = process.env.EXPO_OS === "ios" ? { unstable_headerLeftItems: () => [{ type: "custom" as const, element: title, hidesSharedBackground: true }] } : { headerLeft: () => title };
   return (
     <KeyboardAvoidingView behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={-insets.bottom} style={{ flex: 1 }}>
       {/* The Character doing what this Task does, beside the back button, with the Agent's name and what the Task is
-          about, so both stay in view however far the log scrolls. A new Task and a deleted Agent keep a centred title. */}
-      <Stack.Screen options={readOnly || taskStatus === "new" ? { title: agent.name, headerTitle: () => title } : { title: "", headerBackVisible: !split, ...leftTitle }} />
+          about, so both stay in view however far the log scrolls. A deleted Agent keeps a centred title. */}
+      <Stack.Screen options={readOnly ? { title: agent.name, headerTitle: () => title } : { title: "", headerBackVisible: !split, ...leftTitle }} />
       {/* Other Tasks, a new Task and the settings all live on the Agent's page. */}
       {!readOnly && <HeaderAction label={t("agent")} icon="sliders" onPress={openAgent} />}
       <FlatList
