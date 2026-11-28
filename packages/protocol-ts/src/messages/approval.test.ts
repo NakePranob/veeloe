@@ -33,6 +33,14 @@ describe("approval event bodies", () => {
     expect(parsed.success).toBe(true);
   });
 
+  test("requested carries the Agent's reason, and a reason it cannot read drops only the reason", () => {
+    const base = { request: "ap_1", command: "npm ci", parts: ["npm ci"], expiresAt: 1 };
+    expect(ApprovalRequestedBodySchema.parse({ ...base, reason: "Install the dependencies before running the tests" }).reason).toBe("Install the dependencies before running the tests");
+    const unreadable = ApprovalRequestedBodySchema.safeParse({ ...base, reason: "x".repeat(601) });
+    expect(unreadable.success && unreadable.data.reason).toBe(undefined);
+    expect(unreadable.success && unreadable.data.command).toBe("npm ci");
+  });
+
   test("answered holds who answered and how", () => {
     const parsed = ApprovalAnsweredBodySchema.safeParse({ request: "ap_1", member: "m_kai", decision: "deny" });
     expect(parsed.success).toBe(true);

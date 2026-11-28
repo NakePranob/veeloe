@@ -116,7 +116,9 @@
     "forSchedule": "Approve, and let this Schedule do it",
     "fetchTitle": "Open {{site}}?",
     "showCommand": "Show the full command",
-    "allowSite": "Allow all of *.{{site}}"
+    "allowSite": "Allow all of *.{{site}}",
+    "reason": "{{name}} says: “{{reason}}”",
+    "noReason": "{{name}} did not say what this is for"
   },
   "openAgent": "Open {{name}}",
   "stopped": "{{member}} stopped this Turn · {{when}}",

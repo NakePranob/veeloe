@@ -128,9 +128,10 @@ impl ToolRunner for BashTool {
                 "type": "object",
                 "properties": {
                     "command": { "type": "string", "description": "The command, one line or several." },
+                    "reason": { "type": "string", "description": "One short sentence for the person who may have to approve this: what it is for, not the command again." },
                     "timeout": { "type": "number", "description": format!("Seconds before it is stopped. Default {DEFAULT_TIMEOUT_S}, at most {MAX_TIMEOUT_S}.") },
                 },
-                "required": ["command"],
+                "required": ["command", "reason"],
             }),
         }]
     }

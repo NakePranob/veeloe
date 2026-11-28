@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
-use veeloe_runtime_core::{FromWorker, TaskEvent};
+use veeloe_runtime_core::{reason_of, FromWorker, TaskEvent};
 
 use crate::agents::AgentRegistry;
 use crate::egress::Egress;
@@ -62,6 +62,10 @@ pub struct Turn {
     pub trigger: Option<String>,
     /// What this Turn's requests carry through the proxy (ADR 0080).
     pub token: Option<String>,
+    /// Why the Agent's latest reply reaches out, for a domain's Approval
+    /// (ADR 0092): the one `reason` its calls that can reach the network gave,
+    /// none when they gave none or more than one.
+    pub reason: Option<String>,
 }
 
 /// The running Turns of each Agent, one per Task at most (ADR 0080). No Turn
@@ -106,8 +110,41 @@ impl Turns {
                             unattended,
                             trigger,
                             token: None,
+                            reason: None,
                         },
                     );
+            }
+            "llm.message" => {
+                let mut reasons: Vec<String> = event
+                    .body
+                    .get("content")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter(|block| {
+                        block.get("type").and_then(Value::as_str) == Some("tool_use")
+                            && matches!(
+                                block.get("name").and_then(Value::as_str),
+                                Some("bash" | "web_fetch")
+                            )
+                    })
+                    .filter_map(|block| block.get("input").and_then(reason_of))
+                    .collect();
+                reasons.sort();
+                reasons.dedup();
+                if let Some(turn) = self
+                    .running
+                    .lock()
+                    .expect("turns")
+                    .get_mut(agent)
+                    .and_then(|turns| turns.get_mut(task))
+                {
+                    turn.reason = if reasons.len() == 1 {
+                        reasons.pop()
+                    } else {
+                        None
+                    };
+                }
             }
             "turn.ended" => {
                 let mut running = self.running.lock().expect("turns");
@@ -316,7 +353,7 @@ impl Approvals {
             },
         );
         let expires_at = crate::usage::now_ms() + timeout.as_millis() as i64;
-        let body = json!({
+        let mut body = json!({
             "request": request,
             "kind": "domain",
             "domain": host,
@@ -324,6 +361,9 @@ impl Approvals {
             "task": &turn.task,
             "expiresAt": expires_at,
         });
+        if let Some(reason) = &turn.reason {
+            body["reason"] = json!(reason);
+        }
         let event = match self.logs.record(
             agent,
             &turn.task,
@@ -726,6 +766,45 @@ mod tests {
             .into_iter()
             .find_map(|turn| turn.token);
         approvals.ask(agent, token.as_deref(), host).await
+    }
+
+    #[test]
+    fn a_domain_asks_with_the_one_reason_the_latest_reply_gave_for_reaching_out() {
+        let fixture = fixture();
+        start_turn(&fixture.approvals, "a1", "t1", "m_1");
+        let reply = |calls: Value| {
+            fixture.approvals.observe(
+                "a1",
+                &FromWorker::Event {
+                    task: "t1".into(),
+                    starter: "m_1".into(),
+                    event: TaskEvent {
+                        seq: 3,
+                        kind: "llm.message".into(),
+                        at: 0,
+                        body: json!({ "content": calls }),
+                    },
+                },
+            );
+            fixture.approvals.turns("a1")[0].reason.clone()
+        };
+        let call = |name: &str, reason: &str| json!({ "type": "tool_use", "name": name, "input": { "reason": reason } });
+        assert_eq!(
+            reply(
+                json!([{ "type": "text", "text": "fetching" }, call("web_fetch", "Read the release notes")])
+            ),
+            Some("Read the release notes".to_string())
+        );
+        // Two different reasons, or only a file tool's, say nothing about the domain.
+        assert_eq!(
+            reply(json!([call("bash", "a"), call("web_fetch", "b")])),
+            None
+        );
+        assert_eq!(reply(json!([call("read_file", "c")])), None);
+        assert_eq!(
+            reply(json!([call("bash", "same"), call("bash", "same")])),
+            Some("same".to_string())
+        );
     }
 
     #[tokio::test]

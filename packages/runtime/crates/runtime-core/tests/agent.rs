@@ -603,6 +603,42 @@ async fn a_round_someone_ran_asks_as_any_turn_does() {
     assert!(!kinds(&events).contains(&"approval.skipped".to_string()));
 }
 
+#[tokio::test]
+async fn an_approval_carries_the_reason_the_agent_gave_and_asks_without_one_too() {
+    let harness = setup(Setup {
+        replies: vec![
+            Ok(tool_use(
+                "u1",
+                "bash",
+                json!({ "command": "npm ci", "reason": "  Install the dependencies before the tests  " }),
+            )),
+            Ok(tool_use("u2", "bash", json!({ "command": "rm -rf build" }))),
+            Ok(text("ok")),
+        ],
+        runners: vec![Arc::new(Bash {
+            ran: Arc::new(Mutex::new(Vec::new())),
+        })],
+        timeout_ms: Some(50),
+        ..Setup::default()
+    });
+    harness.core.receive(message("test it")).expect("receive");
+    harness.core.idle().await;
+    let asked: Vec<Value> = harness
+        .core
+        .events("t1")
+        .expect("events")
+        .into_iter()
+        .filter(|event| event.kind == "approval.requested")
+        .map(|event| event.body)
+        .collect();
+    assert_eq!(asked.len(), 2);
+    assert_eq!(
+        asked[0]["reason"],
+        json!("Install the dependencies before the tests")
+    );
+    assert_eq!(asked[1].get("reason"), None);
+}
+
 fn tool_names(request: &LlmRequest) -> Vec<String> {
     request.tools.iter().map(|tool| tool.name.clone()).collect()
 }

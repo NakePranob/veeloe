@@ -13,7 +13,7 @@ pub mod untrusted;
 pub mod usage;
 pub mod write_lock;
 
-pub use agent::{AgentCore, AgentError, Files, APPROVAL_TIMEOUT_MS, MAX_ROUNDS};
+pub use agent::{reason_of, AgentCore, AgentError, Files, APPROVAL_TIMEOUT_MS, MAX_ROUNDS};
 pub use conversation::conversation;
 pub use event_store::{
     Clock, EventLog, EventStore, StoreError, SystemClock, TaskEvent, TaskSummary,

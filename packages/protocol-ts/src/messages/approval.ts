@@ -46,6 +46,12 @@ export const ApprovalRequestedBodySchema = z.looseObject({
   command: z.string().min(1).optional(),
   /** ท่อนที่แยกแล้วทีละท่อน. */
   parts: z.array(z.string().min(1)).optional(),
+  /**
+   * ประโยคเดียวที่ Agent เขียนบอกคนอนุมัติว่าทำไปเพื่ออะไร (ADR 0092) เป็นคำพูดของ Agent ไม่ใช่สิ่งที่ระบบตรวจแล้ว
+   * ไม่มีเมื่อ Agent ไม่ได้ใส่หรือ Runtime รุ่นเก่า และถ้าอ่านไม่ได้ก็ทิ้งแค่เหตุผล ไม่ทิ้งคำขอ
+   */
+  // 300 characters from the Runtime, each at most two UTF-16 units.
+  reason: z.string().trim().min(1).max(600).optional().catch(undefined),
   /** Unix milliseconds ที่คำขอหมดอายุ. */
   expiresAt: z.number().int().nonnegative(),
 });

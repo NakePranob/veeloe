@@ -105,7 +105,9 @@
     "forSchedule": "อนุมัติ และให้ Schedule นี้ทำได้เลย",
     "fetchTitle": "ขอเปิดเว็บ {{site}} ได้ไหม?",
     "showCommand": "ดูคำสั่งเต็ม",
-    "allowSite": "อนุญาตทั้ง *.{{site}}"
+    "allowSite": "อนุญาตทั้ง *.{{site}}",
+    "reason": "{{name}} บอกว่า “{{reason}}”",
+    "noReason": "{{name}} ไม่ได้บอกว่าทำไปเพื่ออะไร"
   },
   "openAgent": "เปิดหน้า {{name}}",
   "stopped": "{{member}} หยุด Turn นี้ · {{when}}",

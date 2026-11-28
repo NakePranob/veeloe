@@ -1766,6 +1766,7 @@ async fn run_tool(
             starter,
             command,
             split_command(command),
+            reason_of(input),
             cancel,
         )
         .await;
@@ -1780,7 +1781,16 @@ async fn run_tool(
     if unattended.is_some() {
         return Err(skip(state, task, starter, name, vec![name.to_string()]));
     }
-    let answer = ask_approval(state, task, starter, name, vec![name.to_string()], cancel).await;
+    let answer = ask_approval(
+        state,
+        task,
+        starter,
+        name,
+        vec![name.to_string()],
+        reason_of(input),
+        cancel,
+    )
+    .await;
     if answer.decision == ApprovalDecision::Approve {
         return call_tool(state, task, starter, id, name, input, cancel).await;
     }
@@ -2013,25 +2023,36 @@ async fn ask_card(
     Ok(crate::cards::result(settled.as_ref()))
 }
 
+/// Most a `reason` keeps, in characters: one sentence, not a page (ADR 0092).
+pub const REASON_MAX: usize = 300;
+
+/// The `reason` a tool call gave for the person who approves it (ADR 0092),
+/// trimmed and cut to `REASON_MAX`; none when it is missing or blank, which
+/// still asks, since refusing would stop the work over a forgotten sentence.
+pub fn reason_of(input: &Value) -> Option<String> {
+    let text = input.get("reason")?.as_str()?.trim();
+    (!text.is_empty()).then(|| text.chars().take(REASON_MAX).collect())
+}
+
 async fn ask_approval(
     state: &Arc<State>,
     task: &str,
     starter: &str,
     command: &str,
     parts: Vec<String>,
+    reason: Option<String>,
     cancel: &Cancel,
 ) -> Answer {
     let _waiting = Waiting::on(state, task);
     let request = request_id(state);
     let timeout = state.approval_timeout();
     let expires_at = state.now_ms() + timeout.as_millis() as i64;
-    let _ = state.append(
-        task,
-        starter,
-        "approval.requested",
-        json!({ "request": request, "command": command, "parts": parts, "expiresAt": expires_at }),
-        None,
-    );
+    let mut body =
+        json!({ "request": request, "command": command, "parts": parts, "expiresAt": expires_at });
+    if let Some(reason) = reason {
+        body["reason"] = json!(reason);
+    }
+    let _ = state.append(task, starter, "approval.requested", body, None);
 
     let (answer, answered) = oneshot::channel();
     state.waiting.lock().expect("waiting").insert(

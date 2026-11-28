@@ -122,11 +122,10 @@ export function ApprovalCard({ approval, agentName, look, allowlist, canAnswer, 
       <Text variant="title" style={{ textAlign: "center" }}>
         {domain ? t("approval.domainTitle", { name: agentName }) : site ? t("approval.fetchTitle", { site }) : t("approval.title", { name: agentName })}
       </Text>
-      {approval.reason && (
-        <Text variant="footnote" selectable style={{ textAlign: "center" }}>
-          {approval.reason}
-        </Text>
-      )}
+      {/* The Agent's own words, not something the system checked (ADR 0092): said as theirs, and the command stays below. */}
+      <Text variant="footnote" tone={approval.reason ? "label" : "secondary"} selectable style={{ textAlign: "center" }}>
+        {approval.reason ? t("approval.reason", { name: agentName, reason: approval.reason }) : t("approval.noReason", { name: agentName })}
+      </Text>
       {site && !showCommand ? (
         <TextLink role="button" label={t("approval.showCommand")} onPress={() => setShowCommand(true)} />
       ) : (

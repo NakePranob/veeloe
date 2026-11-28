@@ -187,8 +187,9 @@ impl ToolRunner for WebFetchTool {
                 "type": "object",
                 "properties": {
                     "url": { "type": "string", "description": "The http or https URL of the page." },
+                    "reason": { "type": "string", "description": "One short sentence for the person who may have to approve this: what it is for, not the command again." },
                 },
-                "required": ["url"],
+                "required": ["url", "reason"],
             }),
         }]
     }
