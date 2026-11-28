@@ -13,6 +13,9 @@ mod cli {
 }
 
 use std::collections::HashMap;
+
+/// An Approval still waiting: its Agent, Task, the Member whose Turn asked, and the event.
+type OpenApproval = (String, String, String, veeloe_runtime_core::TaskEvent);
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use veeloe_runtime_supervisor::tasks::Outbox;
@@ -172,6 +175,10 @@ struct Supervisor {
     /// Agents that narrowed their file level and wait for their Turns to end
     /// before their worker starts again with it (ADR 0087).
     narrowed: Mutex<std::collections::HashSet<String>>,
+    /// Approvals still open, by request: their Agent, Task, the Member whose
+    /// Turn asked, and the event, so an approver who was not connected when it
+    /// was asked gets it on their next `task.list` (ADR 0010).
+    open_approvals: Mutex<HashMap<String, OpenApproval>>,
     started_at: u64,
 }
 
@@ -233,6 +240,61 @@ impl Supervisor {
             return;
         }
         if let Some(outbox) = outbox.as_ref() {
+            // An Approval goes to everyone who holds Approve here, not only to the
+            // Member whose Turn asked (ADR 0010): they get its own events, and
+            // nothing else of the Task.
+            if let FromWorker::Event {
+                task,
+                starter,
+                event,
+            } = &message
+            {
+                // A Turn that ends ends whatever it still asked: a timeout or a
+                // stop writes no answer of its own.
+                if event.kind == "turn.ended" {
+                    self.open_approvals
+                        .lock()
+                        .expect("approvals")
+                        .retain(|_, (_, open_task, _, _)| open_task != task);
+                }
+                if event.kind.starts_with("approval.") {
+                    let request = event
+                        .body
+                        .get("request")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_string();
+                    let mut open = self.open_approvals.lock().expect("approvals");
+                    if event.kind == "approval.requested" {
+                        open.insert(
+                            request,
+                            (
+                                agent.to_string(),
+                                task.clone(),
+                                starter.clone(),
+                                event.clone(),
+                            ),
+                        );
+                    } else {
+                        open.remove(&request);
+                    }
+                    drop(open);
+                    let trust = self.trust.lock().expect("trust").clone();
+                    for member in veeloe_runtime_supervisor::tasks::approvers(&trust, agent) {
+                        if member != *starter {
+                            forward(
+                                outbox.as_ref(),
+                                agent,
+                                FromWorker::Event {
+                                    task: task.clone(),
+                                    starter: member,
+                                    event: event.clone(),
+                                },
+                            );
+                        }
+                    }
+                }
+            }
             forward(outbox.as_ref(), agent, message);
         }
     }
@@ -847,6 +909,31 @@ impl Supervisor {
         {
             return outbox.error(&from, "member.forbidden");
         }
+        // An approver who was away when an Approval was asked hears of it now.
+        if type_ == "task.list" {
+            let open: Vec<OpenApproval> = self
+                .open_approvals
+                .lock()
+                .expect("approvals")
+                .values()
+                .filter(|(agent, _, starter, _)| {
+                    *starter != from.member
+                        && trust.approves(agent, &from.member, from.key.as_deref())
+                })
+                .cloned()
+                .collect();
+            for (agent, task, _, event) in open {
+                forward(
+                    outbox.as_ref(),
+                    &agent,
+                    FromWorker::Event {
+                        task,
+                        starter: from.member.clone(),
+                        event,
+                    },
+                );
+            }
+        }
         if type_ == "grant.set" {
             return self.set_grant(&from, &body, &outbox);
         }
@@ -1196,6 +1283,7 @@ async fn supervisor(home: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         quiet_since: Mutex::new(HashMap::new()),
         person_turns: Mutex::new(std::collections::HashSet::new()),
         narrowed: Mutex::new(std::collections::HashSet::new()),
+        open_approvals: Mutex::new(HashMap::new()),
         started_at: veeloe_runtime_supervisor::usage::now_ms() as u64,
     });
 

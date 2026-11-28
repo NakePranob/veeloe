@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseMessage, publicKeyOf, toBase64url, type KnownMessage } from "@veeloe/protocol-ts";
 import { startHubClient } from "../controller/src/shared/hub-client";
-import { FAKE_KEY, fakeProvider, sse } from "./helpers/fake-provider";
+import { bashUseSse, FAKE_KEY, fakeProvider, sse } from "./helpers/fake-provider";
 import { buildRuntime } from "../scripts/runtime";
 
 // The compiled `veeloe`, its workers and its proxy, through the real relay, with
@@ -257,16 +257,6 @@ test("usage.list answers with the Machine's own days, the Tasks behind the token
   expect(weekBody.from < today).toBe(true);
   owner.client.stop();
 }, 90_000);
-
-/** The SSE a Provider streams for one message that asks for one `bash` command. */
-function bashUseSse(command: string) {
-  const start = JSON.stringify({ type: "message_start", message: { id: "msg_bash", type: "message", role: "assistant", model: "model-a", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } } });
-  const block = JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tu1", name: "bash", input: { command } } });
-  const delta = JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify({ command }) } });
-  const stop = JSON.stringify({ type: "content_block_stop", index: 0 });
-  const end = JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 3 } });
-  return new Response([start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
-}
 
 test("an Approval answered from the Controller runs the real command, and a denied one does not", async () => {
   const owner = controller();

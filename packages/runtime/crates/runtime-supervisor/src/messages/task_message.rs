@@ -260,6 +260,16 @@ pub(crate) fn approval_answer(
     let Some((agent, task)) = target(machine, outbox, from, body) else {
         return;
     };
+    // Whoever holds Approve answers, not whoever started the Turn (ADR 0010);
+    // a permanent yes grows the Allowlist, which is Manage.
+    if let Some(trust) = machine.trust {
+        let key = from.key.as_deref();
+        if !trust.approves(&agent.id, &from.member, key)
+            || (body.get("allowAlways").is_some() && !trust.manages(&agent.id, &from.member, key))
+        {
+            return outbox.error(from, "approval.forbidden");
+        }
+    }
     let registry = machine.registry;
     let workers = machine.workers;
     let Some(request) = body.get("request").and_then(Value::as_str) else {

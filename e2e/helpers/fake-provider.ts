@@ -69,3 +69,13 @@ export function sse(content: { type: string; [k: string]: unknown }[]) {
   lines.push(`event: message_stop\ndata: {"type":"message_stop"}\n\n`);
   return new Response(lines.join(""), { headers: { "content-type": "text/event-stream" } });
 }
+
+/** The SSE a Provider streams for one message that asks for one `bash` command. */
+export function bashUseSse(command: string) {
+  const start = JSON.stringify({ type: "message_start", message: { id: "msg_bash", type: "message", role: "assistant", model: "model-a", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } } });
+  const block = JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tu1", name: "bash", input: { command } } });
+  const delta = JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify({ command }) } });
+  const stop = JSON.stringify({ type: "content_block_stop", index: 0 });
+  const end = JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 3 } });
+  return new Response([start, block, delta, stop, end, '{"type":"message_stop"}'].map((data) => `event: x\ndata: ${data}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
+}

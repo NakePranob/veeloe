@@ -113,9 +113,9 @@ export function TaskPage() {
         agentName={agent.name}
         look={lookOfJson(agent.character)}
         allowlist={allowlist}
-        // v0.1 Members in trust are all Owners, who may Approve and Manage every Agent; v0.3 reads Grants.
-        canAnswer={!readOnly}
-        canManage={!readOnly}
+        // Approve answers it; Manage may also allow it always (ADR 0010). Use only sees it wait.
+        canAnswer={!readOnly && agent.level !== "use"}
+        canManage={!readOnly && agent.level === "manage"}
         online={status.online !== false && !!link}
         now={now}
         me={machine?.member_id}

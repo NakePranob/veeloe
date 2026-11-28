@@ -174,6 +174,19 @@ impl Outbox for MachineOutbox {
 /// stays for a Controller that reads one list: it is the union of every Agent's,
 /// which is exactly what each Agent's list was before the split and what the
 /// legacy `egress.set` still sets everywhere.
+/// Every Member who may answer this Agent's Approvals (ADR 0010).
+pub fn approvers(trust: &Trust, agent: &str) -> Vec<String> {
+    let mut members: Vec<String> = trust
+        .owners
+        .iter()
+        .chain(&trust.members)
+        .map(|person| person.member.clone())
+        .filter(|member| trust.approves(agent, member, None))
+        .collect();
+    members.dedup();
+    members
+}
+
 /// What one Member is told of this Machine's Agents (ADR 0010): only those they
 /// hold a Grant at, each with their level, and no Provider, trash or Egress of
 /// anyone else's unless they are an Owner. `owner` says which they are.

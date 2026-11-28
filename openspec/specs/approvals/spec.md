@@ -26,7 +26,11 @@ Approval คือคำขอที่ Agent ส่งให้ Member ที�
 - **THEN** คำขอถัดไปของ Agent นั้นหมดเวลาใน 5 นาที และหน้า Allowlist แสดง 5 นาที
 
 ### Requirement: เฉพาะ Member ที่มี Approve ที่ Agent นั้นตอบได้
-คำตอบ Approval SHALL มาจาก Member ที่มี Grant ระดับ Approve ขึ้นไปที่ Agent ตัวนั้น (ใน v0.1 คือ Owner ทุกคน) Member ที่มีแค่ Use SHALL ตอบไม่ได้ คนที่มี Approve SHALL เปิดอ่าน Task ที่ขออนุมัติได้เมื่อต้องการ และการเปิด SHALL ถูกบันทึกไว้ใน Task
+คำตอบ Approval SHALL มาจาก Member ที่มี Grant ระดับ Approve ขึ้นไปที่ Agent ตัวนั้น ไม่ว่าใครเริ่ม Turn และ "อนุญาตตลอด" SHALL ต้องมี Manage Member ที่มีแค่ Use SHALL ตอบไม่ได้ แม้ใน Turn ของตัวเอง Runtime SHALL ส่ง event Approval ของ Task (`approval.requested`, `approval.answered`, `approval.skipped`) ไปถึงทุกคนที่มี Approve ที่ Agent นั้น โดยไม่ส่งส่วนอื่นของ Task และ SHALL ส่ง Approval ที่ยังรออยู่ให้คนที่มี Approve ที่เพิ่งต่อเข้ามาเมื่อเขาส่ง `task.list`
+
+#### Scenario: คนที่มี Approve ไม่ได้ต่ออยู่ตอนถาม
+- **WHEN** Owner ไม่ได้เปิดแอปตอนที่ Turn ของ Member ขอ Approval แล้วเปิดแอปภายหลัง
+- **THEN** Owner ได้ `approval.requested` นั้นและตอบได้
 
 #### Scenario: คนที่ไม่มี Approve
 - **WHEN** Member ที่มีแค่ Use ส่งคำตอบ Approval

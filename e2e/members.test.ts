@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { parseMessage, publicKeyOf, toBase64url, type KnownMessage } from "@veeloe/protocol-ts";
 import { startHubClient } from "../controller/src/shared/hub-client";
 import { buildRuntime } from "../scripts/runtime";
-import { FAKE_KEY, fakeProvider } from "./helpers/fake-provider";
+import { bashUseSse, FAKE_KEY, fakeProvider, sse } from "./helpers/fake-provider";
 
 // The compiled `veeloe` through the real relay, with an Owner and a second Member who is not one
 // (ADR 0010, issue #98). TEST-ONLY KEYS, the seeds cmd/testhub knows.
@@ -96,7 +96,7 @@ function controller(seed: Uint8Array, member: string) {
 const errorCode = (m: Received) => (m.type === "error" ? m.body.code : undefined);
 
 test("a Member who is not an Owner reaches an Agent only through a Grant, and loses it on the next Turn once it is taken away", async () => {
-  const owner = controller(ownerSeed, "member-1");
+  let owner = controller(ownerSeed, "member-1");
   const colleague = controller(colleagueSeed, "member-2");
   await Promise.all([owner.ready, colleague.ready]);
   // One at a time: two creates at once each answer with the list as it was.
@@ -156,6 +156,37 @@ test("a Member who is not an Owner reaches an Agent only through a Grant, and lo
   colleague.send("trigger.set", daily("tr_mine"));
   const mine = await colleague.next(from, (m) => m.type === "trigger.listed");
   expect(mine.type === "trigger.listed" && mine.body.triggers.map((x) => x.id)).toEqual(["tr_mine"]);
+
+  // An Approval in the Member's own Turn goes to whoever holds Approve (#101): Use does not answer it, the Owner does.
+  let calls = 0;
+  provider.reply = () => (++calls === 1 ? bashUseSse("touch member-marker") : sse([{ type: "text", text: "done" }]));
+  at = owner.inbox.length;
+  from = colleague.inbox.length;
+  colleague.send("task.message", { agent: "shared", id: "m-ap", text: "go" }, "task-ap");
+  const asked = await owner.next(at, (m) => m.type === "task.event" && m.task === "task-ap" && m.body.kind === "approval.requested");
+  const request = (asked.body as { body: { request: string } }).body.request;
+  await colleague.next(from, (m) => m.type === "task.event" && m.task === "task-ap" && m.body.kind === "approval.requested");
+  from = colleague.inbox.length;
+  colleague.send("approval.answer", { agent: "shared", request, decision: "approve" }, "task-ap");
+  expect(errorCode(await colleague.next(from, (m) => m.type === "error"))).toBe("approval.forbidden");
+  owner.send("approval.answer", { agent: "shared", request, decision: "approve" }, "task-ap");
+  await colleague.next(from, (m) => m.type === "task.event" && m.task === "task-ap" && m.body.kind === "turn.ended");
+  // The Owner saw the Approval, and nothing else of the Member's Task.
+  expect(owner.inbox.filter((m) => m.task === "task-ap").every((m) => m.type === "task.event" && m.body.kind.startsWith("approval."))).toBe(true);
+
+  // An approver who was not connected when it was asked hears of it on their next `task.list`.
+  owner.client.stop();
+  calls = 0;
+  from = colleague.inbox.length;
+  colleague.send("task.message", { agent: "shared", id: "m-ap2", text: "go" }, "task-ap2");
+  await colleague.next(from, (m) => m.type === "task.event" && m.task === "task-ap2" && m.body.kind === "approval.requested");
+  const back = controller(ownerSeed, "member-1");
+  await back.ready;
+  back.send("task.list", {});
+  const late = await back.next(0, (m) => m.type === "task.event" && m.task === "task-ap2" && m.body.kind === "approval.requested");
+  back.send("approval.answer", { agent: "shared", request: (late.body as { body: { request: string } }).body.request, decision: "approve" }, "task-ap2");
+  await colleague.next(from, (m) => m.type === "task.event" && m.task === "task-ap2" && m.body.kind === "turn.ended");
+  owner = back;
 
   // Taken away: the next Turn is refused.
   at = owner.inbox.length;

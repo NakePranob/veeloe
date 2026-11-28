@@ -7,10 +7,10 @@
 //! Member answers, the Turn ends, or the Agent's Approval timeout passes.
 //!
 //! An answer is not a fact until it is checked: it must name the same request,
-//! the same Agent and the same Task, it must come from the Member of that Turn,
-//! and that Member must have Approve at that Agent (ADR 0010). In v0.1 that is
-//! the Owner whose key signed the envelope ([`Trust::approves`]). Anything else
-//! is refused and the connection keeps waiting.
+//! the same Agent and the same Task, and it must come from a Member who holds
+//! Approve at that Agent with a key of theirs ([`Trust::approves`], ADR 0010),
+//! whoever started the Turn. Anything else is refused and the connection keeps
+//! waiting.
 //!
 //! `always` is the permanent yes: the domain goes into that Agent's Egress in
 //! one write, so the next request does not ask again. `approve` opens this one
@@ -413,8 +413,8 @@ impl Approvals {
             outbox.error(from, "approval.forbidden");
             return true;
         };
-        // The Member whose Turn asked, holding Approve here (who else may answer is #101).
-        if from.member != member || !trust.approves(&agent, &from.member, from.key.as_deref()) {
+        // Anyone who holds Approve here, not only the Member whose Turn asked (ADR 0010).
+        if !trust.approves(&agent, &from.member, from.key.as_deref()) {
             outbox.error(from, "approval.forbidden");
             return true;
         }
