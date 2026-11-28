@@ -320,38 +320,13 @@ impl Supervisor {
                         .expect("narrowed")
                         .insert(agent.to_string());
                     // Whoever is talking to it sees the narrower level now.
-                    let mut members: Vec<String> = self
+                    let members: Vec<String> = self
                         .approvals
                         .turns(agent)
                         .into_iter()
                         .map(|turn| turn.member)
                         .collect();
-                    members.sort();
-                    members.dedup();
-                    if let Some(me) = self.me.upgrade() {
-                        tokio::spawn(async move {
-                            let providers = load_providers(&me.home).unwrap_or_default();
-                            let info = veeloe_runtime_supervisor::models::info(
-                                &providers,
-                                me.http.as_ref(),
-                            )
-                            .await;
-                            let body = veeloe_runtime_supervisor::tasks::agents_listed(
-                                &me.registry,
-                                &info,
-                                Some(me.budgets.as_ref()),
-                            );
-                            let trust = me.trust.lock().expect("trust").clone();
-                            if let Some(outbox) = me.outbox.lock().expect("outbox").as_ref() {
-                                for member in members {
-                                    let body = veeloe_runtime_supervisor::tasks::listed_for(
-                                        &body, &trust, &member, None,
-                                    );
-                                    outbox.to_member(&member, "agent.listed", body, None);
-                                }
-                            }
-                        });
-                    }
+                    self.relist(members);
                 }
             }
             "turn.ended" => {
@@ -1026,9 +1001,42 @@ impl Supervisor {
             }
         };
         match answer {
-            Ok(listed) => outbox.to_member(&from.member, "grants.listed", listed, None),
+            Ok(listed) => {
+                outbox.to_member(&from.member, "grants.listed", listed, None);
+                // The Member granted sees the Agent come or go without reconnecting.
+                if let Some(to) = body.get("member").and_then(Value::as_str) {
+                    self.relist(vec![to.to_string()]);
+                }
+            }
             Err(code) => outbox.error(from, code),
         }
+    }
+
+    /// Sends these Members a fresh `agent.listed`, each as their Grants let them see it:
+    /// what they may reach changed, and their app only asks for the list when it connects.
+    fn relist(&self, mut members: Vec<String>) {
+        members.sort();
+        members.dedup();
+        let Some(me) = self.me.upgrade() else {
+            return;
+        };
+        tokio::spawn(async move {
+            let providers = load_providers(&me.home).unwrap_or_default();
+            let info = veeloe_runtime_supervisor::models::info(&providers, me.http.as_ref()).await;
+            let body = veeloe_runtime_supervisor::tasks::agents_listed(
+                &me.registry,
+                &info,
+                Some(me.budgets.as_ref()),
+            );
+            let trust = me.trust.lock().expect("trust").clone();
+            if let Some(outbox) = me.outbox.lock().expect("outbox").as_ref() {
+                for member in members {
+                    let body =
+                        veeloe_runtime_supervisor::tasks::listed_for(&body, &trust, &member, None);
+                    outbox.to_member(&member, "agent.listed", body, None);
+                }
+            }
+        });
     }
 
     /// A signed `group.set`: kept in `trust.json`, and answered with the groups
@@ -1044,6 +1052,12 @@ impl Supervisor {
         // Sending reads trust for the Member's devices, so nothing is sent while it is held.
         let answer = {
             let mut held = self.trust.lock().expect("trust");
+            let before: Vec<String> = body
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|id| held.groups.iter().find(|group| group.id == id))
+                .map(|group| group.members.clone())
+                .unwrap_or_default();
             match held.set_group(&exists, &from.member, from.key.as_deref(), body) {
                 Err(code) => Err(code),
                 Ok(next) => match veeloe_runtime_supervisor::trust::save_trust(&self.home, &next) {
@@ -1053,14 +1067,25 @@ impl Supervisor {
                     }
                     Ok(()) => {
                         let listed = next.groups_listed(&from.member, from.key.as_deref());
+                        let after = body
+                            .get("members")
+                            .and_then(Value::as_array)
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|member| member.as_str().map(str::to_string));
+                        let affected: Vec<String> = before.into_iter().chain(after).collect();
                         *held = next;
-                        Ok(listed)
+                        Ok((listed, affected))
                     }
                 },
             }
         };
         match answer {
-            Ok(listed) => outbox.to_member(&from.member, "groups.listed", listed, None),
+            Ok((listed, affected)) => {
+                outbox.to_member(&from.member, "groups.listed", listed, None);
+                // Everyone in the group, before and after, sees what it now gives them.
+                self.relist(affected);
+            }
             Err(code) => outbox.error(from, code),
         }
     }

@@ -7,7 +7,7 @@ Grant คือสิทธิ์ของ Member หนึ่งคนที่
 ## Requirements
 
 ### Requirement: ให้และถอน Grant ด้วยคำสั่งที่เซ็น
-Runtime SHALL รับ `grant.set` ที่มี `agent`, `member` และ `level` (`use`, `approve`, `manage` หรือ `none` เพื่อถอน) เฉพาะเมื่อผู้เซ็นเป็น Owner หรือมี Manage ที่ Agent นั้น Runtime SHALL ปฏิเสธ Grant ที่ให้กับ Owner (`grant.owner`), Member ที่ Machine ไม่รู้จัก (`grant.unknown_member`) และ Agent ที่ไม่มีหรืออยู่ในถังขยะ (`agent.unknown`) Runtime SHALL เก็บ Grant ใน `trust.json` และตอบผู้ส่งด้วย `grants.listed` ที่มี Grant ทั้งหมดของ Agent นั้น
+Runtime SHALL รับ `grant.set` ที่มี `agent`, `member` และ `level` (`use`, `approve`, `manage` หรือ `none` เพื่อถอน) เฉพาะเมื่อผู้เซ็นเป็น Owner หรือมี Manage ที่ Agent นั้น Runtime SHALL ปฏิเสธ Grant ที่ให้กับ Owner (`grant.owner`), Member ที่ Machine ไม่รู้จัก (`grant.unknown_member`) และ Agent ที่ไม่มีหรืออยู่ในถังขยะ (`agent.unknown`) Runtime SHALL เก็บ Grant ใน `trust.json` และตอบผู้ส่งด้วย `grants.listed` ที่มี Grant ทั้งหมดของ Agent นั้น และส่ง `agent.listed` ชุดใหม่ให้ Member ที่ได้หรือเสีย Grant ทันที ไม่ต้องรอให้แอปของคนนั้นต่อใหม่ `group.set` ก็ส่งให้ทุกคนในกลุ่มทั้งก่อนและหลังการเปลี่ยนแบบเดียวกัน
 
 #### Scenario: Owner ให้ Use
 - **WHEN** Owner ส่ง `grant.set` ให้ `member-2` ได้ `use` ที่ `shared`

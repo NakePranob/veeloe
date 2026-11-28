@@ -119,7 +119,11 @@ test("a Member who is not an Owner reaches an Agent only through a Grant, and lo
 
   // The Owner grants Use at one Agent; it is kept on the Machine.
   let at = owner.inbox.length;
+  from = colleague.inbox.length;
   owner.send("grant.set", { agent: "shared", member: "member-2", level: "use" });
+  // The Member's app hears of it without asking or reconnecting.
+  const told = await colleague.next(from, (m) => m.type === "agent.listed");
+  expect(told.type === "agent.listed" && told.body.agents.map((a) => a.id)).toEqual(["shared"]);
   const listed = await owner.next(at, (m) => m.type === "grants.listed");
   expect(listed.body).toEqual({ agent: "shared", grants: [{ member: "member-2", level: "use" }] });
   expect(JSON.parse(readFileSync(join(home, "runtime/trust.json"), "utf8")).grants).toEqual([{ agent: "shared", member: "member-2", level: "use" }]);
@@ -192,8 +196,11 @@ test("a Member who is not an Owner reaches an Agent only through a Grant, and lo
   provider.reply = () => sse([{ type: "text", text: "done" }]);
   const team = (version: number, members: string[], level = "use") => ({ id: "g_team", name: "Team", version, members, admins: [], grants: [{ agent: "private", level }] });
   at = owner.inbox.length;
+  from = colleague.inbox.length;
   owner.send("group.set", team(1, ["member-2"]));
   await owner.next(at, (m) => m.type === "groups.listed");
+  // Joining a group sends the Member a list with what it gives.
+  await colleague.next(from, (m) => m.type === "agent.listed" && m.body.agents.some((a) => a.id === "private"));
   from = colleague.inbox.length;
   colleague.send("task.message", { agent: "private", id: "m-g1", text: "hi" }, "task-g");
   await colleague.next(from, (m) => m.type === "task.event" && m.task === "task-g" && m.body.kind === "turn.ended");
