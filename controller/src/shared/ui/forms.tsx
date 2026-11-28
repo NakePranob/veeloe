@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, Switch, TextInput, View, type KeyboardTypeOptions } from "react-native";
 import { Card } from "./card";
-import { HeaderAction } from "./header-action";
+import { HeaderAction, type HeaderIcon } from "./header-action";
 import { Icon, type IconName } from "./icon";
 import { Text } from "./text";
 import { Button } from "./button";
@@ -15,7 +15,7 @@ interface ScreenProps {
   // A line under the title in the header, such as whose page this is ("Nim · 4 entries").
   subtitle?: string;
   // Goes on the header's right, such as a save or add action.
-  right?: { label: string; onPress: () => void; disabled?: boolean; icon?: IconName; variant?: "primary" | "chip" | "ghost" };
+  right?: { label: string; onPress: () => void; disabled?: boolean; icon?: HeaderIcon; variant?: "primary" | "chip" | "ghost" };
   // The one action the screen is for, pinned under the content, clear of the home indicator.
   bottom?: ReactNode;
   // False while something on the page follows the finger, such as a row being dragged, so the page holds still.
