@@ -1,12 +1,4 @@
 {
-  "subtitle_one": "{{count}} person",
-  "subtitle_other": "{{count}} people",
-  "empty": {
-    "title": "Nobody has joined yet",
-    "body": "Invite people with a link; whoever joins shows here"
-  },
-  "invite": "Invite people",
-  "footer": "People who joined with an invitation link. Owners are not in this list.",
   "joined": "Joined {{when}}",
   "removed": "Removed",
   "level": {
@@ -32,5 +24,26 @@
     "action": "Remove",
     "cannot": "Cannot remove"
   },
-  "named": "{{name}} · {{title}}"
+  "named": "{{name}} · {{title}}",
+  "title": "People",
+  "subtitle_one": "{{count}} person",
+  "subtitle_other": "{{count}} people",
+  "invite": "Invite",
+  "footer": "Everyone in the Workspace. Owners hold every Agent; tap someone who joined by link to see or change what they can do.",
+  "you": "You",
+  "youNamed": "{{name}} (you)",
+  "owner": "Owner",
+  "ownerRole": "Owner",
+  "groups": {
+    "heading": "Groups",
+    "footer": "A group grants everyone in it at once",
+    "new": "Create a group",
+    "none": "No groups yet"
+  },
+  "links": {
+    "heading": "Open invitation links",
+    "agents_one": "A link to {{count}} Agent",
+    "agents_other": "A link to {{count}} Agents",
+    "detail": "{{joined}} of {{count}} joined · expires {{when}}"
+  }
 }

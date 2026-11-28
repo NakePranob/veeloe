@@ -1,34 +1,76 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { useAgents } from "../../../entities/agent";
-import { useGrants, useMembers } from "../../../entities/device";
-import { ownsAny, useMachines } from "../../../entities/machine";
+import { useGrants, useGroups, useMembers } from "../../../entities/device";
+import { ownersOf, ownsAny, useMachines } from "../../../entities/machine";
 import { AgentLevelSelect } from "../../../widgets/agent-level";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
+import { useLiveQuery } from "../../../shared/db";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Button, confirm, Empty, inform, Row, Screen, Section } from "../../../shared/ui";
+import { confirm, inform, Row, Screen, Section } from "../../../shared/ui";
 import { removeMember } from "../model/remove";
 
 type Choice = "none" | "use" | "approve" | "manage";
 
-// Who else is in the Workspace (ADR 0059), laid out as the device list: one row each, a tap opens them.
+/** An Invitation still taking people, as this device keeps it (the invite page's table). */
+type OpenLink = { id: string; group_id: string | null; title: string | null; max_members: number; joined: string; expires_at: number; grants: string };
+// ponytail: read straight from the invite page's table; give Invitations an entity when a third screen needs them.
+const OPEN_LINKS = "SELECT id, group_id, title, max_members, joined, expires_at, grants FROM invitation WHERE closed_at IS NULL ORDER BY created_at DESC";
+const LINK_TOPICS = ["invitation"];
+
+// Everyone in the Workspace on one page (ADR 0093): the Owners, the people let in, then the groups and the links
+// still taking people. Laid out as the device list: one row each, a tap opens them. Inviting is the header's.
 export function MembersPage() {
   const t = useT("members");
   const language = useLanguage();
   const members = useMembers();
   const machines = useMachines();
-  const here = members?.filter((member) => member.removed_at === null);
+  const groups = useGroups();
+  const links = useLiveQuery<OpenLink>(OPEN_LINKS, [], LINK_TOPICS);
+  if (!members || !machines || !groups) return <Screen title={t("title")}>{null}</Screen>;
+  const me = new Set(machines.map((m) => m.member_id));
+  const owner = ownsAny(machines);
+  const canInvite = owner || groups.some((group) => group.admins.some((m) => me.has(m)));
+  const owners = ownersOf(machines);
+  const here = members.filter((member) => member.removed_at === null && !owners.includes(member.id));
+  const open = (links ?? []).filter((link) => link.expires_at * 1000 > Date.now() && (JSON.parse(link.joined) as unknown[]).length < link.max_members);
+  const groupName = (id: string | null) => groups.find((g) => g.id === id)?.name;
+  const named = (name: string, title: string | null) => (title ? t("named", { name, title }) : name);
+
   return (
-    <Screen title="Member" subtitle={here?.length ? t("subtitle", { count: here.length }) : undefined}>
-      {here && here.length === 0 && (
-        <Empty icon="share" title={t("empty.title")} detail={t("empty.body")} action={ownsAny(machines ?? undefined) ? <Button label={t("invite")} variant="primary" onPress={() => router.push("/invite")} /> : undefined} />
-      )}
-      {here && here.length > 0 && (
-        <Section footer={t("footer")}>
-          {here.map((member) => (
-            <Row key={member.id} title={member.title ? t("named", { name: member.name, title: member.title }) : member.name} detail={t("joined", { when: when(member.added_at, language) })} href={`/members/${member.id}`} />
+    <Screen title={t("title")} subtitle={t("subtitle", { count: owners.length + here.length })} right={canInvite ? { label: t("invite"), icon: "add", variant: "chip", onPress: () => router.push("/invite") } : undefined}>
+      <Section footer={t("footer")}>
+        {/* Owners came by Pairing and have no name a Machine knows: they read as Owner, and you as you. */}
+        {owners.map((id) => (
+          <Row key={id} title={me.has(id) ? t("you") : t("owner")} value={me.has(id) ? t("ownerRole") : undefined} />
+        ))}
+        {here.map((member) => (
+          <Row
+            key={member.id}
+            title={me.has(member.id) ? t("youNamed", { name: named(member.name, member.title) }) : named(member.name, member.title)}
+            detail={t("joined", { when: when(member.added_at, language) })}
+            href={me.has(member.id) ? undefined : `/members/${member.id}`}
+          />
+        ))}
+      </Section>
+      <Section title={t("groups.heading")} footer={owner ? t("groups.footer") : undefined}>
+        {groups.map((group) => (
+          <Row key={group.id} icon="people" title={group.name} value={t("subtitle", { count: group.members.length })} href={`/groups/${group.id}`} />
+        ))}
+        {owner ? <Row icon="add" title={t("groups.new")} href="/groups" /> : groups.length === 0 && <Row title={t("groups.none")} />}
+      </Section>
+      {canInvite && open.length > 0 && (
+        <Section title={t("links.heading")}>
+          {open.map((link) => (
+            <Row
+              key={link.id}
+              icon="share"
+              title={groupName(link.group_id) ?? t("links.agents", { count: (JSON.parse(link.grants) as unknown[]).length })}
+              detail={t("links.detail", { joined: (JSON.parse(link.joined) as unknown[]).length, count: link.max_members, when: when(link.expires_at * 1000, language) })}
+              href={{ pathname: "/invite", params: { id: link.id } }}
+            />
           ))}
         </Section>
       )}

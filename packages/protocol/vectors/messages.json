@@ -606,6 +606,26 @@
       "valid": true
     },
     {
+      "name": "listed, with the Owners' Member ids",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5"
+          }
+        ],
+        "providers": [],
+        "owner": false,
+        "owners": [
+          "m_owner"
+        ]
+      },
+      "valid": true
+    },
+    {
       "name": "listed, with an Agent's git repos",
       "type": "agent.listed",
       "body": {

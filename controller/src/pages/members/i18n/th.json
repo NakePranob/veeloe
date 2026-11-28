@@ -1,11 +1,4 @@
 {
-  "subtitle": "{{count}} คน",
-  "empty": {
-    "title": "ยังไม่มีใครเข้าร่วม",
-    "body": "เชิญคนด้วยลิงก์ แล้วคนที่เข้ามาจะขึ้นที่นี่"
-  },
-  "invite": "เชิญคน",
-  "footer": "คนที่เข้ามาด้วยลิงก์เชิญ Owner ไม่อยู่ในรายการนี้",
   "joined": "เข้าเมื่อ {{when}}",
   "removed": "ถูกเอาออกแล้ว",
   "level": {
@@ -31,5 +24,24 @@
     "action": "เอาออก",
     "cannot": "เอาออกไม่ได้"
   },
-  "named": "{{name}} · {{title}}"
+  "named": "{{name}} · {{title}}",
+  "title": "คน",
+  "subtitle": "{{count}} คน",
+  "invite": "เชิญ",
+  "footer": "ทุกคนใน Workspace Owner มีสิทธิ์ทุก Agent แตะคนที่เข้ามาด้วยลิงก์เพื่อดูหรือแก้สิทธิ์",
+  "you": "คุณ",
+  "youNamed": "{{name}} (คุณ)",
+  "owner": "Owner",
+  "ownerRole": "Owner",
+  "groups": {
+    "heading": "กลุ่ม",
+    "footer": "กลุ่มให้สิทธิ์ทุกคนในกลุ่มพร้อมกัน",
+    "new": "สร้างกลุ่ม",
+    "none": "ยังไม่มีกลุ่ม"
+  },
+  "links": {
+    "heading": "ลิงก์เชิญที่เปิดอยู่",
+    "agents": "ลิงก์ให้ Agent {{count}} ตัว",
+    "detail": "เข้าแล้ว {{joined}} จาก {{count}} · หมดอายุ {{when}}"
+  }
 }

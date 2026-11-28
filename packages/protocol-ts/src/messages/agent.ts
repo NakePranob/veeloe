@@ -143,5 +143,7 @@ export const AgentListedBodySchema = z.looseObject({
   egress: EgressSchema.optional(),
   /** Whether the Member this list is for is an Owner of the Machine. Absent from a Machine older than Grants. */
   owner: z.boolean().optional(),
+  /** The Owners' Member ids, so everyone's People page lists them (ADR 0093). Absent from an older Machine. */
+  owners: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).max(50).optional(),
 });
 export type AgentListedBody = z.infer<typeof AgentListedBodySchema>;

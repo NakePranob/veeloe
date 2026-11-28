@@ -15,6 +15,8 @@ export type Machine = {
   egress: string;
   /** 1 when this Member is an Owner of it, 0 when a Grant is all they hold there (ADR 0010). */
   owner?: number;
+  /** The Owners' Member ids as a JSON list, from the Machine's latest Agent list. */
+  owners?: string;
   /** When it last answered a usage request, for "ข้อมูลเมื่อ" (`usage-history`); null before the first. */
   usage_fetched_at?: number | null;
 };
@@ -32,7 +34,7 @@ export function egressOf(machine: Pick<Machine, "egress">): string[] {
 export const LIST_MACHINES = "SELECT * FROM machine ORDER BY paired_at, id";
 
 /** The same Machine paired again after `veeloe unpair` has a new key and id, so this only replaces a repeat. */
-export function saveMachine(database: Database, machine: Omit<Machine, "egress" | "owner">) {
+export function saveMachine(database: Database, machine: Omit<Machine, "egress" | "owner" | "owners">) {
   return database.write([MACHINE_TOPIC], (transaction) =>
     transaction.run("INSERT OR REPLACE INTO machine (id, public_key, name, hub_url, workspace_id, member_id, paired_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [
       machine.id,
@@ -53,8 +55,15 @@ export function ownsAny(machines: readonly Pick<Machine, "owner">[] | undefined)
 }
 
 /** Whether this Member is an Owner there, as its Agent list said. */
-export function saveOwner(database: Database, machineId: string, owner: boolean) {
-  return database.write([MACHINE_TOPIC], (transaction) => transaction.run("UPDATE machine SET owner = ? WHERE id = ?", [owner ? 1 : 0, machineId]));
+export function saveOwner(database: Database, machineId: string, owner: boolean, owners?: readonly string[]) {
+  return database.write([MACHINE_TOPIC], (transaction) =>
+    owners ? transaction.run("UPDATE machine SET owner = ?, owners = ? WHERE id = ?", [owner ? 1 : 0, JSON.stringify(owners), machineId]) : transaction.run("UPDATE machine SET owner = ? WHERE id = ?", [owner ? 1 : 0, machineId]),
+  );
+}
+
+/** The Owners of these Machines' Workspace, each once. */
+export function ownersOf(machines: readonly Pick<Machine, "owners">[]): string[] {
+  return [...new Set(machines.flatMap((machine) => JSON.parse(machine.owners ?? "[]") as string[]))];
 }
 
 export function saveEgress(database: Database, machineId: string, egress: string[]) {

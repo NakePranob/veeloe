@@ -188,4 +188,6 @@ export const MIGRATIONS = [
   // What an Invitation gives besides its Grants: a group to join and a title.
   `ALTER TABLE invitation ADD COLUMN group_id TEXT`,
   `ALTER TABLE invitation ADD COLUMN title TEXT`,
+  // The Owners' Member ids as the Machine last listed them, for the People page (ADR 0093).
+  `ALTER TABLE machine ADD COLUMN owners TEXT NOT NULL DEFAULT '[]'`,
 ] as const;

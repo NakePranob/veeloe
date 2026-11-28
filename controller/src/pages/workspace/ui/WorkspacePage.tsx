@@ -1,7 +1,7 @@
 import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
-import { useDevices, useGroups, useMembers } from "../../../entities/device";
-import { ownsAny, useMachines } from "../../../entities/machine";
+import { useDevices, useMembers } from "../../../entities/device";
+import { ownersOf, useMachines } from "../../../entities/machine";
 import { needsYou, statusOf, useLatestTasks } from "../../../entities/task";
 import { dailyTotals, useUsageDays } from "../../../entities/usage";
 import { PUSH_READY, savePushEnabled, useMachineStatuses, usePushEnabled } from "../../../features/machine-link";
@@ -24,9 +24,8 @@ export function WorkspacePage() {
   const rows = useUsageDays();
   const devices = useDevices();
   const members = useMembers()?.filter((member) => member.removed_at === null);
-  const groups = useGroups();
-  const me = new Set(machines?.map((m) => m.member_id));
-  const canInvite = ownsAny(machines ?? undefined) || !!groups?.some((group) => group.admins.some((m) => me.has(m)));
+  const owners = ownersOf(machines ?? []);
+  const people = owners.length + (members?.filter((member) => !owners.includes(member.id)).length ?? 0);
   const live = devices?.filter((d) => d.revoked_at === null);
   const online = machines?.filter((m) => statuses[m.id]?.online === true).length ?? 0;
 
@@ -95,11 +94,9 @@ export function WorkspacePage() {
           />
         </View>
       </View>
+      {/* Everyone, the groups and the open links live on one page (ADR 0093). */}
       <Section title={t("people.heading")} footer={t("people.footer")}>
-        <Row icon="people" title="Member" value={members ? String(members.length) : undefined} href="/members" />
-        <Row icon="list" title={t("people.groups")} value={groups ? String(groups.length) : undefined} href="/groups" />
-        {/* Only an Owner or a group admin brings people in (ADR 0093). */}
-        {canInvite && <Row icon="share" title={t("people.invite")} href="/invite" />}
+        <Row icon="people" title={t("people.row")} value={members ? String(people) : undefined} href="/members" />
       </Section>
       {/* The board's switch, hidden while push is dormant, so it never promises a banner that will not come. */}
       {PUSH_READY && (

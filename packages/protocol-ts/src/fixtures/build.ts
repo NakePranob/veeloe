@@ -271,6 +271,7 @@ export function messageVectors() {
       valid: true,
     },
     { name: "listed, with an Agent that has a Character and one made before Characters", type: "agent.listed", body: { agents: [{ ...agent, character }, { ...agent, id: "agent-2" }], providers: [] }, valid: true },
+    { name: "listed, with the Owners' Member ids", type: "agent.listed", body: { agents: [agent], providers: [], owner: false, owners: ["m_owner"] }, valid: true },
     { name: "listed, with an Agent's git repos", type: "agent.listed", body: { agents: [{ ...agent, gitRepos: ["acme/shop"] }], providers: [] }, valid: true },
     { name: "listed with a git repo that is not owner/name", type: "agent.listed", body: { agents: [{ ...agent, gitRepos: ["acme"] }], providers: [] }, valid: false },
     { name: "listed, with a Budget and today's usage", type: "agent.listed", body: { agents: [{ ...agent, budget: 10_000_000, usage: { day: "2026-11-06", tokens: 17_000 } }], providers: [] }, valid: true },

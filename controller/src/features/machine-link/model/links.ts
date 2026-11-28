@@ -193,7 +193,7 @@ export function createMachineLinks({
       await saveAgents(database, machine.id, message.body.agents, message.body.trash);
       // A Machine older than `sandboxed-commands` says nothing of it, which is not the same as an empty Egress.
       if (message.body.egress) await saveEgress(database, machine.id, message.body.egress);
-      if (message.body.owner !== undefined) await saveOwner(database, machine.id, message.body.owner);
+      if (message.body.owner !== undefined) await saveOwner(database, machine.id, message.body.owner, message.body.owners);
       setStatus(machine.id, { online: true, providers: message.body.providers });
       // It answered, so it is online: now is when a direct link can come up.
       offerDirect(machine);

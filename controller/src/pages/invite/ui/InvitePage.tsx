@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 import { parseInvitationLink, type GrantLevel } from "@veeloe/protocol-ts";
 import { useEffect, useState } from "react";
 import { Share, View } from "react-native";
@@ -25,9 +26,11 @@ type Choice = GrantLevel | "none";
 export function InvitePage() {
   const t = useT("invite");
   const invitations = useLiveQuery<Invitation>(LIST_INVITATIONS, [], TOPICS);
+  // One link from the People page's list of open ones (ADR 0093), else the latest.
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const [drafting, setDrafting] = useState(false);
   // The latest one stays on screen while it is still live or just filled up, so whoever was let in shows.
-  const latest = invitations?.[0];
+  const latest = (id && invitations?.find((invitation) => invitation.id === id)) || invitations?.[0];
   const open = latest && latest.closed_at === null && Date.now() < latest.expires_at * 1000 ? latest : undefined;
   if (!invitations) return <Screen title={t("title")}>{null}</Screen>;
   if (open && !drafting) return <OpenInvitation key={open.id} invitation={open} onNew={() => setDrafting(true)} />;

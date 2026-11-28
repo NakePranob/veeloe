@@ -25,7 +25,19 @@ function connection(sqlite: Sqlite): Connection {
   } as unknown as Connection;
 }
 
-const machine = (id: string, paired_at: number): Machine => ({ id, public_key: `key-${id}`, name: `mac-${id}`, hub_url: "wss://hub.test", workspace_id: "w", member_id: "m", paired_at, egress: "[]", owner: 1, usage_fetched_at: null });
+const machine = (id: string, paired_at: number): Machine => ({
+  id,
+  public_key: `key-${id}`,
+  name: `mac-${id}`,
+  hub_url: "wss://hub.test",
+  workspace_id: "w",
+  member_id: "m",
+  paired_at,
+  egress: "[]",
+  owner: 1,
+  owners: "[]",
+  usage_fetched_at: null,
+});
 
 async function open() {
   const c = connection(new Sqlite(":memory:"));

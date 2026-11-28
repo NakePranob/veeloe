@@ -23,8 +23,7 @@
   "note": "This applies to this device only; your other devices keep their own. Change the language with the button at the top right.",
   "people": {
     "heading": "People",
-    "invite": "Invite people",
-    "footer": "Send a link so others can use the Agents you choose. You compare a code and let each one in.",
-    "groups": "Groups"
+    "row": "People in the Workspace",
+    "footer": "Everyone, the groups and the invitation links still open"
   }
 }

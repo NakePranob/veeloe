@@ -215,6 +215,12 @@ pub fn listed_for(body: &Value, trust: &Trust, member: &str, key: Option<&str>) 
         });
     }
     body["owner"] = json!(owner);
+    // Everyone's People page lists the Owners (ADR 0093); their ids are all a Machine knows of them.
+    body["owners"] = json!(trust
+        .owners
+        .iter()
+        .map(|owner| owner.member.clone())
+        .collect::<Vec<_>>());
     if !owner {
         body["providers"] = json!([]);
         body["trash"] = json!([]);
