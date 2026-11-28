@@ -2,9 +2,9 @@ import { parseInvitationLink, type GrantLevel } from "@veeloe/protocol-ts";
 import { useEffect, useState } from "react";
 import { Share, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
-import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { groupBodies, useGroups } from "../../../entities/device";
 import { ownsAny, useMachines } from "../../../entities/machine";
+import { AgentLevelRow, AgentLevelSelect } from "../../../widgets/agent-level";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { useDatabase, useLiveQuery } from "../../../shared/db";
 import { deviceName } from "../../../shared/device-name";
@@ -101,10 +101,10 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
       <Section title="Agent" footer={t("agents.footer")}>
         {ours.length === 0 && <Row title={t("agents.empty")} />}
         {ours.map((agent) => (
-          <Select
+          <AgentLevelSelect
             key={agent.id}
-            label={agent.name}
-            leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={32} still />}
+            agent={agent}
+            machine={machines?.find((m) => m.id === agent.machine_id)?.name ?? ""}
             value={levels[agent.id] ?? "none"}
             cancel={t("cancel")}
             options={(["none", "use", "approve", "manage"] as const).map((level) => ({ value: level, label: levelLabel(level) }))}
@@ -199,10 +199,6 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
   }
 
   const agentName = (id: string) => agents.find((agent) => agent.id === id)?.name ?? id;
-  const head = (id: string) => {
-    const agent = agents.find((a) => a.id === id);
-    return agent ? <Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={32} still /> : undefined;
-  };
   const full = joined.length >= invitation.max_members;
   return (
     <Screen title={t("title")} subtitle={t("subtitle", { joined: joined.length, count: invitation.max_members })}>
@@ -245,9 +241,12 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
         </Section>
       )}
       <Section title={t("grants.heading")}>
-        {grants.map((grant) => (
-          <Row key={`${grant.machine}/${grant.agent}`} title={agentName(grant.agent)} value={t(`level.${grant.level}`)} leading={head(grant.agent)} />
-        ))}
+        {grants.map((grant) => {
+          const agent = agents.find((a) => a.id === grant.agent);
+          const key = `${grant.machine}/${grant.agent}`;
+          const value = t(`level.${grant.level}`);
+          return agent ? <AgentLevelRow key={key} agent={agent} machine={machines.find((m) => m.id === grant.machine)?.name ?? ""} value={value} /> : <Row key={key} title={agentName(grant.agent)} value={value} />;
+        })}
         {group && <Row icon="people" title={t("group.label")} value={group.name} />}
         {invitation.title && <Row title={t("role.label")} value={invitation.title} />}
       </Section>

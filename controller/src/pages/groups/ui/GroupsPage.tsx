@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { useAgents } from "../../../entities/agent";
-import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { groupBodies, type MemberGroup, useGroups, useMembers } from "../../../entities/device";
 import { ownsAny, useMachines } from "../../../entities/machine";
+import { AgentLevelSelect } from "../../../widgets/agent-level";
 import { useMachineLink } from "../../../features/machine-link";
 import { useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
-import { Button, Empty, Field, inform, Row, Screen, Section, Select, ToggleRow } from "../../../shared/ui";
+import { Button, Empty, Field, inform, Row, Screen, Section, ToggleRow } from "../../../shared/ui";
 
 type Choice = "none" | "use" | "approve" | "manage";
 
@@ -108,10 +108,10 @@ export function GroupPage() {
       </Section>
       <Section title="Agent" footer={t("grants.footer")}>
         {agents.map((agent) => (
-          <Select
+          <AgentLevelSelect
             key={agent.id}
-            label={agent.name}
-            leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={32} still />}
+            agent={agent}
+            machine={machines.find((m) => m.id === agent.machine_id)?.name ?? ""}
             value={levelOf(agent.id)}
             cancel={t("cancel")}
             disabled={agent.level !== "manage"}

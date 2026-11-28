@@ -26,6 +26,8 @@ export function Select<T extends string>({
   disabled,
   cancel,
   leading,
+  content,
+  tight,
 }: {
   label: string;
   value: T;
@@ -34,6 +36,9 @@ export function Select<T extends string>({
   disabled?: boolean;
   cancel: string;
   leading?: ReactNode;
+  /** In place of the label on the row (Row's `content`); the label still titles the sheet. */
+  content?: ReactNode;
+  tight?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const chosen = options.find((option) => option.value === value);
@@ -56,6 +61,8 @@ export function Select<T extends string>({
       <Row
         title={label}
         leading={leading}
+        content={content}
+        tight={tight}
         value={chosen?.dot ? undefined : chosen?.label}
         disabled={disabled}
         onPress={press}

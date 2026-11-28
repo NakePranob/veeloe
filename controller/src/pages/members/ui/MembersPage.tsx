@@ -1,14 +1,14 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { useAgents } from "../../../entities/agent";
-import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useGrants, useMembers } from "../../../entities/device";
 import { ownsAny, useMachines } from "../../../entities/machine";
+import { AgentLevelSelect } from "../../../widgets/agent-level";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Button, confirm, Empty, inform, Row, Screen, Section, Select } from "../../../shared/ui";
+import { Button, confirm, Empty, inform, Row, Screen, Section } from "../../../shared/ui";
 import { removeMember } from "../model/remove";
 
 type Choice = "none" | "use" | "approve" | "manage";
@@ -90,10 +90,10 @@ export function MemberPage() {
       {member.removed_at === null && (
         <Section title="Agent" footer={managed.length > 0 ? t("grants.footer") : t("grants.none")}>
           {managed.map((agent) => (
-            <Select
+            <AgentLevelSelect
               key={agent.id}
-              label={agent.name}
-              leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={32} still />}
+              agent={agent}
+              machine={machines.find((m) => m.id === agent.machine_id)?.name ?? ""}
               value={levelOf(agent.id)}
               cancel={t("cancel")}
               disabled={statuses[agent.machine_id]?.online === false}

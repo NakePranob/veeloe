@@ -114,13 +114,27 @@ interface RowProps {
   // For a row that opens choices under it (Select): whether they are showing, and which one is chosen.
   expanded?: boolean;
   selected?: boolean;
+  // In place of the title and detail, such as an Agent's name with its model; the title still names the row.
+  content?: ReactNode;
+  // Closer to its neighbours, for a row led by a 40pt Character, as on the Agents page.
+  tight?: boolean;
 }
 
 // One line in a section. It opens something when it has an href or onPress.
-export function Row({ title, detail, value, icon, leading, iconColor, href, onLongPress, onPress, destructive, mono, accessory, disabled, add, expanded, selected }: RowProps) {
+export function Row({ title, detail, value, icon, leading, iconColor, href, onLongPress, onPress, destructive, mono, accessory, disabled, add, expanded, selected, content, tight }: RowProps) {
   const colors = useColors();
   const body = (pressed: boolean) => (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: size.row, paddingHorizontal: space.inset, paddingVertical: space.md, backgroundColor: pressed ? colors.chipPressed : "transparent" }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: space.md,
+        minHeight: size.row,
+        paddingHorizontal: tight ? space.lg : space.inset,
+        paddingVertical: tight ? space.sm : space.md,
+        backgroundColor: pressed ? colors.chipPressed : "transparent",
+      }}
+    >
       {add ? (
         <View aria-hidden style={{ width: 32, height: 32, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", backgroundColor: colors.accent }}>
           <Icon name="add" size="md" color="onAccent" weight="semibold" />
@@ -129,13 +143,17 @@ export function Row({ title, detail, value, icon, leading, iconColor, href, onLo
         (leading ?? (icon && <Icon name={icon} size="md" color={iconColor ?? (destructive ? "red" : "label")} />))
       )}
       <View style={{ flex: 1, gap: space.xxs }}>
-        <Text mono={mono} strong={destructive || add} tone={destructive ? "danger" : "label"} variant="subheadline" selectable={!href && !onPress}>
-          {title}
-        </Text>
-        {detail && (
-          <Text variant="caption" tone="secondary" selectable={!href && !onPress}>
-            {detail}
-          </Text>
+        {content ?? (
+          <>
+            <Text mono={mono} strong={destructive || add} tone={destructive ? "danger" : "label"} variant="subheadline" selectable={!href && !onPress}>
+              {title}
+            </Text>
+            {detail && (
+              <Text variant="caption" tone="secondary" selectable={!href && !onPress}>
+                {detail}
+              </Text>
+            )}
+          </>
         )}
       </View>
       {value && (
