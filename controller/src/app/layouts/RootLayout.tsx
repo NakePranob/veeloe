@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useGlobalSearchParams } from "expo-router";
+import { InvitationRequests } from "../../pages/invite";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { useColorScheme, View } from "react-native";
@@ -93,6 +94,8 @@ export function RootLayout() {
       ) : state.status === "ready" ? (
         <DatabaseProvider value={state.database}>
           <MachineLinks />
+          {/* People asking in wait in the Inbox, whatever screen is open (ADR 0093). */}
+          <InvitationRequests />
           {/* The Stack stays mounted but hidden while locked, so unlocking returns to the same page. */}
           <View onTouchStartCapture={trackActivity} style={{ flex: 1, display: keyStatus === "unlocked" ? "flex" : "none" }}>
             {/* The Stack keeps its place in the tree either way, so resizing never resets navigation. */}

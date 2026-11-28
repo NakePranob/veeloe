@@ -179,12 +179,26 @@ export function saveInvitation(database: Database, row: Omit<Invitation, "joined
   );
 }
 
+/** The requests still waiting on one Invitation, oldest first. */
+export const LIST_ASKS = "SELECT key, name, code FROM invitation_request WHERE invitation_id = ? AND refused = 0 ORDER BY at";
+
+/** Keeps a request whose proof checked out; the same key again changes nothing, a refused one included. */
+export function saveAsk(database: Database, invitation: string, ask: Ask, at = Date.now()) {
+  return database.write([INVITATION_TOPIC], (tx) => tx.run("INSERT OR IGNORE INTO invitation_request (key, invitation_id, name, code, at) VALUES (?, ?, ?, ?, ?)", [ask.key, invitation, ask.name, ask.code, at]));
+}
+
+/** Refused: it stays, so the same person asking again does not come back. */
+export function refuseAsk(database: Database, key: string) {
+  return database.write([INVITATION_TOPIC], (tx) => tx.run("UPDATE invitation_request SET refused = 1 WHERE key = ?", [key]));
+}
+
 export function addJoined(database: Database, id: string, person: Joined) {
   return database.write([INVITATION_TOPIC], async (tx) => {
     const [row] = await tx.all<{ joined: string }>("SELECT joined FROM invitation WHERE id = ?", [id]);
     if (!row) return;
     const joined = JSON.parse(row.joined) as Joined[];
     await tx.run("UPDATE invitation SET joined = ? WHERE id = ?", [JSON.stringify([...joined, person]), id]);
+    await tx.run("DELETE FROM invitation_request WHERE key = ?", [person.key]);
   });
 }
 

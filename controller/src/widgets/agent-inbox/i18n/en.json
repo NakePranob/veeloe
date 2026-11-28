@@ -26,5 +26,9 @@
   "noGrants": {
     "title": "No Agent you can use yet",
     "body": "When whoever invited you grants you an Agent, it shows here"
+  },
+  "asking": {
+    "title": "{{name}} asks to join",
+    "code": "Code {{code}}: compare it with their device before letting them in"
   }
 }

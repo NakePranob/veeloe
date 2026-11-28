@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { parseInvitationLink, type GrantLevel } from "@veeloe/protocol-ts";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Share, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
 import { groupBodies, useGroups } from "../../../entities/device";
@@ -13,7 +13,24 @@ import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
 import { Button, Card, confirm, Empty, Field, inform, Note, Row, Screen, Section, Select, space, Text } from "../../../shared/ui";
-import { addJoined, closeInvitation, draftInvitation, grantsOf, INVITATION_TOPIC, joinedOf, LIST_INVITATIONS, letIn, markClosed, openInvitation, saveInvitation, takeRequest, type Ask, type Grant, type Invitation } from "../model/invite";
+import {
+  addJoined,
+  LIST_ASKS,
+  refuseAsk,
+  closeInvitation,
+  draftInvitation,
+  grantsOf,
+  INVITATION_TOPIC,
+  joinedOf,
+  LIST_INVITATIONS,
+  letIn,
+  markClosed,
+  openInvitation,
+  saveInvitation,
+  type Ask,
+  type Grant,
+  type Invitation,
+} from "../model/invite";
 
 const TOPICS = [INVITATION_TOPIC];
 const PEOPLE = [1, 2, 3, 5, 10, 20] as const;
@@ -156,26 +173,14 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
   const parsed = parseInvitationLink(invitation.link, 0);
   const grants = grantsOf(invitation);
   const joined = joinedOf(invitation);
-  const [asks, setAsks] = useState<Ask[]>([]);
-  const [refused, setRefused] = useState<string[]>([]);
+  // Kept on the device by InvitationRequests whatever screen is open (ADR 0093).
+  const asks = useLiveQuery<Ask>(LIST_ASKS, [invitation.id], TOPICS) ?? [];
   const [problem, setProblem] = useState<string | null>(null);
   const machine = machines.find((m) => m.hub_url === invitation.hub_url && m.workspace_id === invitation.workspace_id);
 
-  // Requests reach this device only while it is connected; whoever asks keeps asking until let in.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: joined and refused are read fresh through the setter
-  useEffect(() => {
-    if (!link || !parsed.ok) return;
-    return link.onInvitationRequest((hub, request) => {
-      if (hub !== invitation.hub_url) return;
-      const ask = takeRequest(parsed.link, request, joinedOf(invitation));
-      if (!ask) return;
-      setAsks((was) => (was.some((a) => a.key === ask.key) ? was : [...was, ask]));
-    });
-  }, [link, invitation.id, invitation.joined]);
-
   if (!parsed.ok || !machine) return <Screen title={t("title")}>{null}</Screen>;
   const inviteLink = parsed.link;
-  const waiting = asks.filter((ask) => !refused.includes(ask.key) && !joined.some((person) => person.key === ask.key));
+  const waiting = asks.filter((ask) => !joined.some((person) => person.key === ask.key));
 
   async function admit(ask: Ask) {
     if (!link || !machine) return;
@@ -250,7 +255,7 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
               detail={t("asks.code", { code: ask.code })}
               accessory={
                 <View style={{ flexDirection: "row", gap: space.sm }}>
-                  <Button size="small" label={t("asks.refuse")} onPress={() => setRefused((was) => [...was, ask.key])} />
+                  <Button size="small" label={t("asks.refuse")} onPress={() => void refuseAsk(database, ask.key)} />
                   <Button size="small" variant="primary" label={t("asks.admit")} onPress={() => void admit(ask)} />
                 </View>
               }

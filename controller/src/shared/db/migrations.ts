@@ -190,4 +190,14 @@ export const MIGRATIONS = [
   `ALTER TABLE invitation ADD COLUMN title TEXT`,
   // The Owners' Member ids as the Machine last listed them, for the People page (ADR 0093).
   `ALTER TABLE machine ADD COLUMN owners TEXT NOT NULL DEFAULT '[]'`,
+  // Someone asking in through an open Invitation, kept until let in, refused or the link closes, so the request
+  // waits in the Inbox instead of only on an open invite page (ADR 0093). Refused stays, as they keep asking.
+  `CREATE TABLE invitation_request (
+    key TEXT PRIMARY KEY NOT NULL,
+    invitation_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    refused INTEGER NOT NULL DEFAULT 0,
+    at INTEGER NOT NULL
+  )`,
 ] as const;

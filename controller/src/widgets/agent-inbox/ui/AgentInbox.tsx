@@ -7,6 +7,7 @@ import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { ownsAny, useMachines } from "../../../entities/machine";
 import { answersFromInbox, isBudgetOut, latestEvents, previewOf, STATUS_DOT, titleOf, useLatestTasks, useOpenTasks, type TaskStatus, type TaskSummary } from "../../../entities/task";
 import { useMachineStatuses } from "../../../features/machine-link";
+import { useLiveQuery } from "../../../shared/db";
 import { useLanguage, useT } from "../../../shared/i18n";
 import { useNow, when } from "../../../shared/lib";
 import { Branch, Button, closeSwipes, Dot, Empty, Swipe, Tabs, Tap, Text, column, space, type SwipeAccess } from "../../../shared/ui";
@@ -139,6 +140,31 @@ function OpenTask({ task, status, first, last, selected, onPress, onAnswer }: { 
   );
 }
 
+/** Someone asking in through one of this device's open Invitations (ADR 0093), from the invite page's table. */
+type Asking = { key: string; name: string; code: string; invitation_id: string };
+// ponytail: read straight from the invite page's table, as the People page reads its links.
+const ASKING = "SELECT r.key, r.name, r.code, r.invitation_id FROM invitation_request r JOIN invitation i ON i.id = r.invitation_id WHERE r.refused = 0 AND i.closed_at IS NULL AND i.expires_at > ? ORDER BY r.at";
+const ASKING_TOPICS = ["invitation"];
+
+// One person asking in: their name and the code to compare, and the pill that opens their link to let them in.
+function AskRow({ asking }: { asking: Asking }) {
+  const t = useT("agent-inbox");
+  const open = () => router.push({ pathname: "/invite", params: { id: asking.invitation_id } });
+  return (
+    <Tap onPress={open} style={{ flexDirection: "row", alignItems: "center", gap: space.md, marginHorizontal: 10, paddingHorizontal: space.md, paddingVertical: space.sm }}>
+      <View style={{ flex: 1, gap: space.xxs }}>
+        <Text variant="rowTitle" numberOfLines={1}>
+          {t("asking.title", { name: asking.name })}
+        </Text>
+        <Text variant="callout" tone="secondary" numberOfLines={1}>
+          {t("asking.code", { code: asking.code })}
+        </Text>
+      </View>
+      <Button label={t("answer")} variant="primary" size="small" onPress={open} />
+    </Tap>
+  );
+}
+
 interface Props {
   // What sits above the rows, such as the screen's header actions.
   header?: ReactNode;
@@ -156,6 +182,9 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
   const openTasks = useOpenTasks();
   const statuses = useMachineStatuses();
   const now = useNow();
+  // The clock the query starts from; a link that lapses while the Inbox stays open goes on the next visit.
+  const [since] = useState(() => Math.floor(Date.now() / 1000));
+  const asking = useLiveQuery<Asking>(ASKING, [since], ASKING_TOPICS) ?? [];
   // Kept while the app is open; a fresh launch starts on All so no Agent is out of sight.
   const [tab, setTab] = useState<InboxTab>("all");
   if (machines === null || agents === null || tasks === null || openTasks === null) return header ?? null;
@@ -163,15 +192,17 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
   const online = (machine: string) => statuses[machine]?.online ?? null;
   const rows = inboxRows(agents, tasks, openTasks, online);
   const counts = countsOf(rows);
+  // People asking in need you too, and come first in All and Needs you (ADR 0093).
+  const asks = tab === "all" || tab === "needsYou" ? asking : [];
   const tabs =
-    rows.length > 0 ? (
+    rows.length > 0 || asking.length > 0 ? (
       <View style={{ paddingHorizontal: space.lg, paddingBottom: space.inset }}>
         <Tabs
           value={tab}
           onChange={setTab}
           items={[
             { value: "all", label: t("tabs.all") },
-            { value: "needsYou", label: t("tabs.needsYou"), count: counts.needsYou, urgent: true },
+            { value: "needsYou", label: t("tabs.needsYou"), count: counts.needsYou + asking.length, urgent: true },
             { value: "working", label: t("tabs.working"), count: counts.working },
             { value: "done", label: t("tabs.done") },
           ]}
@@ -191,10 +222,13 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
         <>
           {header}
           {tabs}
+          {asks.map((item) => (
+            <AskRow key={item.key} asking={item} />
+          ))}
         </>
       }
       ListEmptyComponent={
-        tab !== "all" ? (
+        asks.length > 0 ? undefined : tab !== "all" ? (
           <Empty icon="inbox" title={t(`emptyTab.${tab}`)} headerless={split} />
         ) : // Someone who owns no Machine only sees the Agents they were granted; there is nothing to create.
         ownsAny(machines) ? (

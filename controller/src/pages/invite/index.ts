@@ -3,3 +3,4 @@ import th from "./i18n/th.json";
 
 export const inviteI18n = { th, en };
 export { InvitePage } from "./ui/InvitePage";
+export { InvitationRequests } from "./ui/InvitationRequests";
