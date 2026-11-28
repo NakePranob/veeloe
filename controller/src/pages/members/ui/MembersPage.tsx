@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { useAgents } from "../../../entities/agent";
+import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { useGrants, useMembers } from "../../../entities/device";
 import { ownsAny, useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
@@ -92,6 +93,7 @@ export function MemberPage() {
             <Select
               key={agent.id}
               label={agent.name}
+              leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={32} still />}
               value={levelOf(agent.id)}
               cancel={t("cancel")}
               disabled={statuses[agent.machine_id]?.online === false}

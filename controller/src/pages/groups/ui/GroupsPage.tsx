@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { useAgents } from "../../../entities/agent";
+import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { groupBodies, type MemberGroup, useGroups, useMembers } from "../../../entities/device";
 import { ownsAny, useMachines } from "../../../entities/machine";
 import { useMachineLink } from "../../../features/machine-link";
@@ -110,6 +111,7 @@ export function GroupPage() {
           <Select
             key={agent.id}
             label={agent.name}
+            leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={32} still />}
             value={levelOf(agent.id)}
             cancel={t("cancel")}
             disabled={agent.level !== "manage"}

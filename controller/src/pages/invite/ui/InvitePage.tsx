@@ -2,6 +2,7 @@ import { parseInvitationLink, type GrantLevel } from "@veeloe/protocol-ts";
 import { useEffect, useState } from "react";
 import { Share, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
+import { Character, lookOfJson, moodOf } from "../../../entities/character";
 import { groupBodies, useGroups } from "../../../entities/device";
 import { ownsAny, useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
@@ -103,6 +104,7 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
           <Select
             key={agent.id}
             label={agent.name}
+            leading={<Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={32} still />}
             value={levels[agent.id] ?? "none"}
             cancel={t("cancel")}
             options={(["none", "use", "approve", "manage"] as const).map((level) => ({ value: level, label: levelLabel(level) }))}
@@ -197,6 +199,10 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
   }
 
   const agentName = (id: string) => agents.find((agent) => agent.id === id)?.name ?? id;
+  const head = (id: string) => {
+    const agent = agents.find((a) => a.id === id);
+    return agent ? <Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={32} still /> : undefined;
+  };
   const full = joined.length >= invitation.max_members;
   return (
     <Screen title={t("title")} subtitle={t("subtitle", { joined: joined.length, count: invitation.max_members })}>
@@ -240,7 +246,7 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
       )}
       <Section title={t("grants.heading")}>
         {grants.map((grant) => (
-          <Row key={`${grant.machine}/${grant.agent}`} title={agentName(grant.agent)} value={t(`level.${grant.level}`)} />
+          <Row key={`${grant.machine}/${grant.agent}`} title={agentName(grant.agent)} value={t(`level.${grant.level}`)} leading={head(grant.agent)} />
         ))}
         {group && <Row icon="people" title={t("group.label")} value={group.name} />}
         {invitation.title && <Row title={t("role.label")} value={invitation.title} />}

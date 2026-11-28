@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 // biome-ignore lint/correctness/useReactNativePlatformComponents: used only behind the EXPO_OS === "ios" check in press()
 import { ActionSheetIOS } from "react-native";
 import { DotLabel } from "./dot";
@@ -17,8 +17,24 @@ export type SelectOption<T extends string> = { value: T; label: string; disabled
  * control opens being the platform's; elsewhere the choices open under it, ticked. The label names
  * the choice, so a screen reader reads "Agent, every Agent" rather than just a value.
  */
-// cancel: the words on the sheet's Cancel row, from the screen's own words.
-export function Select<T extends string>({ label, value, options, onChange, disabled, cancel }: { label: string; value: T; options: SelectOption<T>[]; onChange: (value: T) => void; disabled?: boolean; cancel: string }) {
+// cancel: the words on the sheet's Cancel row, from the screen's own words. leading: what sits before the label, as a Row's.
+export function Select<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+  cancel,
+  leading,
+}: {
+  label: string;
+  value: T;
+  options: SelectOption<T>[];
+  onChange: (value: T) => void;
+  disabled?: boolean;
+  cancel: string;
+  leading?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const chosen = options.find((option) => option.value === value);
   const pick = (next: T) => {
@@ -39,6 +55,7 @@ export function Select<T extends string>({ label, value, options, onChange, disa
     <>
       <Row
         title={label}
+        leading={leading}
         value={chosen?.dot ? undefined : chosen?.label}
         disabled={disabled}
         onPress={press}
