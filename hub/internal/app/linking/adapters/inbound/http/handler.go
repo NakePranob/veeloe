@@ -44,6 +44,7 @@ func (h *Handler) Register(rg gin.IRouter) {
 	rg.POST("/invitations/close", h.serve(h.svc.CloseInvitation, domain.ErrInvitationInvalid))
 	rg.POST("/invitation-requests", h.ask)
 	rg.POST("/members", h.addMember)
+	rg.POST("/member-removals", h.serve(h.svc.RemoveMember, domain.ErrMemberRemoveInvalid))
 	// go-scaffold:handler-routes
 }
 
@@ -129,6 +130,8 @@ func appError(err error) error {
 		return apperror.New(http.StatusBadRequest, protocol.CodeLinkRequestInvalid, "link request is not valid")
 	case errors.Is(err, domain.ErrInvitationInvalid):
 		return apperror.New(http.StatusBadRequest, protocol.CodeInvitationInvalid, "invitation is not valid")
+	case errors.Is(err, domain.ErrMemberRemoveInvalid):
+		return apperror.New(http.StatusBadRequest, protocol.CodeMemberRemoveInvalid, "member removal is not valid")
 	case errors.Is(err, domain.ErrInvitationClosed):
 		return apperror.New(http.StatusGone, protocol.CodeInvitationClosed, "invitation is closed")
 	case errors.Is(err, domain.ErrDeviceOffline):

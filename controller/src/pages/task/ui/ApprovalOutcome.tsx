@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import { useMembers } from "../../../entities/device";
 import { useT } from "../../../shared/i18n";
 import { mark, splitMarks } from "../../../shared/lib";
 import { Card, Icon, radius, space, Text, type IconName } from "../../../shared/ui";
@@ -14,6 +15,7 @@ const OUTCOME: Record<Exclude<ApprovalStatus, "open" | "closed">, { icon: IconNa
 /** Answered, an Approval settles into the log as a small grey pill: the outcome, who, and what. */
 export function ApprovalOutcome({ approval, target, me }: { approval: Approval; target: string; me: string | undefined }) {
   const t = useT("task");
+  const members = useMembers();
   if (approval.status === "closed")
     return (
       <Pill icon="stopped" color="secondaryLabel">
@@ -30,6 +32,8 @@ export function ApprovalOutcome({ approval, target, me }: { approval: Approval; 
   // A no that told the Agent what to do instead says so, not just "denied" (issue #55).
   const redirected = approval.answeredBy?.decision === "redirect";
   const member = approval.answeredBy?.member;
+  // Someone invited is in the Member table; anyone else who answers came by Pairing, an Owner.
+  const name = members?.find((m) => m.id === member)?.name ?? "Owner";
   const marks = { outcome: mark(0), target: mark(1) };
   const line = always
     ? t("approval.outcomeAlways", marks)
@@ -38,7 +42,7 @@ export function ApprovalOutcome({ approval, target, me }: { approval: Approval; 
       : member && member === me
         ? t("approval.outcomeByYou", marks)
         : member
-          ? t("approval.outcomeBy", { ...marks, member })
+          ? t("approval.outcomeBy", { ...marks, member: name })
           : t("approval.outcome", marks);
   const parts: ReactNode[] = [
     <Text key="outcome" variant="footnote" strong>

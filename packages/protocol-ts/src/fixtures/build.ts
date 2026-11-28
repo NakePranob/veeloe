@@ -380,6 +380,7 @@ export function messageVectors() {
     { name: "a Grant with a level that is not one", type: "grant.set", body: { agent: "agent-1", member: "m_kai", level: "owner" }, valid: false },
     { name: "a Grant for a Member id that is not a folder name", type: "grant.set", body: { agent: "agent-1", member: "../m", level: "use" }, valid: false },
     { name: "a Grant with no Agent", type: "grant.set", body: { member: "m_kai", level: "use" }, valid: false },
+    { name: "ask for the Grants at one Agent", type: "grant.list", body: { agent: "agent-1" }, valid: true },
     { name: "the Grants at one Agent", type: "grants.listed", body: { agent: "agent-1", grants: [{ member: "m_kai", level: "approve" }] }, valid: true },
     { name: "listed Grants with none as a level", type: "grants.listed", body: { agent: "agent-1", grants: [{ member: "m_kai", level: "none" }] }, valid: false },
     { name: "set the Egress with more than 100 domains", type: "egress.set", body: { egress: Array.from({ length: 101 }, (_, i) => `d${i}.example.com`) }, valid: false },
@@ -455,6 +456,7 @@ export function certificateVectors() {
     { name: "an Invitation opened to five people", certificate: open },
     { name: "an Invitation opened to no one", certificate: resigned(open.signed.replace('"max":5', '"max":0'), TEST_CONTROLLER) },
     { name: "an Invitation opened to more than 100", certificate: resigned(open.signed.replace('"max":5', '"max":101'), TEST_CONTROLLER) },
+    { name: "a Member removed", certificate: signCertificate({ ...common, member: "m_new", type: "member.remove", key: keyOf(TEST_CONTROLLER) }, TEST_CONTROLLER) },
     { name: "an Invitation closed", certificate: signCertificate({ ...common, type: "invitation.close", key: keyOf(TEST_CONTROLLER), invitation: invitationId }, TEST_CONTROLLER) },
   ];
   // A tree: A linked B and C, B linked D. Revoking A and keeping C drops A, B and D.

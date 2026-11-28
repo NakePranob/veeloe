@@ -56,3 +56,10 @@ Runtime SHALL ให้แก้, หยุด, รัน หรือลบ Tri
 #### Scenario: Member ลบ Schedule ของ Owner
 - **WHEN** Member ที่มี Use ส่ง `trigger.delete` ด้วย id ของ Schedule ที่ Owner ตั้ง
 - **THEN** Runtime ตอบ `trigger.forbidden` และ Schedule ยังอยู่
+
+### Requirement: Manager ดู Grant ของ Agent ได้
+Runtime SHALL ตอบ `grant.list` ที่มี `agent` ด้วย `grants.listed` ของ Agent นั้น เฉพาะเมื่อผู้ส่งเป็น Owner หรือมี Manage ที่ Agent นั้น อย่างอื่นตอบ `grant.forbidden`
+
+#### Scenario: Member ที่มี Use ขอดู Grant
+- **WHEN** Member ที่มี Use ที่ `shared` ส่ง `grant.list` ที่ `shared`
+- **THEN** Runtime ตอบ `grant.forbidden`

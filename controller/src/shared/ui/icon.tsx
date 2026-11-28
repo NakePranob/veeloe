@@ -36,6 +36,7 @@ const SYMBOLS = {
   network: { ios: "globe", android: "public" },
   folder: { ios: "folder", android: "folder" },
   device: { ios: "iphone", android: "smartphone" },
+  people: { ios: "person.2", android: "group" },
   usage: { ios: "chart.bar", android: "bar_chart" },
   trash: { ios: "trash", android: "delete" },
   memory: { ios: "brain.head.profile", android: "psychology" },

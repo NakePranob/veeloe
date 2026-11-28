@@ -1808,6 +1808,14 @@
       "valid": false
     },
     {
+      "name": "ask for the Grants at one Agent",
+      "type": "grant.list",
+      "body": {
+        "agent": "agent-1"
+      },
+      "valid": true
+    },
+    {
       "name": "the Grants at one Agent",
       "type": "grants.listed",
       "body": {

@@ -26,16 +26,19 @@ const invitation = z.string().regex(/^[A-Za-z0-9_-]{22}$/);
 export const MemberAddSchema = z.looseObject({ ...common, type: z.literal("member.add"), name: z.string().trim().min(1).max(80), invitation });
 /** For the Hub alone: `by` (`key` is the same) opens `invitation` to at most `max` people until `expires` (Unix ms). */
 export const InvitationOpenSchema = z.looseObject({ ...common, type: z.literal("invitation.open"), invitation, max: z.number().int().min(1).max(100), expires: z.number().int().nonnegative() });
+/** `member` is no longer in the Workspace, nor any key of theirs. `key` is the signer's, an Owner's (ADR 0059). */
+export const MemberRemoveSchema = z.looseObject({ ...common, type: z.literal("member.remove") });
 /** For the Hub alone: `invitation` takes no one else. */
 export const InvitationCloseSchema = z.looseObject({ ...common, type: z.literal("invitation.close"), invitation });
 export type DeviceLink = z.infer<typeof DeviceLinkSchema>;
 export type DeviceRevoke = z.infer<typeof DeviceRevokeSchema>;
 export type MemberAdd = z.infer<typeof MemberAddSchema>;
+export type MemberRemove = z.infer<typeof MemberRemoveSchema>;
 export type InvitationOpen = z.infer<typeof InvitationOpenSchema>;
 export type InvitationClose = z.infer<typeof InvitationCloseSchema>;
-export type Certified = DeviceLink | DeviceRevoke | MemberAdd | InvitationOpen | InvitationClose;
+export type Certified = DeviceLink | DeviceRevoke | MemberAdd | MemberRemove | InvitationOpen | InvitationClose;
 
-const CertifiedSchema = z.discriminatedUnion("type", [DeviceLinkSchema, DeviceRevokeSchema, MemberAddSchema, InvitationOpenSchema, InvitationCloseSchema]);
+const CertifiedSchema = z.discriminatedUnion("type", [DeviceLinkSchema, DeviceRevokeSchema, MemberAddSchema, MemberRemoveSchema, InvitationOpenSchema, InvitationCloseSchema]);
 
 /** The frame the Hub sends after `hub.ready`, and again with each new certificate. In the order they were made. */
 export const HubCertificatesSchema = z.looseObject({ type: z.literal("hub.certificates"), certificates: z.array(CertificateSchema) });

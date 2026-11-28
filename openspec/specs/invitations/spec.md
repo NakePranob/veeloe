@@ -37,3 +37,14 @@ Runtime SHALL เพิ่ม Member จาก `member.add` เฉพาะเ�
 #### Scenario: คนที่เข้าใช้ Agent ที่ได้
 - **WHEN** คนที่เข้าด้วยลิงก์ที่ให้ Use ที่ `shared` ส่ง `task.message` ถึง `shared` และถึง `private`
 - **THEN** Turn ที่ `shared` จบ และ `private` ตอบ `agent.forbidden`
+
+### Requirement: Owner เอา Member ออกจาก Workspace
+Hub SHALL รับใบรับรอง `member.remove` ที่ `POST /member-removals` เฉพาะเมื่อผู้เซ็นเป็น Owner ของ Workspace และคนที่ถูกเอาออกเข้ามาด้วยลิงก์เชิญ ไม่ใช่ Owner อย่างอื่นตอบ `hub.member_remove_invalid` เมื่อรับแล้ว Hub SHALL ตัดกุญแจทุกเครื่องของคนนั้นและส่งใบรับรองถึงทุก Machine Runtime SHALL รับ `member.remove` เฉพาะจากกุญแจของ Owner แล้วถอนกุญแจและ Grant ทุกตัวของคนนั้น
+
+#### Scenario: Member พยายามเอา Owner ออก
+- **WHEN** Member ที่ถูกเชิญเซ็น `member.remove` ที่ชี้ Owner
+- **THEN** Hub ตอบ `hub.member_remove_invalid` และไม่มีอะไรเปลี่ยน
+
+#### Scenario: Owner เอา Member ออก
+- **WHEN** Owner เซ็น `member.remove` ที่ชี้ Member ที่เข้ามาด้วยลิงก์
+- **THEN** `trust.json` บน Machine ไม่มีกุญแจและ Grant ของคนนั้นอีก

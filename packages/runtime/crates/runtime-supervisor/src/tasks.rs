@@ -358,6 +358,7 @@ pub fn open_to_members(type_: &str) -> bool {
             | "card.answer"
             | "egress.set"
             | "grant.set"
+            | "grant.list"
             | "push.register"
             | "push.unregister"
     )

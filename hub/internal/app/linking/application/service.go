@@ -21,6 +21,7 @@ type ServicePort interface {
 	CloseInvitation(ctx context.Context, c protocol.Certificate) error
 	AskToJoin(ctx context.Context, r protocol.InvitationRequest) (*domain.Handoff, error)
 	AddMember(ctx context.Context, c protocol.Certificate, handoff domain.Handoff) error
+	RemoveMember(ctx context.Context, c protocol.Certificate) error
 	// go-scaffold:service-interface
 }
 
@@ -168,6 +169,23 @@ func (s *Service) AddMember(ctx context.Context, c protocol.Certificate, handoff
 	if err != nil || !created {
 		return err
 	}
+	s.notify.Publish(cert.Workspace.String(), protocol.CertificatesFrame([]protocol.Certificate{c}))
+	return nil
+}
+
+// RemoveMember takes a Member out of the Workspace on an Owner's signature: their
+// Controllers go, their live connections close, and every Machine and Controller
+// gets the certificate (ADR 0059).
+func (s *Service) RemoveMember(ctx context.Context, c protocol.Certificate) error {
+	cert, ok := read(c, protocol.MemberRemove)
+	if !ok {
+		return domain.ErrMemberRemoveInvalid
+	}
+	dropped, err := s.store.RemoveMember(ctx, cert)
+	if err != nil || dropped == nil {
+		return err
+	}
+	s.notify.Revoke(dropped)
 	s.notify.Publish(cert.Workspace.String(), protocol.CertificatesFrame([]protocol.Certificate{c}))
 	return nil
 }

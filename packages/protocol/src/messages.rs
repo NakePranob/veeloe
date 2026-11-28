@@ -34,6 +34,9 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "task.listed" => object.map(is_task_listed).unwrap_or(false),
         "egress.set" => object.map(is_egress_set).unwrap_or(false),
         "grant.set" => object.map(is_grant_set).unwrap_or(false),
+        "grant.list" => object
+            .map(|object| is_id(object.get("agent")))
+            .unwrap_or(false),
         "grants.listed" => object.map(is_grants_listed).unwrap_or(false),
         "error" => object.map(is_error).unwrap_or(false),
         "usage.list" => object.map(is_usage_list).unwrap_or(false),

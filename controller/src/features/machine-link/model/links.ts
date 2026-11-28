@@ -16,7 +16,7 @@ import {
   type SignedPart,
   type TriggerSetBody,
 } from "@veeloe/protocol-ts";
-import { saveCertificates } from "../../../entities/device";
+import { saveCertificates, saveGrants } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, saveOwner, type Machine } from "../../../entities/machine";
 import { addListedTasks, addPendingMessage, failPendingMessage, markPendingSent, saveTaskEvents } from "../../../entities/task";
@@ -172,6 +172,10 @@ export function createMachineLinks({
     }
     if (message.type === "direct.answer") {
       directs.get(machine.id)?.answer(message.body.id, message.body.sdp);
+      return;
+    }
+    if (message.type === "grants.listed") {
+      await saveGrants(database, message.body.agent, message.body.grants);
       return;
     }
     if (message.type === "agent.listed") {
@@ -499,6 +503,11 @@ export function createMachineLinks({
      * (ADR 0012); the Machine answers with `agent.listed`, which is what changes
      * the list shown. False when the Hub is not connected and nothing went.
      */
+    /** Asks for one Agent's Grants; `grants.listed` lands in the database. False when nothing went. */
+    listGrants(machine: Machine, agent: string) {
+      return sendTo(machine, "other", { type: "grant.list", body: { agent } }) !== null;
+    },
+
     /** A Member's level at one Agent, or `none` (ADR 0010). False when nothing went. */
     setGrant(machine: Machine, body: { agent: string; member: string; level: GrantLevel | "none" }) {
       return sendTo(machine, "other", { type: "grant.set", body }) !== null;

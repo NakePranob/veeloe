@@ -25,4 +25,7 @@ var (
 	// ErrInvitationClosed is an Invitation that takes no one now: closed, run
 	// out of time, or full.
 	ErrInvitationClosed = errors.New("invitation is closed")
+	// ErrMemberRemoveInvalid is a member.remove not signed by an Owner, or of an
+	// Owner, or of no Member who came by an Invitation.
+	ErrMemberRemoveInvalid = errors.New("member removal is not valid")
 )

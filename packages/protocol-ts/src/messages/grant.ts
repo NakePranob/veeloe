@@ -15,6 +15,9 @@ export type GrantLevel = z.infer<typeof GrantLevelSchema>;
 export const GrantSetBodySchema = z.looseObject({ agent: AgentIdSchema, member: MemberIdSchema, level: z.union([GrantLevelSchema, z.literal("none")]) });
 export type GrantSetBody = z.infer<typeof GrantSetBodySchema>;
 
+/** Controller → Machine: the Grants at one Agent, for whoever manages it. Answered with `grants.listed`. */
+export const GrantListBodySchema = z.looseObject({ agent: AgentIdSchema });
+
 /** Machine → Controller: every Grant at one Agent, Owners left out since they hold Manage everywhere. */
 export const GrantsListedBodySchema = z.looseObject({
   agent: AgentIdSchema,

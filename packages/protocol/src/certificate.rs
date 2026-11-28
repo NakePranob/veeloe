@@ -68,6 +68,8 @@ pub fn verify_certificate(certificate: &Value) -> Option<Value> {
                 return None;
             }
         }
+        // A Member taken out of the Workspace, keys and all (ADR 0059).
+        "member.remove" => {}
         // For the Hub alone, but every side agrees on what is one.
         "invitation.open" => {
             let max = object.get("max")?.as_u64()?;

@@ -1,6 +1,6 @@
 import { View } from "react-native";
 import { useAgents } from "../../../entities/agent";
-import { useDevices } from "../../../entities/device";
+import { useDevices, useMembers } from "../../../entities/device";
 import { useMachines } from "../../../entities/machine";
 import { needsYou, statusOf, useLatestTasks } from "../../../entities/task";
 import { dailyTotals, useUsageDays } from "../../../entities/usage";
@@ -23,6 +23,7 @@ export function WorkspacePage() {
   const tasks = useLatestTasks();
   const rows = useUsageDays();
   const devices = useDevices();
+  const members = useMembers()?.filter((member) => member.removed_at === null);
   const live = devices?.filter((d) => d.revoked_at === null);
   const online = machines?.filter((m) => statuses[m.id]?.online === true).length ?? 0;
 
@@ -92,6 +93,7 @@ export function WorkspacePage() {
         </View>
       </View>
       <Section title={t("people.heading")} footer={t("people.footer")}>
+        <Row icon="people" title="Member" value={members ? String(members.length) : undefined} href="/members" />
         <Row icon="share" title={t("people.invite")} href="/invite" />
       </Section>
       {/* The board's switch, hidden while push is dormant, so it never promises a banner that will not come. */}

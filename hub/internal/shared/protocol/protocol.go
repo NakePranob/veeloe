@@ -135,6 +135,8 @@ const (
 	CodeInvitationInvalid = "hub.invitation_invalid"
 	// CodeInvitationClosed is an Invitation that takes no one now: closed, expired or full.
 	CodeInvitationClosed = "hub.invitation_closed"
+	// CodeMemberRemoveInvalid is a member.remove the Hub will not take.
+	CodeMemberRemoveInvalid = "hub.member_remove_invalid"
 )
 
 // Close codes the Hub ends a connection with.

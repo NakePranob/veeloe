@@ -23,6 +23,7 @@ const (
 	DeviceLink      = "device.link"
 	DeviceRevoke    = "device.revoke"
 	MemberAdd       = "member.add"
+	MemberRemove    = "member.remove"
 	InvitationOpen  = "invitation.open"
 	InvitationClose = "invitation.close"
 )
@@ -101,6 +102,7 @@ func VerifyCertificate(c Certificate) (Certified, bool) {
 			return out, false
 		}
 		out.Max, out.Expires = int(max), int64(expires)
+	case MemberRemove:
 	case InvitationClose:
 		if !readInvitation(fields, &out) {
 			return out, false

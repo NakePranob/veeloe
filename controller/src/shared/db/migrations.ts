@@ -155,4 +155,20 @@ export const MIGRATIONS = [
   // what was here came from an Owner's list.
   `ALTER TABLE agent ADD COLUMN level TEXT NOT NULL DEFAULT 'manage'`,
   `ALTER TABLE machine ADD COLUMN owner INTEGER NOT NULL DEFAULT 1`,
+  // The Members let in through an Invitation, as their certificates say (ADR 0059); an Owner came by Pairing and is not here.
+  `CREATE TABLE member (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    added_by TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    removed_at INTEGER
+  )`,
+  // Each Agent's Grants as the Machine last listed them, for whoever manages it (ADR 0010).
+  `CREATE TABLE agent_grant (
+    agent_id TEXT NOT NULL,
+    member_id TEXT NOT NULL,
+    level TEXT NOT NULL,
+    PRIMARY KEY (agent_id, member_id)
+  )`,
 ] as const;

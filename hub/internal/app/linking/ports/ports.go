@@ -38,6 +38,11 @@ type Store interface {
 	// keeps c and handoff, and counts one more in the Invitation, all at once, while
 	// it is open and c.By opened it. created is false for the same c again.
 	AddMember(ctx context.Context, c domain.Certificate, invitation []byte, handoff domain.Handoff, now time.Time) (created bool, err error)
+	// RemoveMember removes every Controller of c.Member and keeps c, when c.By
+	// is an Owner's (a Member who came by Pairing, not by an Invitation) and
+	// c.Member came by an Invitation. It answers the keys removed, none for the
+	// same c again.
+	RemoveMember(ctx context.Context, c domain.Certificate) (dropped []string, err error)
 }
 
 // Notifier reaches the live connections. The relay module answers it, through

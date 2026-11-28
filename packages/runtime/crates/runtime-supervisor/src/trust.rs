@@ -482,6 +482,10 @@ pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&s
             add_member(&mut next, &body, log);
             continue;
         }
+        if body.get("type").and_then(Value::as_str) == Some("member.remove") {
+            remove_member(&mut next, &body, log);
+            continue;
+        }
         let (Some(member), Some(key), Some(by), Some(type_)) = (
             body.get("member").and_then(Value::as_str),
             body.get("key").and_then(Value::as_str),
@@ -590,6 +594,36 @@ fn add_member(next: &mut Trust, body: &Value, log: &dyn Fn(&str)) {
         member: member.to_string(),
         keys: vec![key.to_string()],
     });
+}
+
+/// A Member taken out on an Owner's signature (ADR 0059): their keys are revoked,
+/// so what they set up stops, and their Grants go. An Owner is never taken out
+/// this way.
+fn remove_member(next: &mut Trust, body: &Value, log: &dyn Fn(&str)) {
+    let text = |name: &str| body.get(name).and_then(Value::as_str).unwrap_or_default();
+    let (member, by) = (text("member"), text("by"));
+    if !next
+        .owners
+        .iter()
+        .any(|owner| owner.keys.iter().any(|known| known == by))
+    {
+        log("ignored a certificate: untrusted-signer");
+        return;
+    }
+    let Some(index) = next
+        .members
+        .iter()
+        .position(|person| person.member == member)
+    else {
+        return;
+    };
+    let gone = next.members.remove(index);
+    for key in gone.keys {
+        if !next.revoked.contains(&key) {
+            next.revoked.push(key);
+        }
+    }
+    next.grants.retain(|grant| grant.member != member);
 }
 
 /// The numbers a connection takes in memory, with a window so an envelope that
@@ -986,6 +1020,30 @@ mod tests {
             apply_certificates(&after, &[added(0x41, "m_new", 0x71)], &quiet),
             after
         );
+    }
+
+    #[test]
+    fn an_owner_removes_a_member_and_their_keys_and_grants_go() {
+        let mut trust = apply_certificates(&paired(), &[added(0x41, "m_kai", 0x71)], &quiet);
+        trust.set_grant("a_1", "m_kai", Some(GrantLevel::Manage));
+        let removed = |by: u8| {
+            certificate(
+                &[
+                    ("type", json!("member.remove")),
+                    ("workspace", json!("w_1")),
+                    ("member", json!("m_kai")),
+                    ("key", json!(key(by))),
+                    ("at", json!(2)),
+                ],
+                by,
+            )
+        };
+        // Not by the Member themselves, even with Manage.
+        assert_eq!(apply_certificates(&trust, &[removed(0x71)], &quiet), trust);
+        let after = apply_certificates(&trust, &[removed(0x41)], &quiet);
+        assert!(after.members.is_empty() && after.grants.is_empty());
+        assert_eq!(after.revoked, vec![key(0x71)]);
+        assert!(!after.trusted_keys().contains(&key(0x71)));
     }
 
     #[test]

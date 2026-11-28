@@ -7,6 +7,7 @@ import type { Machine } from "../controller/src/entities/machine";
 import { pairMachine } from "../controller/src/pages/add-machine/model/pair";
 import { draftInvitation, letIn, openInvitation, takeRequest } from "../controller/src/pages/invite/model/invite";
 import { askToJoin, ownCode } from "../controller/src/pages/join/model/join";
+import { removeMember } from "../controller/src/pages/members/model/remove";
 import { startHubClient } from "../controller/src/shared/hub-client";
 import { buildRuntime } from "../scripts/runtime";
 import { FAKE_KEY, fakeProvider } from "./helpers/fake-provider";
@@ -152,6 +153,22 @@ test.skipIf(!dsn)("an Owner invites someone with one link, compares their code, 
 
   // A request the Hub made up, with no secret behind it, is never taken.
   expect(takeRequest(link, { ...request, key: toBase64url(publicKeyOf(generateSecretKey())) }, [])).toBeNull();
+
+  // Kai cannot take an Owner out; the Owner takes Kai out, and the Machine drops Kai's keys and Grants (#102).
+  const asKai = async (use: (key: Uint8Array) => Promise<void>) => {
+    await use(kaiKey);
+    return true;
+  };
+  expect(await removeMember(asKai, { hub: hubUrl, workspace: m.workspace, member: m.member })).toMatchObject({ ok: false, code: "hub.member_remove_invalid" });
+  expect(await removeMember(authenticate, { hub: hubUrl, workspace: m.workspace, member: result.member })).toEqual({ ok: true });
+  const end = Date.now() + 15_000;
+  let after = JSON.parse(readFileSync(join(home, "runtime/trust.json"), "utf8"));
+  while (after.members?.length && Date.now() < end) {
+    await Bun.sleep(100);
+    after = JSON.parse(readFileSync(join(home, "runtime/trust.json"), "utf8"));
+  }
+  expect(after.members ?? []).toEqual([]);
+  expect(after.grants ?? []).toEqual([]);
   owner.client.stop();
   kaiApp.client.stop();
 }, 120_000);

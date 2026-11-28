@@ -367,3 +367,60 @@ func (s *Store) AddMember(ctx context.Context, c domain.Certificate, invitation 
 	})
 	return created, err
 }
+
+// RemoveMember locks the Member's Controller rows, so a link they sign cannot
+// land in between.
+func (s *Store) RemoveMember(ctx context.Context, c domain.Certificate) (dropped []string, err error) {
+	err = tx.Do(ctx, s.db, func(ctx context.Context) error {
+		db := tx.From(ctx, s.db).WithContext(ctx)
+		var same int64
+		if err := db.Model(&certificateRow{}).Where("type = ? AND signed = ?", protocol.MemberRemove, c.Signed).Count(&same).Error; err != nil {
+			return err
+		}
+		if same > 0 {
+			return nil
+		}
+		var by controllerRow
+		err := db.Take(&by, "public_key = ? AND workspace_id = ?", c.By, c.Workspace).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.ErrMemberRemoveInvalid
+		}
+		if err != nil {
+			return err
+		}
+		// An Owner came by Pairing: no member.add names them. The one removed came by an Invitation.
+		invited := func(member string) (bool, error) {
+			var n int64
+			err := db.Model(&certificateRow{}).Where("workspace_id = ? AND member_id = ? AND type = ?", c.Workspace, member, protocol.MemberAdd).Count(&n).Error
+			return n > 0, err
+		}
+		signerInvited, err := invited(by.MemberID)
+		if err != nil {
+			return err
+		}
+		targetInvited, err := invited(c.Member)
+		if err != nil {
+			return err
+		}
+		if signerInvited || !targetInvited || by.MemberID == c.Member {
+			return domain.ErrMemberRemoveInvalid
+		}
+		var rows []controllerRow
+		if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).Where("workspace_id = ? AND member_id = ?", c.Workspace, c.Member).Find(&rows).Error; err != nil {
+			return err
+		}
+		dropped = []string{}
+		for _, r := range rows {
+			dropped = append(dropped, text(r.PublicKey))
+		}
+		if err := db.Where("workspace_id = ? AND member_id = ?", c.Workspace, c.Member).Delete(&controllerRow{}).Error; err != nil {
+			return err
+		}
+		cert := row(c)
+		return db.Create(&cert).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return dropped, nil
+}

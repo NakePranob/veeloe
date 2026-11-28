@@ -1,0 +1,35 @@
+{
+  "subtitle_one": "{{count}} person",
+  "subtitle_other": "{{count}} people",
+  "empty": {
+    "title": "Nobody has joined yet",
+    "body": "Invite people with a link; whoever joins shows here"
+  },
+  "invite": "Invite people",
+  "footer": "People who joined with an invitation link. Owners are not in this list.",
+  "joined": "Joined {{when}}",
+  "removed": "Removed",
+  "level": {
+    "none": "None",
+    "use": "Use",
+    "approve": "Approve",
+    "manage": "Manage"
+  },
+  "grants": {
+    "footer": "Counts from their next Turn. You can change only Agents you manage, while their Machine is online.",
+    "none": "You manage no Agent, so you cannot change what they hold"
+  },
+  "cancel": "Cancel",
+  "prompt": {
+    "grant": "Give {{name}} {{level}}",
+    "remove": "Remove {{name}} from the Workspace"
+  },
+  "remove": {
+    "row": "Remove {{name}} from the Workspace",
+    "footer": "Every device key of {{name}} stops working, and their Grants and Triggers stop. Invite them again with a new link.",
+    "title": "Remove {{name}}",
+    "body": "{{name}} can no longer give work to any Agent. Tasks they made stay on the Machine.",
+    "action": "Remove",
+    "cannot": "Cannot remove"
+  }
+}

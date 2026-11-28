@@ -934,6 +934,22 @@ impl Supervisor {
                 );
             }
         }
+        // The Grants at one Agent, for whoever manages it.
+        if type_ == "grant.list" {
+            let agent = body
+                .get("agent")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if !trust.manages(agent, &from.member, from.key.as_deref()) {
+                return outbox.error(&from, "grant.forbidden");
+            }
+            return outbox.to_member(
+                &from.member,
+                "grants.listed",
+                trust.grants_listed(agent),
+                None,
+            );
+        }
         if type_ == "grant.set" {
             return self.set_grant(&from, &body, &outbox);
         }

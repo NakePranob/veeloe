@@ -5,7 +5,7 @@ import { ApprovalAnswerBodySchema } from "./approval";
 import { DirectAnswerBodySchema, DirectCloseBodySchema, DirectOfferBodySchema } from "./direct";
 import { EgressSetBodySchema } from "./egress";
 import { ErrorBodySchema } from "./error";
-import { GrantSetBodySchema, GrantsListedBodySchema } from "./grant";
+import { GrantListBodySchema, GrantSetBodySchema, GrantsListedBodySchema } from "./grant";
 import { DeviceHandoffBodySchema, DeviceLinkedBodySchema } from "./linking";
 import { MemoryGetBodySchema, MemoryGotBodySchema } from "./memory";
 import { PairingClaimBodySchema, PairingDoneBodySchema } from "./pairing-claim";
@@ -41,6 +41,7 @@ const known = {
   "task.events": TaskEventsBodySchema,
   "egress.set": EgressSetBodySchema,
   "grant.set": GrantSetBodySchema,
+  "grant.list": GrantListBodySchema,
   "grants.listed": GrantsListedBodySchema,
   "task.list": TaskListBodySchema,
   "task.listed": TaskListedBodySchema,

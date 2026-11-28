@@ -128,3 +128,31 @@ func TestARevokedOpenerLetsNoOneIn(t *testing.T) {
 		t.Fatalf("revoked opener: %d %s", status, code)
 	}
 }
+
+func TestOnlyAnOwnerRemovesAnInvitedMember(t *testing.T) {
+	h := newHub(t)
+	m := h.member()
+	id := invitationID()
+	h.must("/invitations", open(m, id, 2, m.first))
+	kai, lee := newKey(t), newKey(t)
+	if status, code := h.add(memberAdd(m, id, "m_kai", kai, m.first)); status != http.StatusOK {
+		t.Fatalf("kai: %d %s", status, code)
+	}
+	if status, code := h.add(memberAdd(m, id, "m_lee", lee, m.first)); status != http.StatusOK {
+		t.Fatalf("lee: %d %s", status, code)
+	}
+	remove := func(member string, by ed25519.PrivateKey, signer string) protocol.Certificate {
+		return sign(map[string]any{"type": "member.remove", "workspace": m.workspace, "member": member, "key": text(public(by))}, by)
+	}
+	// An invited Member removes no one, and no one removes the Owner.
+	h.refused("/member-removals", remove("m_lee", kai, "m_kai"), http.StatusBadRequest, "hub.member_remove_invalid")
+	h.refused("/member-removals", remove(m.id, m.first, m.id), http.StatusBadRequest, "hub.member_remove_invalid")
+	// The Owner removes Kai: their key goes and their connection is cut.
+	h.must("/member-removals", remove("m_kai", m.first, m.id))
+	if got := h.registered(member{id: "m_kai"}); len(got) != 0 {
+		t.Fatalf("still registered %v", got)
+	}
+	if len(h.notes.revoked) != 1 || h.notes.revoked[0][0] != text(public(kai)) {
+		t.Fatalf("revoked %v", h.notes.revoked)
+	}
+}

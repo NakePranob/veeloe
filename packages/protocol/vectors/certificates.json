@@ -114,6 +114,14 @@
       "valid": false
     },
     {
+      "name": "a Member removed",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_new\",\"at\":1800000000000,\"type\":\"member.remove\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "JEYrmntoLxXhM-fJ293lFm_Rrc_tAnyBlo_-WiqesKfZ71RHUOmdDG6V81-etRAYtbWev3S9bPVx9tptnFskAg"
+      },
+      "valid": true
+    },
+    {
       "name": "an Invitation closed",
       "certificate": {
         "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"invitation.close\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"invitation\":\"IiIiIiIiIiIiIiIiIiIiIg\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",

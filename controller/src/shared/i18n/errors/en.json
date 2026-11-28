@@ -38,6 +38,7 @@
   "hub.invitation_closed": "This invitation is closed, full or expired. Ask whoever invited you for a new one.",
   "hub.invitation_invalid": "The Hub did not take this invitation",
   "hub.key_taken": "The Hub refused the new device's key: it belongs to someone else, or was revoked before",
+  "hub.member_remove_invalid": "Cannot remove this person. Only an Owner removes, and only someone who joined with an invitation link.",
   "hub.last_device": "The Hub refused: this would leave you no device that works. Link another device first",
   "hub.link_invalid": "The Hub refused the link because this device is not one of yours there",
   "hub.link_request_invalid": "The Hub refused this Linking request. Scan the QR code again",
