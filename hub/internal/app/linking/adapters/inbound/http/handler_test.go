@@ -44,13 +44,14 @@ func (n never) AddMember(ctx context.Context, c protocol.Certificate, _ domain.H
 }
 
 func (n never) RemoveMember(ctx context.Context, c protocol.Certificate) error { return n.Link(ctx, c) }
+func (n never) TitleMember(ctx context.Context, c protocol.Certificate) error  { return n.Link(ctx, c) }
 
 func TestUnreadableBodyIsTheInvalidCodeOfItsRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.Error(false))
 	NewHandler(never{t}).Register(r)
-	for path, code := range map[string]string{"/links": "hub.link_invalid", "/revocations": "hub.revocation_invalid", "/link-requests": "hub.link_request_invalid", "/invitations": "hub.invitation_invalid", "/invitations/close": "hub.invitation_invalid", "/invitation-requests": "hub.invitation_invalid", "/members": "hub.invitation_invalid", "/member-removals": "hub.member_remove_invalid"} {
+	for path, code := range map[string]string{"/links": "hub.link_invalid", "/revocations": "hub.revocation_invalid", "/link-requests": "hub.link_request_invalid", "/invitations": "hub.invitation_invalid", "/invitations/close": "hub.invitation_invalid", "/invitation-requests": "hub.invitation_invalid", "/members": "hub.invitation_invalid", "/member-removals": "hub.member_remove_invalid", "/member-titles": "hub.member_title_invalid"} {
 		for _, body := range []string{"not json", `{"signed":1,"name":1}`, `{"signed":"` + strings.Repeat("A", maxBodyBytes) + `"}`} {
 			rec := httptest.NewRecorder()
 			r.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(body)))

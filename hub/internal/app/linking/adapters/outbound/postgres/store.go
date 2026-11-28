@@ -368,6 +368,53 @@ func (s *Store) AddMember(ctx context.Context, c domain.Certificate, invitation 
 	return created, err
 }
 
+// TitleMember keeps a member.title from an Owner, or from the Member themself,
+// for a Member who came by an Invitation (ADR 0093).
+func (s *Store) TitleMember(ctx context.Context, c domain.Certificate) (created bool, err error) {
+	err = tx.Do(ctx, s.db, func(ctx context.Context) error {
+		db := tx.From(ctx, s.db).WithContext(ctx)
+		var same int64
+		if err := db.Model(&certificateRow{}).Where("type = ? AND signed = ?", protocol.MemberTitle, c.Signed).Count(&same).Error; err != nil {
+			return err
+		}
+		if same > 0 {
+			return nil
+		}
+		var by controllerRow
+		err := db.Take(&by, "public_key = ? AND workspace_id = ?", c.By, c.Workspace).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.ErrMemberTitleInvalid
+		}
+		if err != nil {
+			return err
+		}
+		// An Owner came by Pairing: no member.add names them. An Owner has no title to change.
+		invited := func(member string) (bool, error) {
+			var n int64
+			err := db.Model(&certificateRow{}).Where("workspace_id = ? AND member_id = ? AND type = ?", c.Workspace, member, protocol.MemberAdd).Count(&n).Error
+			return n > 0, err
+		}
+		signerInvited, err := invited(by.MemberID)
+		if err != nil {
+			return err
+		}
+		targetInvited, err := invited(c.Member)
+		if err != nil {
+			return err
+		}
+		if !targetInvited || (signerInvited && by.MemberID != c.Member) {
+			return domain.ErrMemberTitleInvalid
+		}
+		cert := row(c)
+		if err := db.Create(&cert).Error; err != nil {
+			return err
+		}
+		created = true
+		return nil
+	})
+	return created, err
+}
+
 // RemoveMember locks the Member's Controller rows, so a link they sign cannot
 // land in between.
 func (s *Store) RemoveMember(ctx context.Context, c domain.Certificate) (dropped []string, err error) {

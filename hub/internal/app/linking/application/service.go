@@ -22,6 +22,7 @@ type ServicePort interface {
 	AskToJoin(ctx context.Context, r protocol.InvitationRequest) (*domain.Handoff, error)
 	AddMember(ctx context.Context, c protocol.Certificate, handoff domain.Handoff) error
 	RemoveMember(ctx context.Context, c protocol.Certificate) error
+	TitleMember(ctx context.Context, c protocol.Certificate) error
 	// go-scaffold:service-interface
 }
 
@@ -186,6 +187,22 @@ func (s *Service) RemoveMember(ctx context.Context, c protocol.Certificate) erro
 		return err
 	}
 	s.notify.Revoke(dropped)
+	s.notify.Publish(cert.Workspace.String(), protocol.CertificatesFrame([]protocol.Certificate{c}))
+	return nil
+}
+
+// TitleMember changes a Member's title on the signature of an Owner or of the
+// Member themself, and hands the certificate to everyone in the Workspace
+// (ADR 0091, 0093). The Hub keeps it as it keeps names: on the certificate.
+func (s *Service) TitleMember(ctx context.Context, c protocol.Certificate) error {
+	cert, ok := read(c, protocol.MemberTitle)
+	if !ok {
+		return domain.ErrMemberTitleInvalid
+	}
+	created, err := s.store.TitleMember(ctx, cert)
+	if err != nil || !created {
+		return err
+	}
 	s.notify.Publish(cert.Workspace.String(), protocol.CertificatesFrame([]protocol.Certificate{c}))
 	return nil
 }

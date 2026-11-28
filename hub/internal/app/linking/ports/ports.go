@@ -43,6 +43,9 @@ type Store interface {
 	// c.Member came by an Invitation. It answers the keys removed, none for the
 	// same c again.
 	RemoveMember(ctx context.Context, c domain.Certificate) (dropped []string, err error)
+	// TitleMember keeps c, when c.By is an Owner's or c.Member's own and
+	// c.Member came by an Invitation. created is false for the same c again.
+	TitleMember(ctx context.Context, c domain.Certificate) (created bool, err error)
 }
 
 // Notifier reaches the live connections. The relay module answers it, through

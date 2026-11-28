@@ -28,6 +28,11 @@ export const MemberAddSchema = z.looseObject({ ...common, type: z.literal("membe
 export const InvitationOpenSchema = z.looseObject({ ...common, type: z.literal("invitation.open"), invitation, max: z.number().int().min(1).max(100), expires: z.number().int().nonnegative() });
 /** `member` is no longer in the Workspace, nor any key of theirs. `key` is the signer's, an Owner's (ADR 0059). */
 export const MemberRemoveSchema = z.looseObject({ ...common, type: z.literal("member.remove") });
+/**
+ * `member`'s title is now `title` (empty takes it away), signed by an Owner or by `member` themself, `key` being
+ * the signer's (ADR 0091, 0093). A Runtime never reads it as a key change.
+ */
+export const MemberTitleSchema = z.looseObject({ ...common, type: z.literal("member.title"), title: z.string().trim().max(40) });
 /** For the Hub alone: `invitation` takes no one else. */
 export const InvitationCloseSchema = z.looseObject({ ...common, type: z.literal("invitation.close"), invitation });
 export type DeviceLink = z.infer<typeof DeviceLinkSchema>;
@@ -36,9 +41,10 @@ export type MemberAdd = z.infer<typeof MemberAddSchema>;
 export type MemberRemove = z.infer<typeof MemberRemoveSchema>;
 export type InvitationOpen = z.infer<typeof InvitationOpenSchema>;
 export type InvitationClose = z.infer<typeof InvitationCloseSchema>;
-export type Certified = DeviceLink | DeviceRevoke | MemberAdd | MemberRemove | InvitationOpen | InvitationClose;
+export type MemberTitle = z.infer<typeof MemberTitleSchema>;
+export type Certified = DeviceLink | DeviceRevoke | MemberAdd | MemberRemove | MemberTitle | InvitationOpen | InvitationClose;
 
-const CertifiedSchema = z.discriminatedUnion("type", [DeviceLinkSchema, DeviceRevokeSchema, MemberAddSchema, MemberRemoveSchema, InvitationOpenSchema, InvitationCloseSchema]);
+const CertifiedSchema = z.discriminatedUnion("type", [DeviceLinkSchema, DeviceRevokeSchema, MemberAddSchema, MemberRemoveSchema, MemberTitleSchema, InvitationOpenSchema, InvitationCloseSchema]);
 
 /** The frame the Hub sends after `hub.ready`, and again with each new certificate. In the order they were made. */
 export const HubCertificatesSchema = z.looseObject({ type: z.literal("hub.certificates"), certificates: z.array(CertificateSchema) });

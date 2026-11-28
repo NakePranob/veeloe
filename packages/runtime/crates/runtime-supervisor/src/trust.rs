@@ -691,6 +691,11 @@ pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&s
             }
             continue;
         }
+        // Only a revocation takes keys away: a title or an Invitation signed by
+        // the same key says nothing about it (ADR 0093).
+        if type_ != "device.revoke" {
+            continue;
+        }
         let keep: Vec<String> = body
             .get("keep")
             .and_then(Value::as_array)
@@ -1004,6 +1009,30 @@ mod tests {
             0x41,
         );
         assert_eq!(apply_certificates(&paired(), &[other], &quiet), paired());
+    }
+
+    #[test]
+    fn a_certificate_that_is_not_a_revocation_never_takes_a_key_away() {
+        let two = apply_certificates(&paired(), &[link(0x41, 0x42)], &quiet);
+        let signed = |type_: &str, extra: (&str, Value)| {
+            certificate(
+                &[
+                    ("type", json!(type_)),
+                    ("workspace", json!("w_1")),
+                    ("member", json!("m_1")),
+                    ("key", json!(key(0x42))),
+                    extra,
+                    ("at", json!(2)),
+                ],
+                0x42,
+            )
+        };
+        let invitation = json!("IiIiIiIiIiIiIiIiIiIiIg");
+        let others = [
+            signed("member.title", ("title", json!("Sales"))),
+            signed("invitation.close", ("invitation", invitation)),
+        ];
+        assert_eq!(apply_certificates(&two, &others, &quiet), two);
     }
 
     #[test]

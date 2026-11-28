@@ -137,6 +137,8 @@ const (
 	CodeInvitationClosed = "hub.invitation_closed"
 	// CodeMemberRemoveInvalid is a member.remove the Hub will not take.
 	CodeMemberRemoveInvalid = "hub.member_remove_invalid"
+	// CodeMemberTitleInvalid is a member.title the Hub will not take (ADR 0093).
+	CodeMemberTitleInvalid = "hub.member_title_invalid"
 )
 
 // Close codes the Hub ends a connection with.

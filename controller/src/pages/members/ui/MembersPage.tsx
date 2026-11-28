@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAgents } from "../../../entities/agent";
 import { useGrants, useGroups, useMembers } from "../../../entities/device";
 import { ownersOf, ownsAny, useMachines } from "../../../entities/machine";
@@ -9,9 +9,10 @@ import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { useLiveQuery } from "../../../shared/db";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { confirm, inform, Row, Screen, Section } from "../../../shared/ui";
+import { confirm, Field, inform, Row, Screen, Section } from "../../../shared/ui";
 import { fromGroups } from "../model/access";
 import { removeMember } from "../model/remove";
+import { setTitle } from "../model/title";
 
 type Choice = "none" | "use" | "approve" | "manage";
 
@@ -52,7 +53,7 @@ export function MembersPage() {
             key={member.id}
             title={me.has(member.id) ? t("youNamed", { name: named(member.name, member.title) }) : named(member.name, member.title)}
             detail={t("joined", { when: when(member.added_at, language) })}
-            href={me.has(member.id) ? undefined : `/members/${member.id}`}
+            href={`/members/${member.id}`}
           />
         ))}
       </Section>
@@ -79,7 +80,8 @@ export function MembersPage() {
   );
 }
 
-// One Member: their level at each Agent this device's Member manages, and, for an Owner, taking them out.
+// One Member: their title, their level at each Agent this device's Member manages, and, for an Owner, taking them
+// out. Your own page holds only your title, which you may change yourself (ADR 0093).
 export function MemberPage() {
   const t = useT("members");
   const { member: id } = useLocalSearchParams<{ member: string }>();
@@ -93,6 +95,9 @@ export function MemberPage() {
   const managed = agents.filter((agent) => agent.level === "manage");
   const workspaceMachines = machines.filter((machine) => machine.workspace_id === member?.workspace_id);
   const owner = workspaceMachines.find((machine) => machine.owner !== 0);
+  const self = workspaceMachines.some((machine) => machine.member_id === id);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
 
   // What each Agent's Machine holds now; a Machine that is not connected keeps what was last heard.
   // Asked again once the Agents and Machines have loaded, not on every change of their rows.
@@ -120,6 +125,15 @@ export function MemberPage() {
     if (result.status === "sent") link.listGrants(machine, agentId);
   }
 
+  async function saveTitle() {
+    const hub = owner ?? workspaceMachines[0];
+    if (!hub || !member) return;
+    const answer = await setTitle((use) => keySession.withFreshAuthentication(t("prompt.role", { name }), use), { hub: hub.hub_url, workspace: member.workspace_id, member: member.id, title: draft });
+    if (answer === null) return;
+    if (!answer.ok) return inform(t("role.cannot"), describeError({ code: answer.code }));
+    setEditing(false);
+  }
+
   async function remove() {
     if (!owner) return;
     if (!(await confirm({ title: t("remove.title", { name }), message: t("remove.body", { name }), action: t("remove.action"), cancel: t("cancel"), destructive: true }))) return;
@@ -131,7 +145,28 @@ export function MemberPage() {
 
   return (
     <Screen title={name} subtitle={member.removed_at !== null ? t("removed") : (member.title ?? undefined)}>
-      {member.removed_at === null && (
+      {(owner || self) && member.removed_at === null && (
+        <Section footer={t("role.footer")}>
+          {editing ? (
+            <>
+              <Field label={t("role.label")} value={draft} onChangeText={(text) => setDraft(text.slice(0, 40))} placeholder={t("role.placeholder")} />
+              <Row title={t("role.save")} onPress={() => void saveTitle()} />
+              <Row title={t("cancel")} onPress={() => setEditing(false)} />
+            </>
+          ) : (
+            <Row
+              icon="edit"
+              title={t("role.label")}
+              value={member.title ?? t("role.none")}
+              onPress={() => {
+                setDraft(member.title ?? "");
+                setEditing(true);
+              }}
+            />
+          )}
+        </Section>
+      )}
+      {!self && member.removed_at === null && (
         <Section title="Agent" footer={managed.length > 0 ? t("grants.footer") : t("grants.none")}>
           {managed.map((agent) => {
             const given = fromGroups(groups, member.id, agent.id);

@@ -8,6 +8,7 @@ import { pairMachine } from "../controller/src/pages/add-machine/model/pair";
 import { draftInvitation, letIn, openInvitation, takeRequest } from "../controller/src/pages/invite/model/invite";
 import { askToJoin, ownCode } from "../controller/src/pages/join/model/join";
 import { removeMember } from "../controller/src/pages/members/model/remove";
+import { setTitle } from "../controller/src/pages/members/model/title";
 import { startHubClient } from "../controller/src/shared/hub-client";
 import { buildRuntime } from "../scripts/runtime";
 import { FAKE_KEY, fakeProvider } from "./helpers/fake-provider";
@@ -154,11 +155,18 @@ test.skipIf(!dsn)("an Owner invites someone with one link, compares their code, 
   // A request the Hub made up, with no secret behind it, is never taken.
   expect(takeRequest(link, { ...request, key: toBase64url(publicKeyOf(generateSecretKey())) }, [])).toBeNull();
 
-  // Kai cannot take an Owner out; the Owner takes Kai out, and the Machine drops Kai's keys and Grants (#102).
   const asKai = async (use: (key: Uint8Array) => Promise<void>) => {
     await use(kaiKey);
     return true;
   };
+  // A title changes on the word of Kai themself or an Owner, as often as they like, and of no one else (#112).
+  const titled = (who: typeof asKai, member: string, title: string) => setTitle(who, { hub: hubUrl, workspace: m.workspace, member, title });
+  expect(await titled(asKai, result.member, "Sales")).toEqual({ ok: true });
+  expect(await titled(authenticate, result.member, "Lead")).toEqual({ ok: true });
+  expect(await titled(authenticate, result.member, "")).toEqual({ ok: true });
+  expect(await titled(asKai, m.member, "Boss")).toMatchObject({ ok: false, code: "hub.member_title_invalid" });
+
+  // Kai cannot take an Owner out; the Owner takes Kai out, and the Machine drops Kai's keys and Grants (#102).
   expect(await removeMember(asKai, { hub: hubUrl, workspace: m.workspace, member: m.member })).toMatchObject({ ok: false, code: "hub.member_remove_invalid" });
   expect(await removeMember(authenticate, { hub: hubUrl, workspace: m.workspace, member: result.member })).toEqual({ ok: true });
   const end = Date.now() + 15_000;

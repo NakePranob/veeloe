@@ -114,6 +114,11 @@ export function saveCertificates(database: Database, { member, own, ownName, now
         await transaction.run("INSERT OR IGNORE INTO member (id, workspace_id, name, title, added_by, added_at) VALUES (?, ?, ?, ?, ?, ?)", [body.member, body.workspace, body.name, title, body.by, body.at]);
         continue;
       }
+      // A title changed later (ADR 0093); certificates come in the order they were made, so the last one stays.
+      if (body?.type === "member.title") {
+        await transaction.run("UPDATE member SET title = ? WHERE id = ?", [body.title.trim() || null, body.member]);
+        continue;
+      }
       if (body?.type === "member.remove") {
         await transaction.run("UPDATE member SET removed_at = ? WHERE id = ? AND removed_at IS NULL", [body.at, body.member]);
         continue;

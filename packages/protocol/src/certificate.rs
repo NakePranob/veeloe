@@ -70,6 +70,12 @@ pub fn verify_certificate(certificate: &Value) -> Option<Value> {
         }
         // A Member taken out of the Workspace, keys and all (ADR 0059).
         "member.remove" => {}
+        // A Member's title, from an Owner or themself (ADR 0091, 0093); empty takes it away.
+        "member.title" => {
+            if object.get("title")?.as_str()?.trim().chars().count() > 40 {
+                return None;
+            }
+        }
         // For the Hub alone, but every side agrees on what is one.
         "invitation.open" => {
             let max = object.get("max")?.as_u64()?;

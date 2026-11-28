@@ -19,7 +19,7 @@ async function postFor(hub: string, path: string, body: unknown, fetchFn: typeof
 }
 
 /** `POST /links` or `/revocations`: the Hub's yes, or its error code (ADR 0065). Unreachable reads as `pairing.hub_unreachable`. */
-export function postCertificate(hub: string, path: "/links" | "/revocations" | "/invitations" | "/invitations/close" | "/member-removals", certificate: Certificate, fetchFn: typeof fetch = fetch): Promise<HubAnswer> {
+export function postCertificate(hub: string, path: "/links" | "/revocations" | "/invitations" | "/invitations/close" | "/member-removals" | "/member-titles", certificate: Certificate, fetchFn: typeof fetch = fetch): Promise<HubAnswer> {
   return post(hub, path, certificate, fetchFn);
 }
 

@@ -14,7 +14,8 @@
   "cancel": "Cancel",
   "prompt": {
     "grant": "Give {{name}} {{level}}",
-    "remove": "Remove {{name}} from the Workspace"
+    "remove": "Remove {{name}} from the Workspace",
+    "role": "Set {{name}}'s title"
   },
   "remove": {
     "row": "Remove {{name}} from the Workspace",
@@ -29,7 +30,7 @@
   "subtitle_one": "{{count}} person",
   "subtitle_other": "{{count}} people",
   "invite": "Invite",
-  "footer": "Everyone in the Workspace. Owners hold every Agent; tap someone who joined by link to see or change what they can do.",
+  "footer": "Everyone in the Workspace. Owners have every Agent. Tap someone who joined with a link to see or change their access and title.",
   "you": "You",
   "youNamed": "{{name}} (you)",
   "owner": "Owner",
@@ -46,5 +47,13 @@
     "agents_other": "A link to {{count}} Agents",
     "detail": "{{joined}} of {{count}} joined · expires {{when}}"
   },
-  "fromGroup": "{{group}} gives {{level}}"
+  "fromGroup": "{{group}} gives {{level}}",
+  "role": {
+    "label": "Title",
+    "none": "None",
+    "placeholder": "e.g. Sales",
+    "footer": "Shown after the name on every device; grants nothing. Only an Owner or the person themself changes it.",
+    "save": "Save",
+    "cannot": "Cannot change the title"
+  }
 }

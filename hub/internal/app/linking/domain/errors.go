@@ -28,4 +28,7 @@ var (
 	// ErrMemberRemoveInvalid is a member.remove not signed by an Owner, or of an
 	// Owner, or of no Member who came by an Invitation.
 	ErrMemberRemoveInvalid = errors.New("member removal is not valid")
+	// ErrMemberTitleInvalid is a member.title signed by neither an Owner nor
+	// the Member themself, or of no Member who came by an Invitation (ADR 0093).
+	ErrMemberTitleInvalid = errors.New("member title is not valid")
 )

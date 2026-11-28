@@ -71,5 +71,6 @@
   "usage.invalid_range": "That usage range isn't valid. It must be between 1 and 90 days",
   "group.forbidden": "Only an Owner makes a group or changes its name or admins, and only an Owner or a group admin changes who is in it",
   "group.stale": "Someone changed this group first; open it again and make the change once more",
-  "group.invalid": "The Machine did not take this group"
+  "group.invalid": "The Machine did not take this group",
+  "hub.member_title_invalid": "Cannot change this title. Only an Owner or the person themself changes it, and only for someone who joined with an invitation link."
 }

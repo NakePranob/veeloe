@@ -447,6 +447,7 @@ export function certificateVectors() {
   const invitationId = toBase64url(new Uint8Array(16).fill(0x22));
   const memberAdd = signCertificate({ ...common, member: "m_new", type: "member.add", key: keyOf(TEST_NEW_DEVICE), name: "Kai", invitation: invitationId }, TEST_CONTROLLER);
   const open = signCertificate({ ...common, type: "invitation.open", key: keyOf(TEST_CONTROLLER), invitation: invitationId, max: 5, expires: 1_800_086_400_000 }, TEST_CONTROLLER);
+  const title = signCertificate({ ...common, member: "m_new", type: "member.title", key: keyOf(TEST_CONTROLLER), title: "ฝ่ายขาย" }, TEST_CONTROLLER);
   const cases = [
     { name: "a link", certificate: link },
     { name: "a revocation that keeps one key", certificate: revoke },
@@ -463,6 +464,10 @@ export function certificateVectors() {
     { name: "an Invitation opened to no one", certificate: resigned(open.signed.replace('"max":5', '"max":0'), TEST_CONTROLLER) },
     { name: "an Invitation opened to more than 100", certificate: resigned(open.signed.replace('"max":5', '"max":101'), TEST_CONTROLLER) },
     { name: "a Member removed", certificate: signCertificate({ ...common, member: "m_new", type: "member.remove", key: keyOf(TEST_CONTROLLER) }, TEST_CONTROLLER) },
+    { name: "a Member's title", certificate: title },
+    { name: "a Member's title taken away", certificate: signCertificate({ ...common, member: "m_new", type: "member.title", key: keyOf(TEST_CONTROLLER), title: "" }, TEST_CONTROLLER) },
+    { name: "a title longer than 40", certificate: resigned(title.signed.replace('"title":"ฝ่ายขาย"', `"title":"${"x".repeat(41)}"`), TEST_CONTROLLER) },
+    { name: "a title change with no title", certificate: resigned(title.signed.replace(/,?"title":"[^"]*"/, ""), TEST_CONTROLLER) },
     { name: "an Invitation closed", certificate: signCertificate({ ...common, type: "invitation.close", key: keyOf(TEST_CONTROLLER), invitation: invitationId }, TEST_CONTROLLER) },
   ];
   // A tree: A linked B and C, B linked D. Revoking A and keeping C drops A, B and D.

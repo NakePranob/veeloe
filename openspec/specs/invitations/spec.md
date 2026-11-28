@@ -66,3 +66,14 @@ Hub SHALL รับใบรับรอง `member.remove` ที่ `POST /mem
 #### Scenario: Owner เอา Member ออก
 - **WHEN** Owner เซ็น `member.remove` ที่ชี้ Member ที่เข้ามาด้วยลิงก์
 - **THEN** `trust.json` บน Machine ไม่มีกุญแจและ Grant ของคนนั้นอีก
+
+### Requirement: ตำแหน่งแก้ได้โดย Owner หรือคนนั้นเอง
+ตำแหน่งของ Member SHALL เปลี่ยนด้วยใบรับรอง `member.title` ที่เซ็นโดย Owner หรือโดย Member คนนั้นเอง Hub SHALL ปฏิเสธใบที่คนอื่นเซ็นด้วย `hub.member_title_invalid` เก็บใบที่รับไว้เหมือนใบอื่น และส่งให้ทุกเครื่องใน Workspace ตำแหน่งว่างคือเอาตำแหน่งออก Runtime SHALL ไม่อ่านใบที่ไม่ใช่ `device.revoke` เป็นการถอนกุญแจ (ADR 0091, 0093)
+
+#### Scenario: Member แก้ตำแหน่งของ Owner
+- **WHEN** Member ที่เข้ามาด้วยลิงก์เซ็น `member.title` ของ Owner หรือของ Member อื่น
+- **THEN** Hub ตอบ `hub.member_title_invalid` และไม่มีเครื่องไหนเห็นตำแหน่งนั้น
+
+#### Scenario: แก้ตำแหน่งตัวเอง
+- **WHEN** Member แก้ตำแหน่งของตัวเองจากหน้าของตัวเอง
+- **THEN** หน้า "คน" ของทุกเครื่องแสดงตำแหน่งใหม่หลังชื่อ และ Machine ยังเชื่อกุญแจของคนนั้นเหมือนเดิม

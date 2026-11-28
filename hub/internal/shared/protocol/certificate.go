@@ -24,6 +24,7 @@ const (
 	DeviceRevoke    = "device.revoke"
 	MemberAdd       = "member.add"
 	MemberRemove    = "member.remove"
+	MemberTitle     = "member.title"
 	InvitationOpen  = "invitation.open"
 	InvitationClose = "invitation.close"
 )
@@ -35,9 +36,11 @@ type Certified struct {
 	Member    string
 	Key       string
 	By        string
-	// Name is set on a device.link and a member.add, Keep on a device.revoke.
-	Name string
-	Keep []string
+	// Name is set on a device.link and a member.add, Keep on a device.revoke,
+	// Title on a member.title (empty takes it away).
+	Name  string
+	Title string
+	Keep  []string
 	// Invitation is set on a member.add and an invitation.*, Max and Expires
 	// (Unix ms) on an invitation.open (ADR 0059).
 	Invitation string
@@ -103,6 +106,14 @@ func VerifyCertificate(c Certificate) (Certified, bool) {
 		}
 		out.Max, out.Expires = int(max), int64(expires)
 	case MemberRemove:
+	case MemberTitle:
+		if json.Unmarshal(fields["title"], &out.Title) != nil {
+			return out, false
+		}
+		out.Title = strings.TrimFunc(out.Title, isJSSpace)
+		if utf16Len(out.Title) > 40 {
+			return out, false
+		}
 	case InvitationClose:
 		if !readInvitation(fields, &out) {
 			return out, false

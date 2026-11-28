@@ -122,6 +122,38 @@
       "valid": true
     },
     {
+      "name": "a Member's title",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_new\",\"at\":1800000000000,\"type\":\"member.title\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"title\":\"ฝ่ายขาย\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "vVkaqOaDvKd6akSr1TO-i_mdhLgI4zwriLclBprayJooMEkr2vv7PB6n11BmZikkp9iBXkmVidKNOcwkk65BAg"
+      },
+      "valid": true
+    },
+    {
+      "name": "a Member's title taken away",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_new\",\"at\":1800000000000,\"type\":\"member.title\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"title\":\"\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "LK4OPT80n3knhErgAYrIYvhDa6cEEb9XdGj-SQu1d7EAhWemJ4HgC3RMz_CYc2oSe1-YOFoGGDwn7yQdecJGCA"
+      },
+      "valid": true
+    },
+    {
+      "name": "a title longer than 40",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_new\",\"at\":1800000000000,\"type\":\"member.title\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"title\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "tk_NCpAqzf_qpA6sC-x1kGmJR-k_TWAkT9ryZVDy_2_y-DOkr0_yJlnMGN-LhisktsjH7vAZQTZj7CaVU-rJAQ"
+      },
+      "valid": false
+    },
+    {
+      "name": "a title change with no title",
+      "certificate": {
+        "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_new\",\"at\":1800000000000,\"type\":\"member.title\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",
+        "sig": "Aog--Xmba9iiFqzulDQ_hOErfyfWk57qNFSdeCSUAlv6dk3LanTiZ4YMslABwquULlEqJhNxOxSa3PqCzY37DA"
+      },
+      "valid": false
+    },
+    {
       "name": "an Invitation closed",
       "certificate": {
         "signed": "{\"v\":1,\"workspace\":\"w_vector\",\"member\":\"m_vector\",\"at\":1800000000000,\"type\":\"invitation.close\",\"key\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\",\"invitation\":\"IiIiIiIiIiIiIiIiIiIiIg\",\"by\":\"11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg\"}",

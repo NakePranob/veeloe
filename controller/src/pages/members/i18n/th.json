@@ -14,7 +14,8 @@
   "cancel": "ยกเลิก",
   "prompt": {
     "grant": "ให้ {{name}} ระดับ {{level}}",
-    "remove": "เอา {{name}} ออกจาก Workspace"
+    "remove": "เอา {{name}} ออกจาก Workspace",
+    "role": "ตั้งตำแหน่งของ {{name}}"
   },
   "remove": {
     "row": "เอา {{name}} ออกจาก Workspace",
@@ -28,7 +29,7 @@
   "title": "คน",
   "subtitle": "{{count}} คน",
   "invite": "เชิญ",
-  "footer": "ทุกคนใน Workspace Owner มีสิทธิ์ทุก Agent แตะคนที่เข้ามาด้วยลิงก์เพื่อดูหรือแก้สิทธิ์",
+  "footer": "ทุกคนใน Workspace Owner มีสิทธิ์ทุก Agent แตะคนที่เข้ามาด้วยลิงก์เพื่อดูหรือแก้สิทธิ์และตำแหน่ง",
   "you": "คุณ",
   "youNamed": "{{name}} (คุณ)",
   "owner": "Owner",
@@ -44,5 +45,13 @@
     "agents": "ลิงก์ให้ Agent {{count}} ตัว",
     "detail": "เข้าแล้ว {{joined}} จาก {{count}} · หมดอายุ {{when}}"
   },
-  "fromGroup": "กลุ่ม {{group}} ให้ {{level}}"
+  "fromGroup": "กลุ่ม {{group}} ให้ {{level}}",
+  "role": {
+    "label": "ตำแหน่ง",
+    "none": "ไม่มี",
+    "placeholder": "เช่น ฝ่ายขาย",
+    "footer": "แสดงหลังชื่อในทุกเครื่อง ไม่ให้สิทธิ์อะไร แก้ได้เฉพาะ Owner และเจ้าของตำแหน่งเอง",
+    "save": "บันทึก",
+    "cannot": "แก้ตำแหน่งไม่ได้"
+  }
 }
