@@ -32,7 +32,11 @@ Hub SHALL รับ `invitation.open` ที่เซ็นโดย Controller 
 - **THEN** Hub ตอบ `hub.invitation_closed` และคนที่เข้าแล้วยังรับของที่ฝากไว้ได้
 
 ### Requirement: Machine รับ Member และ Grant จากคนที่มีสิทธิ์
-Runtime SHALL เพิ่ม Member จาก `member.add` เฉพาะเมื่อผู้เซ็นเป็น Owner หรือ Member ที่มี Manage ที่ Agent ใดบน Machine นั้น และ SHALL ไม่ทับ Member id หรือกุญแจที่มีอยู่ หรือกุญแจที่ถูกถอน หลังรับ คนออก SHALL ส่ง `grant.set` ของแต่ละ Agent ไปที่ Machine ของ Agent นั้น
+Runtime SHALL เพิ่ม Member จาก `member.add` เฉพาะเมื่อผู้เซ็นเป็น Owner หรือผู้ดูแลกลุ่มบน Machine นั้น การมี Manage ที่ Agent ไม่พอ (ADR 0093) และ SHALL ไม่ทับ Member id หรือกุญแจที่มีอยู่ หรือกุญแจที่ถูกถอน หลังรับ คนออก SHALL ส่ง `grant.set` ของแต่ละ Agent ไปที่ Machine ของ Agent นั้น
+
+#### Scenario: Manager เชิญคน
+- **WHEN** Member ที่มี Manage ที่ Agent แต่ไม่ได้ดูแลกลุ่มไหนเซ็น `member.add`
+- **THEN** Machine ไม่รับคนนั้น และเขียน log ว่าผู้เซ็นไม่น่าเชื่อถือ
 
 #### Scenario: คนที่เข้าใช้ Agent ที่ได้
 - **WHEN** คนที่เข้าด้วยลิงก์ที่ให้ Use ที่ `shared` ส่ง `task.message` ถึง `shared` และถึง `private`

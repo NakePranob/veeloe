@@ -47,11 +47,13 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
   const onHub = agents?.filter((agent) => here.some((m) => m.id === agent.machine_id)) ?? [];
   // Only where this Member may grant (ADR 0093): an Owner holds Manage everywhere, anyone else where they manage.
   // A Grant elsewhere would let the person in and then be refused by the Machine.
-  const ours = onHub.filter((agent) => agent.level === "manage");
+  // Only an Owner attaches Agents; a group admin brings people into their group alone (ADR 0093).
+  const owner = ownsAny(machines ?? undefined);
+  const ours = owner ? onHub.filter((agent) => agent.level === "manage") : [];
   const [levels, setLevels] = useState<Record<string, Choice>>({});
   // A group this device's Member may add people to: an Owner's every group, an admin's own (ADR 0091).
   const me = new Set(machines?.map((m) => m.member_id));
-  const groups = useGroups()?.filter((group) => ownsAny(machines ?? undefined) || group.admins.some((m) => me.has(m))) ?? [];
+  const groups = useGroups()?.filter((group) => owner || group.admins.some((m) => me.has(m))) ?? [];
   const [group, setGroup] = useState("");
   const [title, setTitle] = useState("");
   const [people, setPeople] = useState<number>(1);
@@ -67,6 +69,14 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
     return (
       <Screen title={t("title")}>
         <Empty icon="agent" title={t("none.title")} detail={t("none.body")} />
+      </Screen>
+    );
+  }
+  // Someone who is neither an Owner nor a group admin brings nobody in (ADR 0093).
+  if (!owner && groups.length === 0) {
+    return (
+      <Screen title={t("title")}>
+        <Empty icon="share" title={t("cannotInvite.title")} detail={t("cannotInvite.body")} />
       </Screen>
     );
   }
@@ -101,20 +111,22 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
   const levelLabel = (level: Choice) => t(`level.${level}`);
   return (
     <Screen title={t("title")} bottom={<Button size="large" variant="primary" label={t("create")} disabled={(grants.length === 0 && !group) || busy} onPress={() => void create()} />}>
-      <Section title="Agent" footer={t("agents.footer")}>
-        {ours.length === 0 && <Row title={onHub.length === 0 ? t("agents.empty") : t("agents.noneToGrant")} />}
-        {ours.map((agent) => (
-          <AgentLevelSelect
-            key={agent.id}
-            agent={agent}
-            machine={machines?.find((m) => m.id === agent.machine_id)?.name ?? ""}
-            value={levels[agent.id] ?? "none"}
-            cancel={t("cancel")}
-            options={(["none", "use", "approve", "manage"] as const).map((level) => ({ value: level, label: levelLabel(level) }))}
-            onChange={(level) => setLevels((was) => ({ ...was, [agent.id]: level }))}
-          />
-        ))}
-      </Section>
+      {owner && (
+        <Section title="Agent" footer={t("agents.footer")}>
+          {ours.length === 0 && <Row title={onHub.length === 0 ? t("agents.empty") : t("agents.noneToGrant")} />}
+          {ours.map((agent) => (
+            <AgentLevelSelect
+              key={agent.id}
+              agent={agent}
+              machine={machines?.find((m) => m.id === agent.machine_id)?.name ?? ""}
+              value={levels[agent.id] ?? "none"}
+              cancel={t("cancel")}
+              options={(["none", "use", "approve", "manage"] as const).map((level) => ({ value: level, label: levelLabel(level) }))}
+              onChange={(level) => setLevels((was) => ({ ...was, [agent.id]: level }))}
+            />
+          ))}
+        </Section>
+      )}
       {groups.length > 0 && (
         <Section title={t("group.heading")} footer={t("group.footer")}>
           <Select label={t("group.label")} value={group} cancel={t("cancel")} options={[{ value: "", label: t("group.none") }, ...groups.map((g) => ({ value: g.id, label: g.name }))]} onChange={setGroup} />

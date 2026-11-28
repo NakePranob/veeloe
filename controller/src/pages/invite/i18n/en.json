@@ -6,7 +6,7 @@
     "body": "Pair a Machine and create an Agent first, then invite people to use it"
   },
   "agents": {
-    "footer": "Everyone who joins with this link gets these. Use gives work; Approve also answers Approvals; Manage changes the Agent and invites others.",
+    "footer": "Everyone who joins with this link gets these. Use gives work; Approve also answers Approvals; Manage changes the Agent and grants others there.",
     "empty": "No Agent on this Machine yet",
     "noneToGrant": "You cannot grant any Agent here; that takes Manage at it"
   },
@@ -90,5 +90,9 @@
     "label": "Title",
     "placeholder": "e.g. Sales",
     "footer": "Shown after the name of everyone who joins; grants nothing"
+  },
+  "cannotInvite": {
+    "title": "You cannot invite people",
+    "body": "Only an Owner or a group admin brings people into the Workspace. Ask an Owner to invite them, or to make you a group admin."
   }
 }

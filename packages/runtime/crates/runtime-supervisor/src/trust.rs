@@ -731,14 +731,15 @@ fn add_member(next: &mut Trust, body: &Value, log: &dyn Fn(&str)) {
         .owners
         .iter()
         .any(|owner| owner.keys.iter().any(|known| known == by));
-    let manager_key = next.members.iter().any(|person| {
+    // A group admin brings people into their group (ADR 0091); Manage at an Agent no longer does (ADR 0093).
+    let admin_key = next.members.iter().any(|person| {
         person.keys.iter().any(|known| known == by)
             && next
-                .grants
+                .groups
                 .iter()
-                .any(|grant| grant.member == person.member && grant.level == GrantLevel::Manage)
+                .any(|group| group.admins.contains(&person.member))
     });
-    if !owner_key && !manager_key {
+    if !owner_key && !admin_key {
         log("ignored a certificate: untrusted-signer");
         return;
     }
@@ -1266,7 +1267,7 @@ mod tests {
     }
 
     #[test]
-    fn a_member_is_added_only_by_an_owner_or_a_manager_and_never_over_someone() {
+    fn a_member_is_added_only_by_an_owner_or_a_group_admin_and_never_over_someone() {
         let after = apply_certificates(&paired(), &[added(0x41, "m_kai", 0x71)], &quiet);
         assert_eq!(
             after.members,
@@ -1289,11 +1290,24 @@ mod tests {
             apply_certificates(&after, &[added(0x71, "m_x", 0x72)], &quiet),
             after
         );
-        // A Member who manages an Agent here may.
+        // Manage at an Agent does not bring people in (ADR 0093); a group admin does.
         let mut managing = after.clone();
         managing.set_grant("a_1", "m_kai", Some(GrantLevel::Manage));
-        let by_manager = apply_certificates(&managing, &[added(0x71, "m_lee", 0x72)], &quiet);
-        assert_eq!(by_manager.members.len(), 2);
+        assert_eq!(
+            apply_certificates(&managing, &[added(0x71, "m_lee", 0x72)], &quiet),
+            managing
+        );
+        let mut admin = after.clone();
+        admin.groups.push(Group {
+            id: "g_sales".into(),
+            name: "Sales".into(),
+            version: 1,
+            members: vec![],
+            admins: vec!["m_kai".into()],
+            grants: vec![],
+        });
+        let by_admin = apply_certificates(&admin, &[added(0x71, "m_lee", 0x72)], &quiet);
+        assert_eq!(by_admin.members.len(), 2);
         // Never an Owner's id, nor a key someone holds.
         assert_eq!(
             apply_certificates(&paired(), &[added(0x41, "m_1", 0x73)], &quiet),
