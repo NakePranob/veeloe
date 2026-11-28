@@ -50,10 +50,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	machine, controller := keyOf(0x33), keyOf(0x44)
+	machine, controller, colleague := keyOf(0x33), keyOf(0x44), keyOf(0x66)
 	known := identities{
 		machine:    {Kind: relay.KindMachine, ID: "machine-1", Workspace: "w-1", Key: machine},
 		controller: {Kind: relay.KindController, ID: "member-1", Workspace: "w-1", Key: controller},
+		// A second Member of the same Workspace, who is not an Owner (ADR 0010).
+		colleague: {Kind: relay.KindController, ID: "member-2", Workspace: "w-1", Key: colleague},
 	}
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()

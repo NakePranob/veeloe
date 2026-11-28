@@ -1741,6 +1741,83 @@
       "valid": false
     },
     {
+      "name": "grant a Member Use at one Agent",
+      "type": "grant.set",
+      "body": {
+        "agent": "agent-1",
+        "member": "m_kai",
+        "level": "use"
+      },
+      "valid": true
+    },
+    {
+      "name": "take a Member's Grant away",
+      "type": "grant.set",
+      "body": {
+        "agent": "agent-1",
+        "member": "m_kai",
+        "level": "none"
+      },
+      "valid": true
+    },
+    {
+      "name": "a Grant with a level that is not one",
+      "type": "grant.set",
+      "body": {
+        "agent": "agent-1",
+        "member": "m_kai",
+        "level": "owner"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Grant for a Member id that is not a folder name",
+      "type": "grant.set",
+      "body": {
+        "agent": "agent-1",
+        "member": "../m",
+        "level": "use"
+      },
+      "valid": false
+    },
+    {
+      "name": "a Grant with no Agent",
+      "type": "grant.set",
+      "body": {
+        "member": "m_kai",
+        "level": "use"
+      },
+      "valid": false
+    },
+    {
+      "name": "the Grants at one Agent",
+      "type": "grants.listed",
+      "body": {
+        "agent": "agent-1",
+        "grants": [
+          {
+            "member": "m_kai",
+            "level": "approve"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "listed Grants with none as a level",
+      "type": "grants.listed",
+      "body": {
+        "agent": "agent-1",
+        "grants": [
+          {
+            "member": "m_kai",
+            "level": "none"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
       "name": "set the Egress with more than 100 domains",
       "type": "egress.set",
       "body": {

@@ -374,6 +374,13 @@ export function messageVectors() {
     { name: "Memory text at the bound", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: true, chars: 9_000, text: "a".repeat(4_200) }, valid: true },
     { name: "Memory text over the bound", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: true, chars: 9_000, text: "a".repeat(4_201) }, valid: false },
     { name: "Memory with a negative count", type: "memory.got", body: { request: "req-1", agent: "agent-1", exists: true, chars: -1, text: "x" }, valid: false },
+    { name: "grant a Member Use at one Agent", type: "grant.set", body: { agent: "agent-1", member: "m_kai", level: "use" }, valid: true },
+    { name: "take a Member's Grant away", type: "grant.set", body: { agent: "agent-1", member: "m_kai", level: "none" }, valid: true },
+    { name: "a Grant with a level that is not one", type: "grant.set", body: { agent: "agent-1", member: "m_kai", level: "owner" }, valid: false },
+    { name: "a Grant for a Member id that is not a folder name", type: "grant.set", body: { agent: "agent-1", member: "../m", level: "use" }, valid: false },
+    { name: "a Grant with no Agent", type: "grant.set", body: { member: "m_kai", level: "use" }, valid: false },
+    { name: "the Grants at one Agent", type: "grants.listed", body: { agent: "agent-1", grants: [{ member: "m_kai", level: "approve" }] }, valid: true },
+    { name: "listed Grants with none as a level", type: "grants.listed", body: { agent: "agent-1", grants: [{ member: "m_kai", level: "none" }] }, valid: false },
     { name: "set the Egress with more than 100 domains", type: "egress.set", body: { egress: Array.from({ length: 101 }, (_, i) => `d${i}.example.com`) }, valid: false },
   ];
   cases.push(

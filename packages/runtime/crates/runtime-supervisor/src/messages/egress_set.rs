@@ -9,13 +9,16 @@ use crate::tasks::{Inbound, Machine, Outbox};
 /// Changes the Egress and answers with the new `agent.listed`.
 pub(crate) async fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, body: &Value) {
     let registry = machine.registry;
-    // Changing an Agent's Egress is a Manage action (ADR 0029, 0010). In
-    // v0.1 that is being an Owner whose key signed: there is no second
-    // Member and no Grant yet, so refusing a non-Owner is the whole check.
+    // Changing an Agent's Egress is a Manage action (ADR 0029, 0010); every
+    // Agent's at once is an Owner's.
     let Some(trust) = machine.trust else {
         return outbox.error(from, "egress.forbidden");
     };
-    if !trust.manages(&from.member, from.key.as_deref()) {
+    let allowed = match body.get("agent").and_then(Value::as_str) {
+        Some(agent) => trust.manages(agent, &from.member, from.key.as_deref()),
+        None => trust.is_owner(&from.member, from.key.as_deref()),
+    };
+    if !allowed {
         return outbox.error(from, "egress.forbidden");
     }
     let Some(egress) = machine.egress else {

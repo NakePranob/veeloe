@@ -30,7 +30,7 @@ fn checked<'a>(
     // A key that is not this Member's, or a Member without Use, sets nothing.
     let allowed = machine
         .trust
-        .is_some_and(|trust| trust.uses(&from.member, from.key.as_deref()));
+        .is_some_and(|trust| trust.uses(agent, &from.member, from.key.as_deref()));
     if !allowed {
         outbox.error(from, "trigger.forbidden");
         return None;
@@ -91,7 +91,7 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     // A scope is an Approval given ahead of time: it takes Approve (ADR 0079).
     let approves = machine
         .trust
-        .is_some_and(|trust| trust.approves(&from.member, Some(key)));
+        .is_some_and(|trust| trust.approves(&agent, &from.member, Some(key)));
     if !allow.is_empty() && !approves {
         return outbox.error(from, "trigger.forbidden");
     }
@@ -256,7 +256,7 @@ pub(crate) fn run(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     // Whoever pressed it is there to answer: this round asks as any Turn does.
     let approves = machine
         .trust
-        .is_some_and(|trust| trust.approves(&record.member, Some(&record.key)));
+        .is_some_and(|trust| trust.approves(&record.agent, &record.member, Some(&record.key)));
     // An Idle Work list's run now is its next piece, with its time limit.
     let started = if record.kind == "idle" {
         crate::triggers::start_piece(machine.workers, triggers, &record, now(), true, approves)

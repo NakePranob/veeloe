@@ -86,14 +86,25 @@ fn agent(id: &str) -> Agent {
     }
 }
 
+/// The Owner, and a Member who has Use at `a1` and is not an Owner.
 fn owner() -> Trust {
-    Trust {
+    let mut trust = Trust {
         owners: vec![Owner {
             member: "member-1".into(),
             keys: vec!["controller-1".into()],
         }],
+        members: vec![Owner {
+            member: "member-2".into(),
+            keys: vec!["controller-2".into()],
+        }],
         ..Trust::default()
-    }
+    };
+    trust.set_grant(
+        "a1",
+        "member-2",
+        Some(veeloe_runtime_supervisor::trust::GrantLevel::Use),
+    );
+    trust
 }
 
 fn from(member: &str, key: &str) -> Inbound {
@@ -473,7 +484,7 @@ async fn a_wide_agent_runs_no_trigger_and_works_only_for_an_owner() {
         "files.wide_agent"
     );
 
-    // A Member who is not an Owner gives it no work.
+    // A Member who is not an Owner gives it no work, even with Use there.
     let stranger = Inbound {
         task: Some("t1".into()),
         ..from("member-2", "controller-2")

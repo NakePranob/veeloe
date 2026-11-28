@@ -33,6 +33,8 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
         "task.list" => object.is_some(),
         "task.listed" => object.map(is_task_listed).unwrap_or(false),
         "egress.set" => object.map(is_egress_set).unwrap_or(false),
+        "grant.set" => object.map(is_grant_set).unwrap_or(false),
+        "grants.listed" => object.map(is_grants_listed).unwrap_or(false),
         "error" => object.map(is_error).unwrap_or(false),
         "usage.list" => object.map(is_usage_list).unwrap_or(false),
         "usage.listed" => object.map(is_usage_listed).unwrap_or(false),
@@ -915,6 +917,36 @@ fn is_git_repos(value: &Value) -> bool {
                 })
         })
         .unwrap_or(false)
+}
+
+fn is_grant_level(value: Option<&Value>) -> bool {
+    matches!(text(value), Some("use" | "approve" | "manage"))
+}
+
+fn is_id(value: Option<&Value>) -> bool {
+    text(value).is_some_and(is_agent_id)
+}
+
+/// `grant.set` (ADR 0010): a Member's level at one Agent, or `none` to take it away.
+fn is_grant_set(object: &Map<String, Value>) -> bool {
+    is_id(object.get("agent"))
+        && is_id(object.get("member"))
+        && (is_grant_level(object.get("level")) || text(object.get("level")) == Some("none"))
+}
+
+fn is_grants_listed(object: &Map<String, Value>) -> bool {
+    is_id(object.get("agent"))
+        && object
+            .get("grants")
+            .and_then(Value::as_array)
+            .is_some_and(|grants| {
+                grants.len() <= 500
+                    && grants.iter().all(|grant| {
+                        grant.as_object().is_some_and(|grant| {
+                            is_id(grant.get("member")) && is_grant_level(grant.get("level"))
+                        })
+                    })
+            })
 }
 
 fn is_egress_set(object: &Map<String, Value>) -> bool {

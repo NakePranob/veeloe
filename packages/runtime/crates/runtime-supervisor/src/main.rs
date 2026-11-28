@@ -418,7 +418,7 @@ impl Supervisor {
         if agent.deleted() {
             return;
         }
-        if !trust.uses(&record.member, Some(&record.key)) {
+        if !trust.uses(&record.agent, &record.member, Some(&record.key)) {
             let _ = self
                 .triggers
                 .update(&record.agent, &record.id, |held| held.suspended = true);
@@ -450,7 +450,7 @@ impl Supervisor {
         {
             return;
         }
-        let approves = trust.approves(&record.member, Some(&record.key));
+        let approves = trust.approves(&record.agent, &record.member, Some(&record.key));
         let start = || {
             veeloe_runtime_supervisor::triggers::start_piece(
                 workers,
@@ -539,6 +539,7 @@ impl Supervisor {
             &self.trust.lock().expect("trust"),
             &self.push_tokens.all(),
             kind,
+            agent,
             starter,
         );
         if tokens.is_empty() {
@@ -590,7 +591,7 @@ impl Supervisor {
                 ms: now_ms as u64,
                 // An Agent purged from the trash waits too: it has no rounds left.
                 in_trash: agent.as_ref().is_none_or(|agent| agent.deleted()),
-                allowed: trust.uses(&record.member, Some(&record.key)),
+                allowed: trust.uses(&record.agent, &record.member, Some(&record.key)),
                 // Only this Schedule's own round still running skips the next (ADR 0080).
                 busy: self.approvals.round_running(&record.agent, &record.id),
                 budget_spent: agent
@@ -619,7 +620,7 @@ impl Supervisor {
                 }
                 Round::Run { at } => {
                     // Came due on its own: nobody is there to answer (ADR 0079).
-                    let approves = trust.approves(&record.member, Some(&record.key));
+                    let approves = trust.approves(&record.agent, &record.member, Some(&record.key));
                     let start = || {
                         veeloe_runtime_supervisor::triggers::start_round(
                             workers,
@@ -731,6 +732,7 @@ impl Supervisor {
         trust
             .owners
             .iter()
+            .chain(&trust.members)
             .find(|owner| owner.keys.iter().any(|known| known == key))
             .map(|owner| owner.member.clone())
     }
@@ -741,6 +743,7 @@ impl Supervisor {
         trust
             .owners
             .iter()
+            .chain(&trust.members)
             .filter(|owner| owner.member == member)
             .flat_map(|owner| owner.keys.iter())
             .filter(|key| !trust.revoked.contains(key))
@@ -834,6 +837,15 @@ impl Supervisor {
             }
             return;
         }
+        // A Member who is not an Owner reaches only what checks their Grants (ADR 0010).
+        if !trust.is_owner(&from.member, from.key.as_deref())
+            && !veeloe_runtime_supervisor::tasks::open_to_members(&type_)
+        {
+            return outbox.error(&from, "member.forbidden");
+        }
+        if type_ == "grant.set" {
+            return self.set_grant(&from, &body, &outbox);
+        }
         // Off the link's own task: a Provider's models come over the wire, and
         // the next envelope must not wait for them.
         tokio::spawn(async move {
@@ -861,6 +873,43 @@ impl Supervisor {
             };
             dispatch(&machine, outbox.as_ref(), &from, &type_, &body).await;
         });
+    }
+
+    /// A signed `grant.set`: kept in `trust.json`, and answered with every
+    /// Grant at that Agent. It counts from the next Turn (ADR 0010).
+    fn set_grant(&self, from: &Inbound, body: &Value, outbox: &MachineOutbox) {
+        let agent = body
+            .get("agent")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let exists = self
+            .registry
+            .get(agent)
+            .ok()
+            .flatten()
+            .is_some_and(|found| !found.deleted());
+        // Sending reads trust for the Member's devices, so nothing is sent while it is held.
+        let answer = {
+            let mut held = self.trust.lock().expect("trust");
+            match held.grant(exists, &from.member, from.key.as_deref(), body) {
+                Err(code) => Err(code),
+                Ok(next) => match veeloe_runtime_supervisor::trust::save_trust(&self.home, &next) {
+                    Err(error) => {
+                        println!("could not save trust: {error}");
+                        Err("grant.unavailable")
+                    }
+                    Ok(()) => {
+                        let listed = next.grants_listed(agent);
+                        *held = next;
+                        Ok(listed)
+                    }
+                },
+            }
+        };
+        match answer {
+            Ok(listed) => outbox.to_member(&from.member, "grants.listed", listed, None),
+            Err(code) => outbox.error(from, code),
+        }
     }
 
     fn apply_certificates(&self, certificates: Vec<Value>) {

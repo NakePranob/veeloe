@@ -154,8 +154,7 @@ impl HubLinkSink for PairSink {
                 keys: all,
             }],
             workspace,
-            links: Vec::new(),
-            revoked: Vec::new(),
+            ..Trust::default()
         };
         if let Err(error) = save_trust(&self.home, &trust) {
             (self.log)(&format!("cannot write this Machine's trust: {error}"));

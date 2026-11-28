@@ -63,17 +63,18 @@ pub fn recipients(
     trust: &Trust,
     tokens: &[PushToken],
     kind: PushKind,
+    agent: &str,
     starter: &str,
 ) -> Vec<PushToken> {
     tokens
         .iter()
         .filter(|held| match kind {
-            PushKind::Approval => trust.approves(&held.member, Some(&held.device)),
+            PushKind::Approval => trust.approves(agent, &held.member, Some(&held.device)),
             PushKind::TurnEnded
             | PushKind::SchedulePaused
             | PushKind::GoalMet
             | PushKind::Question => {
-                held.member == starter && trust.manages(&held.member, Some(&held.device))
+                held.member == starter && trust.uses(agent, &held.member, Some(&held.device))
             }
         })
         .cloned()
@@ -239,24 +240,24 @@ mod tests {
     #[test]
     fn an_approval_goes_to_every_member_who_may_answer_it() {
         let tokens = [held("m_1", "k1"), held("m_2", "k2")];
-        let got = recipients(&two_members(), &tokens, PushKind::Approval, "m_1");
+        let got = recipients(&two_members(), &tokens, PushKind::Approval, "a_1", "m_1");
         assert_eq!(devices(got), vec!["k1", "k2"]);
     }
 
     #[test]
     fn a_turn_end_goes_only_to_the_member_who_started_it() {
         let tokens = [held("m_1", "k1"), held("m_2", "k2")];
-        let got = recipients(&two_members(), &tokens, PushKind::TurnEnded, "m_2");
+        let got = recipients(&two_members(), &tokens, PushKind::TurnEnded, "a_1", "m_2");
         assert_eq!(devices(got), vec!["k2"]);
-        assert!(recipients(&two_members(), &tokens, PushKind::TurnEnded, "").is_empty());
+        assert!(recipients(&two_members(), &tokens, PushKind::TurnEnded, "a_1", "").is_empty());
     }
 
     #[test]
     fn a_key_no_longer_trusted_gets_no_push() {
         // k3 was m_1's, then revoked; its token has not been dropped yet.
         let tokens = [held("m_1", "k3"), held("m_2", "k1")];
-        assert!(recipients(&two_members(), &tokens, PushKind::Approval, "m_1").is_empty());
-        assert!(recipients(&two_members(), &tokens, PushKind::TurnEnded, "m_1").is_empty());
+        assert!(recipients(&two_members(), &tokens, PushKind::Approval, "a_1", "m_1").is_empty());
+        assert!(recipients(&two_members(), &tokens, PushKind::TurnEnded, "a_1", "m_1").is_empty());
     }
 
     #[tokio::test]

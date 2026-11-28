@@ -284,6 +284,26 @@ pub struct Machine<'a> {
     pub http: &'a dyn HttpClient,
 }
 
+/// What a Member who is not an Owner may send: each of these checks their
+/// Grant at the Agent it names (ADR 0010). Everything else is an Owner's until
+/// it checks Grants too (#100, #102). Triggers stay an Owner's: their handlers
+/// check Use at the Agent but not whose Trigger it is, so a Member could run or
+/// delete someone else's.
+pub fn open_to_members(type_: &str) -> bool {
+    matches!(
+        type_,
+        "task.message"
+            | "task.stop"
+            | "task.rename"
+            | "approval.answer"
+            | "card.answer"
+            | "egress.set"
+            | "grant.set"
+            | "push.register"
+            | "push.unregister"
+    )
+}
+
 /// Routes each message type to its module (ADR 0021).
 pub async fn dispatch(
     machine: &Machine<'_>,

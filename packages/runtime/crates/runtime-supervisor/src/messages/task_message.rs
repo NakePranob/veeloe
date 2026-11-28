@@ -44,6 +44,14 @@ pub(crate) fn target(
         outbox.error(from, "agent.unknown");
         return None;
     }
+    // Every message about an Agent's Task takes Use there (ADR 0010).
+    if machine
+        .trust
+        .is_some_and(|trust| !trust.uses(&agent.id, &from.member, from.key.as_deref()))
+    {
+        outbox.error(from, "agent.forbidden");
+        return None;
+    }
     let Some(task) = from.task.clone() else {
         outbox.error(from, "task.unknown");
         return None;
@@ -62,7 +70,7 @@ pub(crate) fn message(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound
     if agent.access.files != crate::agents::Level::Folder
         && !machine
             .trust
-            .is_some_and(|trust| trust.manages(&from.member, from.key.as_deref()))
+            .is_some_and(|trust| trust.is_owner(&from.member, from.key.as_deref()))
     {
         return outbox.error(from, "files.owner_only");
     }

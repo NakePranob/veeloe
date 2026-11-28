@@ -128,55 +128,168 @@ pub struct Owner {
     pub keys: Vec<String>,
 }
 
+/// What a Member may do at one Agent (ADR 0010): each level holds the ones
+/// below it, so Manage can also approve and use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum GrantLevel {
+    Use,
+    Approve,
+    Manage,
+}
+
+impl GrantLevel {
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "use" => Some(Self::Use),
+            "approve" => Some(Self::Approve),
+            "manage" => Some(Self::Manage),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Use => "use",
+            Self::Approve => "approve",
+            Self::Manage => "manage",
+        }
+    }
+}
+
+/// One Member's level at one Agent, as signed by an Owner or a Manager there.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Grant {
+    pub agent: String,
+    pub member: String,
+    pub level: GrantLevel,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Trust {
     pub owners: Vec<Owner>,
+    /// Members who are not Owners, with their keys: they reach only the Agents
+    /// their Grants name (ADR 0010, 0059). An Invitation adds them (#99).
+    pub members: Vec<Owner>,
+    pub grants: Vec<Grant>,
     pub workspace: Option<String>,
     pub links: Vec<(String, String)>,
     pub revoked: Vec<String>,
 }
 
 impl Trust {
+    /// Every key an envelope may be signed by: Owners' and Members'.
     pub fn trusted_keys(&self) -> std::collections::HashSet<String> {
         self.owners
             .iter()
+            .chain(&self.members)
             .flat_map(|owner| owner.keys.iter().cloned())
             .collect()
     }
 
-    /// Whether this Member may change an Agent's settings such as its Egress
-    /// (issue #43).
-    ///
-    /// v0.1 has one Member, the Owner, and an Owner has Manage at every Agent
-    /// (ADR 0010, 0031). So this is being an Owner, and when the envelope names
-    /// the key that signed it, one of that Owner's keys: a key trusted for one
-    /// Member cannot act as another. When Grants are stored per Agent this
-    /// narrows to the Member's Grant at that Agent; the callers already ask per
-    /// Agent, so only this function changes.
-    pub fn manages(&self, member: &str, key: Option<&str>) -> bool {
-        self.owners.iter().any(|owner| {
-            owner.member == member
-                && key
-                    .map(|key| owner.keys.iter().any(|known| known == key))
-                    .unwrap_or(true)
+    /// Whether `key` is one of `member`'s among `people`, or, with no key
+    /// named, whether `member` is there at all: a key trusted for one Member
+    /// cannot act as another.
+    fn holds(people: &[Owner], member: &str, key: Option<&str>) -> bool {
+        people.iter().any(|person| {
+            person.member == member
+                && key.is_none_or(|key| person.keys.iter().any(|known| known == key))
         })
     }
 
-    /// Whether this Member may answer an Approval for this Agent (ADR 0010).
-    ///
-    /// v0.1 has one Member, the Owner, and an Owner has Approve at every Agent
-    /// (ADR 0010, 0031), so this is the same check as [`Trust::manages`]. The
-    /// callers ask per Agent already, so when Grants are stored per Agent only
-    /// this function narrows.
-    pub fn approves(&self, member: &str, key: Option<&str>) -> bool {
-        self.manages(member, key)
+    /// Whether this Member, signing with this key, is an Owner: the root of
+    /// trust, with Manage at every Agent (ADR 0031).
+    pub fn is_owner(&self, member: &str, key: Option<&str>) -> bool {
+        Self::holds(&self.owners, member, key)
+    }
+
+    /// This Member's level at this Agent: Manage for an Owner, the Grant for a
+    /// Member, none for a key that is not theirs.
+    pub fn level(&self, agent: &str, member: &str, key: Option<&str>) -> Option<GrantLevel> {
+        if self.is_owner(member, key) {
+            return Some(GrantLevel::Manage);
+        }
+        if !Self::holds(&self.members, member, key) {
+            return None;
+        }
+        self.grants
+            .iter()
+            .find(|grant| grant.agent == agent && grant.member == member)
+            .map(|grant| grant.level)
+    }
+
+    /// Whether this Member may change this Agent's settings and Grants (ADR 0010).
+    pub fn manages(&self, agent: &str, member: &str, key: Option<&str>) -> bool {
+        self.level(agent, member, key) >= Some(GrantLevel::Manage)
+    }
+
+    /// Whether this Member may answer this Agent's Approvals (ADR 0010).
+    pub fn approves(&self, agent: &str, member: &str, key: Option<&str>) -> bool {
+        self.level(agent, member, key) >= Some(GrantLevel::Approve)
     }
 
     /// Whether this Member may give this Agent work, a Trigger included
-    /// (ADR 0010, issue #56). v0.1's only Member is the Owner, who has every
-    /// Grant, so this is [`Trust::manages`]; per-Agent Grants narrow only this.
-    pub fn uses(&self, member: &str, key: Option<&str>) -> bool {
-        self.manages(member, key)
+    /// (ADR 0010, issue #56).
+    pub fn uses(&self, agent: &str, member: &str, key: Option<&str>) -> bool {
+        self.level(agent, member, key) >= Some(GrantLevel::Use)
+    }
+
+    /// Sets `member`'s level at `agent`, or takes it away with `None`.
+    pub fn set_grant(&mut self, agent: &str, member: &str, level: Option<GrantLevel>) {
+        self.grants
+            .retain(|grant| !(grant.agent == agent && grant.member == member));
+        if let Some(level) = level {
+            self.grants.push(Grant {
+                agent: agent.to_string(),
+                member: member.to_string(),
+                level,
+            });
+        }
+    }
+
+    /// Trust after a signed `grant.set` (ADR 0010), or the error to answer:
+    /// only an Owner or a Manager at that Agent grants there, only to a Member
+    /// who is not an Owner (Owners hold Manage everywhere already).
+    pub fn grant(
+        &self,
+        agent_exists: bool,
+        member: &str,
+        key: Option<&str>,
+        body: &Value,
+    ) -> Result<Trust, &'static str> {
+        let text = |name: &str| body.get(name).and_then(Value::as_str).unwrap_or_default();
+        let (agent, to) = (text("agent"), text("member"));
+        if !agent_exists {
+            return Err("agent.unknown");
+        }
+        if !self.manages(agent, member, key) {
+            return Err("grant.forbidden");
+        }
+        if self.owners.iter().any(|owner| owner.member == to) {
+            return Err("grant.owner");
+        }
+        if !self.members.iter().any(|person| person.member == to) {
+            return Err("grant.unknown_member");
+        }
+        let level = match text("level") {
+            "none" => None,
+            level => Some(GrantLevel::parse(level).ok_or("grant.invalid")?),
+        };
+        let mut next = self.clone();
+        next.set_grant(agent, to, level);
+        Ok(next)
+    }
+
+    /// The body of `grants.listed` for one Agent.
+    pub fn grants_listed(&self, agent: &str) -> Value {
+        json!({
+            "agent": agent,
+            "grants": self
+                .grants
+                .iter()
+                .filter(|grant| grant.agent == agent)
+                .map(|grant| json!({ "member": grant.member, "level": grant.level.as_str() }))
+                .collect::<Vec<_>>(),
+        })
     }
 
     /// The keys revoked here that `before` still had, so what they registered
@@ -190,11 +303,19 @@ impl Trust {
     }
 
     fn to_json(&self) -> Value {
-        let mut value = json!({
-            "owners": self
-                .owners
+        let people = |people: &[Owner]| {
+            people
                 .iter()
                 .map(|owner| json!({ "member": owner.member, "keys": owner.keys }))
+                .collect::<Vec<_>>()
+        };
+        let mut value = json!({
+            "owners": people(&self.owners),
+            "members": people(&self.members),
+            "grants": self
+                .grants
+                .iter()
+                .map(|grant| json!({ "agent": grant.agent, "member": grant.member, "level": grant.level.as_str() }))
                 .collect::<Vec<_>>(),
             "links": self
                 .links
@@ -217,33 +338,61 @@ pub fn load_trust(home: &Path) -> Result<Trust, TrustError> {
     let Some(value) = read_json_file(&file)? else {
         return Ok(Trust::default());
     };
-    let owners = value
-        .get("owners")
+    let people = |name: &str| {
+        value
+            .get(name)
+            .and_then(Value::as_array)
+            .and_then(|owners| {
+                owners
+                    .iter()
+                    .map(|owner| {
+                        Some(Owner {
+                            member: owner.get("member")?.as_str()?.to_string(),
+                            keys: owner
+                                .get("keys")?
+                                .as_array()?
+                                .iter()
+                                .map(|key| key.as_str().map(str::to_string))
+                                .collect::<Option<Vec<_>>>()?,
+                        })
+                    })
+                    .collect::<Option<Vec<_>>>()
+            })
+            .ok_or_else(|| {
+                TrustError::File(format!(
+                    "cannot read {}: {name} is not a list of people",
+                    file.display()
+                ))
+            })
+    };
+    let owners = people("owners")?;
+    // A file from before Members other than Owners has none.
+    let members = if value.get("members").is_some() {
+        people("members")?
+    } else {
+        Vec::new()
+    };
+    // A Grant this Runtime cannot read is dropped, never widened.
+    let grants = value
+        .get("grants")
         .and_then(Value::as_array)
-        .and_then(|owners| {
-            owners
+        .map(|grants| {
+            grants
                 .iter()
-                .map(|owner| {
-                    Some(Owner {
-                        member: owner.get("member")?.as_str()?.to_string(),
-                        keys: owner
-                            .get("keys")?
-                            .as_array()?
-                            .iter()
-                            .map(|key| key.as_str().map(str::to_string))
-                            .collect::<Option<Vec<_>>>()?,
+                .filter_map(|grant| {
+                    Some(Grant {
+                        agent: grant.get("agent")?.as_str()?.to_string(),
+                        member: grant.get("member")?.as_str()?.to_string(),
+                        level: GrantLevel::parse(grant.get("level")?.as_str()?)?,
                     })
                 })
-                .collect::<Option<Vec<_>>>()
+                .collect()
         })
-        .ok_or_else(|| {
-            TrustError::File(format!(
-                "cannot read {}: it is not a list of owners",
-                file.display()
-            ))
-        })?;
+        .unwrap_or_default();
     Ok(Trust {
         owners,
+        members,
+        grants,
         workspace: value
             .get("workspace")
             .and_then(Value::as_str)
@@ -298,6 +447,8 @@ pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&s
                 keys: owner.keys.clone(),
             })
             .collect(),
+        members: trust.members.clone(),
+        grants: trust.grants.clone(),
         workspace: trust.workspace.clone(),
         links: trust.links.clone(),
         revoked: trust.revoked.clone(),
@@ -326,7 +477,13 @@ pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&s
         ) else {
             continue;
         };
-        let Some(owner) = next.owners.iter_mut().find(|owner| owner.member == member) else {
+        // A Member links and revokes their own devices as an Owner does.
+        let Some(owner) = next
+            .owners
+            .iter_mut()
+            .chain(next.members.iter_mut())
+            .find(|owner| owner.member == member)
+        else {
             if !next.revoked.iter().any(|revoked| revoked == key) {
                 log("ignored a certificate: untrusted-signer");
             }
@@ -520,8 +677,7 @@ mod tests {
                 keys: vec![key(0x41)],
             }],
             workspace: Some("w_1".into()),
-            links: Vec::new(),
-            revoked: Vec::new(),
+            ..Trust::default()
         }
     }
 
@@ -636,5 +792,106 @@ mod tests {
         let two = apply_certificates(&paired(), &[link(0x41, 0x42)], &quiet);
         let after = apply_certificates(&two, &[revoke(0x42, 0x41, &[])], &quiet);
         assert_eq!(after.owners[0].keys, vec![key(0x41), key(0x42)]);
+    }
+
+    fn with_member() -> Trust {
+        let mut trust = paired();
+        trust.members.push(Owner {
+            member: "m_2".into(),
+            keys: vec![key(0x51)],
+        });
+        trust
+    }
+
+    #[test]
+    fn an_owner_has_every_level_at_every_agent() {
+        let trust = paired();
+        assert!(trust.manages("a_1", "m_1", Some(&key(0x41))));
+        // Not with another Member's key, nor a stranger's.
+        assert!(!trust.uses("a_1", "m_1", Some(&key(0x51))));
+        assert!(!trust.uses("a_1", "m_9", None));
+    }
+
+    #[test]
+    fn a_member_has_only_the_level_granted_at_that_agent() {
+        let mut trust = with_member();
+        assert!(!trust.uses("a_1", "m_2", Some(&key(0x51))));
+        trust.set_grant("a_1", "m_2", Some(GrantLevel::Approve));
+        assert!(trust.uses("a_1", "m_2", Some(&key(0x51))));
+        assert!(trust.approves("a_1", "m_2", Some(&key(0x51))));
+        assert!(!trust.manages("a_1", "m_2", Some(&key(0x51))));
+        assert!(!trust.uses("a_2", "m_2", Some(&key(0x51))));
+        assert!(!trust.is_owner("m_2", Some(&key(0x51))));
+        // The Owner's key does not carry the Member's Grant, nor the other way.
+        assert!(!trust.uses("a_1", "m_2", Some(&key(0x41))));
+        trust.set_grant("a_1", "m_2", None);
+        assert!(!trust.uses("a_1", "m_2", Some(&key(0x51))));
+        assert!(trust.trusted_keys().contains(&key(0x51)));
+    }
+
+    #[test]
+    fn only_an_owner_or_a_manager_there_grants_and_only_to_a_member() {
+        let mut trust = with_member();
+        trust.members.push(Owner {
+            member: "m_3".into(),
+            keys: vec![key(0x61)],
+        });
+        let body =
+            |member: &str, level: &str| json!({ "agent": "a_1", "member": member, "level": level });
+        let owner = Some(key(0x41));
+        let granted = trust
+            .grant(true, "m_1", owner.as_deref(), &body("m_2", "manage"))
+            .expect("owner grants");
+        assert!(granted.manages("a_1", "m_2", Some(&key(0x51))));
+        // A Manager there grants others; a Member with only Use does not.
+        let by_manager = granted
+            .grant(true, "m_2", Some(&key(0x51)), &body("m_3", "use"))
+            .expect("manager grants");
+        assert!(by_manager.uses("a_1", "m_3", Some(&key(0x61))));
+        assert_eq!(
+            by_manager.grant(true, "m_3", Some(&key(0x61)), &body("m_3", "manage")),
+            Err("grant.forbidden")
+        );
+        // Not at another Agent, not to an Owner, not to a stranger, not an unknown Agent.
+        let other = json!({ "agent": "a_2", "member": "m_3", "level": "use" });
+        assert_eq!(
+            granted.grant(true, "m_2", Some(&key(0x51)), &other),
+            Err("grant.forbidden")
+        );
+        assert_eq!(
+            trust.grant(true, "m_1", owner.as_deref(), &body("m_1", "use")),
+            Err("grant.owner")
+        );
+        assert_eq!(
+            trust.grant(true, "m_1", owner.as_deref(), &body("m_9", "use")),
+            Err("grant.unknown_member")
+        );
+        assert_eq!(
+            trust.grant(false, "m_1", owner.as_deref(), &body("m_2", "use")),
+            Err("agent.unknown")
+        );
+        // `none` takes it away.
+        let taken = by_manager
+            .grant(true, "m_1", owner.as_deref(), &body("m_3", "none"))
+            .expect("taken");
+        assert!(!taken.uses("a_1", "m_3", Some(&key(0x61))));
+        assert_eq!(
+            taken.grants_listed("a_1"),
+            json!({ "agent": "a_1", "grants": [{ "member": "m_2", "level": "manage" }] })
+        );
+    }
+
+    #[test]
+    fn members_and_grants_survive_the_file_and_an_unknown_level_is_dropped() {
+        let home = tempfile::tempdir().expect("home");
+        let mut trust = with_member();
+        trust.set_grant("a_1", "m_2", Some(GrantLevel::Use));
+        save_trust(home.path(), &trust).expect("save");
+        assert_eq!(load_trust(home.path()).expect("load"), trust);
+        let file = home.path().join("runtime/trust.json");
+        let mut value: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+        value["grants"][0]["level"] = json!("owner");
+        fs::write(&file, value.to_string()).unwrap();
+        assert!(load_trust(home.path()).expect("load").grants.is_empty());
     }
 }

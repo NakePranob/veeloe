@@ -145,13 +145,13 @@ async fn save(
         return outbox.error(from, "agent.unknown");
     }
     // Which repos an Agent may push to is a Manage action, like its Egress
-    // (ADR 0029, 0069): in v0.1 an Owner whose key signed.
+    // (ADR 0029, 0069).
     let git_repos: Option<Vec<String>> = match body.get("gitRepos") {
         None => None,
         Some(repos) => {
             if !machine
                 .trust
-                .is_some_and(|trust| trust.manages(&from.member, from.key.as_deref()))
+                .is_some_and(|trust| trust.manages(id, &from.member, from.key.as_deref()))
             {
                 return outbox.error(from, "git.forbidden");
             }
@@ -198,7 +198,7 @@ async fn save(
             .unwrap_or_else(|| fallback.to_string())
     };
     // Which of the Machine's files an Agent reaches is the Owner's to set
-    // (ADR 0087): in v0.1 an Owner whose key signed. Every folder is checked
+    // (ADR 0087); a Manager may only bring it back to its own folder. Every folder is checked
     // against the forbidden list by its real path, and kept as that path.
     // A new Agent starts in its own folder, whatever drafted it (ADR 0087).
     let access = if create {
@@ -206,10 +206,15 @@ async fn save(
     } else if body.get("files").is_none() && body.get("folders").is_none() {
         base.access.clone()
     } else {
-        if !machine
-            .trust
-            .is_some_and(|trust| trust.manages(&from.member, from.key.as_deref()))
-        {
+        let back_to_folder = body.get("files").and_then(Value::as_str) == Some("folder")
+            && body
+                .get("folders")
+                .is_none_or(|folders| folders.as_array().is_some_and(Vec::is_empty));
+        let allowed = machine.trust.is_some_and(|trust| {
+            trust.is_owner(&from.member, from.key.as_deref())
+                || (back_to_folder && trust.manages(id, &from.member, from.key.as_deref()))
+        });
+        if !allowed {
             return outbox.error(from, "files.forbidden");
         }
         let files = match body.get("files") {

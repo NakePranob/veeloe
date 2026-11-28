@@ -413,8 +413,8 @@ impl Approvals {
             outbox.error(from, "approval.forbidden");
             return true;
         };
-        // v0.1: the Owner whose key signed, and the Member whose Turn asked.
-        if from.member != member || !trust.approves(&from.member, from.key.as_deref()) {
+        // The Member whose Turn asked, holding Approve here (who else may answer is #101).
+        if from.member != member || !trust.approves(&agent, &from.member, from.key.as_deref()) {
             outbox.error(from, "approval.forbidden");
             return true;
         }
@@ -422,7 +422,7 @@ impl Approvals {
             // A permanent yes changes the Agent's Egress, which is Manage, not
             // Approve (ADR 0029). v0.1 has them on the same Member; the check
             // is here so a later Grant split does not open it by accident.
-            if !trust.manages(&from.member, from.key.as_deref()) {
+            if !trust.manages(&agent, &from.member, from.key.as_deref()) {
                 outbox.error(from, "approval.forbidden");
                 return true;
             }
@@ -570,8 +570,7 @@ mod tests {
                 keys: vec!["k_1".into()],
             }],
             workspace: Some("w_1".into()),
-            links: Vec::new(),
-            revoked: Vec::new(),
+            ..Trust::default()
         }
     }
 
