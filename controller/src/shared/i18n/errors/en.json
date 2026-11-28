@@ -68,5 +68,8 @@
   "task.not_found": "This Machine doesn't have that Task",
   "turn.not_running": "This Task has no Turn running, so there is nothing to stop",
   "turn.too_many_rounds": "The Agent stopped after too many steps in one go",
-  "usage.invalid_range": "That usage range isn't valid. It must be between 1 and 90 days"
+  "usage.invalid_range": "That usage range isn't valid. It must be between 1 and 90 days",
+  "group.forbidden": "Only an Owner makes a group or changes its name or admins, and only an Owner or a group admin changes who is in it",
+  "group.stale": "Someone changed this group first; open it again and make the change once more",
+  "group.invalid": "The Machine did not take this group"
 }

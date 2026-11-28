@@ -30,5 +30,6 @@
     "body": "{{name}} จะสั่งงาน Agent ไม่ได้อีก Task ที่ทำไว้ยังอยู่บน Machine",
     "action": "เอาออก",
     "cannot": "เอาออกไม่ได้"
-  }
+  },
+  "named": "{{name}} · {{title}}"
 }

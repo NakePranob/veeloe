@@ -171,4 +171,21 @@ export const MIGRATIONS = [
     level TEXT NOT NULL,
     PRIMARY KEY (agent_id, member_id)
   )`,
+  // A Member's title, shown after their name and granting nothing (ADR 0091).
+  `ALTER TABLE member ADD COLUMN title TEXT`,
+  // Each Machine's copy of a group of Members with one set of Grants (ADR 0091): one row per group and Machine,
+  // the lists as JSON; a Machine holds only its own Agents' Grants.
+  `CREATE TABLE member_group (
+    id TEXT NOT NULL,
+    machine_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    members TEXT NOT NULL,
+    admins TEXT NOT NULL,
+    grants TEXT NOT NULL,
+    PRIMARY KEY (id, machine_id)
+  )`,
+  // What an Invitation gives besides its Grants: a group to join and a title.
+  `ALTER TABLE invitation ADD COLUMN group_id TEXT`,
+  `ALTER TABLE invitation ADD COLUMN title TEXT`,
 ] as const;

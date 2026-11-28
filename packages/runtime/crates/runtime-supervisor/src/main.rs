@@ -953,6 +953,18 @@ impl Supervisor {
         if type_ == "grant.set" {
             return self.set_grant(&from, &body, &outbox);
         }
+        // Groups of Members with one set of Grants (ADR 0091).
+        if type_ == "group.list" {
+            return outbox.to_member(
+                &from.member,
+                "groups.listed",
+                trust.groups_listed(&from.member, from.key.as_deref()),
+                None,
+            );
+        }
+        if type_ == "group.set" {
+            return self.set_group(&from, &body, &outbox);
+        }
         // Off the link's own task: a Provider's models come over the wire, and
         // the next envelope must not wait for them.
         tokio::spawn(async move {
@@ -1015,6 +1027,40 @@ impl Supervisor {
         };
         match answer {
             Ok(listed) => outbox.to_member(&from.member, "grants.listed", listed, None),
+            Err(code) => outbox.error(from, code),
+        }
+    }
+
+    /// A signed `group.set`: kept in `trust.json`, and answered with the groups
+    /// the sender sees. It counts from the next Turn of everyone in it (ADR 0091).
+    fn set_group(&self, from: &Inbound, body: &Value, outbox: &MachineOutbox) {
+        let exists = |agent: &str| {
+            self.registry
+                .get(agent)
+                .ok()
+                .flatten()
+                .is_some_and(|found| !found.deleted())
+        };
+        // Sending reads trust for the Member's devices, so nothing is sent while it is held.
+        let answer = {
+            let mut held = self.trust.lock().expect("trust");
+            match held.set_group(&exists, &from.member, from.key.as_deref(), body) {
+                Err(code) => Err(code),
+                Ok(next) => match veeloe_runtime_supervisor::trust::save_trust(&self.home, &next) {
+                    Err(error) => {
+                        println!("could not save trust: {error}");
+                        Err("grant.unavailable")
+                    }
+                    Ok(()) => {
+                        let listed = next.groups_listed(&from.member, from.key.as_deref());
+                        *held = next;
+                        Ok(listed)
+                    }
+                },
+            }
+        };
+        match answer {
+            Ok(listed) => outbox.to_member(&from.member, "groups.listed", listed, None),
             Err(code) => outbox.error(from, code),
         }
     }

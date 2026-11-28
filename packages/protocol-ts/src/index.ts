@@ -173,7 +173,7 @@ export {
   type InvitationRequest,
   type ParsedInvitationLink,
 } from "./messages/invitation";
-export { GrantLevelSchema, type GrantLevel } from "./messages/grant";
+export { GrantLevelSchema, type GrantLevel, type Group } from "./messages/grant";
 export {
   IDLE_ITEMS_MAX,
   SCHEDULE_MAX_MINUTES,

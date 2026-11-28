@@ -1,0 +1,47 @@
+{
+  "title": "Groups",
+  "count_one": "{{count}} person",
+  "count_other": "{{count}} people",
+  "empty": {
+    "title": "No groups yet",
+    "body": "A group grants everyone in it at once; change it in one place and everyone follows"
+  },
+  "footer": "People in a group get the highest of their own Grants and every group they are in",
+  "new": {
+    "label": "New group",
+    "placeholder": "e.g. Sales",
+    "footer": "Only an Owner makes groups and names who looks after them",
+    "action": "Create group"
+  },
+  "members": {
+    "footer": "Counts from their next Turn",
+    "empty": "No Members yet; invite people first"
+  },
+  "grants": {
+    "footer": "You can change only Agents you manage; it counts for everyone in the group from their next Turn"
+  },
+  "admins": {
+    "heading": "Group admins",
+    "footer": "Admins add and take people out, but cannot change what the group grants"
+  },
+  "level": {
+    "none": "None",
+    "use": "Use",
+    "approve": "Approve",
+    "manage": "Manage"
+  },
+  "cancel": "Cancel",
+  "back": "Back",
+  "prompt": {
+    "create": "Create the group {{name}}",
+    "add": "Add {{name}} to {{group}}",
+    "takeOut": "Take {{name}} out of {{group}}",
+    "admins": "Change who looks after {{group}}",
+    "grant": "Give {{group}} {{level}}"
+  },
+  "unsent": {
+    "title": "Not sent everywhere",
+    "body_one": "{{count}} Machine is not connected and has not got this change; change it again once it is online",
+    "body_other": "{{count}} Machines are not connected and have not got this change; change them again once they are online"
+  }
+}

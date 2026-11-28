@@ -19,6 +19,9 @@ export type Invitation = {
   max_members: number;
   expires_at: number;
   grants: string;
+  /** A group everyone let in joins, and a title shown after their name (ADR 0091). */
+  group_id: string | null;
+  title: string | null;
   joined: string;
   closed_at: number | null;
   created_at: number;
@@ -88,8 +91,8 @@ export function takeRequest(link: InvitationLink, request: HubInvitationRequest,
 }
 
 /** What the new Member's device needs, as text its proof covers: the Machines their Grants are on, on the link's Hub. */
-function handoffFor(link: InvitationLink, { workspace, member }: { workspace: string; member: string }, machines: readonly Machine[], grants: readonly Grant[]) {
-  const on = new Set(grants.map((grant) => grant.machine));
+function handoffFor(link: InvitationLink, { workspace, member }: { workspace: string; member: string }, machines: readonly Machine[], grants: readonly Grant[], alsoOn: readonly string[]) {
+  const on = new Set([...grants.map((grant) => grant.machine), ...alsoOn]);
   return JSON.stringify({
     workspace,
     member,
@@ -113,6 +116,8 @@ export async function letIn(
     machines,
     grants,
     setGrant,
+    title,
+    alsoOn = [],
     fetchFn,
     now = Date.now,
   }: {
@@ -122,6 +127,10 @@ export async function letIn(
     machines: readonly Machine[];
     grants: readonly Grant[];
     setGrant: (machine: Machine, body: { agent: string; member: string; level: GrantLevel }) => boolean;
+    /** Shown after their name everywhere; grants nothing. */
+    title?: string | null;
+    /** Machines their device should know besides the Grants', where a group gives them something. */
+    alsoOn?: readonly string[];
     fetchFn?: typeof fetch;
     now?: () => number;
   },
@@ -129,8 +138,8 @@ export async function letIn(
   const member = `m_${toBase64url(crypto.getRandomValues(new Uint8Array(12)))}`;
   const sent: { answer?: HubAnswer } = {};
   const done = await authenticate(async (key) => {
-    const certificate = signCertificate({ type: "member.add", workspace: machine.workspace_id, member, key: ask.key, name: ask.name, invitation: link.id, at: now() }, key);
-    const data = handoffFor(link, { workspace: machine.workspace_id, member }, machines, grants);
+    const certificate = signCertificate({ type: "member.add", workspace: machine.workspace_id, member, key: ask.key, name: ask.name, ...(title ? { title } : {}), invitation: link.id, at: now() }, key);
+    const data = handoffFor(link, { workspace: machine.workspace_id, member }, machines, grants, alsoOn);
     sent.answer = await postMember(link.hub, certificate, { data, proof: linkingProof({ secret: link.secret, key: ask.key, data }) }, fetchFn);
   });
   const hub = sent.answer;
@@ -153,7 +162,7 @@ export function joinedOf(invitation: Invitation): Joined[] {
 
 export function saveInvitation(database: Database, row: Omit<Invitation, "joined" | "closed_at">) {
   return database.write([INVITATION_TOPIC], (tx) =>
-    tx.run("INSERT INTO invitation (id, hub_url, workspace_id, member_id, secret, link, max_members, expires_at, grants, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+    tx.run("INSERT INTO invitation (id, hub_url, workspace_id, member_id, secret, link, max_members, expires_at, grants, group_id, title, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
       row.id,
       row.hub_url,
       row.workspace_id,
@@ -163,6 +172,8 @@ export function saveInvitation(database: Database, row: Omit<Invitation, "joined
       row.max_members,
       row.expires_at,
       row.grants,
+      row.group_id,
+      row.title,
       row.created_at,
     ]),
   );

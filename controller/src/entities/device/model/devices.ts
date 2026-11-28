@@ -5,9 +5,77 @@ export const DEVICE_TOPIC = "device";
 export const MEMBER_TOPIC = "member";
 
 /** A Member let in through an Invitation, and whether an Owner took them out since. */
-export type Member = { id: string; workspace_id: string; name: string; added_by: string; added_at: number; removed_at: number | null };
+export type Member = { id: string; workspace_id: string; name: string; title: string | null; added_by: string; added_at: number; removed_at: number | null };
 
 export const LIST_MEMBERS = "SELECT * FROM member ORDER BY added_at, id";
+
+/** One Machine's copy of a group (ADR 0091), its lists as JSON. */
+type GroupRow = { id: string; machine_id: string; name: string; version: number; members: string; admins: string; grants: string };
+
+export const LIST_GROUPS = "SELECT * FROM member_group ORDER BY name, id";
+
+/** A group as every Machine's copy adds up to: the newest copy's name and people, and each Machine's Grants. */
+export type MemberGroup = {
+  id: string;
+  name: string;
+  version: number;
+  members: string[];
+  admins: string[];
+  grants: { machine: string; agent: string; level: AgentGrant["level"] }[];
+};
+
+export function mergeGroups(rows: readonly GroupRow[]): MemberGroup[] {
+  const groups = new Map<string, MemberGroup>();
+  for (const row of rows) {
+    const grants = (JSON.parse(row.grants) as { agent: string; level: AgentGrant["level"] }[]).map((grant) => ({ machine: row.machine_id, ...grant }));
+    const was = groups.get(row.id);
+    const newest = !was || row.version > was.version;
+    groups.set(row.id, {
+      id: row.id,
+      name: newest ? row.name : (was?.name ?? row.name),
+      version: Math.max(row.version, was?.version ?? 0),
+      members: newest ? (JSON.parse(row.members) as string[]) : (was?.members ?? []),
+      admins: newest ? (JSON.parse(row.admins) as string[]) : (was?.admins ?? []),
+      grants: [...(was?.grants ?? []), ...grants],
+    });
+  }
+  return [...groups.values()];
+}
+
+/**
+ * The `group.set` each Machine of the Workspace gets for a changed group (ADR 0091): the next version, and only
+ * the Grants at that Machine's own Agents. Every Machine gets one, so who is in the group stays the same on all.
+ */
+export function groupBodies(group: MemberGroup, machines: readonly { id: string }[]) {
+  return machines.map((machine) => ({
+    machine: machine.id,
+    body: {
+      id: group.id,
+      name: group.name,
+      version: group.version + 1,
+      members: group.members,
+      admins: group.admins,
+      grants: group.grants.filter((grant) => grant.machine === machine.id).map(({ agent, level }) => ({ agent, level })),
+    },
+  }));
+}
+
+/** Replaces one Machine's copies of the groups with what it listed. */
+export function saveGroups(database: Database, machine: string, groups: readonly { id: string; name: string; version: number; members: readonly string[]; admins: readonly string[]; grants: readonly { agent: string; level: string }[] }[]) {
+  return database.write([MEMBER_TOPIC], async (transaction) => {
+    await transaction.run("DELETE FROM member_group WHERE machine_id = ?", [machine]);
+    for (const group of groups)
+      await transaction.run("INSERT INTO member_group (id, machine_id, name, version, members, admins, grants) VALUES (?, ?, ?, ?, ?, ?, ?)", [
+        group.id,
+        machine,
+        group.name,
+        group.version,
+        JSON.stringify(group.members),
+        JSON.stringify(group.admins),
+        JSON.stringify(group.grants.map(({ agent, level }) => ({ agent, level }))),
+      ]);
+  });
+}
 
 /** One Agent's Grant to one Member. */
 export type AgentGrant = { agent_id: string; member_id: string; level: "use" | "approve" | "manage" };
@@ -42,7 +110,8 @@ export function saveCertificates(database: Database, { member, own, ownName, now
       const body = verifyCertificate(certificate);
       // Other Members of the Workspace: who came in, and who was taken out.
       if (body?.type === "member.add") {
-        await transaction.run("INSERT OR IGNORE INTO member (id, workspace_id, name, added_by, added_at) VALUES (?, ?, ?, ?, ?)", [body.member, body.workspace, body.name, body.by, body.at]);
+        const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : null;
+        await transaction.run("INSERT OR IGNORE INTO member (id, workspace_id, name, title, added_by, added_at) VALUES (?, ?, ?, ?, ?, ?)", [body.member, body.workspace, body.name, title, body.by, body.at]);
         continue;
       }
       if (body?.type === "member.remove") {

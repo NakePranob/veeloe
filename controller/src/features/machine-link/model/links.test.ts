@@ -127,16 +127,20 @@ async function setup(extra: { onRevoked?: () => void; deviceName?: string } = {}
   const links = createMachineLinks({ database, secretKey: controllerSeed, newId: () => `id-${++n}`, ...extra, start: (o) => startHubClient({ ...o, backoff: createBackoff({ baseMs: 10, capMs: 20 }) }) });
   cleanup.push(() => links.stop());
   links.update([machine]);
-  await until(() => fake.hub.frames.length === 2);
+  await until(() => fake.hub.frames.length === 3);
   return { database, fake, machine, links };
 }
 
 const signed = (type: string, body: unknown, { seed = machineSeed, seq = 1, task }: { seed?: Uint8Array; seq?: number; task?: string } = {}) => createSigner(seed, () => seq)({ type, recipients: [member], ...(task ? { task } : {}), body });
 const sentTypes = (frames: Envelope[]) => frames.map((f) => JSON.parse(f.signed) as { type: string; task?: string; member?: string; to?: string; body: { after?: number } });
 
-test("on connect it asks the Machine for its Agents and this Member's Tasks, as this Member", async () => {
+test("on connect it asks the Machine for its Agents, this Member's Tasks and the groups, as this Member", async () => {
   const { fake } = await setup();
-  expect(sentTypes(fake.hub.frames)).toEqual([expect.objectContaining({ type: "agent.list", to: "machine-1", member }), expect.objectContaining({ type: "task.list", to: "machine-1", member })]);
+  expect(sentTypes(fake.hub.frames)).toEqual([
+    expect.objectContaining({ type: "agent.list", to: "machine-1", member }),
+    expect.objectContaining({ type: "task.list", to: "machine-1", member }),
+    expect.objectContaining({ type: "group.list", to: "machine-1", member }),
+  ]);
 });
 
 test("what the Machine signed is kept, and the same thing from another key is not", async () => {
@@ -154,7 +158,7 @@ test("a new Agent goes with the Character the page picked, and the one the Machi
   const { database, fake, machine, links } = await setup();
   const character = { color: "#9DC3E6", shell: "dome", top: "antenna", sides: "ears", decal: "none" };
   expect(links.createAgent(machine, { name: "A", provider: "main", model: "model-a", character })).toBe("id-1");
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "agent.create", body: { id: "id-1", name: "A", character } });
   fake.push(
     signed("agent.listed", {
@@ -176,7 +180,7 @@ test("a new Agent goes with the Character the page picked, and the one the Machi
 test("a change to an Agent goes signed with only its fields, and the Machine's error about that envelope is kept as its updateError", async () => {
   const { fake, machine, links } = await setup();
   const sig = links.updateAgent(machine, { id: "a1", model: "model-b" });
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   const sent = fake.hub.frames.at(-1)!;
   expect(sent.sig).toBe(sig!);
   expect(JSON.parse(sent.signed)).toMatchObject({ type: "agent.update", to: "machine-1", member, body: { id: "a1", model: "model-b" } });
@@ -188,7 +192,7 @@ test("a change to an Agent goes signed with only its fields, and the Machine's e
 
   links.updateAgent(machine, { id: "a1", name: "B" });
   expect(links.status("machine-1").updateError).toBeNull();
-  await until(() => fake.hub.frames.length === 4);
+  await until(() => fake.hub.frames.length === 5);
   fake.push({ type: "hub.error", code: "hub.machine_offline", ref: fake.hub.frames.at(-1)!.sig });
   await until(() => links.status("machine-1").updateError === "hub.machine_offline");
   expect(links.status("machine-1").online).toBe(false);
@@ -208,7 +212,7 @@ test("a stopped set never connects again, so a late update cannot put a second s
 test("deleting an Agent goes signed as agent.delete and its error is kept separately", async () => {
   const { fake, links, machine } = await setup();
   const sig = links.deleteAgent(machine, "a1");
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   const sent = fake.hub.frames.at(-1)!;
   expect(sent.sig).toBe(sig!);
   expect(JSON.parse(sent.signed)).toMatchObject({ type: "agent.delete", to: "machine-1", member, body: { id: "a1" } });
@@ -220,7 +224,7 @@ test("deleting an Agent goes signed as agent.delete and its error is kept separa
 test("restoring an Agent goes signed as agent.restore and its error is kept separately", async () => {
   const { fake, links, machine } = await setup();
   const sig = links.restoreAgent(machine, "a1");
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   const sent = fake.hub.frames.at(-1)!;
   expect(sent.sig).toBe(sig!);
   expect(JSON.parse(sent.signed)).toMatchObject({ type: "agent.restore", to: "machine-1", member, body: { id: "a1" } });
@@ -260,7 +264,7 @@ test("after a dropped connection it asks for the events of only the Tasks that m
 test("a message shows as pending until the log has it, and the Machine's error marks it failed", async () => {
   const { database, fake, machine, links } = await setup();
   await links.sendMessage(machine, { agent: "a1", task: "t1", text: "hello" });
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   const sent = fake.hub.frames.at(-1)!;
   expect(JSON.parse(sent.signed)).toMatchObject({ type: "task.message", task: "t1", body: { agent: "a1", id: "id-1", text: "hello" } });
   fake.push(signed("error", { code: "agent.busy", ref: sent.sig }, { seq: 5 }));
@@ -302,7 +306,7 @@ test("a Machine found offline by a Memory read is asked again, so it comes back 
 test("the Egress goes as one signed list, and the list kept is the one the Machine signed back", async () => {
   const { database, fake, machine, links } = await setup();
   expect(links.setEgress(machine, ["github.com", "*.npmjs.org"])).toBe(true);
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "egress.set", to: "machine-1", member, body: { egress: ["github.com", "*.npmjs.org"] } });
   // Without an Agent the body is the whole list and nothing else, as it was before per-Agent Egress.
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed).body).toEqual({ egress: ["github.com", "*.npmjs.org"] });
@@ -429,7 +433,7 @@ test("a usage request goes signed with its request id and days, and the Machine'
   const request = links.requestUsage(machine, 7);
   expect(request).not.toBeNull();
   expect(links.usage("machine-1")).toMatchObject({ request, days: 7, loading: true, error: null });
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "usage.list", to: "machine-1", member, body: { request, days: 7 } });
 
   fake.push(signed("usage.listed", { request, from: "2026-10-31", to: "2026-11-06", agents: [{ agent: "a1", days: [{ day: "2026-11-06", tokens: 100 }], tasks: [{ task: "t1", tokens: 100 }], sources: [{ source: "task", tokens: 100 }] }] }));
@@ -442,7 +446,7 @@ test("a usage request goes signed with its request id and days, and the Machine'
 test("an answer to an older request is dropped whole and does not clear the page's loading state", async () => {
   const { database, fake, machine, links } = await setup();
   const request = links.requestUsage(machine, 7)!;
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   fake.push(signed("usage.listed", { request: "an-older-one", from: "2026-10-31", to: "2026-11-05", agents: [{ agent: "a1", days: [{ day: "2026-11-05", tokens: 10 }], tasks: [], sources: [] }] }, { seq: 1 }));
   await Bun.sleep(100);
   expect(await database.query("SELECT * FROM usage_day")).toEqual([]);
@@ -457,7 +461,7 @@ test("an answer to an older request is dropped whole and does not clear the page
 test("a Machine's error about a usage request fails that request only, and does not mark a chat message as failed", async () => {
   const { database, fake, machine, links } = await setup();
   links.requestUsage(machine, 7);
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   fake.push(signed("error", { code: "usage.invalid_range", ref: fake.hub.frames.at(-1)!.sig }));
   await until(() => links.usage("machine-1").error === "usage.invalid_range");
   expect(links.usage("machine-1").loading).toBe(false);
@@ -467,7 +471,7 @@ test("a Machine's error about a usage request fails that request only, and does 
 test("a Hub that says the Machine is offline fails this request only, and does not mark a message as failed", async () => {
   const { database, fake, machine, links } = await setup();
   links.requestUsage(machine, 7);
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   fake.push({ type: "hub.error", code: "hub.machine_offline", ref: fake.hub.frames.at(-1)!.sig });
   await until(() => links.usage("machine-1").error === "hub.machine_offline");
   expect(links.usage("machine-1").loading).toBe(false);
@@ -512,13 +516,13 @@ test("bytes that do not match the offered hash are not written or opened", async
 test("a push token goes to the Machine with the language, and unregister clears this device only", async () => {
   const { fake, machine, links } = await setup();
   expect(links.registerPush(machine, "ExponentPushToken[abc]", "th")).not.toBeNull();
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({
     type: "push.register",
     body: { token: "ExponentPushToken[abc]", language: "th" },
   });
   expect(links.unregisterPush(machine)).not.toBeNull();
-  await until(() => fake.hub.frames.length === 4);
+  await until(() => fake.hub.frames.length === 5);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({ type: "push.unregister", body: {} });
 });
 
@@ -527,7 +531,7 @@ test("a memory request goes signed with its request id, and the answer keeps the
   const request = links.requestMemory(machine, "a1");
   expect(request).not.toBeNull();
   expect(links.memory("machine-1", "a1")).toMatchObject({ machine: "machine-1", agent: "a1", request, loading: true, error: null, memory: null });
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   expect(JSON.parse(fake.hub.frames.at(-1)!.signed)).toMatchObject({
     type: "memory.get",
     to: "machine-1",
@@ -546,7 +550,7 @@ test("a memory request goes signed with its request id, and the answer keeps the
 test("a memory answer for an older request or another Agent is dropped whole", async () => {
   const { fake, machine, links } = await setup();
   const request = links.requestMemory(machine, "a1")!;
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
 
   fake.push(signed("memory.got", { request: "an-older-one", agent: "a1", exists: true, chars: 1, text: "x" }, { seq: 1 }));
   fake.push(signed("memory.got", { request, agent: "a2", exists: true, chars: 1, text: "x" }, { seq: 2 }));
@@ -562,7 +566,7 @@ test("a memory answer for an older request or another Agent is dropped whole", a
 test("a Machine's error about a memory request fails that request and leaves the page's other state alone", async () => {
   const { fake, machine, links } = await setup();
   links.requestMemory(machine, "a1");
-  await until(() => fake.hub.frames.length === 3);
+  await until(() => fake.hub.frames.length === 4);
   fake.push(signed("error", { code: "agent.unknown", ref: fake.hub.frames.at(-1)!.sig }));
   await until(() => links.memory("machine-1", "a1").error === "agent.unknown");
   expect(links.memory("machine-1", "a1").loading).toBe(false);

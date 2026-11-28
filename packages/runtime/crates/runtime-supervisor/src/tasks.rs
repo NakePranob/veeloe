@@ -359,6 +359,8 @@ pub fn open_to_members(type_: &str) -> bool {
             | "egress.set"
             | "grant.set"
             | "grant.list"
+            | "group.set"
+            | "group.list"
             | "push.register"
             | "push.unregister"
     )

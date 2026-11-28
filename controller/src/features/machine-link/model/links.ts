@@ -11,12 +11,13 @@ import {
   type ApprovalAnswerBody,
   type DeviceLink,
   type GrantLevel,
+  type Group,
   type HubInvitationRequest,
   type HubLinkRequest,
   type SignedPart,
   type TriggerSetBody,
 } from "@veeloe/protocol-ts";
-import { saveCertificates, saveGrants } from "../../../entities/device";
+import { saveCertificates, saveGrants, saveGroups } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
 import { saveEgress, saveOwner, type Machine } from "../../../entities/machine";
 import { addListedTasks, addPendingMessage, failPendingMessage, markPendingSent, saveTaskEvents } from "../../../entities/task";
@@ -153,6 +154,7 @@ export function createMachineLinks({
   async function hello(machine: Machine) {
     sendTo(machine, "hello", { type: "agent.list", body: {} });
     sendTo(machine, "other", { type: "task.list", body: {} });
+    sendTo(machine, "other", { type: "group.list", body: {} });
   }
 
   function helloLater(machine: Machine) {
@@ -176,6 +178,10 @@ export function createMachineLinks({
     }
     if (message.type === "grants.listed") {
       await saveGrants(database, message.body.agent, message.body.grants);
+      return;
+    }
+    if (message.type === "groups.listed") {
+      await saveGroups(database, machine.id, message.body.groups);
       return;
     }
     if (message.type === "agent.listed") {
@@ -509,6 +515,11 @@ export function createMachineLinks({
     },
 
     /** A Member's level at one Agent, or `none` (ADR 0010). False when nothing went. */
+    /** Sends one Machine its copy of a group (ADR 0091); `groups.listed` lands in the database. False when nothing went. */
+    setGroup(machine: Machine, body: Group) {
+      return sendTo(machine, "other", { type: "group.set", body }) !== null;
+    },
+
     setGrant(machine: Machine, body: { agent: string; member: string; level: GrantLevel | "none" }) {
       return sendTo(machine, "other", { type: "grant.set", body }) !== null;
     },

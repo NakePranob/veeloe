@@ -164,6 +164,74 @@ pub struct Grant {
     pub level: GrantLevel,
 }
 
+/// A group of Members with one set of Grants (ADR 0091). Only an Owner names it
+/// and its admins; an admin changes who is in it; changing its Grants takes
+/// Manage at each Agent changed. A copy only gives way to a higher `version`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Group {
+    pub id: String,
+    pub name: String,
+    pub version: u64,
+    pub members: Vec<String>,
+    pub admins: Vec<String>,
+    /// Agent and level, only Agents on this Machine.
+    pub grants: Vec<(String, GrantLevel)>,
+}
+
+impl Group {
+    fn to_json(&self) -> Value {
+        json!({
+            "id": self.id,
+            "name": self.name,
+            "version": self.version,
+            "members": self.members,
+            "admins": self.admins,
+            "grants": self
+                .grants
+                .iter()
+                .map(|(agent, level)| json!({ "agent": agent, "level": level.as_str() }))
+                .collect::<Vec<_>>(),
+        })
+    }
+
+    /// A group as `group.set` or `trust.json` hold it; None when any part is unreadable.
+    fn from_json(value: &Value) -> Option<Group> {
+        let texts = |name: &str| -> Option<Vec<String>> {
+            value
+                .get(name)?
+                .as_array()?
+                .iter()
+                .map(|v| v.as_str().map(str::to_string))
+                .collect()
+        };
+        Some(Group {
+            id: value.get("id")?.as_str()?.to_string(),
+            name: value.get("name")?.as_str()?.to_string(),
+            version: value.get("version")?.as_u64()?,
+            members: texts("members")?,
+            admins: texts("admins")?,
+            grants: value
+                .get("grants")?
+                .as_array()?
+                .iter()
+                .map(|grant| {
+                    Some((
+                        grant.get("agent")?.as_str()?.to_string(),
+                        GrantLevel::parse(grant.get("level")?.as_str()?)?,
+                    ))
+                })
+                .collect::<Option<Vec<_>>>()?,
+        })
+    }
+
+    fn level_at(&self, agent: &str) -> Option<GrantLevel> {
+        self.grants
+            .iter()
+            .find(|(at, _)| at == agent)
+            .map(|(_, level)| *level)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Trust {
     pub owners: Vec<Owner>,
@@ -171,6 +239,7 @@ pub struct Trust {
     /// their Grants name (ADR 0010, 0059). An Invitation adds them (#99).
     pub members: Vec<Owner>,
     pub grants: Vec<Grant>,
+    pub groups: Vec<Group>,
     pub workspace: Option<String>,
     pub links: Vec<(String, String)>,
     pub revoked: Vec<String>,
@@ -202,8 +271,9 @@ impl Trust {
         Self::holds(&self.owners, member, key)
     }
 
-    /// This Member's level at this Agent: Manage for an Owner, the Grant for a
-    /// Member, none for a key that is not theirs.
+    /// This Member's level at this Agent: Manage for an Owner, for a Member the
+    /// highest of their own Grant and every group they are in (ADR 0091), none
+    /// for a key that is not theirs.
     pub fn level(&self, agent: &str, member: &str, key: Option<&str>) -> Option<GrantLevel> {
         if self.is_owner(member, key) {
             return Some(GrantLevel::Manage);
@@ -211,10 +281,16 @@ impl Trust {
         if !Self::holds(&self.members, member, key) {
             return None;
         }
-        self.grants
+        let own = self
+            .grants
             .iter()
             .find(|grant| grant.agent == agent && grant.member == member)
-            .map(|grant| grant.level)
+            .map(|grant| grant.level);
+        self.groups
+            .iter()
+            .filter(|group| group.members.iter().any(|m| m == member))
+            .map(|group| group.level_at(agent))
+            .fold(own, Ord::max)
     }
 
     /// Whether this Member may change this Agent's settings and Grants (ADR 0010).
@@ -279,6 +355,86 @@ impl Trust {
         Ok(next)
     }
 
+    /// Trust after a signed `group.set` (ADR 0091), or the error to answer.
+    /// `agent_exists` says whether an Agent is on this Machine and not trashed.
+    pub fn set_group(
+        &self,
+        agent_exists: &dyn Fn(&str) -> bool,
+        member: &str,
+        key: Option<&str>,
+        body: &Value,
+    ) -> Result<Trust, &'static str> {
+        let next = Group::from_json(body).ok_or("group.invalid")?;
+        let stored = self.groups.iter().find(|group| group.id == next.id);
+        if stored.is_some_and(|stored| next.version <= stored.version) {
+            return Err("group.stale");
+        }
+        for person in next.members.iter().chain(&next.admins) {
+            if self.owners.iter().any(|owner| &owner.member == person) {
+                return Err("grant.owner");
+            }
+            if !self.members.iter().any(|known| &known.member == person) {
+                return Err("grant.unknown_member");
+            }
+        }
+        if next.grants.iter().any(|(agent, _)| !agent_exists(agent)) {
+            return Err("agent.unknown");
+        }
+        let owner = self.is_owner(member, key);
+        let Some(stored) = stored else {
+            return if owner {
+                Ok(self.with_group(next))
+            } else {
+                Err("group.forbidden")
+            };
+        };
+        if (next.name != stored.name || next.admins != stored.admins) && !owner {
+            return Err("group.forbidden");
+        }
+        let admin =
+            Self::holds(&self.members, member, key) && stored.admins.iter().any(|a| a == member);
+        let mut before = stored.members.clone();
+        let mut after = next.members.clone();
+        before.sort();
+        after.sort();
+        if before != after && !owner && !admin {
+            return Err("group.forbidden");
+        }
+        let changed = stored
+            .grants
+            .iter()
+            .chain(&next.grants)
+            .map(|(agent, _)| agent)
+            .filter(|agent| stored.level_at(agent) != next.level_at(agent));
+        for agent in changed {
+            if !self.manages(agent, member, key) {
+                return Err("grant.forbidden");
+            }
+        }
+        Ok(self.with_group(next))
+    }
+
+    fn with_group(&self, group: Group) -> Trust {
+        let mut next = self.clone();
+        next.groups.retain(|kept| kept.id != group.id);
+        next.groups.push(group);
+        next
+    }
+
+    /// The body of `groups.listed`: every group for an Owner, else the ones
+    /// this Member is in or looks after.
+    pub fn groups_listed(&self, member: &str, key: Option<&str>) -> Value {
+        let owner = self.is_owner(member, key);
+        json!({
+            "groups": self
+                .groups
+                .iter()
+                .filter(|group| owner || group.members.iter().chain(&group.admins).any(|m| m == member))
+                .map(Group::to_json)
+                .collect::<Vec<_>>(),
+        })
+    }
+
     /// The body of `grants.listed` for one Agent.
     pub fn grants_listed(&self, agent: &str) -> Value {
         json!({
@@ -332,6 +488,9 @@ impl Trust {
                 .iter()
                 .map(|grant| json!({ "agent": grant.agent, "member": grant.member, "level": grant.level.as_str() }))
                 .collect();
+        }
+        if !self.groups.is_empty() {
+            value["groups"] = self.groups.iter().map(Group::to_json).collect();
         }
         value
     }
@@ -395,10 +554,17 @@ pub fn load_trust(home: &Path) -> Result<Trust, TrustError> {
                 .collect()
         })
         .unwrap_or_default();
+    // Like a Grant, a group this Runtime cannot read is dropped.
+    let groups = value
+        .get("groups")
+        .and_then(Value::as_array)
+        .map(|groups| groups.iter().filter_map(Group::from_json).collect())
+        .unwrap_or_default();
     Ok(Trust {
         owners,
         members,
         grants,
+        groups,
         workspace: value
             .get("workspace")
             .and_then(Value::as_str)
@@ -455,6 +621,7 @@ pub fn apply_certificates(trust: &Trust, certificates: &[Value], log: &dyn Fn(&s
             .collect(),
         members: trust.members.clone(),
         grants: trust.grants.clone(),
+        groups: trust.groups.clone(),
         workspace: trust.workspace.clone(),
         links: trust.links.clone(),
         revoked: trust.revoked.clone(),
@@ -624,6 +791,10 @@ fn remove_member(next: &mut Trust, body: &Value, log: &dyn Fn(&str)) {
         }
     }
     next.grants.retain(|grant| grant.member != member);
+    for group in &mut next.groups {
+        group.members.retain(|m| m != member);
+        group.admins.retain(|m| m != member);
+    }
 }
 
 /// The numbers a connection takes in memory, with a window so an envelope that
@@ -913,6 +1084,118 @@ mod tests {
         trust.set_grant("a_1", "m_2", None);
         assert!(!trust.uses("a_1", "m_2", Some(&key(0x51))));
         assert!(trust.trusted_keys().contains(&key(0x51)));
+    }
+
+    #[test]
+    fn a_member_gets_the_highest_level_of_their_groups_and_loses_it_when_taken_out() {
+        let mut trust = with_member();
+        trust.members.push(Owner {
+            member: "m_3".into(),
+            keys: vec![key(0x61)],
+        });
+        let (owner, kai, lee) = (Some(key(0x41)), Some(key(0x51)), Some(key(0x61)));
+        let any = |_: &str| true;
+        let group = |id: &str, version: u64, members: &[&str], admins: &[&str], level: &str| {
+            json!({ "id": id, "name": id, "version": version, "members": members, "admins": admins,
+                    "grants": [{ "agent": "a_1", "level": level }] })
+        };
+        // Only an Owner makes a group; in two, Kai holds the higher level.
+        assert_eq!(
+            trust.set_group(
+                &any,
+                "m_2",
+                kai.as_deref(),
+                &group("g_a", 1, &["m_2"], &[], "use")
+            ),
+            Err("group.forbidden")
+        );
+        let two = trust
+            .set_group(
+                &any,
+                "m_1",
+                owner.as_deref(),
+                &group("g_a", 1, &["m_2"], &["m_3"], "use"),
+            )
+            .and_then(|t| {
+                t.set_group(
+                    &any,
+                    "m_1",
+                    owner.as_deref(),
+                    &group("g_b", 1, &["m_2"], &[], "approve"),
+                )
+            })
+            .expect("owner makes both");
+        assert_eq!(
+            two.level("a_1", "m_2", kai.as_deref()),
+            Some(GrantLevel::Approve)
+        );
+        assert_eq!(two.level("a_1", "m_2", lee.as_deref()), None);
+        // An older copy never comes back.
+        assert_eq!(
+            two.set_group(
+                &any,
+                "m_1",
+                owner.as_deref(),
+                &group("g_b", 1, &[], &[], "approve")
+            ),
+            Err("group.stale")
+        );
+        // The admin changes who is in it, not what it grants; Kai out of g_b falls back to Use.
+        assert_eq!(
+            two.set_group(
+                &any,
+                "m_3",
+                lee.as_deref(),
+                &group("g_a", 2, &["m_2"], &["m_3"], "manage")
+            ),
+            Err("grant.forbidden")
+        );
+        let moved = two
+            .set_group(
+                &any,
+                "m_3",
+                lee.as_deref(),
+                &group("g_a", 2, &["m_2", "m_3"], &["m_3"], "use"),
+            )
+            .expect("admin adds Lee");
+        assert!(moved.uses("a_1", "m_3", lee.as_deref()));
+        let out = moved
+            .set_group(
+                &any,
+                "m_1",
+                owner.as_deref(),
+                &group("g_b", 2, &[], &[], "approve"),
+            )
+            .expect("owner takes Kai out");
+        assert_eq!(
+            out.level("a_1", "m_2", kai.as_deref()),
+            Some(GrantLevel::Use)
+        );
+        // Only an Owner names admins; a group's Grant is only at an Agent here.
+        assert_eq!(
+            moved.set_group(
+                &any,
+                "m_3",
+                lee.as_deref(),
+                &group("g_a", 3, &["m_2", "m_3"], &["m_2", "m_3"], "use")
+            ),
+            Err("group.forbidden")
+        );
+        assert_eq!(
+            trust.set_group(
+                &|_| false,
+                "m_1",
+                owner.as_deref(),
+                &group("g_c", 1, &[], &[], "use")
+            ),
+            Err("agent.unknown")
+        );
+        assert_eq!(
+            out.groups_listed("m_2", kai.as_deref())["groups"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
     }
 
     #[test]

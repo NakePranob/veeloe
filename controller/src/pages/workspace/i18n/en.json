@@ -24,6 +24,7 @@
   "people": {
     "heading": "People",
     "invite": "Invite people",
-    "footer": "Send a link so others can use the Agents you choose. You compare a code and let each one in."
+    "footer": "Send a link so others can use the Agents you choose. You compare a code and let each one in.",
+    "groups": "Groups"
   }
 }

@@ -14,6 +14,7 @@ import { newAgentI18n } from "../../pages/new-agent";
 import { createKeyI18n } from "../../pages/create-key";
 import { devicesI18n } from "../../pages/devices";
 import { inviteI18n } from "../../pages/invite";
+import { groupsI18n } from "../../pages/groups";
 import { joinI18n } from "../../pages/join";
 import { membersI18n } from "../../pages/members";
 import { linkDeviceI18n } from "../../pages/link-device";
@@ -54,6 +55,7 @@ const slices = {
   "create-key": createKeyI18n,
   devices: devicesI18n,
   invite: inviteI18n,
+  groups: groupsI18n,
   join: joinI18n,
   members: membersI18n,
   "link-device": linkDeviceI18n,

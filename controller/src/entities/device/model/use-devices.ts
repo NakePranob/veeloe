@@ -1,5 +1,6 @@
 import { useLiveQuery } from "../../../shared/db";
-import { type AgentGrant, DEVICE_TOPIC, LIST_DEVICES, LIST_MEMBERS, MEMBER_TOPIC, type Device, type Member } from "./devices";
+import { useMemo } from "react";
+import { type AgentGrant, DEVICE_TOPIC, LIST_DEVICES, LIST_GROUPS, LIST_MEMBERS, MEMBER_TOPIC, mergeGroups, type Device, type Member } from "./devices";
 
 const TOPICS = [DEVICE_TOPIC];
 const MEMBERS = [MEMBER_TOPIC];
@@ -17,4 +18,10 @@ export function useMembers() {
 /** Every Grant this device last heard of, for the Agents its Member manages. */
 export function useGrants() {
   return useLiveQuery<AgentGrant>("SELECT * FROM agent_grant", [], MEMBERS);
+}
+
+/** Every group this device heard of, each Machine's copy added up. Null until the first read lands. */
+export function useGroups() {
+  const rows = useLiveQuery<Parameters<typeof mergeGroups>[0][number]>(LIST_GROUPS, [], MEMBERS);
+  return useMemo(() => (rows ? mergeGroups(rows) : null), [rows]);
 }

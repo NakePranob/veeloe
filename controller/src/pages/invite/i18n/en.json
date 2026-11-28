@@ -78,5 +78,16 @@
     "body": "Nobody else can join with it. Those who joined stay.",
     "action": "Close link"
   },
-  "full": "Everyone has joined. This link takes no one else."
+  "full": "Everyone has joined. This link takes no one else.",
+  "group": {
+    "heading": "Group",
+    "label": "Joins",
+    "none": "No group",
+    "footer": "Everyone who joins with this link is in this group and gets what it grants on top of the Grants above"
+  },
+  "role": {
+    "label": "Title",
+    "placeholder": "e.g. Sales",
+    "footer": "Shown after the name of everyone who joins; grants nothing"
+  }
 }

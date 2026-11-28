@@ -2,7 +2,8 @@ import { parseInvitationLink, type GrantLevel } from "@veeloe/protocol-ts";
 import { useEffect, useState } from "react";
 import { Share, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
-import { useMachines } from "../../../entities/machine";
+import { groupBodies, useGroups } from "../../../entities/device";
+import { ownsAny, useMachines } from "../../../entities/machine";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { useDatabase, useLiveQuery } from "../../../shared/db";
 import { deviceName } from "../../../shared/device-name";
@@ -44,6 +45,11 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
   const here = machines?.filter((m) => m.hub_url === first?.hub_url) ?? [];
   const ours = agents?.filter((agent) => here.some((m) => m.id === agent.machine_id)) ?? [];
   const [levels, setLevels] = useState<Record<string, Choice>>({});
+  // A group this device's Member may add people to: an Owner's every group, an admin's own (ADR 0091).
+  const me = new Set(machines?.map((m) => m.member_id));
+  const groups = useGroups()?.filter((group) => ownsAny(machines ?? undefined) || group.admins.some((m) => me.has(m))) ?? [];
+  const [group, setGroup] = useState("");
+  const [title, setTitle] = useState("");
   const [people, setPeople] = useState<number>(1);
   const [hours, setHours] = useState<number>(24);
   const [from, setFrom] = useState(deviceName);
@@ -64,7 +70,7 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
 
   async function create() {
     if (!from.trim()) return inform(t("cannot"), t("from.empty"));
-    if (grants.length === 0 || !link) return;
+    if ((grants.length === 0 && !group) || !link) return;
     setBusy(true);
     const { link: invitation, text } = draftInvitation({ hub: hub.hub_url, ownKey: link.ownKey, from, hours });
     const answer = await openInvitation((use) => keySession.withFreshAuthentication(t("prompt.open", { count: people }), use), { link: invitation, max: people, machine: hub });
@@ -81,6 +87,8 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
       max_members: people,
       expires_at: invitation.expires,
       grants: JSON.stringify(grants),
+      group_id: group || null,
+      title: title.trim() || null,
       created_at: Date.now(),
     });
     onOpened();
@@ -88,7 +96,7 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
 
   const levelLabel = (level: Choice) => t(`level.${level}`);
   return (
-    <Screen title={t("title")} bottom={<Button size="large" variant="primary" label={t("create")} disabled={grants.length === 0 || busy} onPress={() => void create()} />}>
+    <Screen title={t("title")} bottom={<Button size="large" variant="primary" label={t("create")} disabled={(grants.length === 0 && !group) || busy} onPress={() => void create()} />}>
       <Section title="Agent" footer={t("agents.footer")}>
         {ours.length === 0 && <Row title={t("agents.empty")} />}
         {ours.map((agent) => (
@@ -102,6 +110,12 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
           />
         ))}
       </Section>
+      {groups.length > 0 && (
+        <Section title={t("group.heading")} footer={t("group.footer")}>
+          <Select label={t("group.label")} value={group} cancel={t("cancel")} options={[{ value: "", label: t("group.none") }, ...groups.map((g) => ({ value: g.id, label: g.name }))]} onChange={setGroup} />
+        </Section>
+      )}
+      <Field label={t("role.label")} value={title} onChangeText={setTitle} placeholder={t("role.placeholder")} footer={t("role.footer")} />
       <Section title={t("link.heading")} footer={t("link.footer")}>
         <Select label={t("people.label")} value={String(people)} cancel={t("cancel")} options={PEOPLE.map((count) => ({ value: String(count), label: t("people.count", { count }) }))} onChange={(count) => setPeople(Number(count))} />
         <Select label={t("hours.label")} value={String(hours)} cancel={t("cancel")} options={HOURS.map((value) => ({ value: String(value), label: t(`hours.${value}`) }))} onChange={(value) => setHours(Number(value))} />
@@ -118,6 +132,7 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
   const machines = useMachines() ?? [];
   const agents = useAgents() ?? [];
   const link = useMachineLink();
+  const group = useGroups()?.find((g) => g.id === invitation.group_id);
   const parsed = parseInvitationLink(invitation.link, 0);
   const grants = grantsOf(invitation);
   const joined = joinedOf(invitation);
@@ -153,12 +168,22 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
       machines,
       grants,
       setGrant: (on, body) => link.setGrant(on, body),
+      title: invitation.title,
+      alsoOn: group?.grants.map((grant) => grant.machine),
     });
     if (result === null) return;
     if (!result.answer.ok) return setProblem(describeError({ code: result.answer.code }));
+    // Into the group on every Machine; one that is not connected counts as a Grant not sent.
+    const intoGroup = group
+      ? groupBodies({ ...group, members: [...group.members, result.member] }, machines).filter(({ machine: id, body }) => {
+          const on = machines.find((m) => m.id === id);
+          return !on || !link.setGroup(on, body);
+        })
+      : [];
+    const missed = result.unsent.length + intoGroup.length;
     setProblem(null);
     await addJoined(database, invitation.id, { key: ask.key, member: result.member, name: ask.name });
-    if (result.unsent.length > 0) inform(t("unsent.title"), t("unsent.body", { name: ask.name, count: result.unsent.length }));
+    if (missed > 0) inform(t("unsent.title"), t("unsent.body", { name: ask.name, count: missed }));
   }
 
   async function close() {
@@ -217,6 +242,8 @@ function OpenInvitation({ invitation, onNew }: { invitation: Invitation; onNew: 
         {grants.map((grant) => (
           <Row key={`${grant.machine}/${grant.agent}`} title={agentName(grant.agent)} value={t(`level.${grant.level}`)} />
         ))}
+        {group && <Row icon="people" title={t("group.label")} value={group.name} />}
+        {invitation.title && <Row title={t("role.label")} value={invitation.title} />}
       </Section>
       {joined.length > 0 && (
         <Section title={t("joined.heading")}>

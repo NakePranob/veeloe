@@ -1844,6 +1844,79 @@
       "valid": false
     },
     {
+      "name": "a group with one Agent's Grant",
+      "type": "group.set",
+      "body": {
+        "id": "g_sales",
+        "name": "Sales",
+        "version": 1,
+        "members": [
+          "m_kai"
+        ],
+        "admins": [],
+        "grants": [
+          {
+            "agent": "agent-1",
+            "level": "use"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "a group at version 0",
+      "type": "group.set",
+      "body": {
+        "id": "g_sales",
+        "name": "Sales",
+        "version": 0,
+        "members": [],
+        "admins": [],
+        "grants": []
+      },
+      "valid": false
+    },
+    {
+      "name": "a group with a blank name",
+      "type": "group.set",
+      "body": {
+        "id": "g_sales",
+        "name": " ",
+        "version": 1,
+        "members": [],
+        "admins": [],
+        "grants": []
+      },
+      "valid": false
+    },
+    {
+      "name": "ask for the groups",
+      "type": "group.list",
+      "body": {},
+      "valid": true
+    },
+    {
+      "name": "the groups listed",
+      "type": "groups.listed",
+      "body": {
+        "groups": [
+          {
+            "id": "g_sales",
+            "name": "Sales",
+            "version": 2,
+            "members": [
+              "m_kai"
+            ],
+            "admins": [
+              "m_kai"
+            ],
+            "grants": []
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
       "name": "set the Egress with more than 100 domains",
       "type": "egress.set",
       "body": {

@@ -38,6 +38,17 @@ pub fn message_is_valid(type_: &str, body: &Value) -> Option<bool> {
             .map(|object| is_id(object.get("agent")))
             .unwrap_or(false),
         "grants.listed" => object.map(is_grants_listed).unwrap_or(false),
+        "group.set" => object.map(is_group).unwrap_or(false),
+        "group.list" => object.is_some(),
+        "groups.listed" => object
+            .and_then(|object| object.get("groups"))
+            .and_then(Value::as_array)
+            .is_some_and(|groups| {
+                groups.len() <= 200
+                    && groups
+                        .iter()
+                        .all(|group| group.as_object().is_some_and(is_group))
+            }),
         "error" => object.map(is_error).unwrap_or(false),
         "usage.list" => object.map(is_usage_list).unwrap_or(false),
         "usage.listed" => object.map(is_usage_listed).unwrap_or(false),
@@ -947,6 +958,36 @@ fn is_grants_listed(object: &Map<String, Value>) -> bool {
                     && grants.iter().all(|grant| {
                         grant.as_object().is_some_and(|grant| {
                             is_id(grant.get("member")) && is_grant_level(grant.get("level"))
+                        })
+                    })
+            })
+}
+
+/// A group of Members with one set of Grants (ADR 0091), as `group.set` sends it.
+fn is_group(object: &Map<String, Value>) -> bool {
+    let ids = |name: &str, max: usize| {
+        object
+            .get(name)
+            .and_then(Value::as_array)
+            .is_some_and(|list| list.len() <= max && list.iter().all(|id| is_id(Some(id))))
+    };
+    is_id(object.get("id"))
+        && text(object.get("name"))
+            .is_some_and(|name| !name.trim().is_empty() && name.chars().count() <= 60)
+        && object
+            .get("version")
+            .and_then(Value::as_u64)
+            .is_some_and(|version| version >= 1)
+        && ids("members", 500)
+        && ids("admins", 50)
+        && object
+            .get("grants")
+            .and_then(Value::as_array)
+            .is_some_and(|grants| {
+                grants.len() <= 200
+                    && grants.iter().all(|grant| {
+                        grant.as_object().is_some_and(|grant| {
+                            is_id(grant.get("agent")) && is_grant_level(grant.get("level"))
                         })
                     })
             })

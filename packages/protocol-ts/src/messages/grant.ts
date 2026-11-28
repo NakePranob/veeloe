@@ -24,3 +24,23 @@ export const GrantsListedBodySchema = z.looseObject({
   grants: z.array(z.looseObject({ member: MemberIdSchema, level: GrantLevelSchema })).max(500),
 });
 export type GrantsListedBody = z.infer<typeof GrantsListedBodySchema>;
+
+/**
+ * A group of Members with one set of Grants (ADR 0091). Controller → Machine as `group.set`, each
+ * Machine getting only its own Agents' Grants; a copy gives way only to a higher `version`.
+ */
+export const GroupSchema = z.looseObject({
+  id: AgentIdSchema,
+  name: z.string().trim().min(1).max(60),
+  version: z.number().int().min(1),
+  members: z.array(MemberIdSchema).max(500),
+  admins: z.array(MemberIdSchema).max(50),
+  grants: z.array(z.looseObject({ agent: AgentIdSchema, level: GrantLevelSchema })).max(200),
+});
+export type Group = z.infer<typeof GroupSchema>;
+
+/** Controller → Machine: the groups the sender sees. Answered with `groups.listed`. */
+export const GroupListBodySchema = z.looseObject({});
+
+/** Machine → Controller: every group for an Owner, else the ones the Member is in or looks after. */
+export const GroupsListedBodySchema = z.looseObject({ groups: z.array(GroupSchema).max(200) });

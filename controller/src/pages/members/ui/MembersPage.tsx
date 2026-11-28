@@ -27,7 +27,7 @@ export function MembersPage() {
       {here && here.length > 0 && (
         <Section footer={t("footer")}>
           {here.map((member) => (
-            <Row key={member.id} title={member.name} detail={t("joined", { when: when(member.added_at, language) })} href={`/members/${member.id}`} />
+            <Row key={member.id} title={member.title ? t("named", { name: member.name, title: member.title }) : member.name} detail={t("joined", { when: when(member.added_at, language) })} href={`/members/${member.id}`} />
           ))}
         </Section>
       )}
@@ -85,7 +85,7 @@ export function MemberPage() {
   }
 
   return (
-    <Screen title={name} subtitle={member.removed_at !== null ? t("removed") : undefined}>
+    <Screen title={name} subtitle={member.removed_at !== null ? t("removed") : (member.title ?? undefined)}>
       {member.removed_at === null && (
         <Section title="Agent" footer={managed.length > 0 ? t("grants.footer") : t("grants.none")}>
           {managed.map((agent) => (

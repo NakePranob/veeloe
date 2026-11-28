@@ -383,6 +383,11 @@ export function messageVectors() {
     { name: "ask for the Grants at one Agent", type: "grant.list", body: { agent: "agent-1" }, valid: true },
     { name: "the Grants at one Agent", type: "grants.listed", body: { agent: "agent-1", grants: [{ member: "m_kai", level: "approve" }] }, valid: true },
     { name: "listed Grants with none as a level", type: "grants.listed", body: { agent: "agent-1", grants: [{ member: "m_kai", level: "none" }] }, valid: false },
+    { name: "a group with one Agent's Grant", type: "group.set", body: { id: "g_sales", name: "Sales", version: 1, members: ["m_kai"], admins: [], grants: [{ agent: "agent-1", level: "use" }] }, valid: true },
+    { name: "a group at version 0", type: "group.set", body: { id: "g_sales", name: "Sales", version: 0, members: [], admins: [], grants: [] }, valid: false },
+    { name: "a group with a blank name", type: "group.set", body: { id: "g_sales", name: " ", version: 1, members: [], admins: [], grants: [] }, valid: false },
+    { name: "ask for the groups", type: "group.list", body: {}, valid: true },
+    { name: "the groups listed", type: "groups.listed", body: { groups: [{ id: "g_sales", name: "Sales", version: 2, members: ["m_kai"], admins: ["m_kai"], grants: [] }] }, valid: true },
     { name: "set the Egress with more than 100 domains", type: "egress.set", body: { egress: Array.from({ length: 101 }, (_, i) => `d${i}.example.com`) }, valid: false },
   ];
   cases.push(

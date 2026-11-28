@@ -31,5 +31,6 @@
     "body": "{{name}} can no longer give work to any Agent. Tasks they made stay on the Machine.",
     "action": "Remove",
     "cannot": "Cannot remove"
-  }
+  },
+  "named": "{{name}} · {{title}}"
 }

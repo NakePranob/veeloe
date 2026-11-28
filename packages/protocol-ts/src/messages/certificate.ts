@@ -23,7 +23,7 @@ const invitation = z.string().regex(/^[A-Za-z0-9_-]{22}$/);
  * `key` is a new Member's first Controller, named `name`, let in through `invitation` by `by`, who compared
  * its short code (ADR 0059). A Runtime believes it only from a key that may add Members there.
  */
-export const MemberAddSchema = z.looseObject({ ...common, type: z.literal("member.add"), name: z.string().trim().min(1).max(80), invitation });
+export const MemberAddSchema = z.looseObject({ ...common, type: z.literal("member.add"), name: z.string().trim().min(1).max(80), title: z.string().trim().max(40).optional(), invitation });
 /** For the Hub alone: `by` (`key` is the same) opens `invitation` to at most `max` people until `expires` (Unix ms). */
 export const InvitationOpenSchema = z.looseObject({ ...common, type: z.literal("invitation.open"), invitation, max: z.number().int().min(1).max(100), expires: z.number().int().nonnegative() });
 /** `member` is no longer in the Workspace, nor any key of theirs. `key` is the signer's, an Owner's (ADR 0059). */

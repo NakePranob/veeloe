@@ -188,6 +188,25 @@ test("a Member who is not an Owner reaches an Agent only through a Grant, and lo
   await colleague.next(from, (m) => m.type === "task.event" && m.task === "task-ap2" && m.body.kind === "turn.ended");
   owner = back;
 
+  // A group gives everyone in it its Grants (ADR 0091, #103); taken out of it, the next Turn is refused.
+  provider.reply = () => sse([{ type: "text", text: "done" }]);
+  const team = (version: number, members: string[], level = "use") => ({ id: "g_team", name: "Team", version, members, admins: [], grants: [{ agent: "private", level }] });
+  at = owner.inbox.length;
+  owner.send("group.set", team(1, ["member-2"]));
+  await owner.next(at, (m) => m.type === "groups.listed");
+  from = colleague.inbox.length;
+  colleague.send("task.message", { agent: "private", id: "m-g1", text: "hi" }, "task-g");
+  await colleague.next(from, (m) => m.type === "task.event" && m.task === "task-g" && m.body.kind === "turn.ended");
+  from = colleague.inbox.length;
+  colleague.send("group.set", team(2, ["member-2"], "manage"));
+  expect(errorCode(await colleague.next(from, (m) => m.type === "error"))).toBe("grant.forbidden");
+  at = owner.inbox.length;
+  owner.send("group.set", team(2, []));
+  await owner.next(at, (m) => m.type === "groups.listed");
+  from = colleague.inbox.length;
+  colleague.send("task.message", { agent: "private", id: "m-g2", text: "again" }, "task-g");
+  expect(errorCode(await colleague.next(from, (m) => m.type === "error"))).toBe("agent.forbidden");
+
   // Taken away: the next Turn is refused.
   at = owner.inbox.length;
   owner.send("grant.set", { agent: "shared", member: "member-2", level: "none" });

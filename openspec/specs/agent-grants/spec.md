@@ -63,3 +63,18 @@ Runtime SHALL ตอบ `grant.list` ที่มี `agent` ด้วย `grant
 #### Scenario: Member ที่มี Use ขอดู Grant
 - **WHEN** Member ที่มี Use ที่ `shared` ส่ง `grant.list` ที่ `shared`
 - **THEN** Runtime ตอบ `grant.forbidden`
+
+### Requirement: กลุ่มให้ Grant ทุกคนในกลุ่มพร้อมกัน
+Runtime SHALL รับ `group.set` ที่มี `id`, `name`, `version`, `members`, `admins` และ `grants` ราย Agent บนเครื่องนั้น เก็บใน `trust.json` และตอบ `groups.listed` Runtime SHALL รับเฉพาะ version ที่สูงกว่าสำเนาที่ถืออยู่ (`group.stale`) เฉพาะ Owner สร้างกลุ่ม เปลี่ยนชื่อหรือผู้ดูแลได้ (`group.forbidden`) ผู้ดูแลกลุ่มเปลี่ยนรายชื่อคนในกลุ่มได้ และการเปลี่ยนระดับของ Agent ใดต้องมี Manage ที่ Agent นั้น (`grant.forbidden`) Member SHALL ได้ระดับสูงสุดจาก Grant ของตัวเองรวมกับทุกกลุ่มที่อยู่ และเสียสิทธิ์จากกลุ่มตั้งแต่คำสั่งถัดไปเมื่อหลุดจากกลุ่ม
+
+#### Scenario: อยู่สองกลุ่ม
+- **WHEN** Member อยู่ในกลุ่มที่ให้ Use และกลุ่มที่ให้ Approve ที่ Agent เดียวกัน
+- **THEN** Member มี Approve ที่ Agent นั้น
+
+#### Scenario: หลุดจากกลุ่ม
+- **WHEN** Owner ส่ง `group.set` version ใหม่ที่ไม่มี Member คนนั้น แล้ว Member ส่ง `task.message` ถึง Agent ที่ได้จากกลุ่มเท่านั้น
+- **THEN** Runtime ตอบ `agent.forbidden`
+
+#### Scenario: ผู้ดูแลยกระดับกลุ่ม
+- **WHEN** ผู้ดูแลกลุ่มที่ไม่มี Manage ที่ Agent ส่ง `group.set` ที่เปลี่ยนระดับของ Agent นั้น
+- **THEN** Runtime ตอบ `grant.forbidden`
