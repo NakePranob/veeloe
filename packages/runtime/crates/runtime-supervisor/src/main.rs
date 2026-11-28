@@ -1056,7 +1056,7 @@ impl Supervisor {
                 .get("id")
                 .and_then(Value::as_str)
                 .and_then(|id| held.groups.iter().find(|group| group.id == id))
-                .map(|group| group.members.clone())
+                .map(|group| group.members.iter().chain(&group.admins).cloned().collect())
                 .unwrap_or_default();
             match held.set_group(&exists, &from.member, from.key.as_deref(), body) {
                 Err(code) => Err(code),
@@ -1067,22 +1067,32 @@ impl Supervisor {
                     }
                     Ok(()) => {
                         let listed = next.groups_listed(&from.member, from.key.as_deref());
-                        let after = body
-                            .get("members")
-                            .and_then(Value::as_array)
+                        let after = ["members", "admins"]
                             .into_iter()
+                            .filter_map(|field| body.get(field).and_then(Value::as_array))
                             .flatten()
                             .filter_map(|member| member.as_str().map(str::to_string));
-                        let affected: Vec<String> = before.into_iter().chain(after).collect();
+                        let mut affected: Vec<String> = before.into_iter().chain(after).collect();
+                        affected.sort();
+                        affected.dedup();
+                        // Each of them gets their own copy too, so a new admin can invite at once (ADR 0093).
+                        let copies: Vec<(String, Value)> = affected
+                            .iter()
+                            .filter(|member| **member != from.member)
+                            .map(|member| (member.clone(), next.groups_listed(member, None)))
+                            .collect();
                         *held = next;
-                        Ok((listed, affected))
+                        Ok((listed, affected, copies))
                     }
                 },
             }
         };
         match answer {
-            Ok((listed, affected)) => {
+            Ok((listed, affected, copies)) => {
                 outbox.to_member(&from.member, "groups.listed", listed, None);
+                for (member, copy) in copies {
+                    outbox.to_member(&member, "groups.listed", copy, None);
+                }
                 // Everyone in the group, before and after, sees what it now gives them.
                 self.relist(affected);
             }

@@ -17,8 +17,9 @@
     "manage": "Manage"
   },
   "link": {
-    "heading": "Link",
-    "footer": "The link takes this many people, but everyone who opens it waits for you to compare their code and let them in one by one."
+    "footer": "The link takes this many people, but everyone who opens it waits for you to compare their code and let them in one by one.",
+    "settings": "Link settings",
+    "summary": "{{people}} · {{hours}}"
   },
   "people": {
     "label": "Takes",
@@ -32,9 +33,10 @@
     "168": "7 days"
   },
   "from": {
-    "label": "Name they see",
+    "label": "Your name",
     "empty": "Enter the name people will see first",
-    "footer": "Whoever opens the link sees this name as who invited them"
+    "footer": "Whoever opens the link sees this name as who invited them",
+    "placeholder": "e.g. Alex"
   },
   "create": "Create link",
   "cannot": "Cannot invite",
@@ -53,7 +55,7 @@
     "heading": "Asking to join",
     "footer": "Ask them for their code. Let them in only if it matches the one here; refuse if it does not or you do not know the name.",
     "empty": "Nobody has asked yet",
-    "emptyDetail": "Keep this page open; requests show here when someone opens the link",
+    "emptyDetail": "Requests show here and in the Inbox when someone opens the link",
     "code": "Code {{code}}",
     "refuse": "Refuse",
     "admit": "Let in"
@@ -81,10 +83,10 @@
   },
   "full": "Everyone has joined. This link takes no one else.",
   "group": {
-    "heading": "Group",
-    "label": "Joins",
-    "none": "No group",
-    "footer": "Everyone who joins with this link is in this group and gets what it grants on top of the Grants above"
+    "heading": "Access",
+    "label": "Access from",
+    "footer": "Everyone who comes in with this link joins this group and gets its access. Change it later on the group's page.",
+    "agents": "Agents I choose"
   },
   "role": {
     "label": "Title",

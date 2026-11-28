@@ -3,16 +3,15 @@ import { parseInvitationLink, type GrantLevel } from "@veeloe/protocol-ts";
 import { useState } from "react";
 import { Share, View } from "react-native";
 import { useAgents } from "../../../entities/agent";
-import { groupBodies, useGroups } from "../../../entities/device";
+import { groupBodies, useGroups, useMembers } from "../../../entities/device";
 import { ownsAny, useMachines } from "../../../entities/machine";
 import { AgentLevelRow, AgentLevelSelect } from "../../../widgets/agent-level";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { useDatabase, useLiveQuery } from "../../../shared/db";
-import { deviceName } from "../../../shared/device-name";
 import { describeError, useLanguage, useT } from "../../../shared/i18n";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
-import { Button, Card, confirm, Empty, Field, inform, Note, Row, Screen, Section, Select, space, Text } from "../../../shared/ui";
+import { Button, Card, confirm, Empty, Field, Icon, inform, Note, Row, Screen, Section, Select, space, Text } from "../../../shared/ui";
 import {
   addJoined,
   LIST_ASKS,
@@ -51,10 +50,14 @@ export function InvitePage() {
   const open = latest && latest.closed_at === null && Date.now() < latest.expires_at * 1000 ? latest : undefined;
   if (!invitations) return <Screen title={t("title")}>{null}</Screen>;
   if (open && !drafting) return <OpenInvitation key={open.id} invitation={open} onNew={() => setDrafting(true)} />;
-  return <DraftInvitation onOpened={() => setDrafting(false)} />;
+  const last = invitations[0] && parseInvitationLink(invitations[0].link, 0);
+  return <DraftInvitation lastFrom={last?.ok ? last.link.from : ""} onOpened={() => setDrafting(false)} />;
 }
 
-function DraftInvitation({ onOpened }: { onOpened: () => void }) {
+// Picks how the person gets in: one group, or (an Owner only) Agents one by one (ADR 0093).
+const BY_AGENTS = "agents";
+
+function DraftInvitation({ lastFrom, onOpened }: { lastFrom: string; onOpened: () => void }) {
   const t = useT("invite");
   const database = useDatabase();
   const machines = useMachines();
@@ -74,16 +77,28 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
   // A group this device's Member may add people to: an Owner's every group, an admin's own (ADR 0091).
   const me = new Set(machines?.map((m) => m.member_id));
   const groups = useGroups()?.filter((group) => owner || group.admins.some((m) => me.has(m))) ?? [];
-  const [group, setGroup] = useState("");
+  const [choice, setChoice] = useState("");
+  // A group first when there is one; an Owner with none picks Agents.
+  const pick = choice || groups[0]?.id || BY_AGENTS;
+  const group = pick === BY_AGENTS ? "" : pick;
   const [title, setTitle] = useState("");
   const [people, setPeople] = useState<number>(1);
-  const [hours, setHours] = useState<number>(24);
-  const [from, setFrom] = useState(deviceName);
+  const [hours, setHours] = useState<(typeof HOURS)[number]>(24);
+  const [settings, setSettings] = useState(false);
+  // The name whoever opens the link sees is this Member's own (ADR 0093). An Owner has none on record,
+  // so an Owner types one, starting from the last link's.
+  const members = useMembers();
+  const named = members?.find((member) => me.has(member.id))?.name;
+  const [typed, setTyped] = useState(lastFrom);
+  const from = named ?? typed;
   const [busy, setBusy] = useState(false);
-  const grants: Grant[] = ours.flatMap((agent) => {
-    const level = levels[agent.id] ?? "none";
-    return level === "none" ? [] : [{ machine: agent.machine_id, agent: agent.id, level }];
-  });
+  const grants: Grant[] =
+    pick !== BY_AGENTS
+      ? []
+      : ours.flatMap((agent) => {
+          const level = levels[agent.id] ?? "none";
+          return level === "none" ? [] : [{ machine: agent.machine_id, agent: agent.id, level }];
+        });
 
   if (!first || !link) {
     return (
@@ -131,7 +146,12 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
   const levelLabel = (level: Choice) => t(`level.${level}`);
   return (
     <Screen title={t("title")} bottom={<Button size="large" variant="primary" label={t("create")} disabled={(grants.length === 0 && !group) || busy} onPress={() => void create()} />}>
-      {owner && (
+      {groups.length > 0 && (
+        <Section title={t("group.heading")} footer={pick === BY_AGENTS ? undefined : t("group.footer")}>
+          <Select label={t("group.label")} value={pick} cancel={t("cancel")} options={[...groups.map((g) => ({ value: g.id, label: g.name })), ...(owner ? [{ value: BY_AGENTS, label: t("group.agents") }] : [])]} onChange={setChoice} />
+        </Section>
+      )}
+      {pick === BY_AGENTS && (
         <Section title="Agent" footer={t("agents.footer")}>
           {ours.length === 0 && <Row title={onHub.length === 0 ? t("agents.empty") : t("agents.noneToGrant")} />}
           {ours.map((agent) => (
@@ -147,17 +167,30 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
           ))}
         </Section>
       )}
-      {groups.length > 0 && (
-        <Section title={t("group.heading")} footer={t("group.footer")}>
-          <Select label={t("group.label")} value={group} cancel={t("cancel")} options={[{ value: "", label: t("group.none") }, ...groups.map((g) => ({ value: g.id, label: g.name }))]} onChange={setGroup} />
-        </Section>
-      )}
       <Field label={t("role.label")} value={title} onChangeText={setTitle} placeholder={t("role.placeholder")} footer={t("role.footer")} />
-      <Section title={t("link.heading")} footer={t("link.footer")}>
-        <Select label={t("people.label")} value={String(people)} cancel={t("cancel")} options={PEOPLE.map((count) => ({ value: String(count), label: t("people.count", { count }) }))} onChange={(count) => setPeople(Number(count))} />
-        <Select label={t("hours.label")} value={String(hours)} cancel={t("cancel")} options={HOURS.map((value) => ({ value: String(value), label: t(`hours.${value}`) }))} onChange={(value) => setHours(Number(value))} />
+      {named === undefined && <Field label={t("from.label")} value={typed} onChangeText={setTyped} placeholder={t("from.placeholder")} footer={t("from.footer")} />}
+      {/* How many and how long rarely change, so they stay folded (ADR 0093). */}
+      <Section footer={settings ? t("link.footer") : undefined}>
+        <Row
+          title={t("link.settings")}
+          value={t("link.summary", { people: t("people.count", { count: people }), hours: t(`hours.${hours}`) })}
+          expanded={settings}
+          onPress={() => setSettings((was) => !was)}
+          accessory={<Icon name={settings ? "collapse" : "expand"} size="sm" color="tertiaryLabel" />}
+        />
+        {settings && (
+          <>
+            <Select label={t("people.label")} value={String(people)} cancel={t("cancel")} options={PEOPLE.map((count) => ({ value: String(count), label: t("people.count", { count }) }))} onChange={(count) => setPeople(Number(count))} />
+            <Select
+              label={t("hours.label")}
+              value={String(hours)}
+              cancel={t("cancel")}
+              options={HOURS.map((value) => ({ value: String(value), label: t(`hours.${value}`) }))}
+              onChange={(value) => setHours(Number(value) as (typeof HOURS)[number])}
+            />
+          </>
+        )}
       </Section>
-      <Field label={t("from.label")} value={from} onChangeText={setFrom} footer={t("from.footer")} />
     </Screen>
   );
 }
