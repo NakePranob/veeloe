@@ -44,7 +44,10 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
   // One Hub per link: the first Machine that is online, as Linking picks one.
   const first = machines?.find((m) => statuses[m.id]?.online === true) ?? machines?.[0];
   const here = machines?.filter((m) => m.hub_url === first?.hub_url) ?? [];
-  const ours = agents?.filter((agent) => here.some((m) => m.id === agent.machine_id)) ?? [];
+  const onHub = agents?.filter((agent) => here.some((m) => m.id === agent.machine_id)) ?? [];
+  // Only where this Member may grant (ADR 0093): an Owner holds Manage everywhere, anyone else where they manage.
+  // A Grant elsewhere would let the person in and then be refused by the Machine.
+  const ours = onHub.filter((agent) => agent.level === "manage");
   const [levels, setLevels] = useState<Record<string, Choice>>({});
   // A group this device's Member may add people to: an Owner's every group, an admin's own (ADR 0091).
   const me = new Set(machines?.map((m) => m.member_id));
@@ -99,7 +102,7 @@ function DraftInvitation({ onOpened }: { onOpened: () => void }) {
   return (
     <Screen title={t("title")} bottom={<Button size="large" variant="primary" label={t("create")} disabled={(grants.length === 0 && !group) || busy} onPress={() => void create()} />}>
       <Section title="Agent" footer={t("agents.footer")}>
-        {ours.length === 0 && <Row title={t("agents.empty")} />}
+        {ours.length === 0 && <Row title={onHub.length === 0 ? t("agents.empty") : t("agents.noneToGrant")} />}
         {ours.map((agent) => (
           <AgentLevelSelect
             key={agent.id}
