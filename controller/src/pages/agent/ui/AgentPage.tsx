@@ -27,6 +27,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const now = useNow();
   const link = useMachineLink();
   const machine = useMachines()?.find((m) => m.id === agent.machine_id);
+  // Settings are for whoever manages the Agent; a Member with Use or Approve gives it work (ADR 0010).
+  const manages = agent.level === "manage";
   const machineStatus = useMachineStatus(agent.machine_id);
   const online = machineStatus.online;
   // Only what the page shows: the newest few Tasks and how many there are, and one row per Schedule thread.
@@ -47,7 +49,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
   // The Agent-Offline board: its Machine is away, so nothing runs and nothing about the Agent can change (ADR 0006).
   // Its Tasks still open to read, and a new Task's first message waits for the Machine.
   const away = online === false;
-  const problem = providerProblem(agent, machineStatus.providers);
+  // A Member who does not manage the Agent is told of no Provider, so has nothing to compare.
+  const problem = manages ? providerProblem(agent, machineStatus.providers) : null;
   const dirty = name.trim() !== agent.name;
   // A name or Budget not being edited follows the Machine's (ADR 0006).
   const [budgetText, setBudgetText] = useState(agent.budget !== null ? String(agent.budget / 1_000_000) : "");
@@ -104,7 +107,7 @@ function AgentView({ agent }: { agent: AgentRow }) {
   const repos = gitReposOf(agent);
 
   return (
-    <Screen title="" right={{ label: t("save"), onPress: save, disabled: !canSave }}>
+    <Screen title="" right={manages ? { label: t("save"), onPress: save, disabled: !canSave } : undefined}>
       <Stage color={look.color} bleed gap={space.smd}>
         <View style={{ alignItems: "center", gap: space.xs }}>
           <Character look={look} mood={moodOf(latest?.latest_kind ? [{ kind: latest.latest_kind, body: latest.latest_body }] : [], online)} size={112} />
@@ -135,8 +138,8 @@ function AgentView({ agent }: { agent: AgentRow }) {
           <View style={{ flex: 1 }}>
             <Button label={t("tasks.new")} leading="add" variant="primary" size="large" onPress={newTask} />
           </View>
-          {/* Memory is read from the Machine, so it waits for it too. */}
-          <Button label="Memory" leading="memory" variant="surface" size="large" disabled={away} onPress={() => router.push(`/agents/${agent.id}/memory`)} />
+          {/* Memory is read from the Machine, so it waits for it too; it is for whoever manages the Agent. */}
+          {manages && <Button label="Memory" leading="memory" variant="surface" size="large" disabled={away} onPress={() => router.push(`/agents/${agent.id}/memory`)} />}
         </View>
       </Stage>
       {away ? (
@@ -201,44 +204,54 @@ function AgentView({ agent }: { agent: AgentRow }) {
         />
       )}
 
-      <Section title={t("identity")}>
-        <Row icon="character" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} disabled={away} />
-        <Row icon="memory" title="Memory" detail={t("memory.detail")} href={`/agents/${agent.id}/memory`} disabled={away} />
-        <Field label={t("name")} value={name} onChangeText={setName} disabled={away} />
-      </Section>
-
-      <Section title={t("work.heading")} footer={away ? t("away.workFooter", { machine: machine?.name }) : t("work.footer")}>
-        <Row icon="key" title={t("provider.heading")} detail={problem === "provider" ? t("problem.choose") : undefined} value={problem === "provider" ? undefined : agent.model} href={`/agents/${agent.id}/model`} disabled={away} />
-        <ExpiryPicker
-          seconds={approvalSeconds}
-          disabled={offline}
-          onPick={(next) => {
-            if (link && machine) link.updateAgent(machine, { id: agent.id, approvalTimeoutS: next });
-          }}
-        />
-        <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} disabled={away} />
-        {/* Its own Egress beside its Allowlist (ADR 0029): `*` reads as the whole internet (issue #81). */}
-        <Row icon="network" title="Egress" value={egressOf(agent).includes("*") ? t("egress.open") : t("egress.count", { count: egressOf(agent).length })} href={`/agents/${agent.id}/egress`} disabled={away} />
-        {accessOf(agent) && (
-          <Row
-            icon="folder"
-            title={t("files.title")}
-            value={accessOf(agent)?.files === "machine" ? t("files.machine") : accessOf(agent)?.files === "selected" ? t("files.selected", { count: accessOf(agent)?.folders.length ?? 0 }) : t("files.folder")}
-            href={`/agents/${agent.id}/files`}
-            disabled={away}
+      {!manages && (
+        <Section title={t("work.heading")} footer={t("granted.footer", { level: agent.level === "approve" ? "Approve" : "Use" })}>
+          <Row icon="time" title="Trigger" detail={t("trigger.detail")} href={`/agents/${agent.id}/schedule`} disabled={away} />
+        </Section>
+      )}
+      {manages && (
+        <Section title={t("identity")}>
+          <Row icon="character" title="Character" detail={t("character.detail")} href={`/agents/${agent.id}/character`} disabled={away} />
+          <Row icon="memory" title="Memory" detail={t("memory.detail")} href={`/agents/${agent.id}/memory`} disabled={away} />
+          <Field label={t("name")} value={name} onChangeText={setName} disabled={away} />
+        </Section>
+      )}
+      {manages && (
+        <Section title={t("work.heading")} footer={away ? t("away.workFooter", { machine: machine?.name }) : t("work.footer")}>
+          <Row icon="key" title={t("provider.heading")} detail={problem === "provider" ? t("problem.choose") : undefined} value={problem === "provider" ? undefined : agent.model} href={`/agents/${agent.id}/model`} disabled={away} />
+          <ExpiryPicker
+            seconds={approvalSeconds}
+            disabled={offline}
+            onPick={(next) => {
+              if (link && machine) link.updateAgent(machine, { id: agent.id, approvalTimeoutS: next });
+            }}
           />
-        )}
-        <Row icon="branch" title={t("git.row")} value={repos === null ? t("git.unsupported") : t("git.count", { count: repos.length })} href={`/agents/${agent.id}/git`} disabled={away} />
-        <Row icon="time" title="Trigger" detail={t("trigger.detail")} href={`/agents/${agent.id}/schedule`} disabled={away} />
-        {/* Not on the board, which has no way to set the Budget yet; it saves with the name. */}
-        <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" footer={t("budget.footer")} disabled={away} />
-      </Section>
+          <Row icon="shield" title={t("allowlist.row")} value={t("allowlist.count", { count: (allowlistOf(agent) ?? []).length })} href={`/agents/${agent.id}/allowlist`} disabled={away} />
+          {/* Its own Egress beside its Allowlist (ADR 0029): `*` reads as the whole internet (issue #81). */}
+          <Row icon="network" title="Egress" value={egressOf(agent).includes("*") ? t("egress.open") : t("egress.count", { count: egressOf(agent).length })} href={`/agents/${agent.id}/egress`} disabled={away} />
+          {accessOf(agent) && (
+            <Row
+              icon="folder"
+              title={t("files.title")}
+              value={accessOf(agent)?.files === "machine" ? t("files.machine") : accessOf(agent)?.files === "selected" ? t("files.selected", { count: accessOf(agent)?.folders.length ?? 0 }) : t("files.folder")}
+              href={`/agents/${agent.id}/files`}
+              disabled={away}
+            />
+          )}
+          <Row icon="branch" title={t("git.row")} value={repos === null ? t("git.unsupported") : t("git.count", { count: repos.length })} href={`/agents/${agent.id}/git`} disabled={away} />
+          <Row icon="time" title="Trigger" detail={t("trigger.detail")} href={`/agents/${agent.id}/schedule`} disabled={away} />
+          {/* Not on the board, which has no way to set the Budget yet; it saves with the name. */}
+          <Field label={t("budget.field")} value={budgetText} onChangeText={setBudgetText} keyboardType="decimal-pad" footer={t("budget.footer")} disabled={away} />
+        </Section>
+      )}
       {update.sending && <Row title={t("saving")} accessory={<Spinner />} />}
       {update.error && <Note tone="warning">{describeError({ code: update.error })}</Note>}
       {machineStatus.deleteError && <Note tone="warning">{describeError({ code: machineStatus.deleteError })}</Note>}
-      <Section footer={away ? t("away.deleteFooter", { machine: machine?.name }) : t("delete.body")}>
-        <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} disabled={away || removing} />
-      </Section>
+      {manages && (
+        <Section footer={away ? t("away.deleteFooter", { machine: machine?.name }) : t("delete.body")}>
+          <Row icon="trash" title={t("delete.action")} destructive onPress={() => void remove()} disabled={away || removing} />
+        </Section>
+      )}
     </Screen>
   );
 }

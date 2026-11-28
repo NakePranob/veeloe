@@ -279,9 +279,13 @@ impl Supervisor {
                                 &info,
                                 Some(me.budgets.as_ref()),
                             );
+                            let trust = me.trust.lock().expect("trust").clone();
                             if let Some(outbox) = me.outbox.lock().expect("outbox").as_ref() {
                                 for member in members {
-                                    outbox.to_member(&member, "agent.listed", body.clone(), None);
+                                    let body = veeloe_runtime_supervisor::tasks::listed_for(
+                                        &body, &trust, &member, None,
+                                    );
+                                    outbox.to_member(&member, "agent.listed", body, None);
                                 }
                             }
                         });

@@ -14,7 +14,12 @@ pub(crate) async fn list(
     from: &Inbound,
     _body: &Value,
 ) {
-    outbox.to_member(&from.member, "agent.listed", listed(machine).await, None);
+    outbox.to_member(
+        &from.member,
+        "agent.listed",
+        listed(machine, from).await,
+        None,
+    );
 }
 
 /// Moves an Agent to the trash, stopping its worker and proxy.
@@ -34,7 +39,12 @@ pub(crate) async fn delete(
     };
     // Deleting twice is not a second deletion: it must not move the 30 days.
     if existing.deleted() {
-        return outbox.to_member(&from.member, "agent.listed", listed(machine).await, None);
+        return outbox.to_member(
+            &from.member,
+            "agent.listed",
+            listed(machine, from).await,
+            None,
+        );
     }
     // Stop the worker first: the registry entry is what starts a new one.
     workers.stop(id);
@@ -55,7 +65,12 @@ pub(crate) async fn delete(
         "agent.trash",
         json!({ "agent": id }),
     );
-    outbox.to_member(&from.member, "agent.listed", listed(machine).await, None);
+    outbox.to_member(
+        &from.member,
+        "agent.listed",
+        listed(machine, from).await,
+        None,
+    );
 }
 
 /// Brings an Agent back from the trash and starts it again.
@@ -77,7 +92,12 @@ pub(crate) async fn restore(
     // Restoring an Agent that is not in the trash says so by doing nothing;
     // a Controller that retries after a lost answer gets the same list.
     if !existing.deleted() {
-        return outbox.to_member(&from.member, "agent.listed", listed(machine).await, None);
+        return outbox.to_member(
+            &from.member,
+            "agent.listed",
+            listed(machine, from).await,
+            None,
+        );
     }
     if registry.restore(id).is_err() {
         return outbox.error(from, "agent.unknown");
@@ -101,7 +121,12 @@ pub(crate) async fn restore(
         "agent.restore",
         json!({ "agent": id }),
     );
-    outbox.to_member(&from.member, "agent.listed", listed(machine).await, None);
+    outbox.to_member(
+        &from.member,
+        "agent.listed",
+        listed(machine, from).await,
+        None,
+    );
 }
 
 /// A new Agent; `agent.exists` when the id is taken.
@@ -397,5 +422,10 @@ async fn save(
         },
         json!({ "agent": id }),
     );
-    outbox.to_member(&from.member, "agent.listed", listed(machine).await, None);
+    outbox.to_member(
+        &from.member,
+        "agent.listed",
+        listed(machine, from).await,
+        None,
+    );
 }

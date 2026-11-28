@@ -42,3 +42,17 @@ Runtime SHALL ให้สิทธิ์ตามคู่ของ Member ก�
 #### Scenario: อ้างชื่อ Owner ด้วยกุญแจของ Member
 - **WHEN** ซองอ้าง `member-1` ที่เป็น Owner แต่เซ็นด้วยกุญแจของ `member-2`
 - **THEN** Runtime ไม่ให้สิทธิ์ของ Owner
+
+### Requirement: Member เห็นเฉพาะ Agent ที่ได้สิทธิ์
+Runtime SHALL ตอบ `agent.list` ของแต่ละ Member ด้วยเฉพาะ Agent ที่คนนั้นมี Grant พร้อม `level` ของ Agent นั้น และ `owner` ว่าเป็น Owner หรือไม่ Member ที่ไม่ใช่ Owner SHALL ไม่ได้รายชื่อ Provider, ถังขยะ หรือ Egress ของ Agent ที่ไม่ได้สิทธิ์ Task ของแต่ละคน worker ส่งให้เฉพาะคนเริ่ม Task (ADR 0060) และไฟล์ใน Workdir เปิดได้เฉพาะคนที่มี Use
+
+#### Scenario: Member ที่มี Use ที่ Agent เดียว
+- **WHEN** Member ที่มี Use ที่ `shared` ส่ง `agent.list`
+- **THEN** ได้ `agent.listed` ที่มีแค่ `shared` ระดับ `use`, `owner` เป็น false และไม่มี Provider
+
+### Requirement: Trigger เป็นของคนที่เซ็น
+Runtime SHALL ให้แก้, หยุด, รัน หรือลบ Trigger ได้เฉพาะคนที่เซ็น Trigger นั้น หรือคนที่มี Manage ที่ Agent และ `trigger.listed` SHALL มีเฉพาะ Trigger ของคนที่ขอ เว้นแต่เขามี Manage
+
+#### Scenario: Member ลบ Schedule ของ Owner
+- **WHEN** Member ที่มี Use ส่ง `trigger.delete` ด้วย id ของ Schedule ที่ Owner ตั้ง
+- **THEN** Runtime ตอบ `trigger.forbidden` และ Schedule ยังอยู่

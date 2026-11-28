@@ -2,7 +2,7 @@ import { router, Stack } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Character, COLORS, type Look } from "../../../entities/character";
-import { useMachines } from "../../../entities/machine";
+import { ownsAny, useMachines } from "../../../entities/machine";
 import { useT } from "../../../shared/i18n";
 import { Button, Centered, Icon, space, Text, useSplit } from "../../../shared/ui";
 import { AgentInbox } from "../../../widgets/agent-inbox";
@@ -27,7 +27,7 @@ export function HomePage() {
         {machines && machines.length > 0 && (
           <>
             <Button label="Workspace" icon="sliders" onPress={() => router.navigate("/workspace")} />
-            <Button label={t("newAgent")} icon="add" variant="primary" onPress={() => router.push("/agents/new")} />
+            {ownsAny(machines) && <Button label={t("newAgent")} icon="add" variant="primary" onPress={() => router.push("/agents/new")} />}
           </>
         )}
       </View>

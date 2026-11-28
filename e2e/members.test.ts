@@ -111,6 +111,10 @@ test("a Member who is not an Owner reaches an Agent only through a Grant, and lo
   expect(errorCode(await colleague.next(from, (m) => m.type === "error"))).toBe("agent.forbidden");
   from = colleague.inbox.length;
   colleague.send("agent.list", {});
+  const none = await colleague.next(from, (m) => m.type === "agent.listed");
+  expect(none.type === "agent.listed" && none.body.agents).toEqual([]);
+  from = colleague.inbox.length;
+  colleague.send("agent.create", { id: "theirs", name: "Theirs", provider: "main", model: "model-a" });
   expect(errorCode(await colleague.next(from, (m) => m.type === "error"))).toBe("member.forbidden");
 
   // The Owner grants Use at one Agent; it is kept on the Machine.
@@ -130,6 +134,28 @@ test("a Member who is not an Owner reaches an Agent only through a Grant, and lo
   from = colleague.inbox.length;
   colleague.send("grant.set", { agent: "shared", member: "member-2", level: "manage" });
   expect(errorCode(await colleague.next(from, (m) => m.type === "error"))).toBe("grant.forbidden");
+
+  // The list names only the Agent granted, with its level, and nothing an Owner alone sees (#100).
+  from = colleague.inbox.length;
+  colleague.send("agent.list", {});
+  const seen = await colleague.next(from, (m) => m.type === "agent.listed");
+  if (seen.type !== "agent.listed") throw new Error("not a list");
+  expect(seen.body.agents.map((a) => [a.id, a.level])).toEqual([["shared", "use"]]);
+  expect(seen.body.owner).toBe(false);
+  expect(seen.body.providers).toEqual([]);
+
+  // A Trigger is its signer's: the Member neither sees nor deletes the Owner's, and keeps their own.
+  const daily = (id: string) => ({ agent: "shared", trigger: { id, kind: "schedule", text: "check", schedule: { daily: { at: "09:00" } } } });
+  at = owner.inbox.length;
+  owner.send("trigger.set", daily("tr_owner"));
+  await owner.next(at, (m) => m.type === "trigger.listed");
+  from = colleague.inbox.length;
+  colleague.send("trigger.delete", { agent: "shared", id: "tr_owner" });
+  expect(errorCode(await colleague.next(from, (m) => m.type === "error"))).toBe("trigger.forbidden");
+  from = colleague.inbox.length;
+  colleague.send("trigger.set", daily("tr_mine"));
+  const mine = await colleague.next(from, (m) => m.type === "trigger.listed");
+  expect(mine.type === "trigger.listed" && mine.body.triggers.map((x) => x.id)).toEqual(["tr_mine"]);
 
   // Taken away: the next Turn is refused.
   at = owner.inbox.length;

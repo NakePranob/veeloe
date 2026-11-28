@@ -105,5 +105,8 @@
     "selected_one": "{{count}} folder",
     "selected_other": "{{count}} folders",
     "machine": "Whole Machine"
+  },
+  "granted": {
+    "footer": "You hold {{level}} here: you can give it work and set your own Triggers. Only someone with Manage changes the Agent."
   }
 }

@@ -96,6 +96,8 @@ const AgentSchema = z.looseObject({
   /** The file level and the folders it was given (ADR 0087). Absent from an older Machine, or when in-folder with none. */
   files: FilesSchema.optional(),
   folders: FoldersSchema.optional(),
+  /** What the Member this list is for may do here (ADR 0010). Absent from a Machine older than Grants: an Owner's, Manage. */
+  level: z.enum(["use", "approve", "manage"]).optional(),
 });
 export type Agent = z.infer<typeof AgentSchema>;
 
@@ -139,5 +141,7 @@ export const AgentListedBodySchema = z.looseObject({
   /** Every Agent's Egress together, for a Controller that reads only this shape
    * (`sandboxed-commands`, ADR 0029, issue #43). Each Agent's own list is in it. */
   egress: EgressSchema.optional(),
+  /** Whether the Member this list is for is an Owner of the Machine. Absent from a Machine older than Grants. */
+  owner: z.boolean().optional(),
 });
 export type AgentListedBody = z.infer<typeof AgentListedBodySchema>;

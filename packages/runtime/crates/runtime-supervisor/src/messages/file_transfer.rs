@@ -36,6 +36,13 @@ pub(crate) fn get(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     let Ok(Some(agent)) = registry.get(agent_of(body)) else {
         return outbox.error(from, "agent.unknown");
     };
+    // A file of an Agent's Workdir is for those who may use it (ADR 0059).
+    if machine
+        .trust
+        .is_some_and(|trust| !trust.uses(&agent.id, &from.member, from.key.as_deref()))
+    {
+        return outbox.error(from, "agent.forbidden");
+    }
     let Some(task) = from.task.as_deref() else {
         return outbox.error(from, "task.unknown");
     };

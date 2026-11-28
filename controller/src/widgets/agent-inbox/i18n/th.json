@@ -22,5 +22,9 @@
   "allTasks": "Task ทั้งหมด",
   "newTask": "Task ใหม่",
   "untitled": "Task ไม่มีชื่อ",
-  "unreadTitle": "{{title}} ยังไม่ได้อ่าน"
+  "unreadTitle": "{{title}} ยังไม่ได้อ่าน",
+  "noGrants": {
+    "title": "ยังไม่มี Agent ที่คุณใช้ได้",
+    "body": "เมื่อคนที่เชิญคุณให้สิทธิ์ที่ Agent ไหน Agent นั้นจะขึ้นที่นี่"
+  }
 }

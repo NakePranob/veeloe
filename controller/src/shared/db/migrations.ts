@@ -151,4 +151,8 @@ export const MIGRATIONS = [
     closed_at INTEGER,
     created_at INTEGER NOT NULL
   )`,
+  // What this Member may do at each Agent, and whether they are an Owner of the Machine (ADR 0010):
+  // what was here came from an Owner's list.
+  `ALTER TABLE agent ADD COLUMN level TEXT NOT NULL DEFAULT 'manage'`,
+  `ALTER TABLE machine ADD COLUMN owner INTEGER NOT NULL DEFAULT 1`,
 ] as const;

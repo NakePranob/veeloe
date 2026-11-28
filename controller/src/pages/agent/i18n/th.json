@@ -104,5 +104,8 @@
     "selected_one": "{{count}} โฟลเดอร์",
     "selected_other": "{{count}} โฟลเดอร์",
     "machine": "ทั้งเครื่อง"
+  },
+  "granted": {
+    "footer": "คุณมีสิทธิ์ {{level}} ที่ Agent นี้ สั่งงานและตั้ง Trigger ของตัวเองได้ ค่าของ Agent แก้ได้เฉพาะคนที่มี Manage"
   }
 }

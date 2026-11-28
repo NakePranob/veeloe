@@ -3,7 +3,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { isSpent, useAgents, useTrashedAgents, type AgentTrashRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf, RETIRED_COLOR } from "../../../entities/character";
-import { useMachines } from "../../../entities/machine";
+import { ownsAny, useMachines } from "../../../entities/machine";
 import { statusOf, TaskStatusDot, useLatestTasks } from "../../../entities/task";
 import { useMachineLink, useMachineStatuses } from "../../../features/machine-link";
 import { describeError, useT } from "../../../shared/i18n";
@@ -45,7 +45,11 @@ export function AgentsPage() {
   }
 
   return (
-    <Screen title="Agent" subtitle={agents?.length ? t("subtitle", { count: agents.length, machines: machines.length }) : undefined} right={{ label: t("create"), icon: "add", variant: "chip", onPress: () => router.push("/agents/new") }}>
+    <Screen
+      title="Agent"
+      subtitle={agents?.length ? t("subtitle", { count: agents.length, machines: machines.length }) : undefined}
+      right={ownsAny(machines) ? { label: t("create"), icon: "add", variant: "chip", onPress: () => router.push("/agents/new") } : undefined}
+    >
       {agents?.length === 0 && <Empty icon="agent" title={t("none.title")} detail={t("none.body")} />}
       {machines.map((machine) => {
         const own = agents?.filter((agent) => agent.machine_id === machine.id) ?? [];

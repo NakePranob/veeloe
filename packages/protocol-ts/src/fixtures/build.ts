@@ -324,6 +324,7 @@ export function messageVectors() {
     { name: "listed with an Agent the Machine deleted and has not purged", type: "agent.listed", body: { agents: [], trash: [{ ...agent, deletedAt: 1_794_000_000_000, restoreUntil: 1_796_592_000_000 }], providers: [] }, valid: true },
     { name: "listed with a deleted Agent that does not say when it goes", type: "agent.listed", body: { agents: [], trash: [{ ...agent, deletedAt: 1_794_000_000_000 }], providers: [] }, valid: false },
     { name: "listed from a Machine older than the trash", type: "agent.listed", body: { agents: [agent], providers: [] }, valid: true },
+    { name: "listed for a Member who holds Use at one Agent", type: "agent.listed", body: { agents: [{ ...agent, level: "use" }], providers: [], owner: false }, valid: true },
     { name: "restore an Agent", type: "agent.restore", body: { id: "agent-1" }, valid: true },
     { name: "restore with no id", type: "agent.restore", body: {}, valid: false },
     { name: "set the Egress", type: "egress.set", body: { egress: ["github.com", "*.npmjs.org"] }, valid: true },

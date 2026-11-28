@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { FlatList, View } from "react-native";
 import { useAgents, type AgentRow } from "../../../entities/agent";
 import { Character, lookOfJson, moodOf } from "../../../entities/character";
-import { useMachines } from "../../../entities/machine";
+import { ownsAny, useMachines } from "../../../entities/machine";
 import { isBudgetOut, latestEvents, previewOf, STATUS_DOT, titleOf, useLatestTasks, useOpenTasks, type TaskStatus, type TaskSummary } from "../../../entities/task";
 import { useMachineStatuses } from "../../../features/machine-link";
 import { useLanguage, useT } from "../../../shared/i18n";
@@ -183,8 +183,11 @@ export function AgentInbox({ header, selectedTaskId, split }: Props) {
       ListEmptyComponent={
         tab !== "all" ? (
           <Empty icon="inbox" title={t(`emptyTab.${tab}`)} headerless={split} />
-        ) : (
+        ) : // Someone who owns no Machine only sees the Agents they were granted; there is nothing to create.
+        ownsAny(machines) ? (
           <Empty icon="agent" headerless={split} title={t("noAgents.title")} detail={t("noAgents.body")} action={<Button label={t("noAgents.action")} variant="primary" onPress={() => router.push("/agents/new")} />} />
+        ) : (
+          <Empty icon="agent" headerless={split} title={t("noGrants.title")} detail={t("noGrants.body")} />
         )
       }
       // No separators: rows are set apart by their spacing, not by lines.

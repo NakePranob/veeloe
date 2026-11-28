@@ -35,16 +35,49 @@ fn checked<'a>(
         outbox.error(from, "trigger.forbidden");
         return None;
     }
+    // A Trigger runs in the name of whoever signed it (ADR 0067), so only they,
+    // or someone who manages the Agent, may change, pause, run or replace it.
+    let id = body
+        .get("id")
+        .or_else(|| body.get("trigger").and_then(|trigger| trigger.get("id")))
+        .and_then(Value::as_str);
+    if let Some(held) = id.and_then(|id| triggers.get(agent, id)) {
+        if held.member != from.member && !manages(machine, from, agent) {
+            outbox.error(from, "trigger.forbidden");
+            return None;
+        }
+    }
     Some((triggers, agent.to_string()))
 }
 
-fn listed(outbox: &dyn Outbox, from: &Inbound, triggers: &Triggers, agent: &str) {
-    outbox.to_member(
-        &from.member,
-        "trigger.listed",
-        triggers.listed_body(agent),
-        None,
-    );
+fn manages(machine: &Machine<'_>, from: &Inbound, agent: &str) -> bool {
+    machine
+        .trust
+        .is_none_or(|trust| trust.manages(agent, &from.member, from.key.as_deref()))
+}
+
+/// The Agent's Triggers this Member may see: their own, or all of them for
+/// someone who manages the Agent.
+fn listed(
+    machine: &Machine<'_>,
+    outbox: &dyn Outbox,
+    from: &Inbound,
+    triggers: &Triggers,
+    agent: &str,
+) {
+    let mut body = triggers.listed_body(agent);
+    if !manages(machine, from, agent) {
+        if let Some(held) = body.get_mut("triggers").and_then(Value::as_array_mut) {
+            held.retain(|record| {
+                record.get("member").and_then(Value::as_str) == Some(from.member.as_str())
+            });
+        }
+        // The draft is the Agent's proposal for its owner, not for every user.
+        if let Some(object) = body.as_object_mut() {
+            object.remove("draft");
+        }
+    }
+    outbox.to_member(&from.member, "trigger.listed", body, None);
 }
 
 fn now() -> u64 {
@@ -181,7 +214,7 @@ pub(crate) fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     if triggers.set(record).is_err() {
         return outbox.error(from, "trigger.unavailable");
     }
-    listed(outbox, from, triggers, &agent);
+    listed(machine, outbox, from, triggers, &agent);
     if name_it {
         // Counted as the Trigger's own tokens; with no worker running it stays unnamed.
         triggers.started(&format!("trigger:{id}"), &kind);
@@ -215,7 +248,7 @@ pub(crate) fn pause(
             record.met = None;
         }
     }) {
-        Ok(true) => listed(outbox, from, triggers, &agent),
+        Ok(true) => listed(machine, outbox, from, triggers, &agent),
         Ok(false) => outbox.error(from, "trigger.unknown"),
         Err(_) => outbox.error(from, "trigger.unavailable"),
     }
@@ -227,7 +260,7 @@ pub(crate) fn delete(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound,
     };
     let id = body.get("id").and_then(Value::as_str).unwrap_or_default();
     match triggers.delete(&agent, id) {
-        Ok(true) => listed(outbox, from, triggers, &agent),
+        Ok(true) => listed(machine, outbox, from, triggers, &agent),
         Ok(false) => outbox.error(from, "trigger.unknown"),
         Err(_) => outbox.error(from, "trigger.unavailable"),
     }
@@ -266,12 +299,12 @@ pub(crate) fn run(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, bo
     if started.is_none() {
         return outbox.error(from, "agent.unavailable");
     }
-    listed(outbox, from, triggers, &agent);
+    listed(machine, outbox, from, triggers, &agent);
 }
 
 pub(crate) fn list(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbound, body: &Value) {
     let Some((triggers, agent)) = checked(machine, outbox, from, body) else {
         return;
     };
-    listed(outbox, from, triggers, &agent);
+    listed(machine, outbox, from, triggers, &agent);
 }

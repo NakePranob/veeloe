@@ -63,7 +63,12 @@ pub(crate) async fn set(machine: &Machine<'_>, outbox: &dyn Outbox, from: &Inbou
     };
     match changed {
         Ok(Some(_)) => {
-            outbox.to_member(&from.member, "agent.listed", listed(machine).await, None);
+            outbox.to_member(
+                &from.member,
+                "agent.listed",
+                listed(machine, from).await,
+                None,
+            );
         }
         // An Agent that vanished between the check and the write is still
         // an unknown Agent, not a bad list.

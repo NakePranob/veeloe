@@ -4,10 +4,10 @@
 use serde_json::{json, Value};
 
 use crate::models;
-use crate::tasks::{agents_listed, Machine};
+use crate::tasks::{agents_listed, listed_for, Inbound, Machine};
 
-/// Every Agent, after purging the trash past its 30 days.
-pub(crate) async fn listed(machine: &Machine<'_>) -> Value {
+/// The Agents this Member is told of, after purging the trash past its 30 days.
+pub(crate) async fn listed(machine: &Machine<'_>, from: &Inbound) -> Value {
     let registry = machine.registry;
     // A list is the only clock the trash needs: no timer, and a Machine that
     // was off past the 30 days purges as soon as it is asked (`agent-trash`).
@@ -21,9 +21,14 @@ pub(crate) async fn listed(machine: &Machine<'_>) -> Value {
             );
         }
     }
-    agents_listed(
+    let body = agents_listed(
         registry,
         &models::info(machine.providers, machine.http).await,
         machine.budgets,
-    )
+    );
+    match machine.trust {
+        Some(trust) => listed_for(&body, trust, &from.member, from.key.as_deref()),
+        // A slice's test with no trust sees everything, as it always did.
+        None => body,
+    }
 }

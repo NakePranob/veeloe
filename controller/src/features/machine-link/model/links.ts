@@ -18,7 +18,7 @@ import {
 } from "@veeloe/protocol-ts";
 import { saveCertificates } from "../../../entities/device";
 import { saveAgents, saveUsage } from "../../../entities/agent";
-import { saveEgress, type Machine } from "../../../entities/machine";
+import { saveEgress, saveOwner, type Machine } from "../../../entities/machine";
 import { addListedTasks, addPendingMessage, failPendingMessage, markPendingSent, saveTaskEvents } from "../../../entities/task";
 import { saveUsageFetchedAt, saveUsageHistory } from "../../../entities/usage";
 import type { Database } from "../../../shared/db";
@@ -183,6 +183,7 @@ export function createMachineLinks({
       await saveAgents(database, machine.id, message.body.agents, message.body.trash);
       // A Machine older than `sandboxed-commands` says nothing of it, which is not the same as an empty Egress.
       if (message.body.egress) await saveEgress(database, machine.id, message.body.egress);
+      if (message.body.owner !== undefined) await saveOwner(database, machine.id, message.body.owner);
       setStatus(machine.id, { online: true, providers: message.body.providers });
       // It answered, so it is online: now is when a direct link can come up.
       offerDirect(machine);

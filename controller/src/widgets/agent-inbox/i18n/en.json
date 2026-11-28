@@ -22,5 +22,9 @@
   "allTasks": "All Tasks",
   "newTask": "New Task",
   "untitled": "Untitled Task",
-  "unreadTitle": "{{title}}, unread"
+  "unreadTitle": "{{title}}, unread",
+  "noGrants": {
+    "title": "No Agent you can use yet",
+    "body": "When whoever invited you grants you an Agent, it shows here"
+  }
 }

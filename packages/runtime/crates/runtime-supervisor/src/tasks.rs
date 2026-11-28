@@ -174,6 +174,42 @@ impl Outbox for MachineOutbox {
 /// stays for a Controller that reads one list: it is the union of every Agent's,
 /// which is exactly what each Agent's list was before the split and what the
 /// legacy `egress.set` still sets everywhere.
+/// What one Member is told of this Machine's Agents (ADR 0010): only those they
+/// hold a Grant at, each with their level, and no Provider, trash or Egress of
+/// anyone else's unless they are an Owner. `owner` says which they are.
+pub fn listed_for(body: &Value, trust: &Trust, member: &str, key: Option<&str>) -> Value {
+    let mut body = body.clone();
+    let owner = trust.is_owner(member, key);
+    let mut union: Vec<Value> = Vec::new();
+    if let Some(agents) = body.get_mut("agents").and_then(Value::as_array_mut) {
+        agents.retain_mut(|agent| {
+            let id = agent.get("id").and_then(Value::as_str).unwrap_or_default();
+            let Some(level) = trust.level(id, member, key) else {
+                return false;
+            };
+            agent["level"] = json!(level.as_str());
+            for domain in agent
+                .get("egress")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                if !union.contains(domain) {
+                    union.push(domain.clone());
+                }
+            }
+            true
+        });
+    }
+    body["owner"] = json!(owner);
+    if !owner {
+        body["providers"] = json!([]);
+        body["trash"] = json!([]);
+        body["egress"] = json!(union);
+    }
+    body
+}
+
 pub fn agents_listed(
     registry: &AgentRegistry,
     providers: &[Value],
@@ -286,13 +322,23 @@ pub struct Machine<'a> {
 
 /// What a Member who is not an Owner may send: each of these checks their
 /// Grant at the Agent it names (ADR 0010). Everything else is an Owner's until
-/// it checks Grants too (#100, #102). Triggers stay an Owner's: their handlers
-/// check Use at the Agent but not whose Trigger it is, so a Member could run or
-/// delete someone else's.
+/// it checks Grants too (#102). A Trigger is touched only by whoever signed it
+/// or a Manager of its Agent; `agent.list` names only Agents with a Grant.
 pub fn open_to_members(type_: &str) -> bool {
     matches!(
         type_,
-        "task.message"
+        "agent.list"
+            | "task.list"
+            | "task.sync"
+            | "file.chunk"
+            | "file.get"
+            | "trigger.set"
+            | "trigger.pause"
+            | "trigger.resume"
+            | "trigger.delete"
+            | "trigger.run"
+            | "trigger.list"
+            | "task.message"
             | "task.stop"
             | "task.rename"
             | "approval.answer"

@@ -1218,6 +1218,24 @@
       "valid": true
     },
     {
+      "name": "listed for a Member who holds Use at one Agent",
+      "type": "agent.listed",
+      "body": {
+        "agents": [
+          {
+            "id": "agent-1",
+            "name": "Deployer",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "level": "use"
+          }
+        ],
+        "providers": [],
+        "owner": false
+      },
+      "valid": true
+    },
+    {
       "name": "restore an Agent",
       "type": "agent.restore",
       "body": {

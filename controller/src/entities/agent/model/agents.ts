@@ -6,6 +6,8 @@ export const AGENT_TOPIC = "agent";
 /** An Agent as this Controller knows it. The columns are the database's own; `character` is the Machine's JSON, or null. */
 export type AgentRow = {
   id: string;
+  /** What this Member may do here (ADR 0010): use, approve or manage. */
+  level: "use" | "approve" | "manage";
   machine_id: string;
   name: string;
   provider: string;
@@ -35,6 +37,7 @@ export type AgentRow = {
 export function deletedAgent(id: string, machineId: string | undefined, name: string): AgentRow {
   return {
     id,
+    level: "use",
     machine_id: machineId ?? "",
     name,
     provider: "",
@@ -162,7 +165,7 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
       // Null when the Machine is older than per-Agent Egress, so what is kept stays.
       const egress = agent.egress ? JSON.stringify(agent.egress) : null;
       await transaction.run(
-        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress, git_repos, background_share, files, folders) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO agent (id, machine_id, name, provider, model, character, budget, allowlist, approval_timeout_s, egress, git_repos, background_share, files, folders, level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            machine_id = excluded.machine_id,
            name = excluded.name,
@@ -176,7 +179,8 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
            git_repos = COALESCE(excluded.git_repos, agent.git_repos),
            background_share = COALESCE(excluded.background_share, agent.background_share),
            files = COALESCE(excluded.files, agent.files),
-           folders = COALESCE(excluded.folders, agent.folders)`,
+           folders = COALESCE(excluded.folders, agent.folders),
+           level = excluded.level`,
         [
           agent.id,
           machineId,
@@ -192,6 +196,7 @@ export function saveAgents(database: Database, machineId: string, agents: Agent[
           agent.backgroundShare ?? null,
           agent.files ?? null,
           agent.files ? JSON.stringify(agent.folders ?? []) : null,
+          agent.level ?? "manage",
           egress,
         ],
       );
