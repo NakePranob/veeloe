@@ -7,6 +7,8 @@ interface Props<T extends string> {
   agent: Pick<AgentRow, "name" | "model" | "character">;
   /** The Machine it runs on, where the Agents page has its state: who is granted cares where, not what it is doing. */
   machine: string;
+  /** After the Machine, such as where a higher level comes from ("Sales gives Approve"). */
+  note?: string;
   value: T;
   options: SelectOption<T>[];
   onChange: (value: T) => void;
@@ -18,8 +20,8 @@ interface Props<T extends string> {
  * An Agent and the level someone holds there, drawn as a row of the Agents page: its Character at 40pt, its name with
  * the model in mono, and its Machine below. Tapping opens the levels, as any Select does.
  */
-export function AgentLevelSelect<T extends string>({ agent, machine, ...select }: Props<T>) {
-  return <Select {...select} label={agent.name} tight leading={head(agent)} content={<Lines agent={agent} machine={machine} />} />;
+export function AgentLevelSelect<T extends string>({ agent, machine, note, ...select }: Props<T>) {
+  return <Select {...select} label={agent.name} tight leading={head(agent)} content={<Lines agent={agent} machine={machine} note={note} />} />;
 }
 
 /** The same row with a level that cannot change here, such as what an open Invitation gives. */
@@ -29,7 +31,7 @@ export function AgentLevelRow({ agent, machine, value }: { agent: Props<string>[
 
 const head = (agent: Props<string>["agent"]) => <Character look={lookOfJson(agent.character)} mood={moodOf([], null)} size={40} still />;
 
-function Lines({ agent, machine }: { agent: Props<string>["agent"]; machine: string }) {
+function Lines({ agent, machine, note }: { agent: Props<string>["agent"]; machine: string; note?: string }) {
   return (
     <View style={{ gap: space.xxs }}>
       <Text variant="subheadline" strong numberOfLines={1}>
@@ -41,6 +43,12 @@ function Lines({ agent, machine }: { agent: Props<string>["agent"]; machine: str
       <Text variant="caption" tone="secondary" numberOfLines={1}>
         {machine}
       </Text>
+      {/* Its own line, so a long Machine name never cuts it off. */}
+      {note && (
+        <Text variant="caption" numberOfLines={2}>
+          {note}
+        </Text>
+      )}
     </View>
   );
 }

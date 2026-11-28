@@ -10,6 +10,7 @@ import { useLiveQuery } from "../../../shared/db";
 import { keySession } from "../../../shared/keystore";
 import { when } from "../../../shared/lib";
 import { confirm, inform, Row, Screen, Section } from "../../../shared/ui";
+import { fromGroups } from "../model/access";
 import { removeMember } from "../model/remove";
 
 type Choice = "none" | "use" | "approve" | "manage";
@@ -86,6 +87,7 @@ export function MemberPage() {
   const machines = useMachines() ?? [];
   const agents = useAgents() ?? [];
   const grants = useGrants() ?? [];
+  const groups = useGroups() ?? [];
   const statuses = useMachineStatuses();
   const link = useMachineLink();
   const managed = agents.filter((agent) => agent.level === "manage");
@@ -131,18 +133,23 @@ export function MemberPage() {
     <Screen title={name} subtitle={member.removed_at !== null ? t("removed") : (member.title ?? undefined)}>
       {member.removed_at === null && (
         <Section title="Agent" footer={managed.length > 0 ? t("grants.footer") : t("grants.none")}>
-          {managed.map((agent) => (
-            <AgentLevelSelect
-              key={agent.id}
-              agent={agent}
-              machine={machines.find((m) => m.id === agent.machine_id)?.name ?? ""}
-              value={levelOf(agent.id)}
-              cancel={t("cancel")}
-              disabled={statuses[agent.machine_id]?.online === false}
-              options={(["none", "use", "approve", "manage"] as const).map((level) => ({ value: level, label: t(`level.${level}`) }))}
-              onChange={(level) => void change(agent.id, agent.machine_id, level)}
-            />
-          ))}
+          {managed.map((agent) => {
+            const given = fromGroups(groups, member.id, agent.id);
+            return (
+              <AgentLevelSelect
+                key={agent.id}
+                agent={agent}
+                machine={machines.find((m) => m.id === agent.machine_id)?.name ?? ""}
+                value={levelOf(agent.id)}
+                // Their own Grant is what this row sets; a group may give more, and the Machine goes by the higher (ADR 0093).
+                note={given ? t("fromGroup", { group: given.group, level: t(`level.${given.level}`) }) : undefined}
+                cancel={t("cancel")}
+                disabled={statuses[agent.machine_id]?.online === false}
+                options={(["none", "use", "approve", "manage"] as const).map((level) => ({ value: level, label: t(`level.${level}`) }))}
+                onChange={(level) => void change(agent.id, agent.machine_id, level)}
+              />
+            );
+          })}
         </Section>
       )}
       {owner && member.removed_at === null && (

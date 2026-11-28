@@ -8,7 +8,7 @@
     "manage": "Manage"
   },
   "grants": {
-    "footer": "Counts from their next Turn. You can change only Agents you manage, while their Machine is online.",
+    "footer": "Each row sets this person's own Grant; where a group gives more, the Machine goes by the higher. Counts from their next Turn. You can change only Agents you manage, while their Machine is online.",
     "none": "You manage no Agent, so you cannot change what they hold"
   },
   "cancel": "Cancel",
@@ -45,5 +45,6 @@
     "agents_one": "A link to {{count}} Agent",
     "agents_other": "A link to {{count}} Agents",
     "detail": "{{joined}} of {{count}} joined · expires {{when}}"
-  }
+  },
+  "fromGroup": "{{group}} gives {{level}}"
 }
